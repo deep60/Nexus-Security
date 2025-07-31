@@ -1,6 +1,108 @@
 [package]
-name = "backend"
+name = "api-gateway"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+authors = ["Nexus-Security Team"]
+description = "API Gateway for Nexus-Security decentralized threat intelligence platform"
+license = "MIT"
+repository = "https://github.com/nexus-security/deep60"
 
 [dependencies]
+# Web framework
+axum = "0.7"
+tokio = { workspace = true }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "compression"] }
+hyper = "1.0"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Database
+sqlx = { workspace = true }
+redis = { workspace = true }
+
+# Authentication & Security
+jsonwebtoken = "9.2"
+bcrypt = "0.15"
+uuid = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Configuration
+config = { workspace = true }
+dotenvy = { workspace = true }
+
+# HTTP client
+reqwest = { workspace = true }
+
+# Blockchain integration
+ethers = { workspace = true }
+web3 = "0.19"
+
+# File handling
+tempfile = "3.8"
+mime = "0.3"
+bytes = { workspace = true }
+
+# Validation
+validator = { workspace = true }
+
+# Async utilities
+futures = { workspace = true }
+futures-util = "0.3"
+
+# WebSocket support
+axum-extra = { version = "0.9", features = ["ws"] }
+
+# Rate limiting
+tower-governor = "0.1"
+
+# Metrics and monitoring
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"
+
+# Shared workspace dependencies
+shared = { path = "../shared" }
+
+[dev-dependencies]
+# Testing
+tokio-test = { workspace = true }
+axum-test = "14.0"
+sqlx-test = "0.1"
+mockall = { workspace = true }
+
+# Test utilities
+serde_test = "1.0"
+pretty_assertions = { workspace = true }
+
+[features]
+default = []
+# Enable development features like detailed logging
+dev = ["tracing-subscriber/fmt"]
+# Enable production optimizations
+prod = []
+
+[[bin]]
+name = "api-gateway"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
