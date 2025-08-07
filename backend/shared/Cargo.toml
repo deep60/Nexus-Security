@@ -1,6 +1,18 @@
 [package]
 name = "shared"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+authors = ["Nexus-Security Team"]
+description = "Shared utilities and types for Nexus-Security backend services"
+license = "MIT"
+repository = "https://github.com/nexus-security/deep60"
 
 [dependencies]
+# Common dependencies that will be shared across services
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

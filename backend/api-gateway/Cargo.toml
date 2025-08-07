@@ -9,10 +9,10 @@ repository = "https://github.com/nexus-security/deep60"
 
 [dependencies]
 # Web framework
-axum = "0.7"
+axum = { version = "0.7", features = ["macros"] }
 tokio = { workspace = true }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace", "compression"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-br", "compression-gzip"] }
 hyper = "1.0"
 
 # Serialization
@@ -62,11 +62,11 @@ validator = { workspace = true }
 futures = { workspace = true }
 futures-util = "0.3"
 
-# WebSocket support
-axum-extra = { version = "0.9", features = ["ws"] }
+# WebSocket support  
+axum-extra = "0.9"
 
 # Rate limiting
-tower-governor = "0.1"
+tower_governor = "0.4"
 
 # Metrics and monitoring
 metrics = "0.22"
@@ -78,8 +78,6 @@ shared = { path = "../shared" }
 [dev-dependencies]
 # Testing
 tokio-test = { workspace = true }
-axum-test = "14.0"
-sqlx-test = "0.1"
 mockall = { workspace = true }
 
 # Test utilities
@@ -97,12 +95,3 @@ prod = []
 name = "api-gateway"
 path = "src/main.rs"
 
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
-
-[profile.dev]
-opt-level = 0
-debug = true
