@@ -115,7 +115,7 @@ pub async fn create_bounty(
     }
 
     if request.file_hash.is_none() && request.url.is_none() {
-        request Err(StatusCode::BAD_REQUEST);
+        return Err(StatusCode::BAD_REQUEST);
     }
 
     // TODO: Extract user ID from JWT token
@@ -182,7 +182,7 @@ pub async fn create_bounty(
     }
 }
 
-pub async get_bounties(
+pub async fn get_bounties(
     State(state): State<AppState>,
     Query(filters): Query<BountyFilters>,
 ) -> Result<Json<BountListResponse>, StatusCode> {
@@ -222,7 +222,7 @@ pub async get_bounties(
     }
 }
 
-pub async get_bounties_details(
+pub async fn get_bounties_details(
     State(state): State<AppState>,
     Path(bounty_id): Path<Uuid>,
 ) -> Result<Json<BountDetailsResponse>, StatusCode> {
