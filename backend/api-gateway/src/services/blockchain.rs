@@ -20,7 +20,8 @@ use ethers::{
     abi::{Abi, Token},                      //(Abi - Application Binary Interface)
     signers::{LocalWallet, Signer},
     middleware::SignerMiddleware, 
-}
+};
+
 use crate::models::{TransactionStatus, ReputationScore, ThreatSeverity};
 
 /// Configuration for blockchain service
