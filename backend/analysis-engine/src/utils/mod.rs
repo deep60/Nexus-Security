@@ -20,6 +20,8 @@ pub use blockchain::{BlockchainClient, ContractInteraction, StakingResult};
 
 use anyhow::Result;
 use std::collections::HashMap;
+use rand::Rng;
+use hex;
 
 /// Common error types used across the analysis engine
 #[derive(Debug, thiserror::Error)]
@@ -210,7 +212,8 @@ pub mod utils {
         initial_delay: u64,
     ) -> Result<T, E>
     where
-        F: FnMut() -> Result<T, E>,
+        F: FnMut() -> Fut, 
+        Fut: std::future::Future<Output = Result<T, E>>,
         E: std::fmt::Debug,
     {
         let mut delay = initial_delay;
@@ -222,6 +225,7 @@ pub mod utils {
                 Err(error) => {
                     last_error = Some(error);
                     if attempt < max_retries {
+                        //  The function signature suggests it's async but doesn't handle async errors properly
                         tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
                         delay = (delay * 2).min(30000); // Cap at 30 seconds
                     }

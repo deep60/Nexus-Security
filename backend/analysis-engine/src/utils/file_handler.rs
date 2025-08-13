@@ -7,6 +7,7 @@ use tokio::fs as async_fs;
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use anyhow::{Result, anyhow};
+use md5;
 
 /// maximum file size allowed (100MB)
 const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
@@ -152,7 +153,7 @@ impl FileHandler {
     }
 
     // Update file analysis status
-    pub async fn upload_analysis_status(&self, file_id: &str, status: AnalysisStatus) -> Result<()> {
+    pub async fn update_analysis_status(&self, file_id: &str, status: AnalysisStatus) -> Result<()> {
         let mut metadata = self.get_metadata(file_id).await?;
         metadata.analysis_status = status;
         self.store_metadata(&metadata).await?;
@@ -214,6 +215,7 @@ impl FileHandler {
                 if file_name.ends_with(".meta") {
                     let file_id = file_name.trim_end_matches(".meta");
                     if let Ok(metadata) = self.get_metadata(file_id).await {
+                        // matches!
                         if std::mem::discriminant(&metadata.analysis_status) == std::mem::discriminant(&status) {
                             files.push(metadata);
                         }
