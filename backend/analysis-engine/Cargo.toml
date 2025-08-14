@@ -1,10 +1,27 @@
 [package]
 name = "analysis-engine"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-axum = "0.8.4"
+anyhow.workspace = true
+axum = { version = "0.8.4", features = ["multipart"] }
+chrono.workspace = true
+lazy_static = "1.5.0"
 md5 = "0.8.0"
 rand = "0.9.2"
+regex = "1.11.1"
+reqwest.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+sha1 = "0.10.6"
+sha2 = "0.10.9"
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tower = "0.5.2"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+uuid.workspace = true
+hex = "0.4.3"
+# yara = "0.29.0" # Temporarily disabled due to system dependency issues
