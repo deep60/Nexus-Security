@@ -1,0 +1,1 @@
+&std::collections::HashMap<HashType, std::string::String>
