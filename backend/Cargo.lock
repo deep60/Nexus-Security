@@ -90,7 +90,7 @@ dependencies = [
  "chrono",
  "hex",
  "lazy_static",
- "md5",
+ "md5 0.8.0",
  "rand 0.9.2",
  "regex",
  "reqwest",
@@ -141,6 +141,7 @@ dependencies = [
  "anyhow",
  "axum 0.7.9",
  "axum-extra",
+ "base64 0.22.1",
  "bcrypt",
  "bytes",
  "chrono",
@@ -149,18 +150,25 @@ dependencies = [
  "ethers",
  "futures",
  "futures-util",
+ "hex",
  "hyper 1.6.0",
  "jsonwebtoken 9.3.1",
+ "md5 0.7.0",
  "metrics",
  "metrics-exporter-prometheus",
  "mime",
  "mockall",
  "pretty_assertions",
  "redis",
+ "regex",
  "reqwest",
+ "ring 0.17.14",
  "serde",
  "serde_json",
  "serde_test",
+ "sha1",
+ "sha2",
+ "sha3",
  "shared",
  "sqlx",
  "tempfile",
@@ -172,6 +180,8 @@ dependencies = [
  "tower_governor",
  "tracing",
  "tracing-subscriber",
+ "url",
+ "urlencoding",
  "uuid 1.17.0",
  "validator",
  "web3",
@@ -302,6 +312,7 @@ dependencies = [
  "matchit 0.7.3",
  "memchr",
  "mime",
+ "multer",
  "percent-encoding",
  "pin-project-lite",
  "rustversion",
@@ -2727,6 +2738,12 @@ dependencies = [
  "cfg-if",
  "digest 0.10.7",
 ]
+
+[[package]]
+name = "md5"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "md5"

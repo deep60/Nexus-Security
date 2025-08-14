@@ -326,7 +326,7 @@ pub async fn submit_analysis(
         analysis_details: request.analysis_details,
         stake_amount: request.stake_amount,
         submitted_at: Utc::now(),
-        is_winner: None;
+        is_winner: None,
     };
 
     match state.db.create_submission(&submission).await {
