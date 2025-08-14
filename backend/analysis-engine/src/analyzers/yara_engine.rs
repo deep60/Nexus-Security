@@ -80,7 +80,7 @@ impl Default for YaraEngineConfig {
 pub struct YaraEngine {
     config: YaraEngineConfig,
     loaded_rules: Vec<YaraRule>,
-    compiled_rules: Option<yara::Rules>,
+    compiled_rules: Option<String>, // Placeholder - would be yara::Rules
     rules_hash: String,
 }
 

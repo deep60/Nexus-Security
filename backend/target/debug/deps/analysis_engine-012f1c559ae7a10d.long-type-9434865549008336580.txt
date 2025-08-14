@@ -1,0 +1,2 @@
+fn(axum::extract::Path<std::string::String>, State<AppState>) -> impl std::future::Future<Output = std::result::Result<(), std::fmt::Error>> {get_analysis_result}
+fn(axum::extract::Path<std::string::String>, State<AppState>) -> impl std::future::Future<Output = std::result::Result<(), std::fmt::Error>> {get_analysis_result}: Handler<_, _>

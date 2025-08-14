@@ -9,14 +9,24 @@ use reqwest::Client;
 use anyhow::{Result, anyhow};
 use tracing::{info, warn, error, debug};
 
-use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, ConfidenceLevel};
+use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, SeverityLevel};
 
 /// Supported hash algorithms for analysis
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum HashType {
     MD5,
     SHA1,
     SHA256,
+}
+
+impl std::fmt::Display for HashType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HashType::MD5 => write!(f, "MD5"),
+            HashType::SHA1 => write!(f, "SHA1"),
+            HashType::SHA256 => write!(f, "SHA256"),
+        }
+    }
 }
 
 /// Hash information structure
@@ -32,7 +42,7 @@ pub struct HashInfo {
 pub struct HashReputation {
     pub source: String,
     pub verdict: ThreatVerdict,
-    pub confidence: ConfidenceLevel,
+    pub confidence: f32,
     pub first_seen: Option<chrono::DateTime<chrono::Utc>>,
     pub last_seen: Option<chrono::DateTime<chrono::Utc>>,
     pub detection_names: Vec<String>,
@@ -247,7 +257,7 @@ impl HashAnalyzer {
             Ok(HashReputation {
                 source: "VirusTotal".to_string(),
                 verdict: ThreatVerdict::Unknown,
-                confidence: ConfidenceLevel::Low,
+                confidence: 0.1,
                 first_seen: None,
                 last_seen: None,
                 detection_names: vec![],
@@ -274,9 +284,9 @@ impl HashAnalyzer {
         };
 
         let confidence = match stats.malicious {
-            0 => ConfidenceLevel::Low,
-            1..=3 => ConfidenceLevel::Medium,
-            _ => ConfidenceLevel::High,
+            0 => 0.1,
+            1..=3 => 0.6,
+            _ => 0.9,
         };
 
         let detection_names: Vec<String> = response.data.attributes.last_analysis_results
@@ -330,7 +340,7 @@ impl HashAnalyzer {
                 Ok(HashReputation {
                     source: "MalwareBazaar".to_string(),
                     verdict: ThreatVerdict::Malicious,
-                    confidence: ConfidenceLevel::High,
+                    confidence: 0.9,
                     first_seen: json["data"][0]["first_seen"]
                         .as_str()
                         .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
@@ -357,7 +367,7 @@ impl HashAnalyzer {
                 Ok(HashReputation {
                     source: "MalwareBazaar".to_string(),
                     verdict: ThreatVerdict::Unknown,
-                    confidence: ConfidenceLevel::Low,
+                    confidence: 0.1,
                     first_seen: None,
                     last_seen: None,
                     detection_names: vec![],
@@ -382,7 +392,7 @@ impl HashAnalyzer {
         Ok(HashReputation {
             source: "Local Database".to_string(),
             verdict: ThreatVerdict::Unknown,
-            confidence: ConfidenceLevel::Low,
+            confidence: 0.1,
             first_seen: None,
             last_seen: None,
             detection_names: vec![],
@@ -392,17 +402,30 @@ impl HashAnalyzer {
 
     /// Create final analysis result from reputation data
     fn create_analysis_result(&self, hash_info: &HashInfo, reputations: Vec<HashReputation>) -> AnalysisResult {
+        use uuid::Uuid;
+        use crate::models::analysis_result::{FileMetadata, AnalysisStatus, DetectionResult, EngineType, SeverityLevel};
+        use chrono::Utc;
+        
+        // Create file metadata from hash info
+        let file_metadata = FileMetadata {
+            filename: None,
+            file_size: hash_info.file_size.unwrap_or(0),
+            mime_type: "application/octet-stream".to_string(),
+            md5: if hash_info.hash_type == HashType::MD5 { hash_info.hash_value.clone() } else { String::new() },
+            sha1: if hash_info.hash_type == HashType::SHA1 { hash_info.hash_value.clone() } else { String::new() },
+            sha256: if hash_info.hash_type == HashType::SHA256 { hash_info.hash_value.clone() } else { String::new() },
+            sha512: None,
+            entropy: None,
+            magic_bytes: None,
+            executable_info: None,
+        };
+        
+        let mut result = AnalysisResult::new(Uuid::new_v4(), file_metadata);
+        
         if reputations.is_empty() {
-            return AnalysisResult {
-                verdict: ThreatVerdict::Unknown,
-                confidence: ConfidenceLevel::Low,
-                score: 0.0,
-                details: format!("No reputation data found for hash: {}", hash_info.hash_value),
-                metadata: HashMap::new(),
-                timestamp: chrono::Utc::now(),
-                analyzer_name: "HashAnalyzer".to_string(),
-                analyzer_version: "1.0.0".to_string(),
-            };
+            result.status = AnalysisStatus::Completed;
+            result.completed_at = Some(Utc::now());
+            return result;
         }
 
         // Aggregate verdicts and confidence levels
@@ -427,71 +450,38 @@ impl HashAnalyzer {
         };
 
         let confidence = match malicious_count {
-            0 => ConfidenceLevel::Low,
-            1 => ConfidenceLevel::Medium,
-            _ => ConfidenceLevel::High,
+            0 => 0.1,
+            1 => 0.6,
+            _ => 0.9,
         };
-
-        let score = (malicious_count as f64 + suspicious_count as f64 * 0.5) / total_sources as f64;
-
-        let mut metadata = HashMap::new();
-        metadata.insert("hash_type".to_string(), format!("{:?}", hash_info.hash_type));
-        metadata.insert("hash_value".to_string(), hash_info.hash_value.clone());
-        metadata.insert("sources_queried".to_string(), total_sources.to_string());
-        metadata.insert("malicious_detections".to_string(), malicious_count.to_string());
-        metadata.insert("suspicious_detections".to_string(), suspicious_count.to_string());
-
-        if let Some(size) = hash_info.file_size {
-            metadata.insert("file_size".to_string(), size.to_string());
-        }
-
-        // Add detection names from all sources
-        let all_detections: Vec<String> = reputations.iter()
-            .flat_map(|r| r.detection_names.clone())
-            .collect();
         
-        if !all_detections.is_empty() {
-            metadata.insert("detection_names".to_string(), all_detections.join(", "));
+        // Create detection results for each reputation source
+        for reputation in reputations {
+            let detection = DetectionResult {
+                detection_id: Uuid::new_v4(),
+                engine_name: reputation.source,
+                engine_version: "1.0.0".to_string(),
+                engine_type: EngineType::Hash,
+                verdict: reputation.verdict,
+                confidence,
+                severity: match reputation.verdict {
+                    ThreatVerdict::Malicious => SeverityLevel::High,
+                    ThreatVerdict::Suspicious => SeverityLevel::Medium,
+                    ThreatVerdict::Benign => SeverityLevel::Low,
+                    ThreatVerdict::Unknown => SeverityLevel::Info,
+                },
+                categories: vec![],
+                metadata: std::collections::HashMap::new(),
+                detected_at: Utc::now(),
+                processing_time_ms: 100, // Placeholder
+                error_message: None,
+            };
+            result.add_detection(detection);
         }
-
-        // Add threat types from all sources
-        let all_threat_types: Vec<String> = reputations.iter()
-            .flat_map(|r| r.threat_types.clone())
-            .collect();
         
-        if !all_threat_types.is_empty() {
-            metadata.insert("threat_types".to_string(), all_threat_types.join(", "));
-        }
-
-        let details = match final_verdict {
-            ThreatVerdict::Malicious => {
-                format!("Hash {} detected as malicious by {}/{} sources", 
-                       hash_info.hash_value, malicious_count, total_sources)
-            },
-            ThreatVerdict::Suspicious => {
-                format!("Hash {} flagged as suspicious by {}/{} sources", 
-                       hash_info.hash_value, suspicious_count, total_sources)
-            },
-            ThreatVerdict::Benign => {
-                format!("Hash {} appears benign based on {} sources", 
-                       hash_info.hash_value, total_sources)
-            },
-            ThreatVerdict::Unknown => {
-                format!("Hash {} has unknown reputation from {} sources", 
-                       hash_info.hash_value, total_sources)
-            },
-        };
-
-        AnalysisResult {
-            verdict: final_verdict,
-            confidence,
-            score,
-            details,
-            metadata,
-            timestamp: chrono::Utc::now(),
-            analyzer_name: "HashAnalyzer".to_string(),
-            analyzer_version: "1.0.0".to_string(),
-        }
+        result.status = AnalysisStatus::Completed;
+        result.completed_at = Some(Utc::now());
+        result
     }
 
     /// Clear local cache

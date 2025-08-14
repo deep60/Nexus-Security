@@ -1,0 +1,2 @@
+fn(axum::extract::State<AppState>, Multipart) -> impl std::future::Future<Output = std::result::Result<(), std::fmt::Error>> {analyze_file}
+fn(axum::extract::State<AppState>, Multipart) -> impl std::future::Future<Output = std::result::Result<(), std::fmt::Error>> {analyze_file}: Handler<_, _>

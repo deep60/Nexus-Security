@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Represents the verdict of a threat analysis
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ThreatVerdict {
     Malicious,
     Benign,
@@ -23,7 +23,7 @@ pub enum SeverityLevel {
 }
 
 /// Type of analysis engine that produced the result
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum EngineType {
     Static,
     Dynamic,

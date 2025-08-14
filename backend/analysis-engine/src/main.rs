@@ -1,6 +1,4 @@
-use std::net::TcpListener;
-use std::os::macos::raw::stat;
-use std::{env, fmt::Result};
+use std::env;
 use std::sync::Arc;
 
 use axum::{
@@ -14,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::{info, error, warn};
+use tracing::{info, error};
 use uuid::Uuid;
 
 mod analyzers;
@@ -24,9 +22,9 @@ mod utils;
 use analyzers::{
     static_analyzer::StaticAnalyzer,
     hash_analyzer::HashAnalyzer,
-    yara_engine::YaraEngine,
+    yara_engine::{YaraEngine, YaraEngineConfig},
 };
-use models::analysis_result::{AnalysisResult, ThreatVerdict, EngineResult};
+use models::analysis_result::{AnalysisResult, ThreatVerdict, DetectionResult};
 use utils::file_handler::FileHandler;
 
 use crate::analyzers::{hash_analyzer, static_analyzer};
@@ -72,11 +70,11 @@ struct EngineStatus {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_target(false)
-        .with_timer(tracing_subscriber::fmt::time::UtcTime::rfc_3339())
+        .with_timer(tracing_subscriber::fmt::time::time())
         .init();
 
     info!("Starting Nexus-Security Analysis Engine");
@@ -84,17 +82,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load configuration
     let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| "".to_string());
     let redis_url = env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
-    let port = env::var("PORT").unwrap_or_else(|_| "8002".to_string()).parse::<u16>()?;
+    let port = env::var("PORT").unwrap_or_else(|_| "8002".to_string()).parse::<u16>().unwrap_or(8002);
     let yara_rule_path = env::var("YARA_RULE_PATH").unwrap_or_else(|_| "./rules".to_string());
     let upload_dir = env::var("UPLOAD_DIR").unwrap_or_else(|_| "./temp/nexus-uploads".to_string());
 
     // Initialize analyzers
     info!("Initializing analysis engines...");
 
-    let static_analyzer = Arc::new(StaticAnalyzer::new().await?);
-    let hash_analyzer = Arc::new(HashAnalyzer::new(database_url.clone(), redis_url.clone()).await?);
-    let yara_engine = Arc::new(YaraEngine::new(yara_rule_path).await?);
-    let file_handler = Arc::new(FileHandler::new(upload_dir).await?);
+    let static_analyzer = Arc::new(StaticAnalyzer::new(Default::default()));
+    let hash_analyzer = Arc::new(HashAnalyzer::new(Default::default()));
+    let yara_engine = Arc::new(YaraEngine::new(YaraEngineConfig {
+        rules_directory: std::path::PathBuf::from(yara_rule_path),
+        ..Default::default()
+    })?);  
+    let file_handler = Arc::new(FileHandler::new(&upload_dir)?);
 
     // Create application state
     let app_state = AppState {
@@ -109,7 +110,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Analysis engines initialized successfully");
 
     // Build the application router
-    let app = Rounter::new()
+    let app = Router::new()
         .route("/health", get(health_check))
         .route("/analyze/file", post(analyze_file))
         .route("/analyze/url", post(analyze_url))
@@ -125,7 +126,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
 
         // Start the server
-        let addr = fornat!("0.0.0.0:{}", port);
+        let addr = format!("0.0.0.0:{}", port);
         info!("Analysis Engine listening on {}", addr);
 
         let listener = TcpListener::bind(&addr).await?;
@@ -189,7 +190,7 @@ async fn analyze_file(
     }
 
     // Save file and start analysis
-    let file_path = match state.file_handler.save_file(&analysis_id, &filename, &file_data).await {
+    let file_path = match state.file_handler.store_file(&file_data, &filename, None, None).await {
         Ok(path) => path,
         Err(e) => {
             error!("Failed to save file: {}", e);

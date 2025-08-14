@@ -1,0 +1,2 @@
+fn(State<AppState>, axum::Json<{type error}>) -> impl Future<Output = std::result::Result<(), std::fmt::Error>> {analyze_url}
+fn(State<AppState>, axum::Json<{type error}>) -> impl Future<Output = std::result::Result<(), std::fmt::Error>> {analyze_url}: Handler<_, _>

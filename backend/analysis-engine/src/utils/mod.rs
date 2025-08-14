@@ -1,27 +1,10 @@
-
 pub mod file_handler;
-pub mod crypto;
-pub mod network;
-pub mod validation;
-pub mod logger;
-pub mod config;
-pub mod metrics;
-pub mod blockchain;
 
 // Re-export commonly used types and functions for convenience
 pub use file_handler::{FileHandler, FileMetadata, AnalysisStatus};
-pub use crypto::{CryptoUtils, HashType, SignatureResult};
-pub use network::{NetworkUtils, ApiResponse, HttpClientBuilder};
-pub use validation::{Validator, ValidationError, ValidationRule};
-pub use logger::{Logger, LogLevel, init_logger};
-pub use config::{Config, EngineConfig, BlockchainConfig, load_config};
-pub use metrics::{MetricsCollector, AnalysisMetrics, PerformanceStats};
-pub use blockchain::{BlockchainClient, ContractInteraction, StakingResult};
 
 use anyhow::Result;
 use std::collections::HashMap;
-use rand::Rng;
-use hex;
 
 /// Common error types used across the analysis engine
 #[derive(Debug, thiserror::Error)]
@@ -212,8 +195,7 @@ pub mod utils {
         initial_delay: u64,
     ) -> Result<T, E>
     where
-        F: FnMut() -> Fut, 
-        Fut: std::future::Future<Output = Result<T, E>>,
+        F: FnMut() -> Result<T, E>,
         E: std::fmt::Debug,
     {
         let mut delay = initial_delay;
@@ -225,7 +207,6 @@ pub mod utils {
                 Err(error) => {
                     last_error = Some(error);
                     if attempt < max_retries {
-                        //  The function signature suggests it's async but doesn't handle async errors properly
                         tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
                         delay = (delay * 2).min(30000); // Cap at 30 seconds
                     }
@@ -242,13 +223,13 @@ pub mod macros {
     /// Log and return error
     #[macro_export]
     macro_rules! log_error {
-        ($logger:expr, $msg:expr) => {
-            $logger.error($msg);
+        ($msg:expr) => {
+            eprintln!("ERROR: {}", $msg);
             return Err(EngineError::AnalysisError($msg.to_string()));
         };
-        ($logger:expr, $fmt:expr, $($arg:tt)*) => {
+        ($fmt:expr, $($arg:tt)*) => {
             let msg = format!($fmt, $($arg)*);
-            $logger.error(&msg);
+            eprintln!("ERROR: {}", &msg);
             return Err(EngineError::AnalysisError(msg));
         };
     }
@@ -275,57 +256,6 @@ pub mod macros {
     }
 }
 
-/// Initialize all utility modules with configuration
-pub async fn initialize_utils(config: &Config) -> EngineResult<()> {
-    // Initialize logger
-    init_logger(&config.log_level, &config.log_file)?;
-    
-    // Initialize metrics collector
-    MetricsCollector::initialize(&config.metrics)?;
-    
-    // Initialize blockchain client
-    BlockchainClient::initialize(&config.blockchain).await?;
-    
-    // Initialize file handler storage directories
-    let _file_handler = FileHandler::new(&config.storage_path)
-        .map_err(|e| EngineError::FileError(e.to_string()))?;
-    
-    Ok(())
-}
-
-/// Health check function for the entire utils module
-pub async fn health_check() -> EngineResult<HashMap<String, String>> {
-    let mut status = HashMap::new();
-    
-    // Check file system access
-    match std::fs::metadata("./") {
-        Ok(_) => status.insert("filesystem".to_string(), "healthy".to_string()),
-        Err(_) => status.insert("filesystem".to_string(), "error".to_string()),
-    };
-    
-    // Check blockchain connectivity
-    match BlockchainClient::health_check().await {
-        Ok(_) => status.insert("blockchain".to_string(), "healthy".to_string()),
-        Err(_) => status.insert("blockchain".to_string(), "error".to_string()),
-    };
-    
-    // Check metrics system
-    if MetricsCollector::is_healthy() {
-        status.insert("metrics".to_string(), "healthy".to_string());
-    } else {
-        status.insert("metrics".to_string(), "error".to_string());
-    }
-    
-    // Overall status
-    let all_healthy = status.values().all(|v| v == "healthy");
-    status.insert(
-        "overall".to_string(),
-        if all_healthy { "healthy".to_string() } else { "degraded".to_string() }
-    );
-    
-    Ok(status)
-}
-
 // Re-export important traits and types from dependencies
 pub use anyhow::{Result as AnyhowResult, Error as AnyhowError};
 pub use serde::{Deserialize, Serialize};
@@ -346,9 +276,9 @@ mod tests {
     
     #[test]
     fn test_sanitize_filename() {
-        let dirty = "file<name>with|bad*chars?.exe";
+        let dirty = "file<n>with|bad*chars?.exe";
         let clean = sanitize_filename(dirty);
-        assert_eq!(clean, "file_name_with_bad_chars_.exe");
+        assert_eq!(clean, "file_n_with_bad_chars_.exe");
     }
     
     #[test]

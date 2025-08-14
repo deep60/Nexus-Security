@@ -1,0 +1,2 @@
+fn(axum::extract::State<AppState>, Json<serde_json::Value>) -> impl std::future::Future<Output = std::result::Result<(), std::fmt::Error>> {analyze_hash}
+fn(axum::extract::State<AppState>, Json<serde_json::Value>) -> impl std::future::Future<Output = std::result::Result<(), std::fmt::Error>> {analyze_hash}: Handler<_, _>

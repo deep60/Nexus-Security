@@ -1,0 +1,2 @@
+fn(State<AppState>, Json<{type error}>) -> impl std::future::Future<Output = std::result::Result<(), std::fmt::Error>> {analyze_hash}
+fn(State<AppState>, Json<{type error}>) -> impl std::future::Future<Output = std::result::Result<(), std::fmt::Error>> {analyze_hash}: Handler<_, _>
