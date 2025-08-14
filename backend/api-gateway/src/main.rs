@@ -1,11 +1,12 @@
 use axum::{
-    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
+    extract::{DefaultBodyLimit, Path, Query, State},
     http::{header, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Json, Response},
     routing::{get, post, put, delete},
     Router,
 };
+use axum_extra::extract::Multipart;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -444,13 +445,6 @@ fn load_config() -> AppConfig {
     config
 }
 
-// Utility function to get current timestamp
-fn current_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-}
 
 // Graceful shutdown handler
 async fn shutdown_signal() {

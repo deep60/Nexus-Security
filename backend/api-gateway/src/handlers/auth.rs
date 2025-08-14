@@ -12,14 +12,21 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc, Duration};
 use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
 
-// use crate::models::user::User;
-// use crate::services::database::DatabaseService;
-// use crate::utils::crypto::{hash_password, verify_password};
-// use super::{ApiError, ApiResult, ApiResponse};
+use crate::models::user::User;
+use crate::services::database::DatabaseService;
+use crate::utils::crypto::{hash_password, verify_password};
+use super::{ApiError, ApiResult, ApiResponse};
 
 pub fn auth_routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route()
+        .route("/register", post(register))
+        .route("/login", post(login))
+        .route("/logout", post(logout))
+        .route("/refresh", post(refresh_token))
+        .route("/verify", get(verify_token))
+        .route("/profile", get(get_profile))
+        .route("/wallet/connect", post(collect_wallet))
+        .route("/wallet/disconnect", post(disconnect_wallet))
 }
 
 #[derive(Clone)]
@@ -92,7 +99,7 @@ impl From<User> for UserResponse {
             email: user.email,
             wallet_address: user.wallet_address,
             reputation_score: user.reputation_score,
-            total_earnings: user.total_earnings.to_string(),
+            total_earnings: user.total_stakes.to_string(),
             created_at: user.created_at,
             is_verified: user.is_verified,
         }
@@ -255,7 +262,7 @@ pub async fn verify_token(
     headers: HeaderMap, 
     State(state): State<Arc<AppState>>, 
 ) -> ApiResult<Json<ApiResponse<UserResponse>>> {
-    let token = extract_token_from_header(&header)?;
+    let token = extract_token_from_header(&headers)?;
     let claims = decode_token(&token, &state.jwt_secret)?;
 
     let user_id = Uuid::parse_str(&claims.sub)
@@ -272,7 +279,7 @@ pub async fn verify_token(
 pub async fn get_profile(
     headers: HeaderMap, 
     State(state): State<Arc<AppState>>, 
-) -> ApiResponse<Json<ApiResponse<UserResponse>>> {
+) -> ApiResult<Json<ApiResponse<UserResponse>>> {
     let user = authenticate_user(&headers, &state).await?;
     Ok(Json(ApiResponse::success(user.into())))
 }
@@ -306,7 +313,7 @@ pub async fn collect_wallet(
 pub async fn disconnect_wallet(
     headers: HeaderMap,
     State(state): State<Arc<AppState>>,
-) -> ApiResponse<Json<ApiResponse<UserResponse>>> {
+) -> ApiResult<Json<ApiResponse<UserResponse>>> {
     let mut user = authenticate_user(&headers, &state).await?;
     user.wallet_address = None;
 

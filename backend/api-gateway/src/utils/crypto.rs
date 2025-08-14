@@ -9,6 +9,9 @@ use hex;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroU32;
 use thiserror::Error;
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use chrono::{Duration, Utc};
+use uuid::Uuid;
 
 #[derive(Error, Debug)]
 pub enum CryptoError {
@@ -98,11 +101,14 @@ impl SignatureUtils {
     /// Generate a new Ed25519 key pair
     pub fn generate_keypair() -> CryptoResult<KeyPairInfo> {
         let rng = SystemRandom::new();
-        let keypair = Ed25519KeyPair::generate_pkcs8(&rng)
+        let keypair_doc = Ed25519KeyPair::generate_pkcs8(&rng)
             .map_err(|_| CryptoError::KeyGenerationFailed)?;
         
+        let keypair = Ed25519KeyPair::from_pkcs8(keypair_doc.as_ref())
+            .map_err(|_| CryptoError::KeyGenerationFailed)?;
+            
         let public_key = BASE64.encode(keypair.public_key().as_ref());
-        let private_key = BASE64.encode(keypair.private_key_bytes());
+        let private_key = BASE64.encode(keypair_doc.as_ref());
         
         Ok(KeyPairInfo {
             public_key,
@@ -341,6 +347,69 @@ impl CryptoUtils {
             format!("{:.2} {}", size, UNITS[unit_index])
         }
     }
+}
+
+// JWT Claims structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JwtClaims {
+    pub sub: String,    // Subject (user ID)
+    pub exp: usize,     // Expiration time
+    pub iat: usize,     // Issued at
+    pub user_id: String,
+    pub wallet_address: Option<String>,
+}
+
+/// JWT token utilities
+pub fn validate_jwt(token: &str, secret: &str) -> CryptoResult<JwtClaims> {
+    let key = DecodingKey::from_secret(secret.as_ref());
+    let validation = Validation::default();
+    
+    match decode::<JwtClaims>(token, &key, &validation) {
+        Ok(token_data) => Ok(token_data.claims),
+        Err(_) => Err(CryptoError::InvalidSignature),
+    }
+}
+
+/// Generate JWT token
+pub fn generate_jwt(user_id: &str, wallet_address: Option<String>, secret: &str) -> CryptoResult<String> {
+    let now = Utc::now();
+    let exp = now + Duration::hours(24); // Token expires in 24 hours
+    
+    let claims = JwtClaims {
+        sub: user_id.to_string(),
+        exp: exp.timestamp() as usize,
+        iat: now.timestamp() as usize,
+        user_id: user_id.to_string(),
+        wallet_address,
+    };
+    
+    let key = EncodingKey::from_secret(secret.as_ref());
+    match encode(&Header::default(), &claims, &key) {
+        Ok(token) => Ok(token),
+        Err(_) => Err(CryptoError::KeyGenerationFailed),
+    }
+}
+
+/// Calculate SHA256 for file uploads (alias for main function)
+pub fn calculate_sha256(data: &[u8]) -> String {
+    HashUtils::sha256(data)
+}
+
+/// Calculate file hash for uploads (alias)
+pub fn calculate_file_hash(data: &[u8]) -> String {
+    HashUtils::sha256(data)
+}
+
+/// Hash password using bcrypt
+pub fn hash_password(password: &str) -> CryptoResult<String> {
+    bcrypt::hash(password, bcrypt::DEFAULT_COST)
+        .map_err(|_| CryptoError::EncryptionFailed)
+}
+
+/// Verify password using bcrypt
+pub fn verify_password(password: &str, hash: &str) -> CryptoResult<bool> {
+    bcrypt::verify(password, hash)
+        .map_err(|_| CryptoError::DecryptionFailed)
 }
 
 #[cfg(test)]

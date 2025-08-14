@@ -2,32 +2,26 @@ use std::env;
 use std::sync::Arc;
 
 use axum::{
-    extract::{Multipart, Path, State},
+    extract::{Path, State},
     response::Json,
     http::StatusCode,
-    routing::{get, post},
+    routing::get,
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tokio::net::TcpListener;
-use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::{info, error};
-use uuid::Uuid;
+use tracing::info;
 
 mod analyzers;
 mod models;
 mod utils;
 
 use analyzers::{
-    static_analyzer::StaticAnalyzer,
-    hash_analyzer::HashAnalyzer,
+    static_analyzer::{StaticAnalyzer, StaticAnalyzerConfig},
+    hash_analyzer::{HashAnalyzer, HashAnalyzerConfig},
     yara_engine::{YaraEngine, YaraEngineConfig},
 };
-use models::analysis_result::{AnalysisResult, ThreatVerdict, DetectionResult};
 use utils::file_handler::FileHandler;
-
-use crate::analyzers::{hash_analyzer, static_analyzer};
 
 #[derive(Clone)]
 pub struct AppState {

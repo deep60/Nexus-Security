@@ -94,10 +94,10 @@ impl <T> ApiResponse<T> {
 // Pagination helper
 #[derive(serde::Deserialize)]
 pub struct PaginationQuery {
-    #[serde(default = "default-page")]
+    #[serde(default = "default_page")]
     pub page: u32,
-    #[serde(default = "default-limit")]
-    pub limit: u32, 
+    #[serde(default = "default_limit")]
+    pub limit: u32,
 }
 
 fn default_page() -> u32 {

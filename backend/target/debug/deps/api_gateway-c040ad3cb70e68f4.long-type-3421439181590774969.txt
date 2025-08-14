@@ -1,0 +1,2 @@
+fn(HeaderMap, axum::extract::State<Arc<auth::AppState>>) -> impl futures::Future<Output = {type error}> {get_profile}
+fn(HeaderMap, axum::extract::State<Arc<auth::AppState>>) -> impl futures::Future<Output = {type error}> {get_profile}: Handler<_, _>

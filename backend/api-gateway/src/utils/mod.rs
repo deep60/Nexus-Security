@@ -487,10 +487,10 @@ pub mod helpers {
     pub fn sanitize_for_log(input: &str) -> String {
         // Remove potential sensitive patterns
         let patterns = [
-            (r"(?i)password[\"':\s]*[\"']?([^\"'\s,}]+)", "password: [REDACTED]"),
-            (r"(?i)token[\"':\s]*[\"']?([^\"'\s,}]+)", "token: [REDACTED]"),
-            (r"(?i)key[\"':\s]*[\"']?([^\"'\s,}]+)", "key: [REDACTED]"),
-            (r"(?i)secret[\"':\s]*[\"']?([^\"'\s,}]+)", "secret: [REDACTED]"),
+            (r#"(?i)password["':\s]*["']?([^"'\s,}]+)"#, "password: [REDACTED]"),
+            (r#"(?i)token["':\s]*["']?([^"'\s,}]+)"#, "token: [REDACTED]"),
+            (r#"(?i)key["':\s]*["']?([^"'\s,}]+)"#, "key: [REDACTED]"),
+            (r#"(?i)secret["':\s]*["']?([^"'\s,}]+)"#, "secret: [REDACTED]"),
         ];
 
         let mut result = input.to_string();

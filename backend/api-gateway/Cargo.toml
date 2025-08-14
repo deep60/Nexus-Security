@@ -9,10 +9,10 @@ repository = "https://github.com/nexus-security/deep60"
 
 [dependencies]
 # Web framework
-axum = { version = "0.7", features = ["macros"] }
+axum = { version = "0.7", features = ["macros", "multipart"] }
 tokio = { workspace = true }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace", "compression-br", "compression-gzip"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-br", "compression-gzip", "limit"] }
 hyper = "1.0"
 
 # Serialization
@@ -74,6 +74,16 @@ metrics-exporter-prometheus = "0.13"
 
 # Shared workspace dependencies
 shared = { path = "../shared" }
+regex = "1.11.1"
+sha2 = "0.10.9"
+sha1 = "0.10.6"
+sha3 = "0.10.8"
+ring = "0.17.14"
+base64 = "0.22.1"
+hex = "0.4.3"
+url = "2.5.4"
+md5 = "0.7.0"
+urlencoding = "2.1"
 
 [dev-dependencies]
 # Testing
