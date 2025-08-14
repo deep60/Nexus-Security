@@ -9,7 +9,7 @@ use reqwest::Client;
 use anyhow::{Result, anyhow};
 use tracing::{info, warn, error, debug};
 
-use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, SeverityLevel};
+use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, SeverityLevel, FileMetadata, AnalysisStatus, DetectionResult, EngineType};
 
 /// Supported hash algorithms for analysis
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -297,12 +297,10 @@ impl HashAnalyzer {
             .collect();
 
         let first_seen = response.data.attributes.first_submission_date
-            .map(|ts| chrono::DateTime::from_timestamp(ts, 0))
-            .flatten();
+            .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
 
         let last_seen = response.data.attributes.last_submission_date
-            .map(|ts| chrono::DateTime::from_timestamp(ts, 0))
-            .flatten();
+            .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
 
         HashReputation {
             source: "VirusTotal".to_string(),
@@ -352,15 +350,13 @@ impl HashAnalyzer {
                             .unwrap_or("Unknown")
                             .to_string()
                     ],
-                    threat_types: vec![
-                        json["data"][0]["tags"]
-                            .as_array()
-                            .map(|arr| arr.iter()
-                                .filter_map(|v| v.as_str())
-                                .map(|s| s.to_string())
-                                .collect::<Vec<_>>())
-                            .unwrap_or_default()
-                    ].into_iter().flatten().collect(),
+                    threat_types: json["data"][0]["tags"]
+                        .as_array()
+                        .map(|arr| arr.iter()
+                            .filter_map(|v| v.as_str())
+                            .map(|s| s.to_string())
+                            .collect::<Vec<_>>())
+                        .unwrap_or_default(),
                 })
             } else {
                 // Hash not found - unknown
@@ -378,6 +374,7 @@ impl HashAnalyzer {
             Err(anyhow!("MalwareBazaar API error: {}", response.status()))
         }
     }
+
     /// Query local threat database
     async fn query_local_database(&self, hash: &str) -> Result<HashReputation> {
         // This would typically query your internal database
@@ -403,7 +400,6 @@ impl HashAnalyzer {
     /// Create final analysis result from reputation data
     fn create_analysis_result(&self, hash_info: &HashInfo, reputations: Vec<HashReputation>) -> AnalysisResult {
         use uuid::Uuid;
-        use crate::models::analysis_result::{FileMetadata, AnalysisStatus, DetectionResult, EngineType, SeverityLevel};
         use chrono::Utc;
         
         // Create file metadata from hash info
@@ -411,9 +407,21 @@ impl HashAnalyzer {
             filename: None,
             file_size: hash_info.file_size.unwrap_or(0),
             mime_type: "application/octet-stream".to_string(),
-            md5: if hash_info.hash_type == HashType::MD5 { hash_info.hash_value.clone() } else { String::new() },
-            sha1: if hash_info.hash_type == HashType::SHA1 { hash_info.hash_value.clone() } else { String::new() },
-            sha256: if hash_info.hash_type == HashType::SHA256 { hash_info.hash_value.clone() } else { String::new() },
+            md5: if hash_info.hash_type == HashType::MD5 { 
+                Some(hash_info.hash_value.clone()) 
+            } else { 
+                None 
+            },
+            sha1: if hash_info.hash_type == HashType::SHA1 { 
+                Some(hash_info.hash_value.clone()) 
+            } else { 
+                None 
+            },
+            sha256: if hash_info.hash_type == HashType::SHA256 { 
+                Some(hash_info.hash_value.clone()) 
+            } else { 
+                None 
+            },
             sha512: None,
             entropy: None,
             magic_bytes: None,
@@ -436,18 +444,6 @@ impl HashAnalyzer {
         let suspicious_count = reputations.iter()
             .filter(|r| r.verdict == ThreatVerdict::Suspicious)
             .count();
-
-        let total_sources = reputations.len();
-        
-        let final_verdict = if malicious_count > 0 {
-            ThreatVerdict::Malicious
-        } else if suspicious_count > 0 {
-            ThreatVerdict::Suspicious
-        } else if reputations.iter().any(|r| r.verdict == ThreatVerdict::Benign) {
-            ThreatVerdict::Benign
-        } else {
-            ThreatVerdict::Unknown
-        };
 
         let confidence = match malicious_count {
             0 => 0.1,

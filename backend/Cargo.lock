@@ -564,6 +564,12 @@ dependencies = [
 [[package]]
 name = "bounty-manager"
 version = "0.1.0"
+dependencies = [
+ "axum 0.8.4",
+ "chrono",
+ "serde",
+ "uuid 1.17.0",
+]
 
 [[package]]
 name = "brotli"
