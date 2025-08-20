@@ -236,7 +236,7 @@ impl AnalysisEngine {
         Ok(combined_result)
     }
 
-    async fn run_hash_analysis(&mut self, request: &FileAnalysisRequest) -> Result<AnalysisResult> {
+    async fn run_hash_analysis(&self, request: &FileAnalysisRequest) -> Result<AnalysisResult> {
         if !request.analysis_options.enable_hash_analysis {
             return Err(anyhow!("Hash analysis disabled"));
         }
