@@ -94,7 +94,7 @@ impl YaraEngine {
         };
 
         engine.load_rules()?;
-        engine.compiled_rules()?;
+        engine.compile_rules()?;
 
         Ok(engine)
     }
@@ -361,31 +361,47 @@ impl YaraEngine {
         let threat_level = self.calculate_threat_level(&matches);
         let confidence = self.calculate_confidence(&matches);
 
-        Ok(AnalysisResult {
-            engine_name: "yara_engine".to_string(),
-            version: "1.0.0".to_string(),
-            scan_time: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            file_name: filename.to_string(),
+        use crate::models::analysis_result::{FileMetadata, ThreatVerdict, SeverityLevel, DetectionResult, EngineType};
+        use uuid::Uuid;
+        use chrono::Utc;
+        
+        // Create file metadata
+        let file_metadata = FileMetadata {
+            filename: Some(filename.to_string()),
             file_size: data.len() as u64,
-            file_hash: self.calculate_hash(data),
-            threat_level,
-            confidence,
-            is_malicious: !matches.is_empty(),
-            matches: matches.into_iter().map(|m| MatchDetails {
-                rule_name: m.rule_name,
-                description: m.meta.get("description").cloned().unwrap_or_default(),
-                severity: if m.tags.contains(&"critical".to_string()) { "critical" } else { "medium" }.to_string(),
-                tags: m.tags,
-                metadata: m.meta,
-            }).collect(),
-            metadata: HashMap::from([
-                ("rules_loaded".to_string(), self.loaded_rules.len().to_string()),
-                ("rules_hash".to_string(), self.rules_hash.clone()),
-            ]),
-        })
+            mime_type: "application/octet-stream".to_string(),
+            md5: String::new(),
+            sha1: String::new(),
+            sha256: self.calculate_hash(data),
+            sha512: None,
+            entropy: None,
+            magic_bytes: None,
+            executable_info: None,
+        };
+        
+        let mut result = AnalysisResult::new(Uuid::new_v4(), file_metadata);
+        
+        // Add YARA matches to the result
+        for m in matches {
+            let detection = DetectionResult {
+                detection_id: Uuid::new_v4(),
+                engine_name: "YARA".to_string(),
+                engine_version: "1.0.0".to_string(),
+                engine_type: EngineType::Yara,
+                verdict: if m.confidence > 0.7 { ThreatVerdict::Malicious } else { ThreatVerdict::Suspicious },
+                confidence: m.confidence,
+                severity: if m.tags.contains(&"critical".to_string()) { SeverityLevel::Critical } else { SeverityLevel::Medium },
+                categories: vec![],
+                metadata: m.meta.into_iter().map(|(k, v)| (k, serde_json::json!(v))).collect(),
+                detected_at: Utc::now(),
+                processing_time_ms: 100,
+                error_message: None,
+            };
+            result.add_detection(detection);
+        }
+        
+        result.mark_completed();
+        Ok(result)
     }
 
     fn perform_heuristic_analysis(&self, data: &[u8], filename: &str) -> Vec<YaraMatch> {
@@ -597,6 +613,6 @@ mod tests {
         assert!(result.is_ok());
         
         let analysis = result.unwrap();
-        assert!(!analysis.matches.is_empty());
+        assert!(!analysis.detections.is_empty());
     }
 }

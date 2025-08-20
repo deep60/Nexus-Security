@@ -12,6 +12,34 @@ pub enum ThreatVerdict {
     Unknown,
 }
 
+/// Confidence level for analysis results
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ConfidenceLevel {
+    High,
+    Medium,
+    Low,
+}
+
+/// Threat level classification
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ThreatLevel {
+    Clean,
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+/// Match details for YARA rules
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatchDetails {
+    pub rule_name: String,
+    pub namespace: Option<String>,
+    pub tags: Vec<String>,
+    pub meta: HashMap<String, String>,
+    pub strings: Vec<YaraString>,
+}
+
 // Severity level of detected threats
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SeverityLevel {

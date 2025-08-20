@@ -1,0 +1,1 @@
+RefCell<std::collections::HashMap<std::string::String, HashReputation>>

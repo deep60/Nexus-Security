@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
-use md5::Md5;
-use sha1::Sha1;
+use md5::{Md5, Digest as Md5Digest};
+use sha1::{Sha1, Digest as Sha1Digest};
 use tokio::time::timeout;
 use reqwest::Client;
 use anyhow::{Result, anyhow};
@@ -112,7 +112,7 @@ impl Default for HashAnalyzerConfig {
 pub struct HashAnalyzer {
     config: HashAnalyzerConfig,
     http_client: Client,
-    local_cache: HashMap<String, HashReputation>,
+    local_cache: std::cell::RefCell<HashMap<String, HashReputation>>,
 }
 
 impl HashAnalyzer {
@@ -127,12 +127,12 @@ impl HashAnalyzer {
         Self {
             config,
             http_client,
-            local_cache: HashMap::new(),
+            local_cache: std::cell::RefCell::new(HashMap::new()),
         }
     }
 
     /// Analyze a file by its hash values
-    pub async fn analyze_hash(&mut self, hash_info: &HashInfo, file_data: Option<&[u8]>) -> Result<AnalysisResult> {
+    pub async fn analyze_hash(&self, hash_info: &HashInfo, file_data: Option<&[u8]>) -> Result<AnalysisResult> {
         info!("Starting hash analysis for {} hash: {}", 
               hash_info.hash_type, hash_info.hash_value);
 
@@ -143,7 +143,7 @@ impl HashAnalyzer {
 
         // Check local cache first
         if self.config.local_cache_enabled {
-            if let Some(cached_result) = self.local_cache.get(&hash_info.hash_value) {
+            if let Some(cached_result) = self.local_cache.borrow().get(&hash_info.hash_value) {
                 debug!("Found cached result for hash: {}", hash_info.hash_value);
                 return Ok(self.create_analysis_result(hash_info, vec![cached_result.clone()]));
             }
@@ -181,8 +181,9 @@ impl HashAnalyzer {
 
         // Cache the results
         if self.config.local_cache_enabled && !reputations.is_empty() {
+            let mut cache = self.local_cache.borrow_mut();
             for rep in &reputations {
-                self.local_cache.insert(hash_info.hash_value.clone(), rep.clone());
+                cache.insert(hash_info.hash_value.clone(), rep.clone());
             }
         }
 
@@ -408,19 +409,19 @@ impl HashAnalyzer {
             file_size: hash_info.file_size.unwrap_or(0),
             mime_type: "application/octet-stream".to_string(),
             md5: if hash_info.hash_type == HashType::MD5 { 
-                Some(hash_info.hash_value.clone()) 
+                hash_info.hash_value.clone() 
             } else { 
-                None 
+                String::new() 
             },
             sha1: if hash_info.hash_type == HashType::SHA1 { 
-                Some(hash_info.hash_value.clone()) 
+                hash_info.hash_value.clone() 
             } else { 
-                None 
+                String::new() 
             },
             sha256: if hash_info.hash_type == HashType::SHA256 { 
-                Some(hash_info.hash_value.clone()) 
+                hash_info.hash_value.clone() 
             } else { 
-                None 
+                String::new() 
             },
             sha512: None,
             entropy: None,
@@ -482,16 +483,17 @@ impl HashAnalyzer {
 
     /// Clear local cache
     pub fn clear_cache(&mut self) {
-        self.local_cache.clear();
+        self.local_cache.borrow_mut().clear();
         info!("Hash analyzer cache cleared");
     }
 
     /// Get cache statistics
     pub fn get_cache_stats(&self) -> HashMap<String, usize> {
         let mut stats = HashMap::new();
-        stats.insert("total_cached".to_string(), self.local_cache.len());
+        let cache = self.local_cache.borrow();
+        stats.insert("total_cached".to_string(), cache.len());
         
-        let malicious_cached = self.local_cache.values()
+        let malicious_cached = cache.values()
             .filter(|r| r.verdict == ThreatVerdict::Malicious)
             .count();
         stats.insert("malicious_cached".to_string(), malicious_cached);
