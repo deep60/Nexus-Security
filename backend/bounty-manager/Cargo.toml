@@ -6,13 +6,16 @@ edition = "2024"
 [dependencies]
 axum = "0.8.4"
 chrono.workspace = true
+rand = "0.8.5"
 rust_decimal = "1.37.2"
 serde.workspace = true
 serde_json.workspace = true
+shared = { path = "../shared" }
 sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tower = "0.5.2"
 tower-http = "0.6.6"
 tracing.workspace = true
+tracing-subscriber = "0.3.18"
 uuid.workspace = true
