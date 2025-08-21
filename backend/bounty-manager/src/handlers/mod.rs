@@ -33,7 +33,7 @@ pub use bounty_handler::{
     get_bounty_stats,
     submit_to_bounty,
 };
-/ Additional essential handlers
+// Additional essential handlers
 pub mod submission_handler;
 pub mod payout_handler;
 pub mod reputation_handler;
