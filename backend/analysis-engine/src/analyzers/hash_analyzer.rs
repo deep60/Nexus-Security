@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::sync::RwLock;
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
-use md5::{Md5, Digest as Md5Digest};
+use md5::Digest as Md5Digest;
+use md5::Md5;
 use sha1::{Sha1, Digest as Sha1Digest};
 use tokio::time::timeout;
 use reqwest::Client;
@@ -112,7 +114,7 @@ impl Default for HashAnalyzerConfig {
 pub struct HashAnalyzer {
     config: HashAnalyzerConfig,
     http_client: Client,
-    local_cache: std::cell::RefCell<HashMap<String, HashReputation>>,
+    local_cache: RwLock<HashMap<String, HashReputation>>,
 }
 
 impl HashAnalyzer {
@@ -127,7 +129,7 @@ impl HashAnalyzer {
         Self {
             config,
             http_client,
-            local_cache: std::cell::RefCell::new(HashMap::new()),
+            local_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -143,9 +145,11 @@ impl HashAnalyzer {
 
         // Check local cache first
         if self.config.local_cache_enabled {
-            if let Some(cached_result) = self.local_cache.borrow().get(&hash_info.hash_value) {
-                debug!("Found cached result for hash: {}", hash_info.hash_value);
-                return Ok(self.create_analysis_result(hash_info, vec![cached_result.clone()]));
+            if let Ok(cache) = self.local_cache.read() {
+                if let Some(cached_result) = cache.get(&hash_info.hash_value) {
+                    debug!("Found cached result for hash: {}", hash_info.hash_value);
+                    return Ok(self.create_analysis_result(hash_info, vec![cached_result.clone()]));
+                }
             }
         }
 

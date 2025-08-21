@@ -22,7 +22,6 @@ mod services;
 use handlers::bounty_handler;
 use services::reputation;
 
-use crate::handlers::{ArtifactType, BountyStatus};
 // Application State 
 #[derive(Clone)]
 pub struct AppState {
