@@ -183,6 +183,36 @@ pub struct SslInfo {
     pub key_size: Option<i32>,
 }
 
+// Analysis result for consensus and database storage
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AnalysisResult {
+    pub id: Uuid,
+    pub bounty_id: Uuid,
+    pub analysis_id: Uuid,
+    pub engine_id: Uuid,
+    pub engine_name: String,
+    pub verdict: ThreatVerdict,
+    pub confidence: f64,
+    pub stake_amount: String,
+    pub details: serde_json::Value,
+    pub threat_indicators: Vec<ThreatIndicator>,
+    pub submitted_at: DateTime<Utc>,
+    pub verified_at: Option<DateTime<Utc>>,
+}
+
+// Threat indicators found in analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThreatIndicator {
+    pub id: Uuid,
+    pub analysis_result_id: Uuid,
+    pub indicator_type: String, // "hash", "domain", "ip", "url", "signature", etc.
+    pub value: String,
+    pub severity: String, // "low", "medium", "high", "critical"
+    pub confidence: f64,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
 // Analysis request payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalysisRequest {

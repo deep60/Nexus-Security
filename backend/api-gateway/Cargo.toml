@@ -82,8 +82,11 @@ ring = "0.17.14"
 base64 = "0.22.1"
 hex = "0.4.3"
 url = "2.5.4"
-md5 = "0.7.0"
+md5 = "0.8.0"
 urlencoding = "2.1"
+
+[build-dependencies]
+sqlx = { workspace = true }
 
 [dev-dependencies]
 # Testing

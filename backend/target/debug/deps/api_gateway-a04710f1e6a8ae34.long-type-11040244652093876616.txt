@@ -1,0 +1,2 @@
+fn(HeaderMap, axum::extract::State<Arc<AppState>>) -> impl futures::Future<Output = {type error}> {disconnect_wallet}
+fn(HeaderMap, axum::extract::State<Arc<AppState>>) -> impl futures::Future<Output = {type error}> {disconnect_wallet}: Handler<_, _>

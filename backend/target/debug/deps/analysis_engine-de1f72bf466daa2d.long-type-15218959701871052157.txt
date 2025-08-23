@@ -1,0 +1,3 @@
+ResponseBody<axum::body::Body, NeverClassifyEos<ServerErrorsFailureClass>>
+ResponseBody<axum::body::Body, NeverClassifyEos<ServerErrorsFailureClass>>: Default
+Cors<tower_http::trace::Trace<Route, SharedClassifier<ServerErrorsAsFailures>>>

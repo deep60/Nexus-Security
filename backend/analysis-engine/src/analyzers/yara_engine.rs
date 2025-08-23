@@ -434,7 +434,13 @@ impl YaraEngine {
             b"GetProcAddress", b"LoadLibrary", b"RegCreateKey"
         ];
 
-        for (i, window) in data.windows(10).enumerate() {
+        // Find maximum string length for window size
+        let max_str_len = suspicious_strings.iter()
+            .map(|s| s.len())
+            .max()
+            .unwrap_or(10);
+
+        for (i, window) in data.windows(max_str_len).enumerate() {
             for suspicious in &suspicious_strings {
                 if window.starts_with(suspicious) {
                     matches.push(YaraMatch {
