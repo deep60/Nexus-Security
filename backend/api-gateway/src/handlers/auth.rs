@@ -15,6 +15,7 @@ use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey}
 use crate::models::user::User;
 use crate::services::database::DatabaseService;
 use crate::utils::crypto::{hash_password, verify_password};
+use crate::utils::{ApiError, ApiResult};
 use crate::{AppState, ApiResponse};
 
 pub fn auth_routes() -> Router<AppState> {
@@ -119,7 +120,7 @@ pub async fn register(
         payload.username,
         payload.email
     )
-    .fetch_optional(&state.db)
+    .fetch_optional(state.db.pool())
     .await?;
 
     if existing_user.is_some() {
@@ -148,7 +149,7 @@ pub async fn register(
         payload.wallet_address,
         Utc::now()
     )
-    .fetch_one(&state.db)
+    .fetch_one(state.db.pool())
     .await?;
 
     // Generate Tokens
@@ -174,7 +175,7 @@ pub async fn login(
         "SELECT * FROM users WHERE username = $1 OR email = $1",
         payload.identifier
     )
-    .fetch_optional(&state.db)
+    .fetch_optional(state.db.pool())
     .await?
     .ok_or(ApiError::Unauthorized)?;
 
@@ -191,7 +192,7 @@ pub async fn login(
         Utc::now(),
         user.id
     )
-    .execute(&state.db)
+    .execute(state.db.pool())
     .await?;
 
     // Generate Tokens
@@ -235,7 +236,7 @@ pub async fn refresh_token(
         .map_err(|_| ApiError::BadRequest("Invalid user ID in token".to_string()))?;
     
     let user = sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", user_id)
-        .fetch_optional(&state.db)
+        .fetch_optional(state.db.pool())
         .await?
         .ok_or(ApiError::Unauthorized)?;
 
@@ -263,7 +264,7 @@ pub async fn verify_token(
         .map_err(|_| ApiError::BadRequest("Invalid user ID in token".to_string()))?;
 
     let user = sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", user_id)
-        .fetch_optional(&state.db)
+        .fetch_optional(state.db.pool())
         .await?
         .ok_or(ApiError::Unauthorized)?;
 
@@ -298,7 +299,7 @@ pub async fn collect_wallet(
         user.wallet_address,
         user.id
     )
-    .execute(&state.db)
+    .execute(state.db.pool())
     .await?;
 
     Ok(Json(ApiResponse::success(user.into())))
@@ -315,7 +316,7 @@ pub async fn disconnect_wallet(
         "UPDATE users SET wallet_address = NULL WHERE id = $1",
         user.id
     )
-    .execute(&state.db)
+    .execute(state.db.pool())
     .await?;
 
     Ok(Json(ApiResponse::success(user.into())))
@@ -384,7 +385,7 @@ async fn authenticate_user(headers: &HeaderMap, state: &Arc<AppState>) -> ApiRes
         .map_err(|_| ApiError::BadRequest("Invalid user ID in token".to_string()))?;
     
     sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", user_id)
-        .fetch_optional(&state.db)
+        .fetch_optional(state.db.pool())
         .await?
         .ok_or(ApiError::Unauthorized)
 }

@@ -24,6 +24,11 @@ impl DatabaseService {
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
+    
+    /// Get database connection pool for use as executor
+    pub fn executor(&self) -> &PgPool {
+        &self.pool
+    }
 
     // User operations
     pub async fn create_user(&self, wallet_address: &str, username: &str, email: &str, password_hash: &str) -> Result<User> {
