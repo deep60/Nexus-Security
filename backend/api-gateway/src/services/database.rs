@@ -26,18 +26,19 @@ impl DatabaseService {
     }
 
     // User operations
-    pub async fn create_user(&self, wallet_address: &str, username: &str) -> Result<User> {
+    pub async fn create_user(&self, wallet_address: &str, username: &str, email: &str, password_hash: &str) -> Result<User> {
         let user = sqlx::query_as!(
             User,
             r#"
-            INSERT INTO users (id, wallet_address, username, role, reputation_score, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id, wallet_address, username, role as "role: UserRole", reputation_score, created_at, updated_at
+            INSERT INTO users (id, wallet_address, username, email, password_hash, reputation_score, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
             "#,
             Uuid::new_v4(),
             wallet_address,
             username,
-            UserRole::Analyst as UserRole,
+            email,
+            password_hash,
             0i32,
             Utc::now(),
             Utc::now()
@@ -53,8 +54,7 @@ impl DatabaseService {
         let user = sqlx::query_as!(
             User,
             r#"
-            SELECT id, wallet_address, username, role as "role: UserRole", reputation_score, created_at, updated_at
-            FROM users 
+            SELECT * FROM users 
             WHERE wallet_address = $1
             "#,
             wallet_address
@@ -70,8 +70,7 @@ impl DatabaseService {
         let user = sqlx::query_as!(
             User,
             r#"
-            SELECT id, wallet_address, username, role as "role: UserRole", reputation_score, created_at, updated_at
-            FROM users 
+            SELECT * FROM users 
             WHERE id = $1
             "#,
             user_id

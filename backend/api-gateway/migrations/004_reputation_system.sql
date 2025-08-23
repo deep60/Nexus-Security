@@ -260,7 +260,7 @@ ORDER BY rs.total_score DESC;
 
 -- Function to calculate reputation score based on recent performance
 CREATE OR REPLACE FUNCTION calculate_reputation_score(entity_id UUID, is_user BOOLEAN DEFAULT TRUE)
-RETURNS INTEGER AS $
+RETURNS INTEGER AS $$
 DECLARE
     base_score INTEGER := 0;
     accuracy_bonus INTEGER := 0;
@@ -306,14 +306,14 @@ BEGIN
 
     RETURN base_score + accuracy_bonus + speed_bonus + consistency_bonus;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 -- Function to update performance metrics for a specific period
 CREATE OR REPLACE FUNCTION update_performance_metrics(
     entity_id UUID, 
     is_user BOOLEAN DEFAULT TRUE,
     period_type VARCHAR(20) DEFAULT 'monthly'
-) RETURNS VOID AS $
+) RETURNS VOID AS $$
 DECLARE
     start_date DATE;
     end_date DATE;
@@ -404,4 +404,4 @@ BEGIN
         bounties_won = EXCLUDED.bounties_won,
         updated_at = CURRENT_TIMESTAMP;
 END;
-$ LANGUAGE plpgsql; 
+$$ LANGUAGE plpgsql;

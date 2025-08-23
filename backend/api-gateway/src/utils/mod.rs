@@ -1,5 +1,9 @@
 pub mod crypto;
 pub mod validation;
+pub mod errors;
+
+// Re-export commonly used types
+pub use errors::{ApiError, ApiResult, ApiResponse};
 
 // Re-export commonly used items for convenience
 pub use crypto::{
@@ -18,61 +22,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
-/// Common response wrapper for API endpoints
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiResponse<T> {
-    pub success: bool,
-    pub data: Option<T>,
-    pub error: Option<String>,
-    pub timestamp: DateTime<Utc>,
-    pub request_id: Option<String>,
-}
-
-impl<T> ApiResponse<T> {
-    /// Create a successful API response
-    pub fn success(data: T) -> Self {
-        Self {
-            success: true,
-            data: Some(data),
-            error: None,
-            timestamp: Utc::now(),
-            request_id: None,
-        }
-    }
-
-    /// Create a successful API response with request ID
-    pub fn success_with_id(data: T, request_id: String) -> Self {
-        Self {
-            success: true,
-            data: Some(data),
-            error: None,
-            timestamp: Utc::now(),
-            request_id: Some(request_id),
-        }
-    }
-
-    /// Create an error API response
-    pub fn error(message: String) -> ApiResponse<()> {
-        ApiResponse {
-            success: false,
-            data: None,
-            error: Some(message),
-            timestamp: Utc::now(),
-            request_id: None,
-        }
-    }
-
-    /// Create an error API response with request ID
-    pub fn error_with_id(message: String, request_id: String) -> ApiResponse<()> {
-        ApiResponse {
-            success: false,
-            data: None,
-            error: Some(message),
-            timestamp: Utc::now(),
-            request_id: Some(request_id),
-        }
-    }
-}
+// ApiResponse is now defined in errors.rs and re-exported above
 
 /// Pagination parameters for list endpoints
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -192,97 +142,7 @@ impl HttpStatus {
     }
 }
 
-/// Error types for the API
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiError {
-    pub code: String,
-    pub message: String,
-    pub details: Option<HashMap<String, String>>,
-    pub status_code: u16,
-}
-
-impl ApiError {
-    pub fn new(code: String, message: String, status_code: u16) -> Self {
-        Self {
-            code,
-            message,
-            details: None,
-            status_code,
-        }
-    }
-
-    pub fn with_details(
-        code: String,
-        message: String,
-        details: HashMap<String, String>,
-        status_code: u16,
-    ) -> Self {
-        Self {
-            code,
-            message,
-            details: Some(details),
-            status_code,
-        }
-    }
-
-    // Common error constructors
-    pub fn bad_request(message: String) -> Self {
-        Self::new("BAD_REQUEST".to_string(), message, 400)
-    }
-
-    pub fn unauthorized(message: String) -> Self {
-        Self::new("UNAUTHORIZED".to_string(), message, 401)
-    }
-
-    pub fn forbidden(message: String) -> Self {
-        Self::new("FORBIDDEN".to_string(), message, 403)
-    }
-
-    pub fn not_found(message: String) -> Self {
-        Self::new("NOT_FOUND".to_string(), message, 404)
-    }
-
-    pub fn conflict(message: String) -> Self {
-        Self::new("CONFLICT".to_string(), message, 409)
-    }
-
-    pub fn validation_error(details: HashMap<String, String>) -> Self {
-        Self::with_details(
-            "VALIDATION_ERROR".to_string(),
-            "Validation failed".to_string(),
-            details,
-            422,
-        )
-    }
-
-    pub fn internal_error(message: String) -> Self {
-        Self::new("INTERNAL_ERROR".to_string(), message, 500)
-    }
-
-    pub fn rate_limited(message: String) -> Self {
-        Self::new("RATE_LIMITED".to_string(), message, 429)
-    }
-}
-
-/// Convert validation errors to API errors
-impl From<ValidationError> for ApiError {
-    fn from(err: ValidationError) -> Self {
-        let mut details = HashMap::new();
-        details.insert("validation_error".to_string(), err.to_string());
-        Self::validation_error(details)
-    }
-}
-
-/// Convert crypto errors to API errors
-impl From<CryptoError> for ApiError {
-    fn from(err: CryptoError) -> Self {
-        match err {
-            CryptoError::InvalidSignature => Self::unauthorized("Invalid signature".to_string()),
-            CryptoError::InvalidKeyFormat => Self::bad_request("Invalid key format".to_string()),
-            _ => Self::internal_error(format!("Cryptographic error: {}", err)),
-        }
-    }
-}
+// ApiError and related types are now defined in errors.rs and re-exported above
 
 /// Request metadata for logging and tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]

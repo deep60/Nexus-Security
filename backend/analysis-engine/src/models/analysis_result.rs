@@ -64,7 +64,7 @@ pub enum EngineType {
 }
 
 /// Detected threat categories
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ThreatCategory {
     Malware,
     Ransomware,

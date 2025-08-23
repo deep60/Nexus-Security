@@ -232,6 +232,23 @@ impl FileValidator {
         Self::validate_mime_type(mime_type, rules)?;
         Ok(())
     }
+
+    /// Validate file type based on extension
+    pub fn validate_file_type(filename: &str, allowed_types: &[&str]) -> ValidationResult<()> {
+        if let Some(extension) = filename.split('.').last() {
+            let ext = extension.to_lowercase();
+            if allowed_types.contains(&ext.as_str()) {
+                Ok(())
+            } else {
+                Err(ValidationError::InvalidFileType {
+                    file_type: ext,
+                    allowed: allowed_types.iter().map(|s| s.to_string()).collect(),
+                })
+            }
+        } else {
+            Err(ValidationError::InvalidCharacters)
+        }
+    }
 }
 
 /// Hash validation utilities

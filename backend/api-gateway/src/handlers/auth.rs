@@ -15,9 +15,9 @@ use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey}
 use crate::models::user::User;
 use crate::services::database::DatabaseService;
 use crate::utils::crypto::{hash_password, verify_password};
-use super::{ApiError, ApiResult, ApiResponse};
+use crate::{AppState, ApiResponse};
 
-pub fn auth_routes() -> Router<Arc<AppState>> {
+pub fn auth_routes() -> Router<AppState> {
     Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
@@ -29,12 +29,6 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
         .route("/wallet/disconnect", post(disconnect_wallet))
 }
 
-#[derive(Clone)]
-pub struct AppState {
-    pub db: PgPool,
-    pub jwt_secret: String,
-    pub database_service: DatabaseService,
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
@@ -107,9 +101,9 @@ impl From<User> for UserResponse {
 }
 
 pub async fn register(
-    State(state): State<Arc<AppState>>, 
+    State(state): State<AppState>, 
     Json(payload): Json<RegisterRequest>,
-) -> ApiResult<Json<ApiResponse<AuthResponse>>> {
+) -> Result<Json<ApiResponse<AuthResponse>>, StatusCode> {
     // Validate input
 
     if payload.username.is_empty() || payload.email.is_empty() || payload.password.len() < 8 {
@@ -143,7 +137,7 @@ pub async fn register(
     let user = sqlx::query_as!(
         User,
         r#"
-        INSERT INTO user (id, username, email, password_hash, wallet_address, created_at)
+        INSERT INTO users (id, username, email, password_hash, wallet_address, created_at)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
         "#,

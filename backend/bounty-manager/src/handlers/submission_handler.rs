@@ -37,7 +37,7 @@ pub enum EngineType {
     Hybrid,     // Combination
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SubmissionStatus {
     Pending,     // Awaiting blockchain confirmation
     Active,      // Stake confirmed, participating in consensus

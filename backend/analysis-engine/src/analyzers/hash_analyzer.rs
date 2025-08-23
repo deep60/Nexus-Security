@@ -3,8 +3,7 @@ use std::sync::RwLock;
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
-use md5::Digest as Md5Digest;
-use md5::Md5;
+use md5::{Md5, Digest as Md5Digest};
 use sha1::{Sha1, Digest as Sha1Digest};
 use tokio::time::timeout;
 use reqwest::Client;
@@ -185,9 +184,10 @@ impl HashAnalyzer {
 
         // Cache the results
         if self.config.local_cache_enabled && !reputations.is_empty() {
-            let mut cache = self.local_cache.borrow_mut();
-            for rep in &reputations {
-                cache.insert(hash_info.hash_value.clone(), rep.clone());
+            if let Ok(mut cache) = self.local_cache.write() {
+                for rep in &reputations {
+                    cache.insert(hash_info.hash_value.clone(), rep.clone());
+                }
             }
         }
 
@@ -487,21 +487,23 @@ impl HashAnalyzer {
 
     /// Clear local cache
     pub fn clear_cache(&mut self) {
-        self.local_cache.borrow_mut().clear();
+        if let Ok(mut cache) = self.local_cache.write() {
+            cache.clear();
+        }
         info!("Hash analyzer cache cleared");
     }
 
     /// Get cache statistics
     pub fn get_cache_stats(&self) -> HashMap<String, usize> {
         let mut stats = HashMap::new();
-        let cache = self.local_cache.borrow();
-        stats.insert("total_cached".to_string(), cache.len());
-        
-        let malicious_cached = cache.values()
-            .filter(|r| r.verdict == ThreatVerdict::Malicious)
-            .count();
-        stats.insert("malicious_cached".to_string(), malicious_cached);
-        
+        if let Ok(cache) = self.local_cache.read() {
+            stats.insert("total_cached".to_string(), cache.len());
+            
+            let malicious_cached = cache.values()
+                .filter(|r| r.verdict == ThreatVerdict::Malicious)
+                .count();
+            stats.insert("malicious_cached".to_string(), malicious_cached);
+        }
         stats
     }
 }

@@ -4,7 +4,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 // Bounty status enum
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "bounty_status", rename_all = "lowercase")]
 pub enum BountyStatus {
     Draft,
@@ -300,6 +300,32 @@ pub enum BountyEventType {
     Disputed,
     RewardDistributed,
     StakeSlashed,
+}
+
+// Bounty submission from analysis engines
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct BountySubmission {
+    pub id: Uuid,
+    pub bounty_id: Uuid,
+    pub engine_id: Uuid,
+    pub engine_name: String,
+    pub engine_address: String,
+    pub verdict: String, // "benign", "malicious", "suspicious", "unknown"
+    pub confidence: f64,
+    pub stake_amount: String,
+    pub details: serde_json::Value,
+    pub submitted_at: DateTime<Utc>,
+    pub is_verified: bool,
+}
+
+// Engine verdict enum for submissions
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
+#[sqlx(type_name = "engine_verdict", rename_all = "lowercase")]
+pub enum EngineVerdict {
+    Benign,
+    Suspicious,
+    Malicious,
+    Unknown,
 }
 
 // Escrow and payment management
