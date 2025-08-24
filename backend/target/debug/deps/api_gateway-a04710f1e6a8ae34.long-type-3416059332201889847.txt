@@ -1,0 +1,2 @@
+fn(axum::extract::State<submission::AppState>, axum::extract::Query<SubmissionFilters>) -> impl futures::Future<Output = std::result::Result<axum::Json<SubmissionListResponse>, axum::http::StatusCode>> {get_submissions}
+fn(axum::extract::State<submission::AppState>, axum::extract::Query<SubmissionFilters>) -> impl futures::Future<Output = std::result::Result<axum::Json<SubmissionListResponse>, axum::http::StatusCode>> {get_submissions}: Handler<_, _>
