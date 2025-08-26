@@ -1,2 +1,0 @@
-fn(axum::extract::State<handlers::bounty::AppState>, axum::extract::Path<Uuid>, axum::Json<SubmitAnalysisRequest>) -> impl futures::Future<Output = std::result::Result<axum::Json<handlers::bounty::SubmissionResponse>, axum::http::StatusCode>> {submit_analysis}
-fn(axum::extract::State<handlers::bounty::AppState>, axum::extract::Path<Uuid>, axum::Json<SubmitAnalysisRequest>) -> impl futures::Future<Output = std::result::Result<axum::Json<handlers::bounty::SubmissionResponse>, axum::http::StatusCode>> {submit_analysis}: Handler<_, _>

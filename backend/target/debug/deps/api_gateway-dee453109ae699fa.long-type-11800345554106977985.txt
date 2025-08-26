@@ -1,2 +1,0 @@
-fn(axum::extract::State<Arc<auth::AppState>>, axum::Json<RefreshTokenRequest>) -> impl futures::Future<Output = {type error}> {refresh_token}
-fn(axum::extract::State<Arc<auth::AppState>>, axum::Json<RefreshTokenRequest>) -> impl futures::Future<Output = {type error}> {refresh_token}: Handler<_, _>

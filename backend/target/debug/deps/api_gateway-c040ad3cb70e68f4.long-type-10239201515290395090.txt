@@ -1,2 +1,0 @@
-fn(axum::extract::State<handlers::bounty::AppState>, axum::Json<handlers::bounty::CreateBountyRequest>) -> impl futures::Future<Output = std::result::Result<axum::Json<handlers::bounty::BountyResponse>, axum::http::StatusCode>> {create_bounty}
-fn(axum::extract::State<handlers::bounty::AppState>, axum::Json<handlers::bounty::CreateBountyRequest>) -> impl futures::Future<Output = std::result::Result<axum::Json<handlers::bounty::BountyResponse>, axum::http::StatusCode>> {create_bounty}: Handler<_, _>

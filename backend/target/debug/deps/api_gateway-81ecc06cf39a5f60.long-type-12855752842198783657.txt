@@ -1,2 +1,0 @@
-fn(axum::extract::State<submission::AppState>, axum::Json<CreateSubmissionRequest>) -> impl futures::Future<Output = std::result::Result<axum::Json<submission::SubmissionResponse>, axum::http::StatusCode>> {create_submission}
-fn(axum::extract::State<submission::AppState>, axum::Json<CreateSubmissionRequest>) -> impl futures::Future<Output = std::result::Result<axum::Json<submission::SubmissionResponse>, axum::http::StatusCode>> {create_submission}: Handler<_, _>

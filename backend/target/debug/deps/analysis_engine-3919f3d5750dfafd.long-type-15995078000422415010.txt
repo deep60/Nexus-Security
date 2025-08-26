@@ -1,2 +1,0 @@
-fn(axum::extract::State<AppState>) -> impl std::future::Future<Output = axum::Json<EngineStatus>> {engines_status}
-fn(axum::extract::State<AppState>) -> impl std::future::Future<Output = axum::Json<EngineStatus>> {engines_status}: Handler<_, _>

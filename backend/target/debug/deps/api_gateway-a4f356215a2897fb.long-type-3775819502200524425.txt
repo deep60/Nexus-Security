@@ -1,2 +1,0 @@
-fn(axum::extract::State<submission::AppState>, axum::extract::Path<Uuid>) -> impl futures::Future<Output = std::result::Result<axum::http::StatusCode, axum::http::StatusCode>> {delete_submission}
-fn(axum::extract::State<submission::AppState>, axum::extract::Path<Uuid>) -> impl futures::Future<Output = std::result::Result<axum::http::StatusCode, axum::http::StatusCode>> {delete_submission}: Handler<_, _>

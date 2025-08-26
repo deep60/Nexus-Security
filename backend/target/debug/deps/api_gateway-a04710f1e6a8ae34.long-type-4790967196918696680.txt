@@ -1,2 +1,0 @@
-fn(HeaderMap, axum::extract::State<Arc<AppState>>) -> impl futures::Future<Output = {type error}> {logout}
-fn(HeaderMap, axum::extract::State<Arc<AppState>>) -> impl futures::Future<Output = {type error}> {logout}: Handler<_, _>

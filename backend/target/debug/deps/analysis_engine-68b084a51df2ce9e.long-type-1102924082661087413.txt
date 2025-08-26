@@ -1,2 +1,0 @@
-fn(State<AppState>, {type error}) -> impl std::future::Future<Output = std::result::Result<(), std::fmt::Error>> {analyze_file}
-fn(State<AppState>, {type error}) -> impl std::future::Future<Output = std::result::Result<(), std::fmt::Error>> {analyze_file}: Handler<_, _>

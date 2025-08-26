@@ -1,2 +1,0 @@
-fn(HeaderMap, axum::extract::State<Arc<auth::AppState>>) -> impl futures::Future<Output = handlers::ApiResponse<axum::Json<handlers::ApiResponse<auth::UserResponse>>>> {get_profile}
-fn(HeaderMap, axum::extract::State<Arc<auth::AppState>>) -> impl futures::Future<Output = handlers::ApiResponse<axum::Json<handlers::ApiResponse<auth::UserResponse>>>> {get_profile}: Handler<_, _>

@@ -1,2 +1,0 @@
-fn(HeaderMap, axum::extract::State<Arc<AppState>>) -> impl futures::Future<Output = {type error}> {verify_token}
-fn(HeaderMap, axum::extract::State<Arc<AppState>>) -> impl futures::Future<Output = {type error}> {verify_token}: Handler<_, _>
