@@ -196,9 +196,24 @@ pragma solidity ^0.8.19;
      * @param engineAddress Address of the engine
      * @return engineInfo Complete engine information
      */
-    function getEngineInfo(
-        address engineAddress
-    ) external view returns (EngineInfo memory engineInfo);
+    // function getEngineInfo(address engineAddress) 
+    //     external 
+    //     view 
+    //     override
+    //     returns (EngineInfo memory) 
+    // {
+    //     AnalystProfile storage profile = analysts[engineAddress];
+    //     return EngineInfo({
+    //         isRegistered: profile.isActive,
+    //         engineType: uint8(profile.category),
+    //         reputation: profile.reputation,
+    //         totalAnalyses: profile.totalSubmissions,
+    //         correctAnalyses: profile.correctPredictions,
+    //         lastActivityTimestamp: profile.lastActiveTimestamp,
+    //         registrationTimestamp: profile.registrationTimestamp,
+    //         isActive: profile.isActive
+    //     });
+    // }
 
     /**
      * @notice Get accuracy rate of an engine

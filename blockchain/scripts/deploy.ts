@@ -1,3 +1,10 @@
+// Main deployment script that:
+
+// Deploys ThreatToken, ReputationSystem, and BountyManager contracts
+// Sets up initial configurations and role assignments
+// Saves deployment addresses and generates reports
+// Includes safety checks and error handling
+
 import { ethers } from "hardhat";
 import { join } from "path";
 import { writeFileSync, mkdirSync } from "fs";
