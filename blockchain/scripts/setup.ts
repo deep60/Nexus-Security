@@ -1,3 +1,10 @@
+// Post-deployment configuration script that:
+
+// Configures contract parameters (stakes, timeouts, thresholds)
+// Sets up admin and moderator roles
+// Prepares initial analysis engines for registration
+// Validates system configuration
+
 import { ethers } from "hardhat";
 import { readFileSync } from "fs";
 import { join } from "path";

@@ -26,18 +26,21 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
 
     // Structs
     struct AnalystProfile {
-        uint256 reputation;
-        uint256 totalSubmissions;
-        uint256 correctPredictions;
-        uint256 falsePositives;
-        uint256 falseNegatives;
-        uint256 totalStakeAmount;
-        uint256 totalRewards;
-        uint256 lastActiveTimestamp;
-        uint256 consecutiveCorrect;
-        uint256 maxConsecutiveCorrect;
-        bool isActive;
-        AnalystCategory category;
+       bool isRegistered;
+       uint8 engineType;
+       uint256 reputation;
+       uint256 totalSubmissions;
+       uint256 correctPredictions;
+       uint256 lastActiveTimestamp;
+       uint256 registrationTimestamp;
+       bool isActive;
+        // Additional fields
+       uint256 falsePositives;
+       uint256 falseNegatives;
+       uint256 totalStakeAmount;
+       uint256 totalRewards;
+       uint256 consecutiveCorrect;
+       uint256 maxConsecutiveCorrect;
     }
 
     struct SubmissionRecord {
@@ -58,6 +61,17 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         string tierName;
     }
 
+    struct EngineInfo {
+        bool isRegistered;
+        uint8 engineType;
+        uint256 reputation;
+        uint256 totalAnalyses;
+        uint256 correctAnalyses;
+        uint256 lastActivityTimestamp;
+        uint256 registrationTimestamp;
+        bool isActive;
+    }
+
     enum AnalystCategory {
         Human,
         AutomatedEngine,
@@ -75,13 +89,15 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
     uint256 public totalAnalysts;
     uint256 public decayTimestamp;
 
-    // // Events
-    // event AnalystRegistered(address indexed analyst, AnalystCategory category);
-    // event SubmissionRecorded(uint256 indexed submissionId, address indexed analyst, uint256 bountyId);
-    // event SubmissionResolved(uint256 indexed submissionId, bool correct, uint256 reputationChange);
-    // event ReputationUpdated(address indexed analyst, uint256 oldReputation, uint256 newReputation);
-    // event TierUpdated(address indexed analyst, uint256 newTier);
-    // event ReputationDecayed(address indexed analyst, uint256 decayAmount);
+    // Events
+    event EngineRegistered(address indexed engineAddress, uint8 engineType, uint256 initialReputation);
+    event SubmissionRecorded(uint256 indexed submissionId, address indexed analyst, uint256 indexed bountyId);
+    event SubmissionResolved(uint256 indexed submissionId, bool correct, uint256 reputationChange);
+    event ReputationUpdated(address indexed analyst, uint256 oldReputation, uint256 newReputation, string reason);
+    //event TierUpdated(address indexed analyst, uint256 newTier);
+    event EnginePenalized(address indexed engineAddress, uint256 penaltyAmount, string reason);
+    event EngineRewarded(address indexed engineAddress, uint256 rewardAmount, uint256 indexed bountyId);
+    event ReputationDecayed(address indexed engineAddress, uint256 decayAmount);
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -95,37 +111,154 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
     }
 
     /**
-     * @dev Register a new analyst in the system
-     * @param analyst Address of the analyst
-     * @param category Type of analyst (Human, AutomatedEngine, HybridSystem)
-     */
-    function registerAnalyst(address analyst, AnalystCategory category) 
+    * @notice Check if an engine is eligible to participate in bounties
+    */
+    function isEligibleEngine(address engineAddress) 
+        external 
+        view 
+        override 
+        returns (bool) 
+    {
+        AnalystProfile storage profile = analysts[engineAddress];
+        return profile.isActive && profile.reputation >= getMinimumReputation();
+    }
+
+    /**
+    * @notice Get minimum reputation required to participate
+    */
+    function getMinimumReputation() 
+        public 
+        view 
+        override 
+        returns (uint256) 
+    {
+        return MIN_REPUTATION;
+    }
+
+    /**
+    * @notice Get reputation decay parameters
+    */
+    function getDecayParameters() 
+        external 
+        view 
+        override 
+        returns (uint256 decayRate, uint256 decayPeriod) 
+    {
+        return (DECAY_RATE, 30 days);
+    }
+
+    /**
+    * @notice Get reputation multipliers for different engine types
+    */
+    function getEngineMultiplier(uint8 engineType) 
+        external 
+        pure 
+        override 
+        returns (uint256) 
+    {
+        if (engineType == 0) return 100; // Human
+        if (engineType == 1) return 80;  // Automated
+        return 90; // Hybrid
+    }
+
+    function getEngineInfo(address engineAddress) 
+        external 
+        view 
+        override
+        returns (EngineInfo memory) 
+    {
+        AnalystProfile storage profile = analysts[engineAddress];
+        return EngineInfo({
+            isRegistered: profile.isRegistered,
+            engineType: profile.engineType,
+            reputation: profile.reputation,
+            totalAnalyses: profile.totalSubmissions,
+            correctAnalyses: profile.correctPredictions,
+            lastActivityTimestamp: profile.lastActiveTimestamp,
+            registrationTimestamp: profile.registrationTimestamp,
+            isActive: profile.isActive
+        });
+    }
+
+    //
+    //  * @dev Register a new analyst in the system
+    //  * @param analyst Address of the analyst
+    //  * @param category Type of analyst (Human, AutomatedEngine, HybridSystem)
+    //  */
+
+    function registerEngine(address engineAddress, uint8 engineType) 
         external 
         override 
-        onlyRole(BOUNTY_MANAGER_ROLE) 
+        onlyRole(BOUNTY_MANAGER_ROLE)
+        returns (bool success) 
     {
-        require(analyst != address(0), "Invalid analyst address");
-        require(!analysts[analyst].isActive, "Analyst already registered");
+        require(engineAddress != address(0), "Invalid analyst address");
+        require(!analysts[engineAddress].isActive, "Analyst already registered");
 
-        analysts[analyst] = AnalystProfile({
+        analysts[engineAddress] = AnalystProfile({
+            isRegistered: true,
+            engineType: engineType,
             reputation: INITIAL_REPUTATION,
             totalSubmissions: 0,
             correctPredictions: 0,
+            lastActiveTimestamp: block.timestamp,
+            registrationTimestamp: block.timestamp,
+            isActive: true,
             falsePositives: 0,
             falseNegatives: 0,
             totalStakeAmount: 0,
             totalRewards: 0,
-            lastActiveTimestamp: block.timestamp,
             consecutiveCorrect: 0,
-            maxConsecutiveCorrect: 0,
-            isActive: true,
-            category: category
+            maxConsecutiveCorrect: 0
         });
 
-        activeAnalysts.push(analyst);
+        activeAnalysts.push(engineAddress);
         totalAnalysts += 1;
 
-        emit AnalystRegistered(analyst, category);
+        emit EngineRegistered(engineAddress, engineType, INITIAL_REPUTATION);
+        return true;
+    }
+
+    function deactivateEngine(address engineAddress) 
+        external
+        override
+        onlyRole(BOUNTY_MANAGER_ROLE)
+        returns (bool success)
+    {
+        require(analysts[engineAddress].isActive, "Engine not active");
+        analysts[engineAddress].isActive = false;
+        return true;
+    }
+
+    function reactivateEngine(address engineAddress)
+        external
+        override
+        onlyRole(BOUNTY_MANAGER_ROLE)
+        returns (bool success) 
+    {
+        require(!analysts[engineAddress].isActive, "Engine already active");
+        analysts[engineAddress].isActive = true;
+        return true;
+    }
+
+    function penalizeEngine(
+        address engineAddress, 
+        uint256 penaltyAmount, 
+        string calldata reason
+    ) external override onlyRole(BOUNTY_MANAGER_ROLE) returns (bool success) {
+        AnalystProfile storage profile = analysts[engineAddress];
+        require(profile.isActive, "Engine not active");
+
+        uint256 oldReputation = profile.reputation;
+        if (profile.reputation > penaltyAmount) {
+            profile.reputation -= penaltyAmount;
+        } else {
+            profile.reputation = MIN_REPUTATION;
+        }
+
+        emit EnginePenalized(engineAddress, penaltyAmount, reason);
+        emit ReputationUpdated(engineAddress, oldReputation, profile.reputation, reason);
+        return true;
     }
 
     /**
@@ -238,7 +371,7 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
             profile.reputation = MAX_REPUTATION;
         }
 
-        emit ReputationUpdated(analyst, oldReputation, profile.reputation);
+        emit ReputationUpdated(analyst, oldReputation, profile.reputation, isCorrect ? "Correct prediction" : "Incorrect prediction");
     }
 
     /**
