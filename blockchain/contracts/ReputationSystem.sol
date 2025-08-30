@@ -9,7 +9,7 @@ import "./interfaces/IReputationSystem.sol";
  * @dev Manages reputation scores for security analysts and engines in the Nexus-Security platform
  * @notice This contract tracks accuracy, participation, and calculates weighted reputation scores
  */
-abstract contract ReputationSystem is IReputationSystem, AccessControl {
+contract ReputationSystem is IReputationSystem, AccessControl {
 
     bytes32 public constant BOUNTY_MANAGER_ROLE = keccak256("BOUNTY_MANAGER_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
@@ -25,7 +25,7 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
     uint256 public constant MIN_SUBMISSIONS_FOR_RATING = 10;
 
     // Structs
-    struct AnalystProfile {
+    struct EngineProfile {
        bool isRegistered;
        uint8 engineType;
        uint256 reputation;
@@ -43,8 +43,15 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
        uint256 maxConsecutiveCorrect;
     }
 
+    struct ReputationRecord {
+        uint256 timestamp;
+        uint256 oldValue;
+        uint256 newValue;
+        string reason;
+    }
+
     struct SubmissionRecord {
-        address analyst;
+        address engine;
         uint256 bountyId;
         bool prediction; // true for malicious, false for benign
         bool actualResult;
@@ -72,32 +79,69 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         bool isActive;
     }
 
-    enum AnalystCategory {
+    enum EngineCategory {
         Human,
         AutomatedEngine,
         HybridSystem
     }
 
     // State variables
-    mapping(address => AnalystProfile) public analysts;
+    mapping(address => EngineProfile) public engines;
     mapping(uint256 => SubmissionRecord) public submissions;
-    mapping(address => uint256[]) public analystSubmissions;
+    mapping(address => uint256[]) public engineSubmissions;
     mapping(uint256 => ReputationTier) public reputationTiers;
+    mapping(address => ReputationRecord[]) private reputationHistory;
+    mapping(address => uint256) public engineIndex;
     
-    address[] public activeAnalysts;
+    address[] public activeEngines;
     uint256 public nextSubmissionId;
-    uint256 public totalAnalysts;
+    uint256 public totalActiveEngines;
     uint256 public decayTimestamp;
 
     // Events
-    event EngineRegistered(address indexed engineAddress, uint8 engineType, uint256 initialReputation);
-    event SubmissionRecorded(uint256 indexed submissionId, address indexed analyst, uint256 indexed bountyId);
-    event SubmissionResolved(uint256 indexed submissionId, bool correct, uint256 reputationChange);
-    event ReputationUpdated(address indexed analyst, uint256 oldReputation, uint256 newReputation, string reason);
-    //event TierUpdated(address indexed analyst, uint256 newTier);
-    event EnginePenalized(address indexed engineAddress, uint256 penaltyAmount, string reason);
-    event EngineRewarded(address indexed engineAddress, uint256 rewardAmount, uint256 indexed bountyId);
-    event ReputationDecayed(address indexed engineAddress, uint256 decayAmount);
+    event EngineRegistered(
+        address indexed engineAddress,
+        uint8 engineType,
+        uint256 initialReputation
+    );
+
+    event ReputationUpdated(
+        address indexed engineAddress,
+        uint256 oldValue,
+        uint256 newValue,
+        string reason
+    );
+
+    event EnginePenalized(
+        address indexed engineAddress,
+        uint256 penaltyAmount,
+        string reason
+    );
+
+    event EngineRewarded(
+        address indexed engineAddress,
+        uint256 rewardAmount,
+        uint256 indexed bountyId
+    );
+
+    event ReputationDecayed(
+        address indexed engineAddress,
+        uint256 decayAmount
+    );
+
+    event SubmissionRecorded(
+        uint256 indexed submissionId,
+        address indexed engineAddress,
+        uint256 indexed bountyId,
+        bool prediction,
+        uint256 stakeAmount
+    );
+
+    event SubmissionResolved(
+        uint256 indexed submissionId,
+        bool isCorrect,
+        uint256 reputationChange
+    );
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -119,7 +163,7 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         override 
         returns (bool) 
     {
-        AnalystProfile storage profile = analysts[engineAddress];
+        EngineProfile storage profile = engines[engineAddress];
         return profile.isActive && profile.reputation >= getMinimumReputation();
     }
 
@@ -167,7 +211,7 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         override
         returns (EngineInfo memory) 
     {
-        AnalystProfile storage profile = analysts[engineAddress];
+        EngineProfile storage profile = engines[engineAddress];
         return EngineInfo({
             isRegistered: profile.isRegistered,
             engineType: profile.engineType,
@@ -180,22 +224,17 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         });
     }
 
-    //
-    //  * @dev Register a new analyst in the system
-    //  * @param analyst Address of the analyst
-    //  * @param category Type of analyst (Human, AutomatedEngine, HybridSystem)
-    //  */
-
     function registerEngine(address engineAddress, uint8 engineType) 
         external 
         override 
         onlyRole(BOUNTY_MANAGER_ROLE)
         returns (bool success) 
     {
-        require(engineAddress != address(0), "Invalid analyst address");
-        require(!analysts[engineAddress].isActive, "Analyst already registered");
+        require(engineAddress != address(0), "Invalid engine address");
+        require(!engines[engineAddress].isActive, "Engine already registered");
+        require(engineType <= 2, "Invalid engine type");
 
-        analysts[engineAddress] = AnalystProfile({
+        engines[engineAddress] = EngineProfile({
             isRegistered: true,
             engineType: engineType,
             reputation: INITIAL_REPUTATION,
@@ -212,8 +251,9 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
             maxConsecutiveCorrect: 0
         });
 
-        activeAnalysts.push(engineAddress);
-        totalAnalysts += 1;
+        activeEngines.push(engineAddress);
+        engineIndex[engineAddress] = activeEngines.length - 1;
+        totalActiveEngines += 1;
 
         emit EngineRegistered(engineAddress, engineType, INITIAL_REPUTATION);
         return true;
@@ -225,8 +265,15 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         onlyRole(BOUNTY_MANAGER_ROLE)
         returns (bool success)
     {
-        require(analysts[engineAddress].isActive, "Engine not active");
-        analysts[engineAddress].isActive = false;
+        require(engines[engineAddress].isActive, "Engine not active");
+        uint256 index = engineIndex[engineAddress];
+        address last = activeEngines[activeEngines.length - 1];
+        activeEngines[index] = last;
+        engineIndex[last] = index;
+        activeEngines.pop();
+        delete engineIndex[engineAddress];
+        engines[engineAddress].isActive = false;
+        totalActiveEngines -= 1;
         return true;
     }
 
@@ -236,8 +283,11 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         onlyRole(BOUNTY_MANAGER_ROLE)
         returns (bool success) 
     {
-        require(!analysts[engineAddress].isActive, "Engine already active");
-        analysts[engineAddress].isActive = true;
+        require(!engines[engineAddress].isActive, "Engine already active");
+        engines[engineAddress].isActive = true;
+        activeEngines.push(engineAddress);
+        engineIndex[engineAddress] = activeEngines.length - 1;
+        totalActiveEngines += 1;
         return true;
     }
 
@@ -246,7 +296,7 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         uint256 penaltyAmount, 
         string calldata reason
     ) external override onlyRole(BOUNTY_MANAGER_ROLE) returns (bool success) {
-        AnalystProfile storage profile = analysts[engineAddress];
+        EngineProfile storage profile = engines[engineAddress];
         require(profile.isActive, "Engine not active");
 
         uint256 oldReputation = profile.reputation;
@@ -256,57 +306,50 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
             profile.reputation = MIN_REPUTATION;
         }
 
+        reputationHistory[engineAddress].push(ReputationRecord({
+            timestamp: block.timestamp,
+            oldValue: oldReputation,
+            newValue: profile.reputation,
+            reason: reason
+        }));
+
         emit EnginePenalized(engineAddress, penaltyAmount, reason);
         emit ReputationUpdated(engineAddress, oldReputation, profile.reputation, reason);
         return true;
     }
 
-    /**
-     * @dev Record a new submission from an analyst
-     * @param analyst Address of the analyst
-     * @param bountyId ID of the bounty
-     * @param prediction Analyst's prediction (true for malicious, false for benign)
-     * @param stakeAmount Amount staked on this prediction
-     * @param confidenceScore Confidence score (0-100)
-     */
     function recordSubmission(
-        address analyst,
+        address engine,
         uint256 bountyId,
         bool prediction,
         uint256 stakeAmount,
         uint256 confidenceScore
     ) external override onlyRole(BOUNTY_MANAGER_ROLE) returns (uint256) {
-        require(analysts[analyst].isActive, "Analyst not registered");
+        require(engines[engine].isActive, "Engine not active");
         require(confidenceScore <= 100, "Invalid confidence score");
 
-        uint256 submissionId = nextSubmissionId;
-        nextSubmissionId += 1;
+        uint256 submissionId = nextSubmissionId++;
 
         submissions[submissionId] = SubmissionRecord({
-            analyst: analyst,
+            engine: engine,
             bountyId: bountyId,
             prediction: prediction,
-            actualResult: false, // Will be set when resolved
+            actualResult: false,
             stakeAmount: stakeAmount,
             timestamp: block.timestamp,
             isResolved: false,
             confidenceScore: confidenceScore
         });
 
-        analystSubmissions[analyst].push(submissionId);
-        analysts[analyst].totalSubmissions += 1;
-        analysts[analyst].totalStakeAmount += stakeAmount;
-        analysts[analyst].lastActiveTimestamp = block.timestamp;
+        engineSubmissions[engine].push(submissionId);
+        engines[engine].totalSubmissions += 1;
+        engines[engine].totalStakeAmount += stakeAmount;
+        engines[engine].lastActiveTimestamp = block.timestamp;
 
-        emit SubmissionRecorded(submissionId, analyst, bountyId);
+        emit SubmissionRecorded(submissionId, engine, bountyId, prediction, stakeAmount);
         return submissionId;
     }
 
-    /**
-     * @dev Resolve a submission and update reputation
-     * @param submissionId ID of the submission
-     * @param actualResult The actual result (true for malicious, false for benign)
-     */
     function resolveSubmission(uint256 submissionId, bool actualResult) 
         external 
         override 
@@ -314,26 +357,26 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
     {
         SubmissionRecord storage submission = submissions[submissionId];
         require(!submission.isResolved, "Submission already resolved");
-        require(submission.analyst != address(0), "Invalid submission");
+        require(submission.engine != address(0), "Invalid submission");
 
         submission.actualResult = actualResult;
         submission.isResolved = true;
 
         bool isCorrect = submission.prediction == actualResult;
-        _updateAnalystReputation(submission.analyst, submissionId, isCorrect);
+        _updateEngineReputation(submission.engine, submissionId, isCorrect);
 
-        emit SubmissionResolved(submissionId, isCorrect, 0);
+        uint256 reputationChange = 0; // Note: If needed, calculate or retrieve from _update
+        emit SubmissionResolved(submissionId, isCorrect, reputationChange);
     }
 
-    /**
-     * @dev Update analyst reputation based on submission result
-     */
-    function _updateAnalystReputation(address analyst, uint256 submissionId, bool isCorrect) internal {
-        AnalystProfile storage profile = analysts[analyst];
+    function _updateEngineReputation(address engine, uint256 submissionId, bool isCorrect) internal {
+        EngineProfile storage profile = engines[engine];
         SubmissionRecord storage submission = submissions[submissionId];
         
         uint256 oldReputation = profile.reputation;
-        uint256 reputationChange = 0;
+        uint256 reputationChange = isCorrect ? 
+            _calculateReputationGain(engine, submissionId) : 
+            _calculateReputationLoss(engine, submissionId);
 
         if (isCorrect) {
             profile.correctPredictions += 1;
@@ -343,22 +386,17 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
                 profile.maxConsecutiveCorrect = profile.consecutiveCorrect;
             }
 
-            // Calculate reputation gain based on confidence and stake
-            reputationChange = _calculateReputationGain(analyst, submissionId);
             profile.reputation += reputationChange;
             
         } else {
             profile.consecutiveCorrect = 0;
             
-            // Track false positives and false negatives
             if (submission.prediction && !submission.actualResult) {
                 profile.falsePositives += 1;
             } else if (!submission.prediction && submission.actualResult) {
                 profile.falseNegatives += 1;
             }
 
-            // Calculate reputation loss
-            reputationChange = _calculateReputationLoss(analyst, submissionId);
             if (profile.reputation > reputationChange) {
                 profile.reputation -= reputationChange;
             } else {
@@ -371,14 +409,18 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
             profile.reputation = MAX_REPUTATION;
         }
 
-        emit ReputationUpdated(analyst, oldReputation, profile.reputation, isCorrect ? "Correct prediction" : "Incorrect prediction");
+        reputationHistory[engine].push(ReputationRecord({
+            timestamp: block.timestamp,
+            oldValue: oldReputation,
+            newValue: profile.reputation,
+            reason: isCorrect ? "Correct prediction" : "Incorrect prediction"
+        }));
+
+        emit ReputationUpdated(engine, oldReputation, profile.reputation, isCorrect ? "Correct prediction" : "Incorrect prediction");
     }
 
-    /**
-     * @dev Calculate reputation gain for correct predictions
-     */
-    function _calculateReputationGain(address analyst, uint256 submissionId) internal view returns (uint256) {
-        AnalystProfile memory profile = analysts[analyst];
+    function _calculateReputationGain(address engine, uint256 submissionId) internal view returns (uint256) {
+        EngineProfile memory profile = engines[engine];
         SubmissionRecord memory submission = submissions[submissionId];
         
         // Base gain
@@ -397,10 +439,7 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         return baseGain + confidenceBonus + consistencyBonus + stakeBonus;
     }
 
-    /**
-     * @dev Calculate reputation loss for incorrect predictions
-     */
-    function _calculateReputationLoss(address analyst, uint256 submissionId) internal view returns (uint256) {
+    function _calculateReputationLoss(address engine, uint256 submissionId) internal view returns (uint256) {
         SubmissionRecord memory submission = submissions[submissionId];
         
         // Base loss
@@ -416,43 +455,23 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         return baseLoss + confidencePenalty + stakePenalty;
     }
 
-    /**
-     * @dev Get analyst's current reputation
-     * @param analyst Address of the analyst
-     * @return Current reputation score
-     */
-    function getReputation(address analyst) external view override returns (uint256) {
-        return analysts[analyst].reputation;
+    function getReputation(address engine) external view override returns (uint256) {
+        return engines[engine].reputation;
     }
 
-    /**
-     * @dev Get analyst's accuracy rate
-     * @param analyst Address of the analyst
-     * @return Accuracy rate as percentage (0-100)
-     */
-    function getAccuracyRate(address analyst) external view override returns (uint256) {
-        AnalystProfile memory profile = analysts[analyst];
+    function getAccuracyRate(address engine) external view override returns (uint256) {
+        EngineProfile memory profile = engines[engine];
         if (profile.totalSubmissions == 0) return 0;
         
         return profile.correctPredictions * 100 / profile.totalSubmissions;
     }
 
-    /**
-     * @dev Get comprehensive analyst statistics
-     * @param analyst Address of the analyst
-     * @return AnalystProfile struct with all statistics
-     */
-    function getAnalystProfile(address analyst) external view returns (AnalystProfile memory) {
-        return analysts[analyst];
+    function getEngineProfile(address engine) external view returns (EngineProfile memory) {
+        return engines[engine];
     }
 
-    /**
-     * @dev Get analyst's reputation tier
-     * @param analyst Address of the analyst
-     * @return Tier level (0-based)
-     */
-    function getAnalystTier(address analyst) external view returns (uint256) {
-        uint256 reputation = analysts[analyst].reputation;
+    function getAnalystTier(address engine) external view returns (uint256) {
+        uint256 reputation = engines[engine].reputation;
         
         // Determine tier based on reputation
         if (reputation >= 800) return 4; // Expert
@@ -462,17 +481,15 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         return 0; // Novice
     }
 
-    /**
-     * @dev Apply reputation decay for inactive analysts
-     */
     function applyReputationDecay() external onlyRole(ADMIN_ROLE) {
         require(block.timestamp >= decayTimestamp + 30 days, "Decay not due yet");
         
-        for (uint256 i = 0; i < activeAnalysts.length; i++) {
-            address analyst = activeAnalysts[i];
-            AnalystProfile storage profile = analysts[analyst];
+        for (uint256 i = 0; i < activeEngines.length; i++) {
+            address engine = activeEngines[i];
+            EngineProfile storage profile = engines[engine];
             
             if (block.timestamp >= profile.lastActiveTimestamp + 30 days) {
+                uint256 oldReputation = profile.reputation;
                 uint256 decayAmount = profile.reputation * DECAY_RATE / 100;
                 if (profile.reputation > decayAmount) {
                     profile.reputation -= decayAmount;
@@ -480,16 +497,20 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
                     profile.reputation = MIN_REPUTATION;
                 }
                 
-                emit ReputationDecayed(analyst, decayAmount);
+                reputationHistory[engine].push(ReputationRecord({
+                    timestamp: block.timestamp,
+                    oldValue: oldReputation,
+                    newValue: profile.reputation,
+                    reason: "Monthly decay"
+                }));
+                
+                emit ReputationDecayed(engine, decayAmount);
             }
         }
         
         decayTimestamp = block.timestamp;
     }
 
-    /**
-     * @dev Initialize reputation tiers
-     */
     function _initializeReputationTiers() internal {
         reputationTiers[0] = ReputationTier(0, 100, 0, "Novice");
         reputationTiers[1] = ReputationTier(200, 150, 5, "Beginner");
@@ -498,71 +519,116 @@ abstract contract ReputationSystem is IReputationSystem, AccessControl {
         reputationTiers[4] = ReputationTier(800, 500, 35, "Expert");
     }
 
-    /**
-     * @dev Get reputation tier information
-     * @param tier Tier level
-     * @return ReputationTier struct
-     */
     function getReputationTier(uint256 tier) external view returns (ReputationTier memory) {
         return reputationTiers[tier];
     }
 
-    /**
-     * @dev Get top analysts by reputation
-     * @param limit Number of analysts to return
-     * @return Array of analyst addresses sorted by reputation
-     */
     function getTopAnalysts(uint256 limit) external view returns (address[] memory) {
-        require(limit > 0 && limit <= activeAnalysts.length, "Invalid limit");
+        require(limit > 0 && limit <= activeEngines.length, "Invalid limit");
         
-        // Simple selection sort for top analysts (gas-efficient for small lists)
-        address[] memory sortedAnalysts = new address[](limit);
-        uint256[] memory reputations = new uint256[](limit);
+        address[] memory sortedEngines = new address[](limit);
         
-        for (uint256 i = 0; i < limit && i < activeAnalysts.length; i++) {
-            address maxAnalyst = activeAnalysts[0];
+        for (uint256 i = 0; i < limit && i < activeEngines.length; i++) {
+            address maxEngine = activeEngines[0];
             uint256 maxReputation = 0;
-            uint256 maxIndex = 0;
             
-            for (uint256 j = 0; j < activeAnalysts.length; j++) {
+            for (uint256 j = 0; j < activeEngines.length; j++) {
                 bool alreadySelected = false;
                 for (uint256 k = 0; k < i; k++) {
-                    if (sortedAnalysts[k] == activeAnalysts[j]) {
+                    if (sortedEngines[k] == activeEngines[j]) {
                         alreadySelected = true;
                         break;
                     }
                 }
                 
-                if (!alreadySelected && analysts[activeAnalysts[j]].reputation > maxReputation) {
-                    maxAnalyst = activeAnalysts[j];
-                    maxReputation = analysts[activeAnalysts[j]].reputation;
-                    maxIndex = j;
+                if (!alreadySelected && engines[activeEngines[j]].reputation > maxReputation) {
+                    maxEngine = activeEngines[j];
+                    maxReputation = engines[activeEngines[j]].reputation;
                 }
             }
             
-            sortedAnalysts[i] = maxAnalyst;
-            reputations[i] = maxReputation;
+            sortedEngines[i] = maxEngine;
         }
         
-        return sortedAnalysts;
+        return sortedEngines;
     }
 
-    /**
-     * @dev Get total number of active analysts
-     * @return Number of active analysts
-     */
     function getTotalAnalysts() external view returns (uint256) {
-        return totalAnalysts;
+        return totalActiveEngines;
     }
 
-    /**
-     * @dev Check if analyst is eligible for specific tier benefits
-     * @param analyst Address of the analyst
-     * @param requiredTier Minimum required tier
-     * @return Whether analyst meets tier requirement
-     */
-    function isEligibleForTier(address analyst, uint256 requiredTier) external view returns (bool) {
-        uint256 currentTier = this.getAnalystTier(analyst);
+    function isEligibleForTier(address engine, uint256 requiredTier) external view returns (bool) {
+        uint256 currentTier = this.getAnalystTier(engine);
         return currentTier >= requiredTier;
+    }
+
+    function getReputationHistory(
+        address engineAddress, uint256 limit
+    ) external 
+      view 
+      override 
+      returns (ReputationRecord[] memory records) 
+    {
+        require(limit > 0, "Invalid limit");
+        uint256 histLen = reputationHistory[engineAddress].length;
+        uint256 recLen = histLen < limit ? histLen : limit;
+        records = new ReputationRecord[](recLen);
+        uint256 start = histLen - recLen;
+        for (uint256 i = 0; i < recLen; i++) {
+            records[i] = reputationHistory[engineAddress][start + i];
+        }
+        return records;
+    }
+
+    function getTopEngines(
+        uint256 limit
+    ) external view override returns (
+        address[] memory enginesList,
+        uint256[] memory reputations
+    ) {
+        require(limit > 0 && limit <= activeEngines.length, "Invalid limit");
+        
+        enginesList = new address[](limit);
+        reputations = new uint256[](limit);
+        
+        for (uint256 i = 0; i < limit && i < activeEngines.length; i++) {
+            address maxEngine = activeEngines[0];
+            uint256 maxReputation = 0;
+            
+            for (uint256 j = 0; j < activeEngines.length; j++) {
+                bool alreadySelected = false;
+                for (uint256 k = 0; k < i; k++) {
+                    if (enginesList[k] == activeEngines[j]) {
+                        alreadySelected = true;
+                        break;
+                    }
+                }
+                
+                if (!alreadySelected && engines[activeEngines[j]].reputation > maxReputation) {
+                    maxEngine = activeEngines[j];
+                    maxReputation = engines[activeEngines[j]].reputation;
+                }
+            }
+            
+            enginesList[i] = maxEngine;
+            reputations[i] = maxReputation;
+        }
+        return (enginesList, reputations);
+    }
+
+    function calculateRequiredStake(
+        address engineAddress,
+        uint256 baseStake
+    ) external view override returns (uint256 requiredStake) {
+        EngineProfile storage profile = engines[engineAddress];
+        uint256 multiplier = this.getEngineMultiplier(profile.engineType);
+        return (baseStake * multiplier) / 100;
+    } 
+
+    function rewardEngine(address engineAddress, uint256 rewardAmount, uint256 bountyId)
+        external onlyRole(BOUNTY_MANAGER_ROLE) {
+        EngineProfile storage profile = engines[engineAddress];
+        profile.totalRewards += rewardAmount;
+        emit EngineRewarded(engineAddress, rewardAmount, bountyId);
     }
 }
