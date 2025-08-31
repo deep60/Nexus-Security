@@ -29,7 +29,7 @@ interface SetupConfig {
     // System Roles
     adminAddresses: string[];
     moderatorAddresses: string[];
-    engineerAddresses: string[];
+    engineAddresses: string[];
 }
 
 const DEFAULT_CONFIG: SetupConfig = {
@@ -47,7 +47,7 @@ const DEFAULT_CONFIG: SetupConfig = {
 
     adminAddresses: [],
     moderatorAddresses: [],
-    engineerAddresses: []
+    engineAddresses: []
 };
 
 async function loadDeploymentAddresses(networkName: string, chainId: number): Promise<DeploymentAddresses> {

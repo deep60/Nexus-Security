@@ -15,7 +15,7 @@ interface DeploymentAddresses {
     bountyManager: string;
     deployer: string;
     network: string;
-    blocknumber: number;
+    blockNumber: number;
     timestamp: number;
 }
 
