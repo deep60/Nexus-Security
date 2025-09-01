@@ -1,3 +1,4 @@
+// Fixed BountyManager.sol
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
@@ -11,7 +12,7 @@ import "./ThreatToken.sol";
  * @author Nexus-Security Team
  */
 
- contract BountyManager is IBountyManager {
+contract BountyManager is IBountyManager {
     // state variables
     ThreatToken public immutable threatToken;
     IReputationSystem public immutable reputationSystem;
@@ -21,6 +22,7 @@ import "./ThreatToken.sol";
     uint256 public constant ANALYSIS_TIMEOUT = 24 hours;   // 24 hours to complete analysis
     uint256 public constant CONSENSUS_THRESHOLD = 66;   // 66% consensus required
     uint256 public constant PLATFORM_FEE_PERCENT = 5;    // 5% platfrom fee
+    uint256 public constant MIN_ANALYSES_TO_RESOLVE = 5; // Synced threshold
 
     address public owner;
     address public feeCollector;
@@ -31,6 +33,7 @@ import "./ThreatToken.sol";
     mapping(uint256 => mapping(address => Analysis)) public analyses;
     mapping(uint256 => address[]) public bountyAnalysts;
     mapping(address => uint256[]) public userBounties;
+    mapping(uint256 => mapping(address => uint256)) public analystSubmissionIds; // Added for rep integration
 
     // Events
     event BountyCreated(
@@ -115,19 +118,19 @@ import "./ThreatToken.sol";
      */
 
      function createBounty(
-        string memory artifacthash,
+        string memory artifactHash,
         ArtifactType artifactType,
         uint256 rewardAmount,
         uint256 deadline,
         string memory description
      ) external notPaused returns (uint256) {
-        require(bytes(artifacthash).length > 0, "Invalid artifact hash");
-        require(rewardAmount > 0, "Rewarded must be positive");
+        require(bytes(artifactHash).length > 0, "Invalid artifact hash");
+        require(rewardAmount > 0, "Reward must be positive");
         require(deadline > block.timestamp + 1 hours, "Deadline too soon");
         require(bytes(description).length > 0, "Description required");
 
         // Transfer reward tokens to contract
-        require(threatToken.transformFrom(msg.sender, address(this), rewardAmount), "Token transfered failed");
+        require(threatToken.transferFrom(msg.sender, address(this), rewardAmount), "Token transfer failed");
 
         bountyCounter++;
 
@@ -168,7 +171,13 @@ import "./ThreatToken.sol";
      * @param analysisHash IPFS hash of detailed analysis
      */
 
-     function submitAnalysis() external validBounty(bountyId) bountyActive(bountyId) notPaused {
+     function submitAnalysis(
+        uint256 bountyId,
+        ThreatVerdict verdict,
+        uint256 confidence,
+        uint256 stakeAmount,
+        string memory analysisHash
+     ) external validBounty(bountyId) bountyActive(bountyId) notPaused {
         require(verdict != ThreatVerdict.Pending, "Invalid verdict");
         require(confidence > 0 && confidence <= 100, "Invalid confidence");
         require(stakeAmount >= MIN_STAKE_AMOUNT, "Insufficient stake");
@@ -201,6 +210,16 @@ import "./ThreatToken.sol";
         bounties[bountyId].totalStaked += stakeAmount;
         bounties[bountyId].analysisCount++;
         
+        // Record submission in reputation system
+        uint256 submissionId = reputationSystem.recordSubmission(
+            msg.sender,
+            bountyId,
+            (verdict == ThreatVerdict.Malicious),
+            stakeAmount,
+            confidence
+        );
+        analystSubmissionIds[bountyId][msg.sender] = submissionId;
+        
         emit AnalysisSubmitted(
             bountyId,
             msg.sender,
@@ -225,7 +244,7 @@ import "./ThreatToken.sol";
         Bounty storage bounty = bounties[bountyId];
         require(bounty.status == BountyStatus.Active, "Bounty not active");
         require(
-            block.timestamp > bounty.deadline || bounty.analysisCount >= 5,
+            block.timestamp > bounty.deadline || bounty.analysisCount >= MIN_ANALYSES_TO_RESOLVE,
             "Cannot resolve yet"
         );
         
@@ -239,7 +258,7 @@ import "./ThreatToken.sol";
         Bounty storage bounty = bounties[bountyId];
         
         // Auto-resolve if we have enough analyses or deadline passed
-        if (bounty.analysisCount >= 10 || block.timestamp > bounty.deadline) {
+        if (bounty.analysisCount >= MIN_ANALYSES_TO_RESOLVE * 2 || block.timestamp > bounty.deadline) { // Adjusted to 10 for auto
             _resolveBountyInternal(bountyId);
         }
     }
@@ -266,6 +285,15 @@ import "./ThreatToken.sol";
         
         bounty.consensusVerdict = consensus;
         bounty.status = BountyStatus.Resolved;
+        
+        // Resolve submissions in reputation system
+        for (uint256 i = 0; i < analysts.length; i++) {
+            address analyst = analysts[i];
+            uint256 submissionId = analystSubmissionIds[bountyId][analyst];
+            if (submissionId > 0) {
+                reputationSystem.resolveSubmission(submissionId, (consensus == ThreatVerdict.Malicious));
+            }
+        }
         
         // Distribute rewards and slash stakes
         _distributeRewards(bountyId, consensus, consensusCount);
@@ -341,19 +369,28 @@ import "./ThreatToken.sol";
         ThreatVerdict consensus, 
         uint256 winnerCount
     ) internal {
-        if (consensus == ThreatVerdict.Pending || winnerCount == 0) {
-            // No consensus reached, refund creator minus platform fee
-            uint256 platformFee = (bounties[bountyId].rewardAmount * PLATFORM_FEE_PERCENT) / 100;
-            uint256 refundAmount = bounties[bountyId].rewardAmount - platformFee;
-            
-            require(threatToken.transfer(feeCollector, platformFee), "Fee transfer failed");
-            require(threatToken.transfer(bounties[bountyId].creator, refundAmount), "Refund failed");
-            return;
-        }
+        Bounty storage bounty = bounties[bountyId];
+        address[] storage analysts = bountyAnalysts[bountyId];
         
-        uint256 totalRewardPool = bounties[bountyId].rewardAmount;
+        uint256 totalRewardPool = bounty.rewardAmount;
         uint256 platformFee = (totalRewardPool * PLATFORM_FEE_PERCENT) / 100;
         uint256 rewardPool = totalRewardPool - platformFee;
+        
+        if (consensus == ThreatVerdict.Pending || winnerCount == 0) {
+            // No consensus reached, refund creator minus platform fee, return stakes
+            uint256 refundAmount = totalRewardPool - platformFee;
+            
+            require(threatToken.transfer(feeCollector, platformFee), "Fee transfer failed");
+            require(threatToken.transfer(bounty.creator, refundAmount), "Refund failed");
+            
+            // Return stakes
+            for (uint256 i = 0; i < analysts.length; i++) {
+                address analyst = analysts[i];
+                Analysis storage analysis = analyses[bountyId][analyst];
+                require(threatToken.transfer(analyst, analysis.stakeAmount), "Stake return failed");
+            }
+            return;
+        }
         
         // Add slashed stakes to reward pool
         uint256 slashedAmount = _processSlashing(bountyId, consensus);
@@ -361,7 +398,6 @@ import "./ThreatToken.sol";
         
         // Distribute rewards to winners
         uint256 individualReward = rewardPool / winnerCount;
-        address[] storage analysts = bountyAnalysts[bountyId];
         
         for (uint256 i = 0; i < analysts.length; i++) {
             address analyst = analysts[i];
@@ -373,9 +409,6 @@ import "./ThreatToken.sol";
                 // Return stake + reward
                 uint256 totalPayout = analysis.stakeAmount + individualReward;
                 require(threatToken.transfer(analyst, totalPayout), "Reward transfer failed");
-                
-                // Update reputation
-                reputationSystem.updateReputation(analyst, true);
                 
                 emit RewardDistributed(bountyId, analyst, individualReward);
             }
@@ -400,9 +433,6 @@ import "./ThreatToken.sol";
             
             if (analysis.verdict != consensus) {
                 totalSlashed += analysis.stakeAmount;
-                
-                // Update reputation negatively
-                reputationSystem.updateReputation(analyst, false);
                 
                 emit StakeSlashed(bountyId, analyst, analysis.stakeAmount);
             }
@@ -472,11 +502,9 @@ import "./ThreatToken.sol";
         }
     }
 
-    // Interface imports
-    interface IERC20 {
-        function transfer(address to, uint256 amount) external returns (bool);
-        function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    }
- }
-
-
+    // // Interface imports
+    // interface IERC20 {
+    //     function transfer(address to, uint256 amount) external returns (bool);
+    //     function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    // }
+}

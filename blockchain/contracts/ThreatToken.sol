@@ -1,3 +1,4 @@
+// Fixed ThreatToken.sol
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -20,7 +21,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  * - Anti-manipulation safeguards
  */
 
- contract ThreatToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl, ReentrancyGuard {
+contract ThreatToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl, ReentrancyGuard {
     // Roles
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -62,6 +63,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
     mapping(address => uint256) public totalStaked;
     mapping(address => uint256) public engineReputation;
     mapping(address => bool) public authorizedEngines;
+    uint256 public globalActiveStakes; // Added for emergency recover tracking
     
     // Events
     event Staked(address indexed engine, uint256 amount, bytes32 indexed analysisId, uint256 stakeIndex);
@@ -70,6 +72,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
     event RewardDistributed(address indexed engine, uint256 amount, bytes32 indexed analysisId);
     event EngineAuthorized(address indexed engine, bool authorized);
     event ReputationUpdated(address indexed engine, uint256 newReputation);
+    event TokensMinted(address indexed to, uint256 amount); // Added for mint transparency
     
     constructor(address admin) ERC20("ThreatToken", "THREAT") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -90,8 +93,10 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         require(totalSupply() + amount <= MAX_SUPPLY, "Exceeds max supply");
         _mint(to, amount);
+        emit TokensMinted(to, amount);
     }
-     /**
+
+    /**
      * @dev Pause all token transfers
      */
     function pause() external onlyRole(PAUSER_ROLE) {
@@ -146,6 +151,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         
         engineStakes[msg.sender].push(newStake);
         totalStaked[msg.sender] += amount;
+        globalActiveStakes += amount; // Added
         
         uint256 stakeIndex = engineStakes[msg.sender].length - 1;
         emit Staked(msg.sender, amount, analysisId, stakeIndex);
@@ -167,6 +173,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         uint256 amount = stake.amount;
         stake.active = false;
         totalStaked[msg.sender] -= amount;
+        globalActiveStakes -= amount; // Added
         
         // Return tokens to engine
         _transfer(address(this), msg.sender, amount);
@@ -194,6 +201,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         
         stake.amount = remainingAmount;
         totalStaked[engine] -= slashAmount;
+        globalActiveStakes -= slashAmount; // Added
         
         // Burn slashed tokens (deflationary mechanism)
         _burn(address(this), slashAmount);
@@ -224,34 +232,41 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         require(!analysisRewards[analysisId].finalized, "Rewards already distributed");
         
         RewardPool storage rewardPool = analysisRewards[analysisId];
-        uint256 totalRewards = 0;
+        uint256 totalRewardsToMint = 0;
         
+        // First pass: Calculate total to mint
         for (uint256 i = 0; i < correctEngines.length; i++) {
             address engine = correctEngines[i];
             uint256 baseReward = _calculateBaseReward(engine, analysisId);
             uint256 finalReward = baseReward;
             
-            // Apply bonus for first correct analysis
             if (isFirstCorrect[i]) {
                 finalReward = (baseReward * BONUS_MULTIPLIER) / 100;
             }
             
             rewardPool.engineRewards[engine] = finalReward;
-            totalRewards += finalReward;
+            totalRewardsToMint += finalReward;
+        }
+        
+        // Check total mint against max supply
+        require(totalSupply() + totalRewardsToMint <= MAX_SUPPLY, "Exceeds max supply");
+        
+        // Second pass: Mint and distribute
+        for (uint256 i = 0; i < correctEngines.length; i++) {
+            address engine = correctEngines[i];
+            uint256 finalReward = rewardPool.engineRewards[engine];
             
             // Update reputation
             engineReputation[engine] += finalReward;
             
             // Mint and transfer rewards
-            if (totalSupply() + finalReward <= MAX_SUPPLY) {
-                _mint(engine, finalReward);
-                emit RewardDistributed(engine, finalReward, analysisId);
-                emit ReputationUpdated(engine, engineReputation[engine]);
-            }
+            _mint(engine, finalReward);
+            emit RewardDistributed(engine, finalReward, analysisId);
+            emit ReputationUpdated(engine, engineReputation[engine]);
         }
         
-        rewardPool.totalPool = totalRewards;
-        rewardPool.distributed = totalRewards;
+        rewardPool.totalPool = totalRewardsToMint;
+        rewardPool.distributed = totalRewardsToMint;
         rewardPool.finalized = true;
     }
     
@@ -337,10 +352,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         if (token == address(this)) {
             // Only recover excess tokens not part of active stakes
             uint256 contractBalance = balanceOf(address(this));
-            uint256 totalActiveStakes = 0;
-            
-            // This is a simplified calculation - in practice you'd want more sophisticated tracking
-            require(amount <= contractBalance - totalActiveStakes, "Cannot recover staked tokens");
+            require(amount <= contractBalance - globalActiveStakes, "Cannot recover staked tokens");
         }
         
         if (token == address(0)) {

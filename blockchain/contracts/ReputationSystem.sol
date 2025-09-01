@@ -1,3 +1,4 @@
+// Fixed ReputationSystem.sol
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
@@ -363,21 +364,43 @@ contract ReputationSystem is IReputationSystem, AccessControl {
         submission.isResolved = true;
 
         bool isCorrect = submission.prediction == actualResult;
-        _updateEngineReputation(submission.engine, submissionId, isCorrect);
+        uint256 reputationChange = _updateEngineReputation(submission.engine, submissionId, isCorrect);
 
-        uint256 reputationChange = 0; // Note: If needed, calculate or retrieve from _update
         emit SubmissionResolved(submissionId, isCorrect, reputationChange);
     }
 
-    function _updateEngineReputation(address engine, uint256 submissionId, bool isCorrect) internal {
+    function updateReputation(address engine, bool success) external override onlyRole(BOUNTY_MANAGER_ROLE) {
+        // Wrapper for compatibility if needed, but prefer resolveSubmission
+        EngineProfile storage profile = engines[engine];
+        uint256 oldReputation = profile.reputation;
+        uint256 change = success ? 10 : 5; // Example, adjust as needed
+        if (success) {
+            profile.reputation = (profile.reputation + change > MAX_REPUTATION) ? MAX_REPUTATION : profile.reputation + change;
+        } else {
+            profile.reputation = (profile.reputation > change) ? profile.reputation - change : MIN_REPUTATION;
+        }
+        emit ReputationUpdated(engine, oldReputation, profile.reputation, success ? "Success" : "Failure");
+    }
+
+    function _updateEngineReputation(address engine, uint256 submissionId, bool isCorrect) internal returns (uint256 reputationChange) {
         EngineProfile storage profile = engines[engine];
         SubmissionRecord storage submission = submissions[submissionId];
         
         uint256 oldReputation = profile.reputation;
-        uint256 reputationChange = isCorrect ? 
+        
+        // Calculate components
+        uint256 accuracyScore = _getAccuracyScore(engine);
+        uint256 participationScore = _getParticipationScore(engine);
+        uint256 consistencyScore = _getConsistencyScore(engine);
+        
+        // Weighted reputation base
+        uint256 weightedBase = (accuracyScore * ACCURACY_WEIGHT + participationScore * PARTICIPATION_WEIGHT + consistencyScore * CONSISTENCY_WEIGHT) / 100;
+        
+        // Adjust for this submission
+        reputationChange = isCorrect ? 
             _calculateReputationGain(engine, submissionId) : 
             _calculateReputationLoss(engine, submissionId);
-
+        
         if (isCorrect) {
             profile.correctPredictions += 1;
             profile.consecutiveCorrect += 1;
@@ -386,7 +409,7 @@ contract ReputationSystem is IReputationSystem, AccessControl {
                 profile.maxConsecutiveCorrect = profile.consecutiveCorrect;
             }
 
-            profile.reputation += reputationChange;
+            profile.reputation = (weightedBase + reputationChange > MAX_REPUTATION) ? MAX_REPUTATION : weightedBase + reputationChange;
             
         } else {
             profile.consecutiveCorrect = 0;
@@ -397,16 +420,7 @@ contract ReputationSystem is IReputationSystem, AccessControl {
                 profile.falseNegatives += 1;
             }
 
-            if (profile.reputation > reputationChange) {
-                profile.reputation -= reputationChange;
-            } else {
-                profile.reputation = MIN_REPUTATION;
-            }
-        }
-
-        // Cap reputation at maximum
-        if (profile.reputation > MAX_REPUTATION) {
-            profile.reputation = MAX_REPUTATION;
+            profile.reputation = (weightedBase > reputationChange) ? weightedBase - reputationChange : MIN_REPUTATION;
         }
 
         reputationHistory[engine].push(ReputationRecord({
@@ -417,6 +431,25 @@ contract ReputationSystem is IReputationSystem, AccessControl {
         }));
 
         emit ReputationUpdated(engine, oldReputation, profile.reputation, isCorrect ? "Correct prediction" : "Incorrect prediction");
+    }
+    
+    // Helper functions for weighted scores (added)
+    function _getAccuracyScore(address engine) internal view returns (uint256) {
+        EngineProfile storage profile = engines[engine];
+        if (profile.totalSubmissions < MIN_SUBMISSIONS_FOR_RATING) return 50; // Default
+        return (profile.correctPredictions * 100) / profile.totalSubmissions;
+    }
+    
+    function _getParticipationScore(address engine) internal view returns (uint256) {
+        EngineProfile storage profile = engines[engine];
+        // Example: Scale based on submissions, cap at 100
+        return profile.totalSubmissions > 100 ? 100 : profile.totalSubmissions;
+    }
+    
+    function _getConsistencyScore(address engine) internal view returns (uint256) {
+        EngineProfile storage profile = engines[engine];
+        // Example: Based on consecutive correct, cap at 100
+        return profile.maxConsecutiveCorrect > 100 ? 100 : profile.maxConsecutiveCorrect;
     }
 
     function _calculateReputationGain(address engine, uint256 submissionId) internal view returns (uint256) {
@@ -472,13 +505,10 @@ contract ReputationSystem is IReputationSystem, AccessControl {
 
     function getAnalystTier(address engine) external view returns (uint256) {
         uint256 reputation = engines[engine].reputation;
-        
-        // Determine tier based on reputation
-        if (reputation >= 800) return 4; // Expert
-        if (reputation >= 600) return 3; // Advanced
-        if (reputation >= 400) return 2; // Intermediate
-        if (reputation >= 200) return 1; // Beginner
-        return 0; // Novice
+        for (uint256 i = 4; i > 0; i--) {
+            if (reputation >= reputationTiers[i].minReputation) return i;
+        }
+        return 0;
     }
 
     function applyReputationDecay() external onlyRole(ADMIN_ROLE) {
@@ -526,6 +556,7 @@ contract ReputationSystem is IReputationSystem, AccessControl {
     function getTopAnalysts(uint256 limit) external view returns (address[] memory) {
         require(limit > 0 && limit <= activeEngines.length, "Invalid limit");
         
+        // NOTE: For efficiency, this could be improved with a better data structure, but kept as-is for now
         address[] memory sortedEngines = new address[](limit);
         
         for (uint256 i = 0; i < limit && i < activeEngines.length; i++) {
@@ -591,6 +622,7 @@ contract ReputationSystem is IReputationSystem, AccessControl {
         enginesList = new address[](limit);
         reputations = new uint256[](limit);
         
+        // NOTE: Same efficiency note as getTopAnalysts
         for (uint256 i = 0; i < limit && i < activeEngines.length; i++) {
             address maxEngine = activeEngines[0];
             uint256 maxReputation = 0;
