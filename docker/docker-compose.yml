@@ -1,0 +1,251 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    build:
+      context: .
+      dockerfile: docker/postgres.Dockerfile
+    container_name: nexus-postgres
+    environment:
+      POSTGRES_DB: nexus_security
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexus_dev_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d/migrations
+      - ./database/seeds:/docker-entrypoint-initdb.d/seeds
+    networks:
+      - nexus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus_security"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: nexus-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - nexus-network
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-nexus_redis_password}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: docker/api-gateway.Dockerfile
+    container_name: nexus-api-gateway
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus_dev_password}@postgres:5432/nexus_security
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus_redis_password}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key_here}
+      BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL:-http://localhost:8545}
+      ANALYSIS_ENGINE_URL: http://analysis-engine:8082
+      BOUNTY_MANAGER_URL: http://bounty-manager:8083
+      RUST_LOG: ${RUST_LOG:-info}
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexus-network
+    restart: unless-stopped
+
+  # Analysis Engine
+  analysis-engine:
+    build:
+      context: .
+      dockerfile: docker/analysis-engine.Dockerfile
+    container_name: nexus-analysis-engine
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus_dev_password}@postgres:5432/nexus_security
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus_redis_password}@redis:6379
+      RUST_LOG: ${RUST_LOG:-info}
+      YARA_RULES_PATH: /app/rules
+      UPLOAD_DIR: /app/uploads
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-104857600} # 100MB
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./backend/analysis-engine/rules:/app/rules
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexus-network
+    restart: unless-stopped
+
+  # Bounty Manager
+  bounty-manager:
+    build:
+      context: .
+      dockerfile: docker/bounty-manager.Dockerfile
+    container_name: nexus-bounty-manager
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus_dev_password}@postgres:5432/nexus_security
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus_redis_password}@redis:6379
+      BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL:-http://localhost:8545}
+      RUST_LOG: ${RUST_LOG:-info}
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexus-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: nexus-frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:8080
+      REACT_APP_WS_URL: ws://localhost:8080
+      REACT_APP_BLOCKCHAIN_NETWORK: ${BLOCKCHAIN_NETWORK:-localhost}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    depends_on:
+      - api-gateway
+    networks:
+      - nexus-network
+    restart: unless-stopped
+
+  # Local Ethereum Node (for development)
+  hardhat:
+    image: node:18-alpine
+    container_name: nexus-hardhat
+    working_dir: /app
+    command: sh -c "npm install && npx hardhat node --hostname 0.0.0.0"
+    environment:
+      NODE_ENV: development
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./blockchain:/app
+      - hardhat_cache:/app/cache
+      - hardhat_artifacts:/app/artifacts
+    networks:
+      - nexus-network
+
+  # IPFS Node (for storing analysis reports)
+  ipfs:
+    image: ipfs/kubo:latest
+    container_name: nexus-ipfs
+    ports:
+      - "4001:4001"    # P2P
+      - "5001:5001"    # API
+      - "8081:8080"    # Gateway
+    volumes:
+      - ipfs_data:/data/ipfs
+    networks:
+      - nexus-network
+    environment:
+      IPFS_PROFILE: server
+
+  # Nginx (Reverse Proxy)
+  nginx:
+    image: nginx:alpine
+    container_name: nexus-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/ssl/certs:ro
+    depends_on:
+      - api-gateway
+      - frontend
+    networks:
+      - nexus-network
+    restart: unless-stopped
+
+  # Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nexus-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - nexus-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nexus-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana:/etc/grafana/provisioning
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    networks:
+      - nexus-network
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  ipfs_data:
+    driver: local
+  hardhat_cache:
+    driver: local
+  hardhat_artifacts:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  nexus-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
