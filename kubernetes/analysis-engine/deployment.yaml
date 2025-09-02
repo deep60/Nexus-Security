@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analysis-engine
+  namespace: nexus-security
+  labels:
+    app: analysis-engine
+    component: backend
+    service: analysis
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: analysis-engine
+  template:
+    metadata:
+      labels:
+        app: analysis-engine
+        component: backend
+        service: analysis
+    spec:
+      containers:
+      - name: analysis-engine
+        image: nexus-security/analysis-engine:latest
+        ports:
+        - containerPort: 8081
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: analysis-engine-config
+              key: redis-url
+        - name: YARA_RULES_PATH
+          value: "/app/rules"
+        - name: MAX_FILE_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: analysis-engine-config
+              key: max-file-size
+        - name: ANALYSIS_TIMEOUT
+          valueFrom:
+            configMapKeyRef:
+              name: analysis-engine-config
+              key: analysis-timeout
+        - name: WORKER_THREADS
+          valueFrom:
+            configMapKeyRef:
+              name: analysis-engine-config
+              key: worker-threads
+        - name: API_GATEWAY_URL
+          valueFrom:
+            configMapKeyRef:
+              name: analysis-engine-config
+              key: api-gateway-url
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: yara-rules
+          mountPath: /app/rules
+          readOnly: true
+        - name: analysis-storage
+          mountPath: /tmp/analysis
+        - name: engine-config
+          mountPath: /app/config
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 10001
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: yara-rules
+        configMap:
+          name: yara-rules-config
+      - name: analysis-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: engine-config
+        configMap:
+          name: analysis-engine-config
+      serviceAccountName: analysis-engine-sa
+      securityContext:
+        fsGroup: 10001
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
