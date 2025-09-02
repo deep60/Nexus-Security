@@ -1,0 +1,198 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nexus-api-gateway-config
+  namespace: nexus-security
+  labels:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: nexus-security-platform
+data:
+  # Application configuration
+  app.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: 8000
+      workers: 4
+      max_connections: 1000
+      keep_alive_timeout: 75
+      request_timeout: 300
+      max_request_size: 104857600  # 100MB for file uploads
+    
+    cors:
+      allowed_origins:
+        - "https://nexus-security.com"
+        - "https://app.nexus-security.com"
+        - "https://admin.nexus-security.com"
+      allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+      allowed_headers: ["*"]
+      allow_credentials: true
+      max_age: 3600
+    
+    rate_limiting:
+      requests_per_minute: 100
+      burst_size: 200
+      whitelist_ips: []
+    
+    logging:
+      level: "info"
+      format: "json"
+      access_log: true
+      error_log: true
+    
+    services:
+      analysis_engine:
+        url: "http://nexus-analysis-service:8080"
+        timeout: 300
+        retry_count: 3
+      
+      bounty_manager:
+        url: "http://nexus-bounty-service:8081"
+        timeout: 30
+        retry_count: 3
+      
+      engine_manager:
+        url: "http://nexus-engine-service:8082"
+        timeout: 30
+        retry_count: 3
+      
+      blockchain_service:
+        url: "http://nexus-blockchain-service:8083"
+        timeout: 60
+        retry_count: 3
+      
+      auth_service:
+        url: "http://nexus-auth-service:8084"
+        timeout: 30
+        retry_count: 3
+      
+      reputation_service:
+        url: "http://nexus-reputation-service:8085"
+        timeout: 30
+        retry_count: 3
+    
+    security:
+      jwt_algorithm: "HS256"
+      token_expiry: 3600  # 1 hour
+      refresh_token_expiry: 604800  # 7 days
+      bcrypt_rounds: 12
+      max_file_size: 104857600  # 100MB
+      allowed_file_types:
+        - "application/x-executable"
+        - "application/x-dosexec"
+        - "application/pdf"
+        - "application/zip"
+        - "text/plain"
+        - "application/octet-stream"
+    
+    monitoring:
+      metrics_enabled: true
+      metrics_port: 9090
+      health_check_endpoint: "/health"
+      readiness_endpoint: "/ready"
+    
+    blockchain:
+      network: "mainnet"  # or "sepolia" for testnet
+      gas_limit: 500000
+      gas_price_multiplier: 1.2
+      confirmation_blocks: 3
+      retry_attempts: 5
+    
+    cache:
+      default_ttl: 300  # 5 minutes
+      analysis_result_ttl: 3600  # 1 hour
+      reputation_ttl: 1800  # 30 minutes
+
+  # Environment-specific overrides
+  production.yaml: |
+    logging:
+      level: "warn"
+    
+    rate_limiting:
+      requests_per_minute: 200
+      burst_size: 400
+    
+    services:
+      analysis_engine:
+        timeout: 600  # 10 minutes for complex analysis
+    
+    security:
+      bcrypt_rounds: 14
+    
+    monitoring:
+      metrics_enabled: true
+
+  # Health check script
+  health_check.sh: |
+    #!/bin/bash
+    set -e
+    
+    # Check if the API gateway is responding
+    response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health)
+    
+    if [ "$response" -eq 200 ]; then
+        echo "API Gateway is healthy"
+        exit 0
+    else
+        echo "API Gateway health check failed with status: $response"
+        exit 1
+    fi
+
+  # Startup script
+  startup.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Starting Nexus Security API Gateway..."
+    
+    # Wait for database to be ready
+    until nc -z $DATABASE_HOST $DATABASE_PORT; do
+      echo "Waiting for database connection..."
+      sleep 2
+    done
+    
+    # Wait for Redis to be ready
+    until nc -z $REDIS_HOST $REDIS_PORT; do
+      echo "Waiting for Redis connection..."
+      sleep 2
+    done
+    
+    echo "Dependencies ready, starting application..."
+    exec ./api-gateway
+
+  # NGINX upstream configuration for load balancing
+  nginx.conf: |
+    upstream api_backend {
+        least_conn;
+        server nexus-api-gateway-service:8000 max_fails=3 fail_timeout=30s;
+    }
+    
+    server {
+        listen 80;
+        server_name api.nexus-security.com;
+        
+        client_max_body_size 100M;
+        client_body_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 300s;
+        
+        location / {
+            proxy_pass http://api_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Enable proxy buffering for better performance
+            proxy_buffering on;
+            proxy_buffer_size 4k;
+            proxy_buffers 8 4k;
+        }
+        
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }

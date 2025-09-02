@@ -69,3 +69,24 @@ ENV UPLOAD_DIR=/app/uploads
 
 # Run database migrations and start the API gateway
 CMD ["./api-gateway"]
+
+
+# api-gateway.Dockerfile
+# This dockerfile builds the main API service with:
+
+# Multi-stage build for optimization
+# Database migration support
+# Security hardening with non-root user
+# Health checks for monitoring
+# Upload handling capabilities
+# JWT/authentication support through runtime dependencies
+
+
+
+# Key Features of Both:
+
+# Security-first approach - non-root users, minimal attack surface
+# Production-ready - health checks, proper logging, error handling
+# Optimized builds - multi-stage builds to reduce image size
+# Monitoring support - health endpoints for orchestration
+# Environment flexibility - configurable through environment variables

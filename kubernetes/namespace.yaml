@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nexus-security
+  labels:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: threat-intelligence
+    app.kubernetes.io/part-of: nexus-security-platform
+    environment: production
+    project: nexus-security
+  annotations:
+    description: "Decentralized threat intelligence marketplace namespace"
+    contact: "security-team@nexus-security.com"
+    version: "1.0.0"
+---
+# Resource Quota for the namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: nexus-security-quota
+  namespace: nexus-security
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: 20Gi
+    limits.cpu: "20"
+    limits.memory: 40Gi
+    persistentvolumeclaims: "10"
+    services: "20"
+    secrets: "20"
+    configmaps: "20"
+    pods: "50"
+---
+# Network Policy for security isolation
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nexus-security-network-policy
+  namespace: nexus-security
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: nexus-security
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+  egress:
+  - {} # Allow all egress for blockchain connectivity and external APIs
+---
+# Service Account for Nexus Security applications
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nexus-security-sa
+  namespace: nexus-security
+  labels:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: service-account
+automountServiceAccountToken: true

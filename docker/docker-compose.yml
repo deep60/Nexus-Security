@@ -1,3 +1,33 @@
+# Core Services:
+
+# PostgreSQL: Custom database with threat intelligence extensions
+# Redis: For caching and session management
+# API Gateway: Main REST API service
+# Analysis Engine: Threat analysis microservice
+# Bounty Manager: Handles bounty logic and payments
+# Frontend: React web application
+
+# Development Tools:
+
+# Hardhat: Local Ethereum blockchain for smart contract testing
+# IPFS: Decentralized storage for analysis reports
+# Nginx: Reverse proxy and load balancer
+
+# Monitoring Stack:
+
+# Prometheus: Metrics collection
+# Grafana: Monitoring dashboards with admin interface
+
+# Key Features:
+
+# Health checks for all services
+# Volume persistence for data
+# Environment variable configuration
+# Proper service dependencies
+# Custom network isolation
+# Development-friendly file mounting
+
+
 version: '3.8'
 
 services:

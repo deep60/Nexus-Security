@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexus-api-gateway-service
+  namespace: nexus-security
+  labels:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: nexus-security-platform
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"  # For AWS
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8000
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: api-gateway
+  sessionAffinity: None
+
+---
+# Headless service for service discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexus-api-gateway-headless
+  namespace: nexus-security
+  labels:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: nexus-security-platform
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: http
+    port: 8000
+    targetPort: http
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: api-gateway
+  publishNotReadyAddresses: true
+
+---
+# Service Monitor for Prometheus (if using Prometheus Operator)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nexus-api-gateway-metrics
+  namespace: nexus-security
+  labels:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: api-gateway
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nexus-security
+      app.kubernetes.io/component: api-gateway
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+  namespaceSelector:
+    matchNames:
+    - nexus-security
+
+---
+# Service for external load balancer (if needed)
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexus-api-gateway-external
+  namespace: nexus-security
+  labels:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: api-gateway-external
+    app.kubernetes.io/part-of: nexus-security-platform
+  annotations:
+    # Cloud provider specific annotations
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "10"
+    service.beta.kubernetes.io/aws-load-balancer-healthy-threshold: "2"
+    service.beta.kubernetes.io/aws-load-balancer-unhealthy-threshold: "3"
+    
+    # For GKE
+    cloud.google.com/load-balancer-type: "External"
+    cloud.google.com/backend-config: '{"default": "nexus-backend-config"}'
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: http
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: api-gateway
+  loadBalancerSourceRanges:
+  - "0.0.0.0/0"  # Adjust based on your security requirements
+
+---
+# Backend configuration for GKE (if using Google Cloud)
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: nexus-backend-config
+  namespace: nexus-security
+  labels:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: api-gateway
+spec:
+  timeoutSec: 300
+  connectionDraining:
+    drainingTimeoutSec: 60
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /health
+    port: 8000
+  logging:
+    enable: true
+    sampleRate: 1.0
+  sessionAffinity:
+    affinityType: "CLIENT_IP"
+    affinityCookieTtlSec: 3600
