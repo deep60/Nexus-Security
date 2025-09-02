@@ -1,4 +1,22 @@
 # Custom PostgreSQL image with extensions for threat intelligence
+# Database Enhancements:
+
+# Custom Extensions: UUID, crypto, full-text search, hstore
+# Threat Intelligence Types: Custom enums for threat levels, bounty status
+# Performance Optimization: Proper indexing strategy
+# Audit Logging: Complete change tracking
+# Statistics Views: Materialized views for analytics
+# Security: Row-level security, multiple roles
+
+# Operational Features:
+
+# Migration System: Automatic schema migration on startup
+# Seed Data: Test data loading capability
+# Health Checks: Comprehensive database health validation
+# Backup Ready: Archive configuration for point-in-time recovery
+
+
+
 FROM postgres:15-alpine
 
 # Install additional extensions and tools

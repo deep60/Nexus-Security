@@ -83,3 +83,29 @@ ENV UPLOAD_DIR=/app/uploads
 
 # Run the analysis engine
 CMD ["./analysis-engine"]
+
+
+# analysis-engine.Dockerfile
+# This dockerfile builds the threat analysis service with:
+
+# Multi-stage build to keep the final image small
+# Analysis tools like YARA, pefile, ssdeep for malware detection
+# Security hardening with non-root user
+# Health checks for container orchestration
+# YARA rules copied into the container
+# File analysis capabilities with proper permissions
+
+# Key Features of Both:
+
+# Security-first approach - non-root users, minimal attack surface
+# Production-ready - health checks, proper logging, error handling
+# Optimized builds - multi-stage builds to reduce image size
+# Monitoring support - health endpoints for orchestration
+# Environment flexibility - configurable through environment variables
+
+
+# # Build analysis engine
+# docker build -f docker/analysis-engine.Dockerfile -t nexus-analysis-engine .
+
+# # Build API gateway  
+# docker build -f docker/api-gateway.Dockerfile -t nexus-api-gateway .
