@@ -1,0 +1,195 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nexus-security-ingress
+  namespace: nexus-security
+  labels:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: ingress
+  annotations:
+    # NGINX Ingress Controller annotations
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' wss: https:; font-src 'self' https://fonts.gstatic.com;" always;
+    
+    # Rate limiting for API protection
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    
+    # Large file upload support for malware samples
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/client-max-body-size: "100m"
+    
+    # Timeouts for long-running analysis
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    
+    # CORS for web3 integration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://nexus-security.com, https://app.nexus-security.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-API-Key"
+    
+    # Load balancing
+    nginx.ingress.kubernetes.io/load-balance: "ewma"
+    
+    # WebSocket support for real-time updates
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/websocket-services: "nexus-websocket-service"
+
+spec:
+  tls:
+  - hosts:
+    - nexus-security.com
+    - api.nexus-security.com
+    - app.nexus-security.com
+    - ws.nexus-security.com
+    secretName: nexus-security-tls
+  
+  rules:
+  # Main web application
+  - host: nexus-security.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus-web-service
+            port:
+              number: 80
+  
+  # Web application (app subdomain)
+  - host: app.nexus-security.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus-web-service
+            port:
+              number: 80
+  
+  # API endpoints
+  - host: api.nexus-security.com
+    http:
+      paths:
+      # File upload and analysis API
+      - path: /v1/analyze
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus-analysis-service
+            port:
+              number: 8080
+      
+      # Bounty management API
+      - path: /v1/bounties
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus-bounty-service
+            port:
+              number: 8081
+      
+      # Engine management API
+      - path: /v1/engines
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus-engine-service
+            port:
+              number: 8082
+      
+      # Blockchain integration API
+      - path: /v1/blockchain
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus-blockchain-service
+            port:
+              number: 8083
+      
+      # User management and authentication
+      - path: /v1/auth
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus-auth-service
+            port:
+              number: 8084
+      
+      # Reputation and scoring API
+      - path: /v1/reputation
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus-reputation-service
+            port:
+              number: 8085
+      
+      # General API catch-all
+      - path: /v1
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus-api-gateway
+            port:
+              number: 8000
+  
+  # WebSocket for real-time updates
+  - host: ws.nexus-security.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus-websocket-service
+            port:
+              number: 8090
+
+---
+# Additional ingress for internal admin interface (with basic auth)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nexus-security-admin-ingress
+  namespace: nexus-security
+  labels:
+    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/component: admin-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: nexus-admin-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Nexus Security Admin Area"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
+spec:
+  tls:
+  - hosts:
+    - admin.nexus-security.com
+    secretName: nexus-security-admin-tls
+  
+  rules:
+  - host: admin.nexus-security.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus-admin-service
+            port:
+              number: 8888
