@@ -560,17 +560,17 @@ impl TryIntoCommonResult for yara_engine::AnalysisResult {
             0.0 
         };
 
-        Ok(AnalysisResult {
-            verdict,
-            confidence,
-            score,
-            details,
-            metadata,
-            timestamp: chrono::DateTime::from_timestamp(self.scan_time as i64, 0)
-                .unwrap_or_else(|| chrono::Utc::now()),
-            analyzer_name: self.engine_name,
-            analyzer_version: self.version,
-        })
+        // Ok(AnalysisResult {
+        //     verdict,
+        //     confidence,
+        //     score,
+        //     details,
+        //     metadata,
+        //     timestamp: chrono::DateTime::from_timestamp(self.scan_time as i64, 0)
+        //         .unwrap_or_else(|| chrono::Utc::now()),
+        //     analyzer_name: self.engine_name,
+        //     analyzer_version: self.version,
+        // })
     }
 }
 
@@ -621,6 +621,7 @@ mod tests {
 
         let analysis = result.unwrap();
         assert!(!analysis.analysis_summary.is_empty());
+        assert!(analysis.metadata.contains_key("analyzers_run")); // Improved assertion
     }
 
     #[test]
