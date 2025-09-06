@@ -1,0 +1,14 @@
+/Users/arjun/Developer/Nexus-Security/backend/target/debug/deps/clang_sys-c9aaa9a41a36ac3e.d: /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/lib.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/support.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/link.rs /Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/macros.rs /Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/common.rs /Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/dynamic.rs
+
+/Users/arjun/Developer/Nexus-Security/backend/target/debug/deps/libclang_sys-c9aaa9a41a36ac3e.rlib: /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/lib.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/support.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/link.rs /Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/macros.rs /Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/common.rs /Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/dynamic.rs
+
+/Users/arjun/Developer/Nexus-Security/backend/target/debug/deps/libclang_sys-c9aaa9a41a36ac3e.rmeta: /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/lib.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/support.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/link.rs /Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/macros.rs /Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/common.rs /Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/dynamic.rs
+
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/lib.rs:
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/support.rs:
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clang-sys-1.8.1/src/link.rs:
+/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/macros.rs:
+/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/common.rs:
+/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out/dynamic.rs:
+
+# env-dep:OUT_DIR=/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/clang-sys-f1799aecefe114da/out

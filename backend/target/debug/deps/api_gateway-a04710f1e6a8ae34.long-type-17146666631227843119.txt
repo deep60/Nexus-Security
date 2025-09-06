@@ -1,2 +1,0 @@
-fn(axum::extract::State<submission::AppState>, axum::extract::Path<Uuid>) -> impl futures::Future<Output = std::result::Result<axum::Json<DetailedSubmissionResponse>, axum::http::StatusCode>> {get_submission_details}
-fn(axum::extract::State<submission::AppState>, axum::extract::Path<Uuid>) -> impl futures::Future<Output = std::result::Result<axum::Json<DetailedSubmissionResponse>, axum::http::StatusCode>> {get_submission_details}: Handler<_, _>
