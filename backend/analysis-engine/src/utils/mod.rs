@@ -5,6 +5,7 @@ pub use file_handler::{FileHandler, FileMetadata, AnalysisStatus};
 
 use anyhow::Result;
 use std::collections::HashMap;
+use crate::utils::sanitize_filename;
 
 /// Common error types used across the analysis engine
 #[derive(Debug, thiserror::Error)]
@@ -229,8 +230,8 @@ pub mod macros {
         };
         ($fmt:expr, $($arg:tt)*) => {
             let msg = format!($fmt, $($arg)*);
-            eprintln!("ERROR: {}", &msg);
-            return Err(EngineError::AnalysisError(msg));
+            tracing::error("{}", &msg);
+            return Err(EngineError::AnalysisError($msg.to_string()));
         };
     }
     

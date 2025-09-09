@@ -351,18 +351,12 @@ async fn engines_status(
 }
 
 async fn perform_file_analysis(
-    _state: AppState,
+    state: AppState,
     analysis_id: &str,
     file_path: &str,
-    _request: Option<AnalysisRequest>,
+    request: Option<AnalysisRequest>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Starting file analysis for: {} ({})", analysis_id, file_path);
-
-    // TODO: Implement actual analysis once analyzer interfaces are fixed
-    // For now, just simulate the analysis
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-    
-    info!("Analysis completed for: {}", analysis_id);
+    let file_data = state.file_handler.get_file(file_path).await?;
     Ok(())
 }
 
