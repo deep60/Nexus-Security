@@ -1,3 +1,8 @@
+use chrono;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use uuid::Uuid;
+
 pub mod analysis_result;
 
 // Re-export commonly used types for convenience
@@ -23,10 +28,6 @@ pub use analysis_result::{
     YaraString,
     YaraStringInstance,
 };
-
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use uuid::Uuid;
 
 /// Configuration for an analysis engine
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,29 +275,29 @@ pub struct CacheEntry {
 }
 
 /// Error types specific to the analysis engine
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
-    /// File not found or inaccessible
+    #[error("File not found: {path}")]
     FileNotFound { path: String },
-    /// File too large for analysis
+    #[error("File too large: {size} bytes (max: {max_size} bytes)")]
     FileTooLarge { size: u64, max_size: u64 },
-    /// Unsupported file type
+    #[error("Unsupported file type: {mime_type}")]
     UnsupportedFileType { mime_type: String },
-    /// Engine execution timeout
+    #[error("Engine '{engine_name}' timed out after {timeout_seconds} seconds")]
     EngineTimeout { engine_name: String, timeout_seconds: u32 },
-    /// Engine execution error
+    #[error("Engine '{engine_name}' error: {error}")]
     EngineError { engine_name: String, error: String },
-    /// Insufficient resources
+    #[error("Insufficient resources: {resource_type}")]
     InsufficientResources { resource_type: String },
-    /// Invalid analysis request
+    #[error("Invalid request: {reason}")]
     InvalidRequest { reason: String },
-    /// Database error
-    DatabaseError { error: String },
-    /// Storage error
-    StorageError { error: String },
-    /// Network error
-    NetworkError { error: String },
-    /// Configuration error
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] anyhow::Error),
+    #[error("Storage error: {0}")]
+    StorageError(#[from] anyhow::Error),
+    #[error("Network error: {0}")]
+    NetworkError(#[from] anyhow::Error),
+    #[error("Configuration error: {error}")]
     ConfigurationError { error: String },
 }
 

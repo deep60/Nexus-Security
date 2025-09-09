@@ -8,6 +8,7 @@ use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use anyhow::{Result, anyhow};
 use md5;
+use crate::utils::sanitize_filename;
 
 /// maximum file size allowed (100MB)
 const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;

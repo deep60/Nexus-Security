@@ -289,11 +289,11 @@ impl YaraEngine {
         }
 
         // Simulate compilation - in reality you'd do:
-        // let mut compiler = yara::Compiler::new()?;
-        // for rule in &self.loaded_rules {
-        //     compiler.add_rules_str(&rule.content)?;
-        // }
-        // self.compiled_rules = Some(compiler.compile_rules()?);
+        let mut compiler = Compiler::new()?;
+        for rule in &self.loaded_rules {
+            compiler.add_rules_str(&rule.content)?;
+        }
+        self.compiled_rules = Some(compiler.compile_rules()?);
 
         debug!("Successfully compiled {} YARA rules", self.loaded_rules.len());
         Ok(())

@@ -40,6 +40,7 @@ pub struct MatchDetails {
     pub strings: Vec<YaraString>,
 }
 
+
 // Severity level of detected threats
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SeverityLevel {
@@ -48,6 +49,19 @@ pub enum SeverityLevel {
     Medium,
     Low,
     Info,
+}
+
+impl SeverityLevel {
+    pub fn max(self, other: Self) -> Self {
+        use SeverityLevel::*;
+        match (self, other) {
+            (Critical, _) | (_, Critical) => Critical,
+            (High, _) | (_, High) => High,
+            (Medium, _) | (_, Medium) => Medium,
+            (Low, _) | (_, Low) => Low,
+            _ => Info,
+        }
+    }
 }
 
 /// Type of analysis engine that produced the result
@@ -223,17 +237,12 @@ pub struct SectionInfo {
 /// Network indicators found during analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkIndicators {
-    /// IP addresses contacted
     pub ip_addresses: Vec<String>,
-    /// Domain names contacted
     pub domains: Vec<String>,
-    /// URLs accessed
     pub urls: Vec<String>,
-    /// Email addresses found
     pub email_addresses: Vec<String>,
-    /// Network protocols used
-    pub protocols: Vec<String>,
 }
+
 
 /// Behavioral analysis results
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -406,16 +415,17 @@ impl AnalysisResult {
             }
 
             // Update maximum severity
-            max_severity = match (&max_severity, &detection.severity) {
-                (_, SeverityLevel::Critical) => SeverityLevel::Critical,
-                (SeverityLevel::Critical, _) => SeverityLevel::Critical,
-                (_, SeverityLevel::High) => SeverityLevel::High,
-                (SeverityLevel::High, _) => SeverityLevel::High,
-                (_, SeverityLevel::Medium) => SeverityLevel::Medium,
-                (SeverityLevel::Medium, _) => SeverityLevel::Medium,
-                (_, SeverityLevel::Low) => SeverityLevel::Low,
-                _ => max_severity,
-            };
+            // max_severity = match (&max_severity, &detection.severity) {
+            //     (_, SeverityLevel::Critical) => SeverityLevel::Critical,
+            //     (SeverityLevel::Critical, _) => SeverityLevel::Critical,
+            //     (_, SeverityLevel::High) => SeverityLevel::High,
+            //     (SeverityLevel::High, _) => SeverityLevel::High,
+            //     (_, SeverityLevel::Medium) => SeverityLevel::Medium,
+            //     (SeverityLevel::Medium, _) => SeverityLevel::Medium,
+            //     (_, SeverityLevel::Low) => SeverityLevel::Low,
+            //     _ => max_severity,
+            // };
+            max_severity = max_severity.max(detection.severity.clone());
         }
 
         self.consensus_confidence = total_confidence / self.detections.len() as f32;
@@ -463,7 +473,7 @@ impl AnalysisResult {
         let mut categories = Vec::new();
         for detection in &self.detections {
             for category in &detection.categories {
-                if !categories.iter().any(|c| std::mem::discriminant(c) == std::mem::discriminant(category)) {
+                if !categories.contains(category) {
                     categories.push(category.clone());
                 }
             }
