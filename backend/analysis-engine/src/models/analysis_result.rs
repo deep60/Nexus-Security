@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-/// Represents the verdict of a threat analysis
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ThreatVerdict {
     Malicious,
@@ -12,7 +11,6 @@ pub enum ThreatVerdict {
     Unknown,
 }
 
-/// Confidence level for analysis results
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ConfidenceLevel {
     High,
@@ -20,7 +18,6 @@ pub enum ConfidenceLevel {
     Low,
 }
 
-/// Threat level classification
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ThreatLevel {
     Clean,
@@ -30,7 +27,6 @@ pub enum ThreatLevel {
     Critical,
 }
 
-/// Match details for YARA rules
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchDetails {
     pub rule_name: String,
@@ -40,9 +36,7 @@ pub struct MatchDetails {
     pub strings: Vec<YaraString>,
 }
 
-
-// Severity level of detected threats
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd, Ord, Eq)]
 pub enum SeverityLevel {
     Critical,
     High,
@@ -64,7 +58,6 @@ impl SeverityLevel {
     }
 }
 
-/// Type of analysis engine that produced the result
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum EngineType {
     Static,
@@ -77,7 +70,6 @@ pub enum EngineType {
     Ml,
 }
 
-/// Detected threat categories
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ThreatCategory {
     Malware,
@@ -94,270 +86,159 @@ pub enum ThreatCategory {
     Other(String),
 }
 
-/// Individual detection result from a specific engine
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetectionResult {
-    /// Unique identifier for this detection
     pub detection_id: Uuid,
-    /// Name of the engine that produced this result
     pub engine_name: String,
-    /// Version of the engine
     pub engine_version: String,
-    /// Type of analysis engine
     pub engine_type: EngineType,
-    /// The verdict from this engine
     pub verdict: ThreatVerdict,
-    /// Confidence score (0.0 to 1.0)
     pub confidence: f32,
-    /// Severity assessment
     pub severity: SeverityLevel,
-    /// Detected threat categories
     pub categories: Vec<ThreatCategory>,
-    /// Engine-specific metadata
     pub metadata: HashMap<String, serde_json::Value>,
-    /// Time when this detection was performed
     pub detected_at: DateTime<Utc>,
-    /// Processing time in milliseconds
     pub processing_time_ms: u64,
-    /// Any error messages from the engine
     pub error_message: Option<String>,
 }
 
-/// YARA rule match information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YaraMatch {
-    /// Name of the matched rule
     pub rule_name: String,
-    /// Rule namespace
     pub namespace: Option<String>,
-    /// Tags associated with the rule
     pub tags: Vec<String>,
-    /// Rule metadata
     pub meta: HashMap<String, String>,
-    /// Matched strings and their positions
     pub strings: Vec<YaraString>,
 }
 
-/// Information about matched strings in YARA rules
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YaraString {
-    /// String identifier
     pub identifier: String,
-    /// Matched instances
     pub instances: Vec<YaraStringInstance>,
 }
 
-/// Individual string match instance
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YaraStringInstance {
-    /// Offset in the file where match occurred
     pub offset: u64,
-    /// Length of the matched string
     pub length: u32,
-    /// The actual matched data (first 256 bytes)
     pub matched_data: Option<String>,
 }
 
-/// File analysis metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileMetadata {
-    /// Original filename
     pub filename: Option<String>,
-    /// File size in bytes
     pub file_size: u64,
-    /// MIME type
     pub mime_type: String,
-    /// MD5 hash
     pub md5: String,
-    /// SHA1 hash
     pub sha1: String,
-    /// SHA256 hash
     pub sha256: String,
-    /// SHA512 hash
     pub sha512: Option<String>,
-    /// File entropy (randomness measure)
     pub entropy: Option<f64>,
-    /// File magic bytes signature
     pub magic_bytes: Option<String>,
-    /// PE/ELF/Mach-O specific information
     pub executable_info: Option<ExecutableInfo>,
 }
 
-/// Executable file specific information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutableInfo {
-    /// Architecture (x86, x64, ARM, etc.)
     pub architecture: String,
-    /// Entry point address
     pub entry_point: Option<u64>,
-    /// Compilation timestamp
     pub compile_time: Option<DateTime<Utc>>,
-    /// Imported libraries/DLLs
     pub imports: Vec<String>,
-    /// Exported functions
     pub exports: Vec<String>,
-    /// Digital signature information
     pub signature_info: Option<SignatureInfo>,
-    /// Sections information
     pub sections: Vec<SectionInfo>,
 }
 
-/// Digital signature information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignatureInfo {
-    /// Is the signature valid
     pub is_valid: bool,
-    /// Signer name
     pub signer: Option<String>,
-    /// Certificate issuer
-    pub issuer: Option<String>,
-    /// Signature algorithm
-    pub algorithm: Option<String>,
-    /// Signing timestamp
-    pub signed_at: Option<DateTime<Utc>>,
 }
 
-/// Section information for executables
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SectionInfo {
-    /// Section name
     pub name: String,
-    /// Virtual address
-    pub virtual_address: u64,
-    /// Virtual size
-    pub virtual_size: u32,
-    /// Raw size
-    pub raw_size: u32,
-    /// Section characteristics/permissions
-    pub characteristics: Vec<String>,
-    /// Entropy of this section
-    pub entropy: Option<f64>,
+    pub size: u64,
+    pub entropy: f64,
 }
 
-/// Network indicators found during analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkIndicators {
-    pub ip_addresses: Vec<String>,
-    pub domains: Vec<String>,
     pub urls: Vec<String>,
-    pub email_addresses: Vec<String>,
+    pub ips: Vec<String>,
+    pub domains: Vec<String>,
 }
 
-
-/// Behavioral analysis results
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BehavioralAnalysis {
-    /// Files created/modified
-    pub file_operations: Vec<FileOperation>,
-    /// Registry keys accessed (Windows)
-    pub registry_operations: Vec<RegistryOperation>,
-    /// Processes spawned
     pub process_operations: Vec<ProcessOperation>,
-    /// Network connections made
+    pub file_operations: Vec<FileOperation>,
+    pub registry_operations: Vec<RegistryOperation>,
     pub network_operations: Vec<NetworkOperation>,
-    /// System calls made
-    pub system_calls: Vec<String>,
 }
 
-/// File operation during behavioral analysis
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileOperation {
-    pub operation_type: String, // create, modify, delete, read
-    pub file_path: String,
-    pub timestamp: DateTime<Utc>,
-}
-
-/// Registry operation (Windows specific)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegistryOperation {
-    pub operation_type: String, // create, modify, delete, query
-    pub key_path: String,
-    pub value_name: Option<String>,
-    pub value_data: Option<String>,
-    pub timestamp: DateTime<Utc>,
-}
-
-/// Process operation during analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessOperation {
-    pub operation_type: String, // create, terminate, inject
-    pub process_name: String,
-    pub process_id: Option<u32>,
-    pub command_line: Option<String>,
-    pub parent_process: Option<String>,
-    pub timestamp: DateTime<Utc>,
+    pub operation: String,
+    pub process_id: u32,
+    pub details: HashMap<String, String>,
 }
 
-/// Network operation during analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileOperation {
+    pub operation: String,
+    pub path: String,
+    pub details: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistryOperation {
+    pub operation: String,
+    pub key: String,
+    pub value: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkOperation {
-    pub operation_type: String, // connect, listen, dns_query
+    pub operation: String,
+    pub destination: String,
     pub protocol: String,
-    pub local_address: Option<String>,
-    pub remote_address: Option<String>,
-    pub port: Option<u16>,
-    pub data_size: Option<u64>,
-    pub timestamp: DateTime<Utc>,
+    pub data_size: u64,
 }
 
-/// Main analysis result containing all information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnalysisResult {
-    /// Unique identifier for this analysis
-    pub analysis_id: Uuid,
-    /// Identifier of the original submission
-    pub submission_id: Uuid,
-    /// Bounty ID if this analysis is part of a bounty
-    pub bounty_id: Option<Uuid>,
-    /// File metadata
-    pub file_metadata: FileMetadata,
-    /// Overall consensus verdict
-    pub consensus_verdict: ThreatVerdict,
-    /// Overall confidence score (0.0 to 1.0)
-    pub consensus_confidence: f32,
-    /// Overall severity assessment
-    pub consensus_severity: SeverityLevel,
-    /// Individual detection results from different engines
-    pub detections: Vec<DetectionResult>,
-    /// YARA rule matches
-    pub yara_matches: Vec<YaraMatch>,
-    /// Network indicators
-    pub network_indicators: Option<NetworkIndicators>,
-    /// Behavioral analysis results
-    pub behavioral_analysis: Option<BehavioralAnalysis>,
-    /// Analysis tags
-    pub tags: Vec<String>,
-    /// Additional context or notes
-    pub notes: Option<String>,
-    /// When the analysis started
-    pub started_at: DateTime<Utc>,
-    /// When the analysis completed
-    pub completed_at: Option<DateTime<Utc>>,
-    /// Total processing time in milliseconds
-    pub total_processing_time_ms: Option<u64>,
-    /// Analysis status
-    pub status: AnalysisStatus,
-    /// Error message if analysis failed
-    pub error_message: Option<String>,
-    /// Cost of this analysis in platform tokens
-    pub analysis_cost: Option<u64>,
-    /// Reputation scores of engines that participated
-    pub engine_reputations: HashMap<String, f32>,
-}
-
-/// Status of the analysis
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum AnalysisStatus {
     Pending,
     InProgress,
     Completed,
     Failed,
-    Cancelled,
-    Timeout,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisResult {
+    pub analysis_id: Uuid,
+    pub submission_id: Uuid,
+    pub bounty_id: Option<Uuid>,
+    pub file_metadata: FileMetadata,
+    pub consensus_verdict: ThreatVerdict,
+    pub consensus_confidence: f32,
+    pub consensus_severity: SeverityLevel,
+    pub detections: Vec<DetectionResult>,
+    pub yara_matches: Vec<YaraMatch>,
+    pub network_indicators: Option<NetworkIndicators>,
+    pub behavioral_analysis: Option<BehavioralAnalysis>,
+    pub tags: Vec<String>,
+    pub notes: Option<String>,
+    pub started_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub total_processing_time_ms: Option<u64>,
+    pub status: AnalysisStatus,
+    pub error_message: Option<String>,
+    pub analysis_cost: Option<f64>,
+    pub engine_reputations: HashMap<String, f32>,
 }
 
 impl AnalysisResult {
-    /// Create a new analysis result with minimal required fields
     pub fn new(
         submission_id: Uuid,
         file_metadata: FileMetadata,
@@ -386,13 +267,11 @@ impl AnalysisResult {
         }
     }
 
-    /// Add a detection result from an engine
     pub fn add_detection(&mut self, detection: DetectionResult) {
         self.detections.push(detection);
         self.update_consensus();
     }
 
-    /// Calculate consensus verdict based on all detections
     fn update_consensus(&mut self) {
         if self.detections.is_empty() {
             return;
@@ -414,17 +293,6 @@ impl AnalysisResult {
                 ThreatVerdict::Unknown => {}
             }
 
-            // Update maximum severity
-            // max_severity = match (&max_severity, &detection.severity) {
-            //     (_, SeverityLevel::Critical) => SeverityLevel::Critical,
-            //     (SeverityLevel::Critical, _) => SeverityLevel::Critical,
-            //     (_, SeverityLevel::High) => SeverityLevel::High,
-            //     (SeverityLevel::High, _) => SeverityLevel::High,
-            //     (_, SeverityLevel::Medium) => SeverityLevel::Medium,
-            //     (SeverityLevel::Medium, _) => SeverityLevel::Medium,
-            //     (_, SeverityLevel::Low) => SeverityLevel::Low,
-            //     _ => max_severity,
-            // };
             max_severity = max_severity.max(detection.severity.clone());
         }
 
@@ -443,7 +311,6 @@ impl AnalysisResult {
         }
     }
 
-    /// Mark analysis as completed
     pub fn mark_completed(&mut self) {
         self.completed_at = Some(Utc::now());
         self.status = AnalysisStatus::Completed;
@@ -455,20 +322,17 @@ impl AnalysisResult {
         }
     }
 
-    /// Mark analysis as failed
     pub fn mark_failed(&mut self, error: String) {
         self.status = AnalysisStatus::Failed;
         self.error_message = Some(error);
         self.completed_at = Some(Utc::now());
     }
 
-    /// Check if analysis has high confidence malicious verdict
     pub fn is_high_confidence_malicious(&self) -> bool {
         matches!(self.consensus_verdict, ThreatVerdict::Malicious) 
             && self.consensus_confidence >= 0.8
     }
 
-    /// Get unique threat categories across all detections
     pub fn get_all_threat_categories(&self) -> Vec<ThreatCategory> {
         let mut categories = Vec::new();
         for detection in &self.detections {
@@ -481,7 +345,6 @@ impl AnalysisResult {
         categories
     }
 
-    /// Get engines that detected this as malicious
     pub fn get_malicious_engines(&self) -> Vec<&String> {
         self.detections
             .iter()

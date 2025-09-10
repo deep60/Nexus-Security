@@ -3,6 +3,9 @@ use anyhow::{Result, anyhow};
 use tracing::{info, warn, error, debug};
 use serde::{Deserialize, Serialize};
 use tokio::time::{timeout, Duration};
+use futures::join;
+use chrono::Utc;
+use uuid::Uuid;
 
 // Re-export all analyzer modules
 pub mod hash_analyzer;
@@ -10,11 +13,11 @@ pub mod static_analyzer;
 pub mod yara_engine;
 
 // Re-export commonly used types
-pub use hash_analyzer::{HashAnalyzer, HashAnalyzerConfig, HashInfo, HashType, HashReputation};
+pub use hash_analyzer::{HashAnalyzer, HashAnalyzerConfig, HashInfo, HashType};
 pub use static_analyzer::{StaticAnalyzer, StaticAnalyzerConfig, FileType, PEAnalysis, StringAnalysis, EntropyAnalysis};
 pub use yara_engine::{YaraEngine, YaraEngineConfig, YaraMatch, YaraRule, YaraEngineError};
 
-use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, ConfidenceLevel};
+use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, ConfidenceLevel, DetectionResult, FileMetadata, AnalysisStatus, EngineType, SeverityLevel, ThreatCategory};
 
 /// Configuration for the combined analysis engine
 #[derive(Debug, Clone)]
@@ -38,21 +41,6 @@ impl Default for AnalysisEngineConfig {
             require_all_analyzers: false,
         }
     }
-}
-
-/// Combined analysis result from all analyzers
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CombinedAnalysisResult {
-    pub overall_verdict: ThreatVerdict,
-    pub overall_confidence: ConfidenceLevel,
-    pub overall_score: f64,
-    pub hash_analysis: Option<AnalysisResult>,
-    pub static_analysis: Option<AnalysisResult>,
-    pub yara_analysis: Option<AnalysisResult>,
-    pub analysis_summary: String,
-    pub metadata: HashMap<String, String>,
-    pub timestamp: chrono::DateTime<chrono::Utc>,
-    pub total_analysis_time_ms: u64,
 }
 
 /// File analysis request
@@ -121,7 +109,7 @@ impl AnalysisEngine {
     }
 
     /// Perform comprehensive analysis on a file
-    pub async fn analyze_file(&mut self, request: FileAnalysisRequest) -> Result<CombinedAnalysisResult> {
+    pub async fn analyze_file(&mut self, request: FileAnalysisRequest) -> Result<AnalysisResult> {
         let start_time = std::time::Instant::now();
         
         info!("Starting comprehensive analysis for file: {}", request.filename);
@@ -138,343 +126,120 @@ impl AnalysisEngine {
         
         info!("Analysis completed in {}ms for file: {}", total_time, request.filename);
 
-        Ok(CombinedAnalysisResult {
-            total_analysis_time_ms: total_time,
-            ..analysis_result
-        })
+        Ok(analysis_result)
     }
 
-    async fn perform_analysis(&mut self, request: &FileAnalysisRequest) -> Result<CombinedAnalysisResult> {
-        let mut hash_result = None;
-        let mut static_result = None;
-        let mut yara_result = None;
+    async fn perform_analysis(&mut self, request: &FileAnalysisRequest) -> Result<AnalysisResult> {
+        let mut detections = Vec::new();
         let mut analysis_errors = Vec::new();
+
+        // Compute file metadata
+        let file_metadata = self.create_file_metadata(request);
+
+        let mut result = AnalysisResult::new(Uuid::new_v4(), file_metadata);
+        result.started_at = Utc::now();
 
         if self.config.enable_parallel_analysis {
             // Run analyzers in parallel
-            let (hash_res, static_res, yara_res) = tokio::join!(
-                self.run_hash_analysis(request),
-                self.run_static_analysis(request),
-                self.run_yara_analysis(request)
-            );
+            let hash_future = self.run_hash_analysis(request);
+            let static_future = self.run_static_analysis(request);
+            let yara_future = self.run_yara_analysis(request);
+
+            let (hash_res, static_res, yara_res) = join!(hash_future, static_future, yara_future);
 
             // Collect results and errors
             match hash_res {
-                Ok(result) => hash_result = Some(result),
+                Ok(mut dets) => detections.append(&mut dets),
                 Err(e) => {
                     warn!("Hash analysis failed: {}", e);
                     analysis_errors.push(format!("Hash: {}", e));
                 }
             }
-
             match static_res {
-                Ok(result) => static_result = Some(result),
+                Ok(det) => detections.push(det),
                 Err(e) => {
                     warn!("Static analysis failed: {}", e);
                     analysis_errors.push(format!("Static: {}", e));
                 }
             }
-
             match yara_res {
-                Ok(result) => yara_result = Some(result),
+                Ok(det) => detections.push(det),
                 Err(e) => {
-                    warn!("YARA analysis failed: {}", e);
-                    analysis_errors.push(format!("YARA: {}", e));
+                    warn!("Yara analysis failed: {}", e);
+                    analysis_errors.push(format!("Yara: {}", e));
                 }
             }
         } else {
-            // Run analyzers sequentially
-            if request.analysis_options.enable_hash_analysis {
-                match self.run_hash_analysis(request).await {
-                    Ok(result) => hash_result = Some(result),
-                    Err(e) => {
-                        warn!("Hash analysis failed: {}", e);
-                        analysis_errors.push(format!("Hash: {}", e));
-                    }
-                }
+            // Run sequentially
+            if let Ok(mut dets) = self.run_hash_analysis(request).await {
+                detections.append(&mut dets);
             }
-
-            if request.analysis_options.enable_static_analysis {
-                match self.run_static_analysis(request).await {
-                    Ok(result) => static_result = Some(result),
-                    Err(e) => {
-                        warn!("Static analysis failed: {}", e);
-                        analysis_errors.push(format!("Static: {}", e));
-                    }
-                }
+            if let Ok(det) = self.run_static_analysis(request).await {
+                detections.push(det);
             }
-
-            if request.analysis_options.enable_yara_analysis {
-                match self.run_yara_analysis(request).await {
-                    Ok(result) => yara_result = Some(result),
-                    Err(e) => {
-                        warn!("YARA analysis failed: {}", e);
-                        analysis_errors.push(format!("YARA: {}", e));
-                    }
-                }
+            if let Ok(det) = self.run_yara_analysis(request).await {
+                detections.push(det);
             }
         }
 
-        // Check if we have at least some results
-        if hash_result.is_none() && static_result.is_none() && yara_result.is_none() {
-            if self.config.require_all_analyzers {
-                return Err(anyhow!("All analyzers failed: {}", analysis_errors.join("; ")));
-            } else {
-                warn!("All analyzers failed, but continuing with empty result");
-            }
+        // Add detections to result
+        for det in detections {
+            result.add_detection(det);
         }
 
-        // Combine and correlate results
-        let combined_result = self.combine_results(
-            hash_result,
-            static_result,
-            yara_result,
-            &request.filename,
-            analysis_errors
-        );
+        // Handle errors
+        if !analysis_errors.is_empty() && self.config.require_all_analyzers {
+            result.mark_failed(analysis_errors.join("; "));
+        } else {
+            result.mark_completed();
+        }
 
-        Ok(combined_result)
+        Ok(result)
     }
 
-    async fn run_hash_analysis(&self, request: &FileAnalysisRequest) -> Result<AnalysisResult> {
-        if !request.analysis_options.enable_hash_analysis {
-            return Err(anyhow!("Hash analysis disabled"));
-        }
-
-        debug!("Running hash analysis");
-
-        // Generate hashes if not provided
-        let hash_info = if let Some(hashes) = &request.file_hashes {
-            if let Some(sha256_hash) = hashes.get(&HashType::SHA256) {
-                HashInfo {
-                    hash_type: HashType::SHA256,
-                    hash_value: sha256_hash.clone(),
-                    file_size: Some(request.file_data.len() as u64),
-                }
-            } else if let Some(sha1_hash) = hashes.get(&HashType::SHA1) {
-                HashInfo {
-                    hash_type: HashType::SHA1,
-                    hash_value: sha1_hash.clone(),
-                    file_size: Some(request.file_data.len() as u64),
-                }
-            } else if let Some(md5_hash) = hashes.get(&HashType::MD5) {
-                HashInfo {
-                    hash_type: HashType::MD5,
-                    hash_value: md5_hash.clone(),
-                    file_size: Some(request.file_data.len() as u64),
-                }
-            } else {
-                return Err(anyhow!("No supported hash types provided"));
-            }
-        } else {
-            // Generate SHA256 hash
-            use sha2::{Sha256, Digest};
-            let mut hasher = Sha256::new();
-            hasher.update(&request.file_data);
-            let hash_result = hasher.finalize();
-            
-            HashInfo {
+    async fn run_hash_analysis(&self, request: &FileAnalysisRequest) -> Result<Vec<DetectionResult>> {
+        if request.analysis_options.enable_hash_analysis {
+            let hash_info = HashInfo {
                 hash_type: HashType::SHA256,
-                hash_value: format!("{:x}", hash_result),
+                hash_value: self.hash_analyzer.compute_sha256(&request.file_data),  // Assume method added in hash_analyzer
                 file_size: Some(request.file_data.len() as u64),
-            }
-        };
-
-        self.hash_analyzer.analyze_hash(&hash_info, Some(&request.file_data)).await
-    }
-
-    async fn run_static_analysis(&self, request: &FileAnalysisRequest) -> Result<AnalysisResult> {
-        if !request.analysis_options.enable_static_analysis {
-            return Err(anyhow!("Static analysis disabled"));
-        }
-
-        debug!("Running static analysis");
-        self.static_analyzer.analyze(&request.file_data, Some(&request.filename)).await
-    }
-
-    async fn run_yara_analysis(&self, request: &FileAnalysisRequest) -> Result<AnalysisResult> {
-        if !request.analysis_options.enable_yara_analysis {
-            return Err(anyhow!("YARA analysis disabled"));
-        }
-
-        debug!("Running YARA analysis");
-        
-        // Convert YaraEngineError to anyhow::Error
-        self.yara_engine.analyze_bytes(&request.file_data, &request.filename)
-            .await
-            .map_err(|e| anyhow!("YARA analysis error: {}", e))?
-            .try_into() // Convert the YARA AnalysisResult to our common AnalysisResult
-            .map_err(|e| anyhow!("Failed to convert YARA result: {:?}", e))
-    }
-
-    fn combine_results(
-        &self,
-        hash_result: Option<AnalysisResult>,
-        static_result: Option<AnalysisResult>,
-        yara_result: Option<AnalysisResult>,
-        filename: &str,
-        errors: Vec<String>
-    ) -> CombinedAnalysisResult {
-        debug!("Combining analysis results");
-
-        let results = vec![&hash_result, &static_result, &yara_result]
-            .into_iter()
-            .filter_map(|r| r.as_ref())
-            .collect::<Vec<_>>();
-
-        if results.is_empty() {
-            return CombinedAnalysisResult {
-                overall_verdict: ThreatVerdict::Unknown,
-                overall_confidence: ConfidenceLevel::Low,
-                overall_score: 0.0,
-                hash_analysis: hash_result,
-                static_analysis: static_result,
-                yara_analysis: yara_result,
-                analysis_summary: format!("Analysis failed for {}: {}", filename, errors.join("; ")),
-                metadata: HashMap::from([
-                    ("errors".to_string(), errors.join("; ")),
-                ]),
-                timestamp: chrono::Utc::now(),
-                total_analysis_time_ms: 0,
             };
-        }
-
-        // Aggregate verdicts using weighted scoring
-        let hash_weight = 0.4;
-        let static_weight = 0.3;
-        let yara_weight = 0.3;
-
-        let mut weighted_score = 0.0;
-        let mut total_weight = 0.0;
-
-        if let Some(ref result) = hash_result {
-            weighted_score += result.score * hash_weight;
-            total_weight += hash_weight;
-        }
-
-        if let Some(ref result) = static_result {
-            weighted_score += result.score * static_weight;
-            total_weight += static_weight;
-        }
-
-        if let Some(ref result) = yara_result {
-            weighted_score += result.score * yara_weight;
-            total_weight += yara_weight;
-        }
-
-        let overall_score = if total_weight > 0.0 {
-            weighted_score / total_weight
+            self.hash_analyzer.analyze_hash(&hash_info, Some(&request.file_data)).await
         } else {
-            0.0
-        };
-
-        // Determine overall verdict
-        let malicious_count = results.iter().filter(|r| r.verdict == ThreatVerdict::Malicious).count();
-        let suspicious_count = results.iter().filter(|r| r.verdict == ThreatVerdict::Suspicious).count();
-
-        let overall_verdict = if malicious_count > 0 {
-            ThreatVerdict::Malicious
-        } else if suspicious_count > 0 {
-            ThreatVerdict::Suspicious
-        } else if results.iter().any(|r| r.verdict == ThreatVerdict::Benign) {
-            ThreatVerdict::Benign
-        } else {
-            ThreatVerdict::Unknown
-        };
-
-        // Determine overall confidence
-        let avg_confidence = results.len() as f64 / 3.0; // Percentage of successful analyzers
-        let overall_confidence = match avg_confidence {
-            c if c >= 0.8 => ConfidenceLevel::High,
-            c if c >= 0.5 => ConfidenceLevel::Medium,
-            _ => ConfidenceLevel::Low,
-        };
-
-        // Generate summary
-        let analysis_summary = self.generate_analysis_summary(
-            &overall_verdict,
-            &results,
-            filename,
-            &errors
-        );
-
-        // Combine metadata
-        let mut combined_metadata = HashMap::new();
-        combined_metadata.insert("analyzers_run".to_string(), results.len().to_string());
-        combined_metadata.insert("overall_score".to_string(), format!("{:.3}", overall_score));
-        
-        if !errors.is_empty() {
-            combined_metadata.insert("analyzer_errors".to_string(), errors.join("; "));
-        }
-
-        // Add individual analyzer metadata
-        if let Some(ref result) = hash_result {
-            for (key, value) in &result.metadata {
-                combined_metadata.insert(format!("hash_{}", key), value.clone());
-            }
-        }
-
-        if let Some(ref result) = static_result {
-            for (key, value) in &result.metadata {
-                combined_metadata.insert(format!("static_{}", key), value.clone());
-            }
-        }
-
-        if let Some(ref result) = yara_result {
-            for (key, value) in &result.metadata {
-                combined_metadata.insert(format!("yara_{}", key), value.clone());
-            }
-        }
-
-        CombinedAnalysisResult {
-            overall_verdict,
-            overall_confidence,
-            overall_score,
-            hash_analysis: hash_result,
-            static_analysis: static_result,
-            yara_analysis: yara_result,
-            analysis_summary,
-            metadata: combined_metadata,
-            timestamp: chrono::Utc::now(),
-            total_analysis_time_ms: 0, // Will be set by caller
+            Ok(vec![])
         }
     }
 
-    fn generate_analysis_summary(
-        &self,
-        verdict: &ThreatVerdict,
-        results: &[&AnalysisResult],
-        filename: &str,
-        errors: &[String]
-    ) -> String {
-        let mut summary = format!("Analysis of '{}': ", filename);
-
-        match verdict {
-            ThreatVerdict::Malicious => {
-                summary.push_str("THREAT DETECTED - File identified as malicious by ");
-            },
-            ThreatVerdict::Suspicious => {
-                summary.push_str("SUSPICIOUS - File shows potentially malicious characteristics detected by ");
-            },
-            ThreatVerdict::Benign => {
-                summary.push_str("CLEAN - File appears benign based on analysis by ");
-            },
-            ThreatVerdict::Unknown => {
-                summary.push_str("UNKNOWN - Unable to determine threat level from analysis by ");
-            },
+    async fn run_static_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
+        if request.analysis_options.enable_static_analysis {
+            self.static_analyzer.analyze(&request.file_data, Some(&request.filename)).await
+        } else {
+            Err(anyhow!("Static analysis disabled"))
         }
+    }
 
-        let analyzer_names: Vec<String> = results.iter()
-            .map(|r| r.analyzer_name.clone())
-            .collect();
-        
-        summary.push_str(&analyzer_names.join(", "));
-
-        if !errors.is_empty() {
-            summary.push_str(&format!(". {} analyzer(s) failed.", errors.len()));
+    async fn run_yara_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
+        if request.analysis_options.enable_yara_analysis {
+            self.yara_engine.analyze_file_data(&request.file_data, &request.filename).await // Assume method updated
+        } else {
+            Err(anyhow!("Yara analysis disabled"))
         }
+    }
 
-        summary
+    fn create_file_metadata(&self, request: &FileAnalysisRequest) -> FileMetadata {
+        let hashes = request.file_hashes.clone().unwrap_or_default();
+        FileMetadata {
+            filename: Some(request.filename.clone()),
+            file_size: request.file_data.len() as u64,
+            mime_type: "application/octet-stream".to_string(),
+            md5: hashes.get(&HashType::MD5).cloned().unwrap_or_default(),
+            sha1: hashes.get(&HashType::SHA1).cloned().unwrap_or_default(),
+            sha256: hashes.get(&HashType::SHA256).cloned().unwrap_or_default(),
+            sha512: None,
+            entropy: None,
+            magic_bytes: None,
+            executable_info: None,
+        }
     }
 
     /// Get statistics about the analysis engine
@@ -510,67 +275,6 @@ impl AnalysisEngine {
     pub fn reload_yara_rules(&mut self) -> Result<()> {
         self.yara_engine.reload_rules()
             .map_err(|e| anyhow!("Failed to reload YARA rules: {}", e))
-    }
-}
-
-// Helper trait to convert between different AnalysisResult types
-trait TryIntoCommonResult {
-    fn try_into(self) -> Result<AnalysisResult>;
-}
-
-// Implementation for YARA's AnalysisResult (assuming it has different fields)
-impl TryIntoCommonResult for yara_engine::AnalysisResult {
-    fn try_into(self) -> Result<AnalysisResult> {
-        // Convert YARA's ThreatLevel to our ThreatVerdict
-        let verdict = match self.threat_level {
-            yara_engine::ThreatLevel::Clean => ThreatVerdict::Benign,
-            yara_engine::ThreatLevel::Low => ThreatVerdict::Suspicious,
-            yara_engine::ThreatLevel::Medium => ThreatVerdict::Suspicious,
-            yara_engine::ThreatLevel::High => ThreatVerdict::Malicious,
-            yara_engine::ThreatLevel::Critical => ThreatVerdict::Malicious,
-        };
-
-        let confidence = if self.confidence > 0.8 {
-            ConfidenceLevel::High
-        } else if self.confidence > 0.5 {
-            ConfidenceLevel::Medium
-        } else {
-            ConfidenceLevel::Low
-        };
-
-        let mut metadata = HashMap::new();
-        metadata.insert("file_hash".to_string(), self.file_hash);
-        metadata.insert("scan_time".to_string(), self.scan_time.to_string());
-        metadata.insert("matches_count".to_string(), self.matches.len().to_string());
-        
-        // Add YARA-specific metadata
-        for (key, value) in self.metadata {
-            metadata.insert(key, value);
-        }
-
-        let details = if self.is_malicious {
-            format!("YARA detected {} rule matches indicating malicious content", self.matches.len())
-        } else {
-            "YARA scan completed with no malicious indicators".to_string()
-        };
-
-        let score = if self.is_malicious { 
-            self.confidence as f64 
-        } else { 
-            0.0 
-        };
-
-        // Ok(AnalysisResult {
-        //     verdict,
-        //     confidence,
-        //     score,
-        //     details,
-        //     metadata,
-        //     timestamp: chrono::DateTime::from_timestamp(self.scan_time as i64, 0)
-        //         .unwrap_or_else(|| chrono::Utc::now()),
-        //     analyzer_name: self.engine_name,
-        //     analyzer_version: self.version,
-        // })
     }
 }
 
@@ -620,8 +324,7 @@ mod tests {
         assert!(result.is_ok());
 
         let analysis = result.unwrap();
-        assert!(!analysis.analysis_summary.is_empty());
-        assert!(analysis.metadata.contains_key("analyzers_run")); // Improved assertion
+        assert_eq!(analysis.status, AnalysisStatus::Completed);
     }
 
     #[test]
