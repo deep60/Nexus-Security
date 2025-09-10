@@ -1,11 +1,11 @@
 pub mod file_handler;
 
 // Re-export commonly used types and functions for convenience
-pub use file_handler::{FileHandler, FileMetadata, AnalysisStatus};
+pub use file_handler::{FileHandler, FileMetadata as UtilsFileMetadata, AnalysisStatus};
+pub use self::utils::sanitize_filename;
 
 use anyhow::Result;
 use std::collections::HashMap;
-use crate::utils::sanitize_filename;
 
 /// Common error types used across the analysis engine
 #[derive(Debug, thiserror::Error)]
@@ -35,40 +35,29 @@ pub enum EngineError {
     RateLimitError(String),
 }
 
-/// Result type alias for the analysis engine
 pub type EngineResult<T> = Result<T, EngineError>;
 
-/// Common constants used throughout the analysis engine
 pub mod constants {
-    /// Maximum file size for analysis (100MB)
     pub const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
     
-    /// Default analysis timeout in seconds
     pub const DEFAULT_ANALYSIS_TIMEOUT: u64 = 300;
     
-    /// Maximum number of concurrent analyses
     pub const MAX_CONCURRENT_ANALYSES: usize = 10;
     
-    /// Default stake amount in ETH
     pub const DEFAULT_STAKE_AMOUNT: f64 = 0.01;
     
-    /// Minimum confidence score for verdict
     pub const MIN_CONFIDENCE_SCORE: f64 = 0.7;
     
-    /// Maximum retries for blockchain operations
     pub const MAX_BLOCKCHAIN_RETRIES: u32 = 3;
     
-    /// Analysis engine version
     pub const ENGINE_VERSION: &str = "1.0.0";
     
-    /// Supported file extensions
     pub const SUPPORTED_EXTENSIONS: &[&str] = &[
         "exe", "dll", "bat", "cmd", "scr", "pif", "com", "vbs", "js", "jar",
         "zip", "rar", "7z", "tar", "gz", "pdf", "doc", "docx", "xls", "xlsx",
         "ppt", "pptx", "rtf", "apk", "ipa", "deb", "rpm", "msi", "dmg", "bin"
     ];
     
-    /// Blockchain network configurations
     pub mod blockchain {
         pub const MAINNET_CHAIN_ID: u64 = 1;
         pub const GOERLI_CHAIN_ID: u64 = 5;
@@ -80,7 +69,6 @@ pub mod constants {
         pub const GAS_LIMIT_WITHDRAW: u64 = 80_000;
     }
     
-    /// API rate limits
     pub mod rate_limits {
         pub const REQUESTS_PER_MINUTE: u32 = 60;
         pub const REQUESTS_PER_HOUR: u32 = 1000;
@@ -88,18 +76,15 @@ pub mod constants {
     }
 }
 
-/// Common utility functions
 pub mod utils {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
     use uuid::Uuid;
     
-    /// Generate a unique analysis ID
     pub fn generate_analysis_id() -> String {
         Uuid::new_v4().to_string()
     }
     
-    /// Get current Unix timestamp
     pub fn current_timestamp() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -107,7 +92,6 @@ pub mod utils {
             .as_secs()
     }
     
-    /// Format file size in human-readable format
     pub fn format_file_size(size: u64) -> String {
         const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
         let mut size_f = size as f64;
@@ -125,7 +109,6 @@ pub mod utils {
         }
     }
     
-    /// Sanitize filename for safe storage
     pub fn sanitize_filename(filename: &str) -> String {
         filename
             .chars()
@@ -139,27 +122,20 @@ pub mod utils {
             .to_string()
     }
     
-    /// Convert hex string to bytes
     pub fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, hex::FromHexError> {
         hex::decode(hex.trim_start_matches("0x"))
     }
     
-    /// Convert bytes to hex string
     pub fn bytes_to_hex(bytes: &[u8]) -> String {
         format!("0x{}", hex::encode(bytes))
     }
     
-    /// Calculate confidence score based on engine verdicts
     pub fn calculate_confidence(verdicts: &HashMap<String, bool>, stakes: &HashMap<String, f64>) -> f64 {
-        if verdicts.is_empty() {
-            return 0.0;
-        }
-        
         let mut total_stake = 0.0;
         let mut malicious_stake = 0.0;
         
         for (engine, is_malicious) in verdicts {
-            let stake = stakes.get(engine).copied().unwrap_or(constants::DEFAULT_STAKE_AMOUNT);
+            let stake = stakes.get(engine).cloned().unwrap_or(constants::DEFAULT_STAKE_AMOUNT);
             total_stake += stake;
             
             if *is_malicious {
@@ -174,7 +150,6 @@ pub mod utils {
         }
     }
     
-    /// Validate Ethereum address format
     pub fn is_valid_eth_address(address: &str) -> bool {
         if !address.starts_with("0x") || address.len() != 42 {
             return false;
@@ -183,13 +158,11 @@ pub mod utils {
         address[2..].chars().all(|c| c.is_ascii_hexdigit())
     }
     
-    /// Generate random nonce for blockchain transactions
     pub fn generate_nonce() -> u64 {
         use rand::Rng;
         rand::thread_rng().gen()
     }
     
-    /// Retry function with exponential backoff
     pub async fn retry_with_backoff<F, T, E>(
         mut operation: F,
         max_retries: u32,
@@ -219,9 +192,7 @@ pub mod utils {
     }
 }
 
-/// Macros for common operations
 pub mod macros {
-    /// Log and return error
     #[macro_export]
     macro_rules! log_error {
         ($msg:expr) => {
@@ -230,12 +201,11 @@ pub mod macros {
         };
         ($fmt:expr, $($arg:tt)*) => {
             let msg = format!($fmt, $($arg)*);
-            tracing::error("{}", &msg);
-            return Err(EngineError::AnalysisError($msg.to_string()));
+            tracing::error!("{}", &msg);
+            return Err(EngineError::AnalysisError(msg));
         };
     }
     
-    /// Time a function execution
     #[macro_export]
     macro_rules! time_function {
         ($func:expr) => {{
@@ -246,7 +216,6 @@ pub mod macros {
         }};
     }
     
-    /// Validate required field
     #[macro_export]
     macro_rules! require_field {
         ($field:expr, $field_name:expr) => {
@@ -284,9 +253,9 @@ mod tests {
     
     #[test]
     fn test_eth_address_validation() {
-        assert!(is_valid_eth_address("0x742d35Cc6666C4532985146a4D7884A0DB4Fce9c"));
+        assert!(is_valid_eth_address("0x742d35Cc6634C0532925a3b844Bc454e4438f44e"));
         assert!(!is_valid_eth_address("invalid_address"));
-        assert!(!is_valid_eth_address("0x742d35Cc6666C4532985146a4D7884A0DB4Fce")); // too short
+        assert!(!is_valid_eth_address("0x742d35Cc6634C0532925a3b844Bc454e4438f44")); // too short
     }
     
     #[test]

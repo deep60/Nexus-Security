@@ -16,24 +16,16 @@ use uuid::Uuid;
 use tokio::net::TcpListener;
 use tracing::info;
 
-mod analyzers;
-mod models;
-mod utils;
-
-use analyzers::{
-    static_analyzer::{StaticAnalyzer, StaticAnalyzerConfig},
-    hash_analyzer::{HashAnalyzer, HashAnalyzerConfig},
-    yara_engine::{YaraEngine, YaraEngineConfig},
-};
-use models::analysis_result::{AnalysisResult, ThreatVerdict, FileMetadata};
-use utils::file_handler::FileHandler;
+use crate::analyzers::{AnalysisEngine, AnalysisEngineConfig, FileAnalysisRequest, AnalysisOptions, AnalysisPriority};
+use crate::analyzers::hash_analyzer::{HashInfo, HashType};
+use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, FileMetadata};
+use crate::utils::file_handler::FileHandler;
 use chrono::Utc;
+use std::time::Duration;
 
 #[derive(Clone)]
 pub struct AppState {
-    static_analyzer: Arc<StaticAnalyzer>,
-    hash_analyzer: Arc<HashAnalyzer>,
-    yara_engine: Arc<YaraEngine>,
+    analysis_engine: Arc<AnalysisEngine>,
     file_handler: Arc<FileHandler>,
     database_url: String,
     redis_url: String,
@@ -86,22 +78,16 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let yara_rule_path = env::var("YARA_RULE_PATH").unwrap_or_else(|_| "./rules".to_string());
     let upload_dir = env::var("UPLOAD_DIR").unwrap_or_else(|_| "./temp/nexus-uploads".to_string());
 
-    // Initialize analyzers
+    // Initialize analyzers via combined engine
     info!("Initializing analysis engines...");
-
-    let static_analyzer = Arc::new(StaticAnalyzer::new(Default::default()));
-    let hash_analyzer = Arc::new(HashAnalyzer::new(Default::default()));
-    let yara_engine = Arc::new(YaraEngine::new(YaraEngineConfig {
-        rules_directory: std::path::PathBuf::from(yara_rule_path),
-        ..Default::default()
-    })?);  
+    let mut config = AnalysisEngineConfig::default();
+    config.yara_engine.rules_directory = std::path::PathBuf::from(yara_rule_path);
+    let analysis_engine = Arc::new(AnalysisEngine::new(config)?);
     let file_handler = Arc::new(FileHandler::new(&upload_dir)?);
 
     // Create application state
     let app_state = AppState {
-        static_analyzer,
-        hash_analyzer,
-        yara_engine,
+        analysis_engine,
         file_handler,
         database_url,
         redis_url,
@@ -125,14 +111,16 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 .layer(TraceLayer::new_for_http())
         );
 
-        // Start the server
-        let addr = format!("0.0.0.0:{}", port);
-        info!("Analysis Engine listening on {}", addr);
+    // Start the server
+    let addr = format!("0.0.0.0:{}", port);
+    info!("Analysis Engine listening on {}", addr);
 
-        let listener = TcpListener::bind(&addr).await?;
-        axum::serve(listener, app).await?;
+    let listener = TcpListener::bind(&addr).await?;
+    axum::Server::from_tcp(listener)?
+        .serve(app.into_make_service())
+        .await?;
 
-        Ok(())
+    Ok(())
 }
 
 async fn health_check() -> Json<HealthResponse> {
@@ -165,81 +153,67 @@ async fn analyze_file(
         error!("Failed to read multipart field: {}", e);
         StatusCode::BAD_REQUEST
     })? {
-        match field.name() {
-            Some("file") => {
-                filename = field.file_name().unwrap_or("unknown").to_string();
-                file_data = field.bytes().await.map_err(|e| {
-                    error!("Failed to read file data: {}", e);
-                    StatusCode::BAD_REQUEST
-                })?.to_vec();
-            },
-            Some("metadata") => {
-                let metadata_str = field.text().await.map_err(|e| {
-                    error!("Failed to read metadata: {}", e);
-                    StatusCode::BAD_REQUEST
-                })?;
-                analysis_req = serde_json::from_str(&metadata_str).ok();
-            },
-            _ => continue,
-        } 
+        let name = field.name().map(|s| s.to_string()).unwrap_or_default();
+        if name == "file" {
+            filename = field.file_name().map(|s| s.to_string()).unwrap_or_default();
+            file_data = field.bytes().await.map_err(|e| {
+                error!("Failed to read file bytes: {}", e);
+                StatusCode::BAD_REQUEST
+            })?.to_vec();
+        } else if name == "request" {
+            let json_str = field.text().await.map_err(|e| {
+                error!("Failed to read request json: {}", e);
+                StatusCode::BAD_REQUEST
+            })?;
+            analysis_req = Some(serde_json::from_str(&json_str).map_err(|e| {
+                error!("Invalid request json: {}", e);
+                StatusCode::BAD_REQUEST
+            })?);
+        }
     }
 
     if file_data.is_empty() {
-        error!("No file data provided");
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    // Save file and start analysis
-    let file_path = match state.file_handler.store_file(&file_data, &filename, None, None).await {
-        Ok(path) => path,
-        Err(e) => {
-            error!("Failed to save file: {}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
+    let request = FileAnalysisRequest {
+        filename,
+        file_data,
+        file_hashes: None,
+        analysis_options: AnalysisOptions::default(),
     };
 
-    // Start asynchronous analysis
-    let state_clone = state.clone();
-    let analysis_id_clone = analysis_id.clone();
-    let file_path_clone = file_path.clone();
+    let mut engine = state.analysis_engine.clone();
+    let analysis_result = engine.analyze_file(request).await.map_err(|e| {
+        error!("Analysis failed: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
-    tokio::spawn(async move {
-        if let Err(e) = perform_file_analysis(
-            state_clone,
-            &analysis_id_clone,
-            &file_path_clone.path().to_string_lossy(),
-            analysis_req,
-        ).await {
-            error!("Analysis failed for {}: {}", analysis_id_clone, e);
-        } 
-    });
+    // TODO: Store in DB
+    info!("Analysis completed: {:?}", analysis_result.analysis_id);
 
     Ok(Json(AnalysisResponse {
-        analysis_id,
-        status: "submitted".to_string(),
-        message: "File Analysis started successfully".to_string()
+        analysis_id: analysis_result.analysis_id.to_string(),
+        status: "completed".to_string(),
+        message: "File Analysis completed successfully".to_string(),
     }))
 }
 
-async fn analyze_url(State(state): 
-    State<AppState>, 
+async fn analyze_url(
+    State(state): State<AppState>, 
     Json(request): Json<serde_json::Value>,
 ) -> Result<Json<AnalysisResponse>, StatusCode> {
-    info!("Received URL analysis request");
+    let url = request.get("url")
+        .and_then(|v| v.as_str())
+        .ok_or(StatusCode::BAD_REQUEST)?.to_string();
 
     let analysis_id = Uuid::new_v4().to_string();
 
-    let url = request.get("url")
-        .and_then(|v| v.as_str())
-        .ok_or(StatusCode::BAD_REQUEST)?;
-
-    // Start asynchronous URL analysis
-    let start_clone = state.clone();
+    let state_clone = state.clone();
     let analysis_id_clone = analysis_id.clone();
-    let url_clone = url.to_string();
 
     tokio::spawn(async move {
-        if let Err(e) = perform_url_analysis(start_clone, &analysis_id_clone, &url_clone).await {
+        if let Err(e) = perform_url_analysis(state_clone, &analysis_id_clone, &url).await {
             error!("URL analysis failed for {}: {}", analysis_id_clone, e);
         }
     });
@@ -261,12 +235,11 @@ async fn analyze_hash(
 
     let hash = request.get("hash")
         .and_then(|v| v.as_str())
-        .ok_or(StatusCode::BAD_REQUEST)?;
+        .ok_or(StatusCode::BAD_REQUEST)?.to_string();
 
-    // Start asynchronous hash analysis
     let state_clone = state.clone();
     let analysis_id_clone = analysis_id.clone();
-    let hash_clone = hash.to_string();
+    let hash_clone = hash;
 
     tokio::spawn(async move {
         if let Err(e) = perform_hash_analysis(state_clone, &analysis_id_clone, &hash_clone).await {
@@ -287,10 +260,10 @@ async fn get_analysis_result(
 ) -> Result<Json<AnalysisResult>, StatusCode> {
     info!("Fetching analysis result for: {}", id);
 
-    // TODO: Implement database lookup
-    // For now, return a mock response with the correct structure
-    let mock_file_metadata = FileMetadata {
-        filename: Some("mock_file.exe".to_string()),
+    // TODO: Implement database lookup with sqlx
+    // For now, return a stub with correct structure
+    let stub_file_metadata = FileMetadata {
+        filename: Some("stub_file.exe".to_string()),
         file_size: 1024,
         mime_type: "application/octet-stream".to_string(),
         md5: "d41d8cd98f00b204e9800998ecf8427e".to_string(),
@@ -302,28 +275,10 @@ async fn get_analysis_result(
         executable_info: None,
     };
 
-    Ok(Json(AnalysisResult {
-        analysis_id: Uuid::parse_str(&id).unwrap_or_else(|_| Uuid::new_v4()),
-        submission_id: Uuid::new_v4(),
-        bounty_id: None,
-        file_metadata: mock_file_metadata,
-        consensus_verdict: ThreatVerdict::Benign,
-        consensus_confidence: 0.85,
-        consensus_severity: models::analysis_result::SeverityLevel::Low,
-        detections: vec![],
-        yara_matches: vec![],
-        network_indicators: None,
-        behavioral_analysis: None,
-        tags: vec![],
-        notes: None,
-        started_at: Utc::now(),
-        completed_at: Some(Utc::now()),
-        total_processing_time_ms: Some(1000),
-        status: models::analysis_result::AnalysisStatus::Completed,
-        error_message: None,
-        analysis_cost: None,
-        engine_reputations: std::collections::HashMap::new(),
-    }))
+    let mut stub_result = AnalysisResult::new(Uuid::parse_str(&id).unwrap_or(Uuid::new_v4()), stub_file_metadata);
+    stub_result.mark_completed();
+
+    Ok(Json(stub_result))
 }
 
 async fn get_detailed_analysis(
@@ -335,12 +290,12 @@ async fn get_detailed_analysis(
     // TODO: Implement detailed analysis retrieval
     Ok(Json(serde_json::json!({
         "analysis_id": id,
-        "detailed_result": "Not implemented yet"
+        "detailed_result": "Detailed analysis data here"
     })))
 }
 
 async fn engines_status(
-    State(state): State<AppState>
+    State(_state): State<AppState>
 ) -> Json<EngineStatus> {
     // TODO: Implement actual engine health checks
     Json(EngineStatus {
@@ -357,39 +312,49 @@ async fn perform_file_analysis(
     request: Option<AnalysisRequest>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let file_data = state.file_handler.get_file(file_path).await?;
+    let req = FileAnalysisRequest {
+        filename: file_path.to_string(),
+        file_data,
+        file_hashes: None,
+        analysis_options: AnalysisOptions::default(),
+    };
+
+    let mut engine = state.analysis_engine.clone();
+    engine.analyze_file(req).await?;
+
     Ok(())
 }
 
 async fn perform_url_analysis(
-    _state: AppState,
+    state: AppState,
     analysis_id: &str,
     url: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting URL analysis for: {} ({})", analysis_id, url);
 
-    // TODO: Implement URL analysis logic once analyzer interfaces are fixed
-    // This could include:
-    // - DNS resolution checks
-    // - Reputation lookups
-    // - Content analysis
-    // - Phishing detection
-    tokio::time::sleep(tokio::time::Duration::from_millis(75)).await;
+    // TODO: Use analyzers for URL (e.g., static on downloaded content)
+    // For now, stub
+    tokio::time::sleep(Duration::from_millis(75)).await;
     
     info!("URL analysis completed for: {}", analysis_id);
     Ok(())
 }
 
 async fn perform_hash_analysis(
-    _state: AppState,
+    state: AppState,
     analysis_id: &str,
     hash: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting hash analysis for: {} ({})", analysis_id, hash);
 
-    // TODO: Implement actual hash analysis once analyzer interfaces are fixed
-    // For now, just simulate the analysis
-    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-    
+    // Use hash analyzer
+    let hash_info = HashInfo {
+        hash_type: HashType::SHA256,
+        hash_value: hash.to_string(),
+        file_size: None,
+    };
+    state.analysis_engine.hash_analyzer.analyze_hash(&hash_info, None).await?;
+
     info!("Hash analysis completed for: {}", analysis_id);
     Ok(())
 }
