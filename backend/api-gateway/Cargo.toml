@@ -7,104 +7,92 @@ description = "API Gateway for Nexus-Security decentralized threat intelligence 
 license = "MIT"
 repository = "https://github.com/nexus-security/deep60"
 
+
 [dependencies]
 # Web framework
-axum = { version = "0.7", features = ["macros", "multipart"] }
-tokio = { workspace = true }
+axum = "0.7"
+axum-extra = { version = "0.9", features = ["multipart"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace", "compression-br", "compression-gzip", "limit"] }
-hyper = "1.0"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
 
 # Serialization
-serde = { workspace = true }
-serde_json = { workspace = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 # Database
-sqlx = { workspace = true }
-redis = { workspace = true }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
 
-# Authentication & Security
-jsonwebtoken = "9.2"
-bcrypt = "0.15"
-uuid = { workspace = true }
+# Redis
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
 
-# Time handling
-chrono = { workspace = true }
+# Blockchain/Ethereum
+ethers = { version = "2.0", features = ["ws", "rustls"] }
 
-# Error handling
-anyhow = { workspace = true }
-thiserror = { workspace = true }
+# Cryptography and hashing
+sha2 = "0.10"
+md5 = "0.7"
+sha1 = "0.10"
 
-# Logging
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+# UUID support
+uuid = { version = "1.0", features = ["serde", "v4"] }
 
-# Configuration
-config = { workspace = true }
-dotenvy = { workspace = true }
+# Date and time
+chrono = { version = "0.4", features = ["serde"] }
 
 # HTTP client
-reqwest = { workspace = true }
+reqwest = { version = "0.11", features = ["json", "multipart"] }
 
-# Blockchain integration
-ethers = { workspace = true }
-web3 = "0.19"
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Environment variables
+dotenv = "0.15"
+
+# JWT tokens
+jsonwebtoken = "9.0"
+
+# Password hashing
+argon2 = "0.5"
+
+# Configuration
+config = "0.14"
 
 # File handling
-tempfile = "3.8"
+tempfile = "3.0"
 mime = "0.3"
-bytes = { workspace = true }
-
-# Validation
-validator = { workspace = true }
-
-# Async utilities
-futures = { workspace = true }
-futures-util = "0.3"
-
-# WebSocket support  
-axum-extra = "0.9"
 
 # Rate limiting
-tower_governor = "0.4"
+governor = "0.6"
 
-# Metrics and monitoring
-metrics = "0.22"
-metrics-exporter-prometheus = "0.13"
+# Validation
+validator = { version = "0.18", features = ["derive"] }
 
-# Shared workspace dependencies
-shared = { path = "../shared" }
-regex = "1.11.1"
-sha2 = "0.10.9"
-sha1 = "0.10.6"
-sha3 = "0.10.8"
-ring = "0.17.14"
-base64 = "0.22.1"
-hex = "0.4.3"
-url = "2.5.4"
-md5 = "0.8.0"
-urlencoding = "2.1"
-
-[build-dependencies]
-sqlx = { workspace = true }
+# Additional utilities that might be needed based on your code
+base64 = "0.21"
+hex = "0.4"
 
 [dev-dependencies]
-# Testing
-tokio-test = { workspace = true }
-mockall = { workspace = true }
+# Testing utilities
+tokio-test = "0.4"
 
-# Test utilities
-serde_test = "1.0"
-pretty_assertions = { workspace = true }
+[profile.dev]
+opt-level = 0
+debug = true
 
-[features]
-default = []
-# Enable development features like detailed logging
-dev = ["tracing-subscriber/fmt"]
-# Enable production optimizations
-prod = []
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
 
 [[bin]]
 name = "api-gateway"
 path = "src/main.rs"
-
