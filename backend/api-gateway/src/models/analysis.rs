@@ -119,6 +119,7 @@ pub struct FileMetadata {
     pub strings: Option<Vec<String>>,
     pub imports: Option<Vec<String>>,
     pub exports: Option<Vec<String>>,
+    pub last_analysis: Option<DateTime<Utc>>,
 }
 
 // PE file information

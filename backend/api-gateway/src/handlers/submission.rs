@@ -221,8 +221,8 @@ pub async fn upload_file(
                 content_type: content_type.unwrap_or_else(|| "application/octet-stream".to_string()),
                 upload_timestamp: Utc::now(),
                 file_path: file_path.clone(),
-                scan_count: 0,
-                last_analysis: None,
+                // scan_count: 0,
+                // last_analysis: None,
             }; 
             match state.db.store_file_metadata(&file_metadata).await {
                 Ok(_) => {
