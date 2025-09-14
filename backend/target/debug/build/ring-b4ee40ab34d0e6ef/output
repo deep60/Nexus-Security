@@ -1,3 +1,0 @@
-cargo:rustc-link-lib=static=ring-core
-cargo:rustc-link-lib=static=ring-test
-cargo:rustc-link-search=native=/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/ring-b4ee40ab34d0e6ef/out

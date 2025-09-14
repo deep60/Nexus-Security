@@ -1,2 +1,0 @@
-fn(axum::extract::State<submission::AppState>, HeaderMap, {type error}) -> impl std::future::Future<Output = std::result::Result<{type error}, axum::http::StatusCode>> {upload_file}
-fn(axum::extract::State<submission::AppState>, HeaderMap, {type error}) -> impl std::future::Future<Output = std::result::Result<{type error}, axum::http::StatusCode>> {upload_file}: Handler<_, _>
