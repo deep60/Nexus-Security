@@ -1,0 +1,8 @@
+cargo:rustc-link-lib=dylib=yara
+cargo:rustc-link-search=native=/opt/homebrew/lib
+cargo:rerun-if-env-changed=YARA_LIBRARY_PATH
+cargo:rerun-if-env-changed=YARA_LIBRARY_PATH_aarch64-apple-darwin
+cargo:rerun-if-env-changed=YARA_LIBRARY_PATH_aarch64_apple_darwin
+cargo:rerun-if-env-changed=YARA_INCLUDE_DIR
+cargo:rerun-if-env-changed=YARA_INCLUDE_DIR_aarch64-apple-darwin
+cargo:rerun-if-env-changed=YARA_INCLUDE_DIR_aarch64_apple_darwin
