@@ -16,16 +16,27 @@ use uuid::Uuid;
 use tokio::net::TcpListener;
 use tracing::info;
 
-use crate::analyzers::{AnalysisEngine, AnalysisEngineConfig, FileAnalysisRequest, AnalysisOptions, AnalysisPriority};
+mod analyzers;
+mod models;
+mod utils;
+
+use crate::analyzers::{AnalysisEngine, AnalysisEngineConfig, AnalysisOptions, AnalysisPriority, FileAnalysisRequest, HashAnalyzer, StaticAnalyzer, YaraEngine};
 use crate::analyzers::hash_analyzer::{HashInfo, HashType};
 use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, FileMetadata};
 use crate::utils::file_handler::FileHandler;
 use chrono::Utc;
 use std::time::Duration;
 
+pub struct AnalysisEngine {
+    pub config: AnalysisEngineConfig,
+    pub hash_analyzer: HashAnalyzer,
+    pub static_analyzer: StaticAnalyzer,
+    pub yara_engine: YaraEngine,
+}
+
 #[derive(Clone)]
 pub struct AppState {
-    analysis_engine: Arc<AnalysisEngine>,
+    analysis_engine: Arc<tokio::sync::Mutex<AnalysisEngine>>,
     file_handler: Arc<FileHandler>,
     database_url: String,
     redis_url: String,
