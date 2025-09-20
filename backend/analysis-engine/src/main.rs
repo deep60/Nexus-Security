@@ -20,28 +20,21 @@ mod analyzers;
 mod models;
 mod utils;
 
-use crate::analyzers::{AnalysisEngine, AnalysisEngineConfig, AnalysisOptions, AnalysisPriority, FileAnalysisRequest, HashAnalyzer, StaticAnalyzer, YaraEngine};
+use crate::analyzers::{AnalysisEngine, AnalysisEngineConfig, FileAnalysisRequest, AnalysisOptions, AnalysisPriority};
 use crate::analyzers::hash_analyzer::{HashInfo, HashType};
 use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, FileMetadata};
 use crate::utils::file_handler::FileHandler;
 use chrono::Utc;
 use std::time::Duration;
-
-pub struct AnalysisEngine {
-    pub config: AnalysisEngineConfig,
-    pub hash_analyzer: HashAnalyzer,
-    pub static_analyzer: StaticAnalyzer,
-    pub yara_engine: YaraEngine,
-}
+use tokio::sync::Mutex;
 
 #[derive(Clone)]
 pub struct AppState {
-    analysis_engine: Arc<tokio::sync::Mutex<AnalysisEngine>>,
+    analysis_engine: Arc<Mutex<AnalysisEngine>>,
     file_handler: Arc<FileHandler>,
     database_url: String,
     redis_url: String,
 }
-
 #[derive(Deserialize)]
 struct AnalysisRequest {
     artifact_type: String,    // "file", "url", "hash"
@@ -49,14 +42,12 @@ struct AnalysisRequest {
     bounty_id: Option<String>,
     metadata: Option<serde_json::Value>,
 }
-
 #[derive(Serialize)]
 struct AnalysisResponse {
     analysis_id: String,
     status: String,
     message: String,
 }
-
 #[derive(Serialize)]
 struct HealthResponse {
     status: String,
@@ -64,7 +55,6 @@ struct HealthResponse {
     version: String,
     engines: EngineStatus,
 }
-
 #[derive(Serialize)]
 struct EngineStatus {
     static_analyzer: bool,
@@ -93,7 +83,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     info!("Initializing analysis engines...");
     let mut config = AnalysisEngineConfig::default();
     config.yara_engine.rules_directory = std::path::PathBuf::from(yara_rule_path);
-    let analysis_engine = Arc::new(AnalysisEngine::new(config)?);
+    let analysis_engine = Arc::new(Mutex::new(AnalysisEngine::new(config)?));
     let file_handler = Arc::new(FileHandler::new(&upload_dir)?);
 
     // Create application state
@@ -127,9 +117,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     info!("Analysis Engine listening on {}", addr);
 
     let listener = TcpListener::bind(&addr).await?;
-    axum::Server::from_tcp(listener)?
-        .serve(app.into_make_service())
-        .await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }
@@ -158,7 +146,7 @@ async fn analyze_file(
     // Process multipart data
     let mut file_data = Vec::new();
     let mut filename = String::new();
-    let mut analysis_req: Option<AnalysisRequest> = None;
+    let mut _analysis_req: Option<AnalysisRequest> = None;
 
     while let Some(field) = multipart.next_field().await.map_err(|e| {
         error!("Failed to read multipart field: {}", e);
@@ -176,15 +164,11 @@ async fn analyze_file(
                 error!("Failed to read request json: {}", e);
                 StatusCode::BAD_REQUEST
             })?;
-            analysis_req = Some(serde_json::from_str(&json_str).map_err(|e| {
+            _analysis_req = Some(serde_json::from_str(&json_str).map_err(|e| {
                 error!("Invalid request json: {}", e);
                 StatusCode::BAD_REQUEST
             })?);
         }
-    }
-
-    if file_data.is_empty() {
-        return Err(StatusCode::BAD_REQUEST);
     }
 
     let request = FileAnalysisRequest {
@@ -194,8 +178,8 @@ async fn analyze_file(
         analysis_options: AnalysisOptions::default(),
     };
 
-    let mut engine = state.analysis_engine.clone();
-    let analysis_result = engine.analyze_file(request).await.map_err(|e| {
+    let mut engine_guard = state.analysis_engine.lock().await;
+    let analysis_result = engine_guard.analyze_file(request).await.map_err(|e| {
         error!("Analysis failed: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
@@ -318,9 +302,9 @@ async fn engines_status(
 
 async fn perform_file_analysis(
     state: AppState,
-    analysis_id: &str,
+    _analysis_id: &str,
     file_path: &str,
-    request: Option<AnalysisRequest>,
+    _request: Option<AnalysisRequest>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let file_data = state.file_handler.get_file(file_path).await?;
     let req = FileAnalysisRequest {
@@ -330,8 +314,8 @@ async fn perform_file_analysis(
         analysis_options: AnalysisOptions::default(),
     };
 
-    let mut engine = state.analysis_engine.clone();
-    engine.analyze_file(req).await?;
+    let mut engine_guard = state.analysis_engine.lock().await;
+    engine_guard.analyze_file(req).await?;
 
     Ok(())
 }
@@ -364,7 +348,8 @@ async fn perform_hash_analysis(
         hash_value: hash.to_string(),
         file_size: None,
     };
-    state.analysis_engine.hash_analyzer.analyze_hash(&hash_info, None).await?;
+    let mut engine_guard = state.analysis_engine.lock().await;
+    engine_guard.hash_analyzer.analyze_hash(&hash_info, None).await?;
 
     info!("Hash analysis completed for: {}", analysis_id);
     Ok(())
