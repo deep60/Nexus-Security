@@ -55,6 +55,7 @@ pub enum DistributionMethod {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Bounty {
     pub id: Uuid,
+    pub creator: Uuid,
     pub creator_address: String,
     pub title: String,
     pub description: String,

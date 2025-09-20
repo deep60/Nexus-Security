@@ -3,7 +3,7 @@ members = [
     "api-gateway",
     "analysis-engine",
     "bounty-manager",
-    "shared",
+    "shared", "notification-service", "user-service",
 ]
 resolver = "2"
 
