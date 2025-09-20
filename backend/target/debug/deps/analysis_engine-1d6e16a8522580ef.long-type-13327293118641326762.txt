@@ -1,3 +1,0 @@
-NeverClassifyEos<ServerErrorsFailureClass>: Default
-ResponseBody<http_body::combinators::box_body::UnsyncBoxBody<axum::body::Bytes, axum::Error>, NeverClassifyEos<ServerErrorsFailureClass>, DefaultOnBodyChunk, DefaultOnEos, DefaultOnFailure>
-Cors<tower_http::trace::Trace<Route<_>, SharedClassifier<ServerErrorsAsFailures>>>
