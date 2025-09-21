@@ -1,9 +1,9 @@
 // backend/bounty-manager/src/handlers/mod.rs
 
-pub mod bounty_handler;
+pub mod bounty_crud;
 
 // Re-export all public types and functions from bounty_handler
-pub use bounty_handler::{
+pub use bounty_crud::{
     // Core types
     Bounty,
     ArtifactType,
@@ -34,12 +34,12 @@ pub use bounty_handler::{
     submit_to_bounty,
 };
 // Additional essential handlers
-pub mod submission_handler;
-pub mod payout_handler;
+pub mod submission;
+pub mod payout;
 pub mod reputation_handler;
 
 // Re-export from additional handlers
-pub use submission_handler::{
+pub use submission::{
     Submission,
     SubmissionStatus,
     AnalysisDetails,
@@ -49,7 +49,7 @@ pub use submission_handler::{
     update_submission_status,
 };
 
-pub use payout_handler::{
+pub use payout::{
     PayoutInfo,
     PayoutStatus,
     RewardDistribution,

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use shared::types::common::{ApiResponse, PaginationParams};
-use crate::handlers::bounty_handler::{BountyManagerState, ThreatVerdict};
+use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Submission {

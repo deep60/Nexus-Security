@@ -9,7 +9,7 @@
 import { run, network } from "hardhat"; 
 import { readFileSync } from "fs";
 import { join } from "path";
-import type { DeploymentAddresses } from "./deploy";
+import type { DeploymentAddresses } from "../deploy";
 
 interface VerificationTask {
     name: string;
