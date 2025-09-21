@@ -19,7 +19,7 @@ use rust_decimal::Decimal;
 mod handlers;
 mod services;
 
-use handlers::bounty_handler;
+use handlers::bounty_crud;
 use services::reputation;
 
 // Application State 
@@ -193,21 +193,21 @@ fn create_router(state: AppState) -> Router {
         .route("/health", get(health_check))
         
         // Bounty management routes
-        .route("/bounties", post(bounty_handler::create_bounty))
-        .route("/bounties", get(bounty_handler::list_bounties))
-        .route("/bounties/:id", get(bounty_handler::get_bounty))
-        .route("/bounties/:id", put(bounty_handler::update_bounty))
-        .route("/bounties/:id/cancel", post(bounty_handler::cancel_bounty))
+        .route("/bounties", post(bounty_crud::create_bounty))
+        .route("/bounties", get(bounty_crud::list_bounties))
+        .route("/bounties/:id", get(bounty_crud::get_bounty))
+        .route("/bounties/:id", put(bounty_crud::update_bounty))
+        .route("/bounties/:id/cancel", post(bounty_crud::cancel_bounty))
         
         // Participation routes
-        .route("/bounties/:id/participate", post(bounty_handler::join_bounty))
-        .route("/bounties/:id/submit", post(bounty_handler::submit_analysis))
-        .route("/bounties/:id/participants", get(bounty_handler::get_participants))
+        .route("/bounties/:id/participate", post(bounty_crud::join_bounty))
+        .route("/bounties/:id/submit", post(bounty_crud::submit_analysis))
+        .route("/bounties/:id/participants", get(bounty_crud::get_participants))
         
         // Analytics routes
-        .route("/bounties/:id/consensus", get(bounty_handler::get_consensus))
-        .route("/stats/creator/:address", get(bounty_handler::get_creator_stats))
-        .route("/stats/participant/:address", get(bounty_handler::get_participant_stats))
+        .route("/bounties/:id/consensus", get(bounty_crud::get_consensus))
+        .route("/stats/creator/:address", get(bounty_crud::get_creator_stats))
+        .route("/stats/participant/:address", get(bounty_crud::get_participant_stats))
         
         // State management
         .with_state(state)
