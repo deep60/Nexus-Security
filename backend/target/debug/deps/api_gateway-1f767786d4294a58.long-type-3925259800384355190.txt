@@ -1,2 +1,0 @@
-fn(axum::extract::State<submission::AppState>, axum::extract::Path<std::string::String>) -> impl std::future::Future<Output = std::result::Result<axum::Json<submission::FileInfo>, axum::http::StatusCode>> {get_file_info}
-fn(axum::extract::State<submission::AppState>, axum::extract::Path<std::string::String>) -> impl std::future::Future<Output = std::result::Result<axum::Json<submission::FileInfo>, axum::http::StatusCode>> {get_file_info}: Handler<_, _>
