@@ -1,75 +1,8 @@
 warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
 package:   /Users/arjun/Developer/Nexus-Security/backend/api-gateway/Cargo.toml
 workspace: /Users/arjun/Developer/Nexus-Security/backend/Cargo.toml
-    Updating crates.io index
-     Locking 62 packages to latest compatible versions
-      Adding aws-config v1.8.10
-      Adding aws-credential-types v1.2.9
-      Adding aws-lc-rs v1.14.1
-      Adding aws-lc-sys v0.32.3
-      Adding aws-runtime v1.5.14
-      Adding aws-sdk-s3 v1.111.0
-      Adding aws-sdk-sso v1.89.0
-      Adding aws-sdk-ssooidc v1.91.0
-      Adding aws-sdk-sts v1.91.0
-      Adding aws-sigv4 v1.3.6
-      Adding aws-smithy-async v1.2.6
-      Adding aws-smithy-checksums v0.63.10 (available: v0.63.11)
-      Adding aws-smithy-eventstream v0.60.13
-      Adding aws-smithy-http v0.62.5
-      Adding aws-smithy-http-client v1.1.4
-      Adding aws-smithy-json v0.61.7
-      Adding aws-smithy-observability v0.1.4
-      Adding aws-smithy-query v0.60.8
-      Adding aws-smithy-runtime v1.9.4
-      Adding aws-smithy-runtime-api v1.9.2
-      Adding aws-smithy-types v1.3.4
-      Adding aws-smithy-xml v0.60.12
-      Adding aws-types v1.3.10
-      Adding base16ct v0.1.1
-      Adding base64-simd v0.8.0
-      Adding bindgen v0.72.1
-      Adding bytes-utils v0.1.4
-      Adding cmake v0.1.54
-      Adding core-foundation v0.10.1
-      Adding crc-fast v1.3.0 (available: v1.6.0)
-      Adding crypto-bigint v0.4.9
-      Adding der v0.6.1
-      Adding ecdsa v0.14.8
-      Adding elliptic-curve v0.12.3
-      Adding ff v0.12.1
-      Adding foldhash v0.1.5
-      Adding fs_extra v1.3.0
-      Adding group v0.12.1
-      Adding h2 v0.4.12
-      Adding hashbrown v0.15.5
-      Adding hyper-rustls v0.27.7
-      Adding idna v0.4.0
-      Adding if_chain v1.0.3
-      Adding lru v0.12.5
-      Adding outref v0.5.2
-      Adding p256 v0.11.1
-      Adding pkcs8 v0.9.0
-      Adding regex-lite v0.1.8
-      Adding rfc6979 v0.3.1
-      Adding rustc-hash v2.1.1
-      Adding rustls-native-certs v0.6.3
-      Adding rustls-native-certs v0.8.2
-      Adding sec1 v0.3.0
-      Adding security-framework v3.5.1
-      Adding signature v1.6.4
-      Adding spki v0.6.0
-      Adding tokio-rustls v0.26.4
-      Adding validator v0.16.1 (available: v0.20.0)
-      Adding validator_derive v0.16.0
-      Adding validator_types v0.16.0
-      Adding vsimd v0.8.0
-      Adding xmlparser v0.13.6
-   2.350693375s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint: stale: changed "/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/ort-0431010e418a4e54/out/onnxruntime-osx-arm64-1.16.0.tgz"
-   2.350714208s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint:           (vs) "/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/ort-0431010e418a4e54/output"
-   2.350718708s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1762463751, nanos: 215470330 } < FileTime { seconds: 1762463754, nanos: 153827222 }
-   2.397931000s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint: fingerprint error for analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine)/Check { test: false }/TargetInner { name: "analysis-engine", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/analysis-engine/src/main.rs", Edition2021) }
-   2.398269541s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/analysis-engine-c34c6b151ae8592a/bin-analysis-engine`
+   0.366841542s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint: fingerprint error for analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine)/Check { test: false }/TargetInner { name: "analysis-engine", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/analysis-engine/src/main.rs", Edition2021) }
+   0.366862792s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/analysis-engine-c34c6b151ae8592a/bin-analysis-engine`
 
 Caused by:
     No such file or directory (os error 2)
@@ -92,66 +25,8 @@ Stack backtrace:
   14: std::rt::lang_start::<()>::{closure#0}
   15: std::rt::lang_start_internal
   16: _main
-   2.428376916s  INFO prepare_target{force=false package_id=blake2 v0.10.6 target="blake2"}: cargo::core::compiler::fingerprint: fingerprint dirty for blake2 v0.10.6/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("blake2", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/blake2-0.10.6/src/lib.rs", Edition2018) }
-   2.428419916s  INFO prepare_target{force=false package_id=blake2 v0.10.6 target="blake2"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.429481916s  INFO prepare_target{force=false package_id=digest v0.10.7 target="digest"}: cargo::core::compiler::fingerprint: fingerprint dirty for digest v0.10.7/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("digest", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/lib.rs", Edition2018) }
-   2.429491750s  INFO prepare_target{force=false package_id=digest v0.10.7 target="digest"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.431874708s  INFO prepare_target{force=false package_id=subtle v2.6.1 target="subtle"}: cargo::core::compiler::fingerprint: fingerprint dirty for subtle v2.6.1/Check { test: false }/TargetInner { ..: lib_target("subtle", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/subtle-2.6.1/src/lib.rs", Edition2018) }
-   2.431880875s  INFO prepare_target{force=false package_id=subtle v2.6.1 target="subtle"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.433925250s  INFO prepare_target{force=false package_id=ndarray v0.16.1 target="ndarray"}: cargo::core::compiler::fingerprint: fingerprint dirty for ndarray v0.16.1/Check { test: false }/TargetInner { benched: false, ..: lib_target("ndarray", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ndarray-0.16.1/src/lib.rs", Edition2018) }
-   2.433930625s  INFO prepare_target{force=false package_id=ndarray v0.16.1 target="ndarray"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.434756166s  INFO prepare_target{force=false package_id=num-integer v0.1.46 target="num_integer"}: cargo::core::compiler::fingerprint: fingerprint dirty for num-integer v0.1.46/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("num_integer", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.46/src/lib.rs", Edition2018) }
-   2.434761291s  INFO prepare_target{force=false package_id=num-integer v0.1.46 target="num_integer"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.435206791s  INFO prepare_target{force=false package_id=ort v1.16.3 target="ort"}: cargo::core::compiler::fingerprint: fingerprint dirty for ort v1.16.3/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ort", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ort-1.16.3/src/lib.rs", Edition2021) }
-   2.435211875s  INFO prepare_target{force=false package_id=ort v1.16.3 target="ort"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.435947125s  INFO prepare_target{force=false package_id=ndarray v0.15.6 target="ndarray"}: cargo::core::compiler::fingerprint: fingerprint dirty for ndarray v0.15.6/Check { test: false }/TargetInner { benched: false, ..: lib_target("ndarray", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ndarray-0.15.6/src/lib.rs", Edition2018) }
-   2.435951791s  INFO prepare_target{force=false package_id=ndarray v0.15.6 target="ndarray"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.436462041s  INFO prepare_target{force=false package_id=ort v1.16.3 target="build-script-build"}: cargo::core::compiler::fingerprint: fingerprint dirty for ort v1.16.3/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ort-1.16.3/build.rs", Edition2021) }
-   2.436467375s  INFO prepare_target{force=false package_id=ort v1.16.3 target="build-script-build"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/ort-0431010e418a4e54/output", reference_mtime: FileTime { seconds: 1762463751, nanos: 215470330 }, stale: "/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/ort-0431010e418a4e54/out/onnxruntime-osx-arm64-1.16.0.tgz", stale_mtime: FileTime { seconds: 1762463754, nanos: 153827222 } }))
-   2.449062166s  INFO prepare_target{force=false package_id=ureq v2.12.1 target="ureq"}: cargo::core::compiler::fingerprint: fingerprint dirty for ureq v2.12.1/Check { test: false }/TargetInner { ..: lib_target("ureq", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ureq-2.12.1/src/lib.rs", Edition2018) }
-   2.449072041s  INFO prepare_target{force=false package_id=ureq v2.12.1 target="ureq"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.449817166s  INFO prepare_target{force=false package_id=rustls v0.23.32 target="rustls"}: cargo::core::compiler::fingerprint: fingerprint dirty for rustls v0.23.32/Check { test: false }/TargetInner { ..: lib_target("rustls", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-0.23.32/src/lib.rs", Edition2021) }
-   2.449823291s  INFO prepare_target{force=false package_id=rustls v0.23.32 target="rustls"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.450274750s  INFO prepare_target{force=false package_id=aws-lc-rs v1.14.1 target="aws_lc_rs"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-lc-rs v1.14.1/Check { test: false }/TargetInner { ..: lib_target("aws_lc_rs", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-rs-1.14.1/src/lib.rs", Edition2021) }
-   2.450279916s  INFO prepare_target{force=false package_id=aws-lc-rs v1.14.1 target="aws_lc_rs"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.451545166s  INFO prepare_target{force=false package_id=aws-lc-sys v0.32.3 target="aws_lc_sys"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-lc-sys v0.32.3/Check { test: false }/TargetInner { ..: lib_target("aws_lc_sys", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.32.3/src/lib.rs", Edition2021) }
-   2.451550000s  INFO prepare_target{force=false package_id=aws-lc-sys v0.32.3 target="aws_lc_sys"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.451799250s  INFO prepare_target{force=false package_id=ring v0.17.14 target="ring"}: cargo::core::compiler::fingerprint: fingerprint dirty for ring v0.17.14/Check { test: false }/TargetInner { ..: lib_target("ring", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ring-0.17.14/src/lib.rs", Edition2021) }
-   2.451806166s  INFO prepare_target{force=false package_id=ring v0.17.14 target="ring"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.453211625s  INFO prepare_target{force=false package_id=rustls-webpki v0.103.6 target="webpki"}: cargo::core::compiler::fingerprint: fingerprint dirty for rustls-webpki v0.103.6/Check { test: false }/TargetInner { ..: lib_target("webpki", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-webpki-0.103.6/src/lib.rs", Edition2021) }
-   2.453217041s  INFO prepare_target{force=false package_id=rustls-webpki v0.103.6 target="webpki"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.459835125s  INFO prepare_target{force=false package_id=reqwest v0.11.27 target="reqwest"}: cargo::core::compiler::fingerprint: fingerprint dirty for reqwest v0.11.27/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("reqwest", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.11.27/src/lib.rs", Edition2021) }
-   2.459840833s  INFO prepare_target{force=false package_id=reqwest v0.11.27 target="reqwest"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.461277458s  INFO prepare_target{force=false package_id=hyper-rustls v0.24.2 target="hyper_rustls"}: cargo::core::compiler::fingerprint: fingerprint dirty for hyper-rustls v0.24.2/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("hyper_rustls", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hyper-rustls-0.24.2/src/lib.rs", Edition2021) }
-   2.461292875s  INFO prepare_target{force=false package_id=hyper-rustls v0.24.2 target="hyper_rustls"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.462223041s  INFO prepare_target{force=false package_id=rustls v0.21.12 target="rustls"}: cargo::core::compiler::fingerprint: fingerprint dirty for rustls v0.21.12/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("rustls", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-0.21.12/src/lib.rs", Edition2021) }
-   2.462231083s  INFO prepare_target{force=false package_id=rustls v0.21.12 target="rustls"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.463209041s  INFO prepare_target{force=false package_id=rustls-webpki v0.101.7 target="webpki"}: cargo::core::compiler::fingerprint: fingerprint dirty for rustls-webpki v0.101.7/Check { test: false }/TargetInner { ..: lib_target("webpki", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-webpki-0.101.7/src/lib.rs", Edition2021) }
-   2.463218916s  INFO prepare_target{force=false package_id=rustls-webpki v0.101.7 target="webpki"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.463559458s  INFO prepare_target{force=false package_id=sct v0.7.1 target="sct"}: cargo::core::compiler::fingerprint: fingerprint dirty for sct v0.7.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sct", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sct-0.7.1/src/lib.rs", Edition2021) }
-   2.463564416s  INFO prepare_target{force=false package_id=sct v0.7.1 target="sct"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.463907500s  INFO prepare_target{force=false package_id=rustls-native-certs v0.6.3 target="rustls_native_certs"}: cargo::core::compiler::fingerprint: fingerprint dirty for rustls-native-certs v0.6.3/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("rustls_native_certs", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-native-certs-0.6.3/src/lib.rs", Edition2021) }
-   2.463912625s  INFO prepare_target{force=false package_id=rustls-native-certs v0.6.3 target="rustls_native_certs"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.465183250s  INFO prepare_target{force=false package_id=tokio-rustls v0.24.1 target="tokio_rustls"}: cargo::core::compiler::fingerprint: fingerprint dirty for tokio-rustls v0.24.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("tokio_rustls", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-rustls-0.24.1/src/lib.rs", Edition2018) }
-   2.465188000s  INFO prepare_target{force=false package_id=tokio-rustls v0.24.1 target="tokio_rustls"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.469750833s  INFO prepare_target{force=false package_id=sha1 v0.10.6 target="sha1"}: cargo::core::compiler::fingerprint: fingerprint dirty for sha1 v0.10.6/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sha1", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sha1-0.10.6/src/lib.rs", Edition2018) }
-   2.469758958s  INFO prepare_target{force=false package_id=sha1 v0.10.6 target="sha1"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.470719166s  INFO prepare_target{force=false package_id=sha2 v0.10.9 target="sha2"}: cargo::core::compiler::fingerprint: fingerprint dirty for sha2 v0.10.9/Check { test: false }/TargetInner { ..: lib_target("sha2", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sha2-0.10.9/src/lib.rs", Edition2018) }
-   2.470724750s  INFO prepare_target{force=false package_id=sha2 v0.10.9 target="sha2"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.470993000s  INFO prepare_target{force=false package_id=sha3 v0.10.8 target="sha3"}: cargo::core::compiler::fingerprint: fingerprint dirty for sha3 v0.10.8/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sha3", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sha3-0.10.8/src/lib.rs", Edition2018) }
-   2.470997666s  INFO prepare_target{force=false package_id=sha3 v0.10.8 target="sha3"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.471572833s  INFO prepare_target{force=false package_id=sqlx v0.6.3 target="sqlx"}: cargo::core::compiler::fingerprint: fingerprint dirty for sqlx v0.6.3/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sqlx", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sqlx-0.6.3/src/lib.rs", Edition2021) }
-   2.471577750s  INFO prepare_target{force=false package_id=sqlx v0.6.3 target="sqlx"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.472343000s  INFO prepare_target{force=false package_id=sqlx-core v0.6.3 target="sqlx_core"}: cargo::core::compiler::fingerprint: fingerprint dirty for sqlx-core v0.6.3/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sqlx_core", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sqlx-core-0.6.3/src/lib.rs", Edition2021) }
-   2.472350708s  INFO prepare_target{force=false package_id=sqlx-core v0.6.3 target="sqlx_core"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.478506000s  INFO prepare_target{force=false package_id=hkdf v0.12.4 target="hkdf"}: cargo::core::compiler::fingerprint: fingerprint dirty for hkdf v0.12.4/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("hkdf", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hkdf-0.12.4/src/lib.rs", Edition2018) }
-   2.478512666s  INFO prepare_target{force=false package_id=hkdf v0.12.4 target="hkdf"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.478846708s  INFO prepare_target{force=false package_id=hmac v0.12.1 target="hmac"}: cargo::core::compiler::fingerprint: fingerprint dirty for hmac v0.12.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("hmac", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hmac-0.12.1/src/lib.rs", Edition2018) }
-   2.478851916s  INFO prepare_target{force=false package_id=hmac v0.12.1 target="hmac"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.479486333s  INFO prepare_target{force=false package_id=md-5 v0.10.6 target="md5"}: cargo::core::compiler::fingerprint: fingerprint dirty for md-5 v0.10.6/Check { test: false }/TargetInner { ..: lib_target("md5", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/md-5-0.10.6/src/lib.rs", Edition2018) }
-   2.479490666s  INFO prepare_target{force=false package_id=md-5 v0.10.6 target="md5"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.498704750s  INFO prepare_target{force=false package_id=yara v0.18.0 target="yara"}: cargo::core::compiler::fingerprint: fingerprint error for yara v0.18.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("yara", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-0.18.0/src/lib.rs", Edition2018) }
-   2.498711875s  INFO prepare_target{force=false package_id=yara v0.18.0 target="yara"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-c70bea5a67eaba7d/lib-yara`
+   0.391687792s  INFO prepare_target{force=false package_id=yara v0.18.0 target="yara"}: cargo::core::compiler::fingerprint: fingerprint error for yara v0.18.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("yara", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-0.18.0/src/lib.rs", Edition2018) }
+   0.391760917s  INFO prepare_target{force=false package_id=yara v0.18.0 target="yara"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-c70bea5a67eaba7d/lib-yara`
 
 Caused by:
     No such file or directory (os error 2)
@@ -175,8 +50,8 @@ Stack backtrace:
   15: std::rt::lang_start::<()>::{closure#0}
   16: std::rt::lang_start_internal
   17: _main
-   2.499025791s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="yara_sys"}: cargo::core::compiler::fingerprint: fingerprint error for yara-sys v0.18.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("yara_sys", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-sys-0.18.0/src/lib.rs", Edition2018) }
-   2.499030958s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="yara_sys"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-sys-469705dcbe5101f1/lib-yara_sys`
+   0.392272792s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="yara_sys"}: cargo::core::compiler::fingerprint: fingerprint error for yara-sys v0.18.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("yara_sys", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-sys-0.18.0/src/lib.rs", Edition2018) }
+   0.392282417s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="yara_sys"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-sys-469705dcbe5101f1/lib-yara_sys`
 
 Caused by:
     No such file or directory (os error 2)
@@ -201,8 +76,8 @@ Stack backtrace:
   16: std::rt::lang_start::<()>::{closure#0}
   17: std::rt::lang_start_internal
   18: _main
-   2.499268000s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="build-script-build"}: cargo::core::compiler::fingerprint: fingerprint error for yara-sys v0.18.0/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-sys-0.18.0/build.rs", Edition2018) }
-   2.499273208s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="build-script-build"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-sys-c14bba5efbfcef22/run-build-script-build-script-build`
+   0.392551292s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="build-script-build"}: cargo::core::compiler::fingerprint: fingerprint error for yara-sys v0.18.0/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-sys-0.18.0/build.rs", Edition2018) }
+   0.392557042s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="build-script-build"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-sys-c14bba5efbfcef22/run-build-script-build-script-build`
 
 Caused by:
     No such file or directory (os error 2)
@@ -229,8 +104,8 @@ Stack backtrace:
   18: std::rt::lang_start::<()>::{closure#0}
   19: std::rt::lang_start_internal
   20: _main
-   2.502905750s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint: fingerprint error for analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine)/Check { test: true }/TargetInner { name: "analysis-engine", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/analysis-engine/src/main.rs", Edition2021) }
-   2.502914625s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/analysis-engine-bd99dd0b18b77f2f/test-bin-analysis-engine`
+   0.393749500s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint: fingerprint error for analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine)/Check { test: true }/TargetInner { name: "analysis-engine", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/analysis-engine/src/main.rs", Edition2021) }
+   0.393758834s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/analysis-engine-bd99dd0b18b77f2f/test-bin-analysis-engine`
 
 Caused by:
     No such file or directory (os error 2)
@@ -253,328 +128,17 @@ Stack backtrace:
   14: std::rt::lang_start::<()>::{closure#0}
   15: std::rt::lang_start_internal
   16: _main
-   2.559982041s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint: fingerprint dirty for api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)/Check { test: false }/TargetInner { name: "api-gateway", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/api-gateway/src/main.rs", Edition2021) }
-   2.560004000s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.562597750s  INFO prepare_target{force=false package_id=argon2 v0.5.3 target="argon2"}: cargo::core::compiler::fingerprint: fingerprint dirty for argon2 v0.5.3/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("argon2", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/argon2-0.5.3/src/lib.rs", Edition2021) }
-   2.562605708s  INFO prepare_target{force=false package_id=argon2 v0.5.3 target="argon2"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.563102583s  INFO prepare_target{force=false package_id=password-hash v0.5.0 target="password_hash"}: cargo::core::compiler::fingerprint: fingerprint dirty for password-hash v0.5.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("password_hash", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/password-hash-0.5.0/src/lib.rs", Edition2021) }
-   2.563107750s  INFO prepare_target{force=false package_id=password-hash v0.5.0 target="password_hash"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.563527208s  INFO prepare_target{force=false package_id=axum v0.7.9 target="axum"}: cargo::core::compiler::fingerprint: fingerprint dirty for axum v0.7.9/Check { test: false }/TargetInner { ..: lib_target("axum", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/axum-0.7.9/src/lib.rs", Edition2021) }
-   2.563531833s  INFO prepare_target{force=false package_id=axum v0.7.9 target="axum"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.565610833s  INFO prepare_target{force=false package_id=hyper v1.7.0 target="hyper"}: cargo::core::compiler::fingerprint: fingerprint dirty for hyper v1.7.0/Check { test: false }/TargetInner { ..: lib_target("hyper", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hyper-1.7.0/src/lib.rs", Edition2021) }
-   2.565617250s  INFO prepare_target{force=false package_id=hyper v1.7.0 target="hyper"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.566631458s  INFO prepare_target{force=false package_id=h2 v0.4.12 target="h2"}: cargo::core::compiler::fingerprint: fingerprint dirty for h2 v0.4.12/Check { test: false }/TargetInner { ..: lib_target("h2", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/h2-0.4.12/src/lib.rs", Edition2021) }
-   2.566635916s  INFO prepare_target{force=false package_id=h2 v0.4.12 target="h2"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.567316000s  INFO prepare_target{force=false package_id=hyper-util v0.1.17 target="hyper_util"}: cargo::core::compiler::fingerprint: fingerprint dirty for hyper-util v0.1.17/Check { test: false }/TargetInner { ..: lib_target("hyper_util", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hyper-util-0.1.17/src/lib.rs", Edition2021) }
-   2.567320666s  INFO prepare_target{force=false package_id=hyper-util v0.1.17 target="hyper_util"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.568525458s  INFO prepare_target{force=false package_id=bcrypt v0.17.1 target="bcrypt"}: cargo::core::compiler::fingerprint: fingerprint dirty for bcrypt v0.17.1/Check { test: false }/TargetInner { ..: lib_target("bcrypt", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bcrypt-0.17.1/src/lib.rs", Edition2021) }
-   2.568532375s  INFO prepare_target{force=false package_id=bcrypt v0.17.1 target="bcrypt"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.572793875s  INFO prepare_target{force=false package_id=ethers v2.0.14 target="ethers"}: cargo::core::compiler::fingerprint: fingerprint dirty for ethers v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-2.0.14/src/lib.rs", Edition2021) }
-   2.572799125s  INFO prepare_target{force=false package_id=ethers v2.0.14 target="ethers"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.573871958s  INFO prepare_target{force=false package_id=ethers-addressbook v2.0.14 target="ethers_addressbook"}: cargo::core::compiler::fingerprint: fingerprint dirty for ethers-addressbook v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_addressbook", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-addressbook-2.0.14/src/lib.rs", Edition2021) }
-   2.573877083s  INFO prepare_target{force=false package_id=ethers-addressbook v2.0.14 target="ethers_addressbook"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.574588333s  INFO prepare_target{force=false package_id=ethers-core v2.0.14 target="ethers_core"}: cargo::core::compiler::fingerprint: fingerprint dirty for ethers-core v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_core", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-core-2.0.14/src/lib.rs", Edition2021) }
-   2.574592708s  INFO prepare_target{force=false package_id=ethers-core v2.0.14 target="ethers_core"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.577479958s  INFO prepare_target{force=false package_id=elliptic-curve v0.13.8 target="elliptic_curve"}: cargo::core::compiler::fingerprint: fingerprint dirty for elliptic-curve v0.13.8/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("elliptic_curve", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/elliptic-curve-0.13.8/src/lib.rs", Edition2021) }
-   2.577486625s  INFO prepare_target{force=false package_id=elliptic-curve v0.13.8 target="elliptic_curve"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.578670041s  INFO prepare_target{force=false package_id=crypto-bigint v0.5.5 target="crypto_bigint"}: cargo::core::compiler::fingerprint: fingerprint dirty for crypto-bigint v0.5.5/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("crypto_bigint", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crypto-bigint-0.5.5/src/lib.rs", Edition2021) }
-   2.578674791s  INFO prepare_target{force=false package_id=crypto-bigint v0.5.5 target="crypto_bigint"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.578982041s  INFO prepare_target{force=false package_id=ff v0.13.1 target="ff"}: cargo::core::compiler::fingerprint: fingerprint dirty for ff v0.13.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ff", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ff-0.13.1/src/lib.rs", Edition2021) }
-   2.578986708s  INFO prepare_target{force=false package_id=ff v0.13.1 target="ff"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.579220083s  INFO prepare_target{force=false package_id=group v0.13.0 target="group"}: cargo::core::compiler::fingerprint: fingerprint dirty for group v0.13.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("group", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/group-0.13.0/src/lib.rs", Edition2021) }
-   2.579224500s  INFO prepare_target{force=false package_id=group v0.13.0 target="group"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.580045250s  INFO prepare_target{force=false package_id=sec1 v0.7.3 target="sec1"}: cargo::core::compiler::fingerprint: fingerprint dirty for sec1 v0.7.3/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sec1", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sec1-0.7.3/src/lib.rs", Edition2021) }
-   2.580051916s  INFO prepare_target{force=false package_id=sec1 v0.7.3 target="sec1"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.580391125s  INFO prepare_target{force=false package_id=ethabi v18.0.0 target="ethabi"}: cargo::core::compiler::fingerprint: fingerprint dirty for ethabi v18.0.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethabi", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethabi-18.0.0/src/lib.rs", Edition2021) }
-   2.580395458s  INFO prepare_target{force=false package_id=ethabi v18.0.0 target="ethabi"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.587182375s  INFO prepare_target{force=false package_id=k256 v0.13.4 target="k256"}: cargo::core::compiler::fingerprint: fingerprint dirty for k256 v0.13.4/Check { test: false }/TargetInner { ..: lib_target("k256", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/k256-0.13.4/src/lib.rs", Edition2021) }
-   2.587190291s  INFO prepare_target{force=false package_id=k256 v0.13.4 target="k256"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.587596625s  INFO prepare_target{force=false package_id=ecdsa v0.16.9 target="ecdsa"}: cargo::core::compiler::fingerprint: fingerprint dirty for ecdsa v0.16.9/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ecdsa", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ecdsa-0.16.9/src/lib.rs", Edition2021) }
-   2.587601958s  INFO prepare_target{force=false package_id=ecdsa v0.16.9 target="ecdsa"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.587983958s  INFO prepare_target{force=false package_id=rfc6979 v0.4.0 target="rfc6979"}: cargo::core::compiler::fingerprint: fingerprint dirty for rfc6979 v0.4.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("rfc6979", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rfc6979-0.4.0/src/lib.rs", Edition2021) }
-   2.587988791s  INFO prepare_target{force=false package_id=rfc6979 v0.4.0 target="rfc6979"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.588229125s  INFO prepare_target{force=false package_id=signature v2.2.0 target="signature"}: cargo::core::compiler::fingerprint: fingerprint dirty for signature v2.2.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("signature", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signature-2.2.0/src/lib.rs", Edition2021) }
-   2.588233708s  INFO prepare_target{force=false package_id=signature v2.2.0 target="signature"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.590112916s  INFO prepare_target{force=false package_id=ethers-contract v2.0.14 target="ethers_contract"}: cargo::core::compiler::fingerprint: fingerprint dirty for ethers-contract v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_contract", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-contract-2.0.14/src/lib.rs", Edition2021) }
-   2.590118583s  INFO prepare_target{force=false package_id=ethers-contract v2.0.14 target="ethers_contract"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.591112208s  INFO prepare_target{force=false package_id=ethers-contract-abigen v2.0.14 target="ethers_contract_abigen"}: cargo::core::compiler::fingerprint: fingerprint dirty for ethers-contract-abigen v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_contract_abigen", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-contract-abigen-2.0.14/src/lib.rs", Edition2021) }
-   2.591117000s  INFO prepare_target{force=false package_id=ethers-contract-abigen v2.0.14 target="ethers_contract_abigen"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.602827708s  INFO prepare_target{force=false package_id=ethers-providers v2.0.14 target="ethers_providers"}: cargo::core::compiler::fingerprint: fingerprint dirty for ethers-providers v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_providers", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-providers-2.0.14/src/lib.rs", Edition2021) }
-   2.602838375s  INFO prepare_target{force=false package_id=ethers-providers v2.0.14 target="ethers_providers"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.604303416s  INFO prepare_target{force=false package_id=enr v0.10.0 target="enr"}: cargo::core::compiler::fingerprint: fingerprint dirty for enr v0.10.0/Check { test: false }/TargetInner { ..: lib_target("enr", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/enr-0.10.0/src/lib.rs", Edition2018) }
-   2.604308875s  INFO prepare_target{force=false package_id=enr v0.10.0 target="enr"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.606834250s  INFO prepare_target{force=false package_id=jsonwebtoken v8.3.0 target="jsonwebtoken"}: cargo::core::compiler::fingerprint: fingerprint dirty for jsonwebtoken v8.3.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("jsonwebtoken", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jsonwebtoken-8.3.0/src/lib.rs", Edition2021) }
-   2.606839708s  INFO prepare_target{force=false package_id=jsonwebtoken v8.3.0 target="jsonwebtoken"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.607462750s  INFO prepare_target{force=false package_id=ring v0.16.20 target="ring"}: cargo::core::compiler::fingerprint: fingerprint dirty for ring v0.16.20/Check { test: false }/TargetInner { ..: lib_target("ring", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ring-0.16.20/src/lib.rs", Edition2018) }
-   2.607467125s  INFO prepare_target{force=false package_id=ring v0.16.20 target="ring"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.608453125s  INFO prepare_target{force=false package_id=simple_asn1 v0.6.3 target="simple_asn1"}: cargo::core::compiler::fingerprint: fingerprint dirty for simple_asn1 v0.6.3/Check { test: false }/TargetInner { ..: lib_target("simple_asn1", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/simple_asn1-0.6.3/src/lib.rs", Edition2018) }
-   2.608458333s  INFO prepare_target{force=false package_id=simple_asn1 v0.6.3 target="simple_asn1"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.609127750s  INFO prepare_target{force=false package_id=num-bigint v0.4.6 target="num_bigint"}: cargo::core::compiler::fingerprint: fingerprint dirty for num-bigint v0.4.6/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("num_bigint", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-bigint-0.4.6/src/lib.rs", Edition2021) }
-   2.609132833s  INFO prepare_target{force=false package_id=num-bigint v0.4.6 target="num_bigint"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.609685000s  INFO prepare_target{force=false package_id=time v0.3.44 target="time"}: cargo::core::compiler::fingerprint: fingerprint dirty for time v0.3.44/Check { test: false }/TargetInner { benched: false, ..: lib_target("time", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/time-0.3.44/src/lib.rs", Edition2021) }
-   2.609689833s  INFO prepare_target{force=false package_id=time v0.3.44 target="time"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.611900416s  INFO prepare_target{force=false package_id=tokio-tungstenite v0.20.1 target="tokio_tungstenite"}: cargo::core::compiler::fingerprint: fingerprint dirty for tokio-tungstenite v0.20.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("tokio_tungstenite", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-tungstenite-0.20.1/src/lib.rs", Edition2018) }
-   2.611905708s  INFO prepare_target{force=false package_id=tokio-tungstenite v0.20.1 target="tokio_tungstenite"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.612456291s  INFO prepare_target{force=false package_id=tungstenite v0.20.1 target="tungstenite"}: cargo::core::compiler::fingerprint: fingerprint dirty for tungstenite v0.20.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("tungstenite", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tungstenite-0.20.1/src/lib.rs", Edition2018) }
-   2.612461208s  INFO prepare_target{force=false package_id=tungstenite v0.20.1 target="tungstenite"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.613449083s  INFO prepare_target{force=false package_id=ethers-etherscan v2.0.14 target="ethers_etherscan"}: cargo::core::compiler::fingerprint: fingerprint dirty for ethers-etherscan v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_etherscan", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-etherscan-2.0.14/src/lib.rs", Edition2021) }
-   2.613454041s  INFO prepare_target{force=false package_id=ethers-etherscan v2.0.14 target="ethers_etherscan"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.614120958s  INFO prepare_target{force=false package_id=ethers-middleware v2.0.14 target="ethers_middleware"}: cargo::core::compiler::fingerprint: fingerprint dirty for ethers-middleware v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_middleware", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-middleware-2.0.14/src/lib.rs", Edition2021) }
-   2.614125916s  INFO prepare_target{force=false package_id=ethers-middleware v2.0.14 target="ethers_middleware"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.615497500s  INFO prepare_target{force=false package_id=ethers-signers v2.0.14 target="ethers_signers"}: cargo::core::compiler::fingerprint: fingerprint dirty for ethers-signers v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_signers", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-signers-2.0.14/src/lib.rs", Edition2021) }
-   2.615503583s  INFO prepare_target{force=false package_id=ethers-signers v2.0.14 target="ethers_signers"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.616180541s  INFO prepare_target{force=false package_id=coins-bip32 v0.8.7 target="coins_bip32"}: cargo::core::compiler::fingerprint: fingerprint dirty for coins-bip32 v0.8.7/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("coins_bip32", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/coins-bip32-0.8.7/src/lib.rs", Edition2018) }
-   2.616185791s  INFO prepare_target{force=false package_id=coins-bip32 v0.8.7 target="coins_bip32"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.616821125s  INFO prepare_target{force=false package_id=bs58 v0.5.1 target="bs58"}: cargo::core::compiler::fingerprint: fingerprint dirty for bs58 v0.5.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("bs58", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bs58-0.5.1/src/lib.rs", Edition2021) }
-   2.616826250s  INFO prepare_target{force=false package_id=bs58 v0.5.1 target="bs58"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.617042041s  INFO prepare_target{force=false package_id=coins-core v0.8.7 target="coins_core"}: cargo::core::compiler::fingerprint: fingerprint dirty for coins-core v0.8.7/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("coins_core", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/coins-core-0.8.7/src/lib.rs", Edition2018) }
-   2.617046500s  INFO prepare_target{force=false package_id=coins-core v0.8.7 target="coins_core"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.617732291s  INFO prepare_target{force=false package_id=ripemd v0.1.3 target="ripemd"}: cargo::core::compiler::fingerprint: fingerprint dirty for ripemd v0.1.3/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ripemd", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ripemd-0.1.3/src/lib.rs", Edition2018) }
-   2.617736625s  INFO prepare_target{force=false package_id=ripemd v0.1.3 target="ripemd"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.617953583s  INFO prepare_target{force=false package_id=coins-bip39 v0.8.7 target="coins_bip39"}: cargo::core::compiler::fingerprint: fingerprint dirty for coins-bip39 v0.8.7/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("coins_bip39", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/coins-bip39-0.8.7/src/lib.rs", Edition2018) }
-   2.617957875s  INFO prepare_target{force=false package_id=coins-bip39 v0.8.7 target="coins_bip39"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.619257708s  INFO prepare_target{force=false package_id=pbkdf2 v0.12.2 target="pbkdf2"}: cargo::core::compiler::fingerprint: fingerprint dirty for pbkdf2 v0.12.2/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("pbkdf2", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pbkdf2-0.12.2/src/lib.rs", Edition2021) }
-   2.619261916s  INFO prepare_target{force=false package_id=pbkdf2 v0.12.2 target="pbkdf2"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.619503083s  INFO prepare_target{force=false package_id=eth-keystore v0.5.0 target="eth_keystore"}: cargo::core::compiler::fingerprint: fingerprint dirty for eth-keystore v0.5.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("eth_keystore", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eth-keystore-0.5.0/src/lib.rs", Edition2018) }
-   2.619508083s  INFO prepare_target{force=false package_id=eth-keystore v0.5.0 target="eth_keystore"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.620172041s  INFO prepare_target{force=false package_id=pbkdf2 v0.11.0 target="pbkdf2"}: cargo::core::compiler::fingerprint: fingerprint dirty for pbkdf2 v0.11.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("pbkdf2", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pbkdf2-0.11.0/src/lib.rs", Edition2021) }
-   2.620176083s  INFO prepare_target{force=false package_id=pbkdf2 v0.11.0 target="pbkdf2"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.620373666s  INFO prepare_target{force=false package_id=scrypt v0.10.0 target="scrypt"}: cargo::core::compiler::fingerprint: fingerprint dirty for scrypt v0.10.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("scrypt", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scrypt-0.10.0/src/lib.rs", Edition2021) }
-   2.620378083s  INFO prepare_target{force=false package_id=scrypt v0.10.0 target="scrypt"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.621868083s  INFO prepare_target{force=false package_id=jsonwebtoken v9.3.1 target="jsonwebtoken"}: cargo::core::compiler::fingerprint: fingerprint dirty for jsonwebtoken v9.3.1/Check { test: false }/TargetInner { ..: lib_target("jsonwebtoken", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jsonwebtoken-9.3.1/src/lib.rs", Edition2021) }
-   2.621873041s  INFO prepare_target{force=false package_id=jsonwebtoken v9.3.1 target="jsonwebtoken"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.622591833s  INFO prepare_target{force=false package_id=sqlx v0.7.4 target="sqlx"}: cargo::core::compiler::fingerprint: fingerprint dirty for sqlx v0.7.4/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sqlx", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sqlx-0.7.4/src/lib.rs", Edition2021) }
-   2.622595916s  INFO prepare_target{force=false package_id=sqlx v0.7.4 target="sqlx"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.623368791s  INFO prepare_target{force=false package_id=sqlx-core v0.7.4 target="sqlx_core"}: cargo::core::compiler::fingerprint: fingerprint dirty for sqlx-core v0.7.4/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sqlx_core", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sqlx-core-0.7.4/src/lib.rs", Edition2021) }
-   2.623373291s  INFO prepare_target{force=false package_id=sqlx-core v0.7.4 target="sqlx_core"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.628156666s  INFO prepare_target{force=false package_id=sqlx-postgres v0.7.4 target="sqlx_postgres"}: cargo::core::compiler::fingerprint: fingerprint dirty for sqlx-postgres v0.7.4/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sqlx_postgres", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sqlx-postgres-0.7.4/src/lib.rs", Edition2021) }
-   2.628164250s  INFO prepare_target{force=false package_id=sqlx-postgres v0.7.4 target="sqlx_postgres"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.632342041s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint: fingerprint dirty for api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)/Check { test: true }/TargetInner { name: "api-gateway", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/api-gateway/src/main.rs", Edition2021) }
-   2.632349500s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.635840958s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint: fingerprint dirty for bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)/Check { test: false }/TargetInner { name: "bounty-manager", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/bounty-manager/src/main.rs", Edition2024) }
-   2.635846791s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.637051375s  INFO prepare_target{force=false package_id=axum v0.8.4 target="axum"}: cargo::core::compiler::fingerprint: fingerprint dirty for axum v0.8.4/Check { test: false }/TargetInner { ..: lib_target("axum", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/axum-0.8.4/src/lib.rs", Edition2021) }
-   2.637056416s  INFO prepare_target{force=false package_id=axum v0.8.4 target="axum"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.638588333s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint: fingerprint dirty for bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)/Check { test: true }/TargetInner { name: "bounty-manager", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/bounty-manager/src/main.rs", Edition2024) }
-   2.638593250s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.639737375s  INFO prepare_target{force=false package_id=consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service) target="consensus-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service)/Check { test: false }/TargetInner { name: "consensus-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/consensus-service/src/main.rs", Edition2021) }
-   2.639742541s  INFO prepare_target{force=false package_id=consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service) target="consensus-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.640883916s  INFO prepare_target{force=false package_id=consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service) target="consensus-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service)/Check { test: true }/TargetInner { name: "consensus-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/consensus-service/src/main.rs", Edition2021) }
-   2.640888791s  INFO prepare_target{force=false package_id=consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service) target="consensus-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.642713916s  INFO prepare_target{force=false package_id=payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service) target="payment-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service)/Check { test: false }/TargetInner { name: "payment-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/payment-service/src/main.rs", Edition2021) }
-   2.642724541s  INFO prepare_target{force=false package_id=payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service) target="payment-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.644602125s  INFO prepare_target{force=false package_id=payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service) target="payment-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service)/Check { test: true }/TargetInner { name: "payment-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/payment-service/src/main.rs", Edition2021) }
-   2.644607458s  INFO prepare_target{force=false package_id=payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service) target="payment-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.646125208s  INFO prepare_target{force=false package_id=reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service) target="reputation-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service)/Check { test: false }/TargetInner { name: "reputation-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/reputation-service/src/main.rs", Edition2021) }
-   2.646129875s  INFO prepare_target{force=false package_id=reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service) target="reputation-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.647255875s  INFO prepare_target{force=false package_id=reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service) target="reputation-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service)/Check { test: true }/TargetInner { name: "reputation-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/reputation-service/src/main.rs", Edition2021) }
-   2.647262958s  INFO prepare_target{force=false package_id=reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service) target="reputation-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.651775666s  INFO prepare_target{force=false package_id=submission-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/submission-service) target="submission-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for submission-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/submission-service)/Check { test: false }/TargetInner { name: "submission-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/submission-service/src/main.rs", Edition2021) }
-   2.651781916s  INFO prepare_target{force=false package_id=submission-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/submission-service) target="submission-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.653500625s  INFO prepare_target{force=false package_id=aws-config v1.8.10 target="aws_config"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-config v1.8.10/Check { test: false }/TargetInner { ..: lib_target("aws_config", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-config-1.8.10/src/lib.rs", Edition2021) }
-   2.653506166s  INFO prepare_target{force=false package_id=aws-config v1.8.10 target="aws_config"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.654638333s  INFO prepare_target{force=false package_id=aws-credential-types v1.2.9 target="aws_credential_types"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-credential-types v1.2.9/Check { test: false }/TargetInner { ..: lib_target("aws_credential_types", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-credential-types-1.2.9/src/lib.rs", Edition2021) }
-   2.654643000s  INFO prepare_target{force=false package_id=aws-credential-types v1.2.9 target="aws_credential_types"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.655204750s  INFO prepare_target{force=false package_id=aws-smithy-async v1.2.6 target="aws_smithy_async"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-async v1.2.6/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_async", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-async-1.2.6/src/lib.rs", Edition2021) }
-   2.655209125s  INFO prepare_target{force=false package_id=aws-smithy-async v1.2.6 target="aws_smithy_async"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.655500250s  INFO prepare_target{force=false package_id=aws-smithy-runtime-api v1.9.2 target="aws_smithy_runtime_api"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-runtime-api v1.9.2/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_runtime_api", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-runtime-api-1.9.2/src/lib.rs", Edition2021) }
-   2.655504833s  INFO prepare_target{force=false package_id=aws-smithy-runtime-api v1.9.2 target="aws_smithy_runtime_api"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.656192458s  INFO prepare_target{force=false package_id=aws-smithy-types v1.3.4 target="aws_smithy_types"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-types v1.3.4/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_types", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-types-1.3.4/src/lib.rs", Edition2021) }
-   2.656198500s  INFO prepare_target{force=false package_id=aws-smithy-types v1.3.4 target="aws_smithy_types"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.656919541s  INFO prepare_target{force=false package_id=base64-simd v0.8.0 target="base64_simd"}: cargo::core::compiler::fingerprint: fingerprint dirty for base64-simd v0.8.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("base64_simd", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/base64-simd-0.8.0/src/lib.rs", Edition2021) }
-   2.656924666s  INFO prepare_target{force=false package_id=base64-simd v0.8.0 target="base64_simd"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.657157500s  INFO prepare_target{force=false package_id=outref v0.5.2 target="outref"}: cargo::core::compiler::fingerprint: fingerprint dirty for outref v0.5.2/Check { test: false }/TargetInner { ..: lib_target("outref", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/outref-0.5.2/src/lib.rs", Edition2021) }
-   2.657162333s  INFO prepare_target{force=false package_id=outref v0.5.2 target="outref"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.657322833s  INFO prepare_target{force=false package_id=vsimd v0.8.0 target="vsimd"}: cargo::core::compiler::fingerprint: fingerprint dirty for vsimd v0.8.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("vsimd", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/vsimd-0.8.0/src/lib.rs", Edition2021) }
-   2.657327458s  INFO prepare_target{force=false package_id=vsimd v0.8.0 target="vsimd"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.657494375s  INFO prepare_target{force=false package_id=bytes-utils v0.1.4 target="bytes_utils"}: cargo::core::compiler::fingerprint: fingerprint dirty for bytes-utils v0.1.4/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("bytes_utils", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bytes-utils-0.1.4/src/lib.rs", Edition2021) }
-   2.657498833s  INFO prepare_target{force=false package_id=bytes-utils v0.1.4 target="bytes_utils"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.657749958s  INFO prepare_target{force=false package_id=aws-runtime v1.5.14 target="aws_runtime"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-runtime v1.5.14/Check { test: false }/TargetInner { ..: lib_target("aws_runtime", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-runtime-1.5.14/src/lib.rs", Edition2021) }
-   2.657757208s  INFO prepare_target{force=false package_id=aws-runtime v1.5.14 target="aws_runtime"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.658721791s  INFO prepare_target{force=false package_id=aws-sigv4 v1.3.6 target="aws_sigv4"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-sigv4 v1.3.6/Check { test: false }/TargetInner { ..: lib_target("aws_sigv4", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-sigv4-1.3.6/src/lib.rs", Edition2021) }
-   2.658726541s  INFO prepare_target{force=false package_id=aws-sigv4 v1.3.6 target="aws_sigv4"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.659957833s  INFO prepare_target{force=false package_id=aws-smithy-eventstream v0.60.13 target="aws_smithy_eventstream"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-eventstream v0.60.13/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_eventstream", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-eventstream-0.60.13/src/lib.rs", Edition2021) }
-   2.659964250s  INFO prepare_target{force=false package_id=aws-smithy-eventstream v0.60.13 target="aws_smithy_eventstream"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.660289958s  INFO prepare_target{force=false package_id=crc32fast v1.5.0 target="crc32fast"}: cargo::core::compiler::fingerprint: fingerprint dirty for crc32fast v1.5.0/Check { test: false }/TargetInner { ..: lib_target("crc32fast", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.0/src/lib.rs", Edition2021) }
-   2.660294583s  INFO prepare_target{force=false package_id=crc32fast v1.5.0 target="crc32fast"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.660509875s  INFO prepare_target{force=false package_id=aws-smithy-http v0.62.5 target="aws_smithy_http"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-http v0.62.5/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_http", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-http-0.62.5/src/lib.rs", Edition2021) }
-   2.660514541s  INFO prepare_target{force=false package_id=aws-smithy-http v0.62.5 target="aws_smithy_http"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.661226375s  INFO prepare_target{force=false package_id=p256 v0.11.1 target="p256"}: cargo::core::compiler::fingerprint: fingerprint dirty for p256 v0.11.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("p256", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/p256-0.11.1/src/lib.rs", Edition2021) }
-   2.661230666s  INFO prepare_target{force=false package_id=p256 v0.11.1 target="p256"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.661509000s  INFO prepare_target{force=false package_id=ecdsa v0.14.8 target="ecdsa"}: cargo::core::compiler::fingerprint: fingerprint dirty for ecdsa v0.14.8/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ecdsa", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ecdsa-0.14.8/src/lib.rs", Edition2021) }
-   2.661513208s  INFO prepare_target{force=false package_id=ecdsa v0.14.8 target="ecdsa"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.661822666s  INFO prepare_target{force=false package_id=der v0.6.1 target="der"}: cargo::core::compiler::fingerprint: fingerprint dirty for der v0.6.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("der", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/der-0.6.1/src/lib.rs", Edition2021) }
-   2.661827083s  INFO prepare_target{force=false package_id=der v0.6.1 target="der"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.662074958s  INFO prepare_target{force=false package_id=elliptic-curve v0.12.3 target="elliptic_curve"}: cargo::core::compiler::fingerprint: fingerprint dirty for elliptic-curve v0.12.3/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("elliptic_curve", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/elliptic-curve-0.12.3/src/lib.rs", Edition2021) }
-   2.662079625s  INFO prepare_target{force=false package_id=elliptic-curve v0.12.3 target="elliptic_curve"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.662642958s  INFO prepare_target{force=false package_id=base16ct v0.1.1 target="base16ct"}: cargo::core::compiler::fingerprint: fingerprint dirty for base16ct v0.1.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("base16ct", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/base16ct-0.1.1/src/lib.rs", Edition2021) }
-   2.662647250s  INFO prepare_target{force=false package_id=base16ct v0.1.1 target="base16ct"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.662810083s  INFO prepare_target{force=false package_id=crypto-bigint v0.4.9 target="crypto_bigint"}: cargo::core::compiler::fingerprint: fingerprint dirty for crypto-bigint v0.4.9/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("crypto_bigint", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crypto-bigint-0.4.9/src/lib.rs", Edition2021) }
-   2.662814416s  INFO prepare_target{force=false package_id=crypto-bigint v0.4.9 target="crypto_bigint"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.663112875s  INFO prepare_target{force=false package_id=ff v0.12.1 target="ff"}: cargo::core::compiler::fingerprint: fingerprint dirty for ff v0.12.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ff", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ff-0.12.1/src/lib.rs", Edition2021) }
-   2.663117250s  INFO prepare_target{force=false package_id=ff v0.12.1 target="ff"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.663354041s  INFO prepare_target{force=false package_id=group v0.12.1 target="group"}: cargo::core::compiler::fingerprint: fingerprint dirty for group v0.12.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("group", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/group-0.12.1/src/lib.rs", Edition2021) }
-   2.663358375s  INFO prepare_target{force=false package_id=group v0.12.1 target="group"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.663643583s  INFO prepare_target{force=false package_id=pkcs8 v0.9.0 target="pkcs8"}: cargo::core::compiler::fingerprint: fingerprint dirty for pkcs8 v0.9.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("pkcs8", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs8-0.9.0/src/lib.rs", Edition2021) }
-   2.663648125s  INFO prepare_target{force=false package_id=pkcs8 v0.9.0 target="pkcs8"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.663882333s  INFO prepare_target{force=false package_id=spki v0.6.0 target="spki"}: cargo::core::compiler::fingerprint: fingerprint dirty for spki v0.6.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("spki", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spki-0.6.0/src/lib.rs", Edition2021) }
-   2.663886500s  INFO prepare_target{force=false package_id=spki v0.6.0 target="spki"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.664125583s  INFO prepare_target{force=false package_id=sec1 v0.3.0 target="sec1"}: cargo::core::compiler::fingerprint: fingerprint dirty for sec1 v0.3.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sec1", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sec1-0.3.0/src/lib.rs", Edition2021) }
-   2.664129791s  INFO prepare_target{force=false package_id=sec1 v0.3.0 target="sec1"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.664509958s  INFO prepare_target{force=false package_id=rfc6979 v0.3.1 target="rfc6979"}: cargo::core::compiler::fingerprint: fingerprint dirty for rfc6979 v0.3.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("rfc6979", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rfc6979-0.3.1/src/lib.rs", Edition2021) }
-   2.664514416s  INFO prepare_target{force=false package_id=rfc6979 v0.3.1 target="rfc6979"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.664791833s  INFO prepare_target{force=false package_id=signature v1.6.4 target="signature"}: cargo::core::compiler::fingerprint: fingerprint dirty for signature v1.6.4/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("signature", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signature-1.6.4/src/lib.rs", Edition2021) }
-   2.664796208s  INFO prepare_target{force=false package_id=signature v1.6.4 target="signature"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.665084000s  INFO prepare_target{force=false package_id=aws-smithy-runtime v1.9.4 target="aws_smithy_runtime"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-runtime v1.9.4/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_runtime", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-runtime-1.9.4/src/lib.rs", Edition2021) }
-   2.665089083s  INFO prepare_target{force=false package_id=aws-smithy-runtime v1.9.4 target="aws_smithy_runtime"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.666041375s  INFO prepare_target{force=false package_id=aws-smithy-http-client v1.1.4 target="aws_smithy_http_client"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-http-client v1.1.4/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_http_client", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-http-client-1.1.4/src/lib.rs", Edition2021) }
-   2.666046166s  INFO prepare_target{force=false package_id=aws-smithy-http-client v1.1.4 target="aws_smithy_http_client"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.667028500s  INFO prepare_target{force=false package_id=hyper-rustls v0.27.7 target="hyper_rustls"}: cargo::core::compiler::fingerprint: fingerprint dirty for hyper-rustls v0.27.7/Check { test: false }/TargetInner { ..: lib_target("hyper_rustls", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hyper-rustls-0.27.7/src/lib.rs", Edition2021) }
-   2.667032625s  INFO prepare_target{force=false package_id=hyper-rustls v0.27.7 target="hyper_rustls"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.667548291s  INFO prepare_target{force=false package_id=rustls-native-certs v0.8.2 target="rustls_native_certs"}: cargo::core::compiler::fingerprint: fingerprint dirty for rustls-native-certs v0.8.2/Check { test: false }/TargetInner { ..: lib_target("rustls_native_certs", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-native-certs-0.8.2/src/lib.rs", Edition2021) }
-   2.667552791s  INFO prepare_target{force=false package_id=rustls-native-certs v0.8.2 target="rustls_native_certs"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.667796833s  INFO prepare_target{force=false package_id=security-framework v3.5.1 target="security_framework"}: cargo::core::compiler::fingerprint: fingerprint dirty for security-framework v3.5.1/Check { test: false }/TargetInner { ..: lib_target("security_framework", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/security-framework-3.5.1/src/lib.rs", Edition2021) }
-   2.667801291s  INFO prepare_target{force=false package_id=security-framework v3.5.1 target="security_framework"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.668143000s  INFO prepare_target{force=false package_id=core-foundation v0.10.1 target="core_foundation"}: cargo::core::compiler::fingerprint: fingerprint dirty for core-foundation v0.10.1/Check { test: false }/TargetInner { ..: lib_target("core_foundation", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/core-foundation-0.10.1/src/lib.rs", Edition2021) }
-   2.668147416s  INFO prepare_target{force=false package_id=core-foundation v0.10.1 target="core_foundation"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.668384125s  INFO prepare_target{force=false package_id=tokio-rustls v0.26.4 target="tokio_rustls"}: cargo::core::compiler::fingerprint: fingerprint dirty for tokio-rustls v0.26.4/Check { test: false }/TargetInner { ..: lib_target("tokio_rustls", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-rustls-0.26.4/src/lib.rs", Edition2021) }
-   2.668388375s  INFO prepare_target{force=false package_id=tokio-rustls v0.26.4 target="tokio_rustls"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.668720000s  INFO prepare_target{force=false package_id=aws-smithy-observability v0.1.4 target="aws_smithy_observability"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-observability v0.1.4/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_observability", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-observability-0.1.4/src/lib.rs", Edition2021) }
-   2.668724458s  INFO prepare_target{force=false package_id=aws-smithy-observability v0.1.4 target="aws_smithy_observability"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.669116333s  INFO prepare_target{force=false package_id=aws-types v1.3.10 target="aws_types"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-types v1.3.10/Check { test: false }/TargetInner { ..: lib_target("aws_types", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/lib.rs", Edition2021) }
-   2.669125250s  INFO prepare_target{force=false package_id=aws-types v1.3.10 target="aws_types"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.670035833s  INFO prepare_target{force=false package_id=aws-sdk-sso v1.89.0 target="aws_sdk_sso"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-sdk-sso v1.89.0/Check { test: false }/TargetInner { ..: lib_target("aws_sdk_sso", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-sdk-sso-1.89.0/src/lib.rs", Edition2021) }
-   2.670040083s  INFO prepare_target{force=false package_id=aws-sdk-sso v1.89.0 target="aws_sdk_sso"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.671437458s  INFO prepare_target{force=false package_id=aws-smithy-json v0.61.7 target="aws_smithy_json"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-json v0.61.7/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_json", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-json-0.61.7/src/lib.rs", Edition2021) }
-   2.671443541s  INFO prepare_target{force=false package_id=aws-smithy-json v0.61.7 target="aws_smithy_json"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.671718833s  INFO prepare_target{force=false package_id=regex-lite v0.1.8 target="regex_lite"}: cargo::core::compiler::fingerprint: fingerprint dirty for regex-lite v0.1.8/Check { test: false }/TargetInner { ..: lib_target("regex_lite", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/regex-lite-0.1.8/src/lib.rs", Edition2021) }
-   2.671723458s  INFO prepare_target{force=false package_id=regex-lite v0.1.8 target="regex_lite"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.672067250s  INFO prepare_target{force=false package_id=aws-sdk-ssooidc v1.91.0 target="aws_sdk_ssooidc"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-sdk-ssooidc v1.91.0/Check { test: false }/TargetInner { ..: lib_target("aws_sdk_ssooidc", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-sdk-ssooidc-1.91.0/src/lib.rs", Edition2021) }
-   2.672071625s  INFO prepare_target{force=false package_id=aws-sdk-ssooidc v1.91.0 target="aws_sdk_ssooidc"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.672801041s  INFO prepare_target{force=false package_id=aws-sdk-sts v1.91.0 target="aws_sdk_sts"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-sdk-sts v1.91.0/Check { test: false }/TargetInner { ..: lib_target("aws_sdk_sts", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-sdk-sts-1.91.0/src/lib.rs", Edition2021) }
-   2.672807833s  INFO prepare_target{force=false package_id=aws-sdk-sts v1.91.0 target="aws_sdk_sts"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.673556416s  INFO prepare_target{force=false package_id=aws-smithy-query v0.60.8 target="aws_smithy_query"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-query v0.60.8/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_query", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-query-0.60.8/src/lib.rs", Edition2021) }
-   2.673561083s  INFO prepare_target{force=false package_id=aws-smithy-query v0.60.8 target="aws_smithy_query"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.673828416s  INFO prepare_target{force=false package_id=aws-smithy-xml v0.60.12 target="aws_smithy_xml"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-xml v0.60.12/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_xml", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-xml-0.60.12/src/lib.rs", Edition2021) }
-   2.673832875s  INFO prepare_target{force=false package_id=aws-smithy-xml v0.60.12 target="aws_smithy_xml"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.674027916s  INFO prepare_target{force=false package_id=xmlparser v0.13.6 target="xmlparser"}: cargo::core::compiler::fingerprint: fingerprint dirty for xmlparser v0.13.6/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("xmlparser", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xmlparser-0.13.6/src/lib.rs", Edition2018) }
-   2.674032500s  INFO prepare_target{force=false package_id=xmlparser v0.13.6 target="xmlparser"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.674217875s  INFO prepare_target{force=false package_id=aws-sdk-s3 v1.111.0 target="aws_sdk_s3"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-sdk-s3 v1.111.0/Check { test: false }/TargetInner { ..: lib_target("aws_sdk_s3", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-sdk-s3-1.111.0/src/lib.rs", Edition2021) }
-   2.674222166s  INFO prepare_target{force=false package_id=aws-sdk-s3 v1.111.0 target="aws_sdk_s3"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.675524750s  INFO prepare_target{force=false package_id=aws-smithy-checksums v0.63.10 target="aws_smithy_checksums"}: cargo::core::compiler::fingerprint: fingerprint dirty for aws-smithy-checksums v0.63.10/Check { test: false }/TargetInner { ..: lib_target("aws_smithy_checksums", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-smithy-checksums-0.63.10/src/lib.rs", Edition2021) }
-   2.675530333s  INFO prepare_target{force=false package_id=aws-smithy-checksums v0.63.10 target="aws_smithy_checksums"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.676447208s  INFO prepare_target{force=false package_id=crc-fast v1.3.0 target="crc_fast"}: cargo::core::compiler::fingerprint: fingerprint dirty for crc-fast v1.3.0/Check { test: false }/TargetInner { ..: lib_target("crc_fast", ["lib", "cdylib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc-fast-1.3.0/src/lib.rs", Edition2021) }
-   2.676454125s  INFO prepare_target{force=false package_id=crc-fast v1.3.0 target="crc_fast"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.676831250s  INFO prepare_target{force=false package_id=rand v0.9.2 target="rand"}: cargo::core::compiler::fingerprint: fingerprint dirty for rand v0.9.2/Check { test: false }/TargetInner { ..: lib_target("rand", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rand-0.9.2/src/lib.rs", Edition2021) }
-   2.676836500s  INFO prepare_target{force=false package_id=rand v0.9.2 target="rand"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.677079750s  INFO prepare_target{force=false package_id=rand_chacha v0.9.0 target="rand_chacha"}: cargo::core::compiler::fingerprint: fingerprint dirty for rand_chacha v0.9.0/Check { test: false }/TargetInner { ..: lib_target("rand_chacha", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rand_chacha-0.9.0/src/lib.rs", Edition2021) }
-   2.677084833s  INFO prepare_target{force=false package_id=rand_chacha v0.9.0 target="rand_chacha"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.677330916s  INFO prepare_target{force=false package_id=rand_core v0.9.3 target="rand_core"}: cargo::core::compiler::fingerprint: fingerprint dirty for rand_core v0.9.3/Check { test: false }/TargetInner { ..: lib_target("rand_core", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rand_core-0.9.3/src/lib.rs", Edition2021) }
-   2.677335541s  INFO prepare_target{force=false package_id=rand_core v0.9.3 target="rand_core"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.677550666s  INFO prepare_target{force=false package_id=lru v0.12.5 target="lru"}: cargo::core::compiler::fingerprint: fingerprint dirty for lru v0.12.5/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("lru", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lru-0.12.5/src/lib.rs", Edition2015) }
-   2.677555791s  INFO prepare_target{force=false package_id=lru v0.12.5 target="lru"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.677752833s  INFO prepare_target{force=false package_id=hashbrown v0.15.5 target="hashbrown"}: cargo::core::compiler::fingerprint: fingerprint dirty for hashbrown v0.15.5/Check { test: false }/TargetInner { ..: lib_target("hashbrown", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hashbrown-0.15.5/src/lib.rs", Edition2021) }
-   2.677757416s  INFO prepare_target{force=false package_id=hashbrown v0.15.5 target="hashbrown"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.678014208s  INFO prepare_target{force=false package_id=foldhash v0.1.5 target="foldhash"}: cargo::core::compiler::fingerprint: fingerprint dirty for foldhash v0.1.5/Check { test: false }/TargetInner { benched: false, ..: lib_target("foldhash", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/foldhash-0.1.5/src/lib.rs", Edition2021) }
-   2.678018750s  INFO prepare_target{force=false package_id=foldhash v0.1.5 target="foldhash"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.678340458s  INFO prepare_target{force=false package_id=validator v0.16.1 target="validator"}: cargo::core::compiler::fingerprint: fingerprint dirty for validator v0.16.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("validator", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/validator-0.16.1/src/lib.rs", Edition2018) }
-   2.678344833s  INFO prepare_target{force=false package_id=validator v0.16.1 target="validator"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.678804875s  INFO prepare_target{force=false package_id=idna v0.4.0 target="idna"}: cargo::core::compiler::fingerprint: fingerprint dirty for idna v0.4.0/Check { test: false }/TargetInner { name_inferred: true, doctest: false, ..: lib_target("idna", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/idna-0.4.0/src/lib.rs", Edition2018) }
-   2.678809333s  INFO prepare_target{force=false package_id=idna v0.4.0 target="idna"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-   2.679311166s  INFO prepare_target{force=false package_id=submission-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/submission-service) target="submission-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for submission-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/submission-service)/Check { test: true }/TargetInner { name: "submission-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/submission-service/src/main.rs", Edition2021) }
-   2.679319208s  INFO prepare_target{force=false package_id=submission-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/submission-service) target="submission-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
-    Checking subtle v2.6.1
-    Checking ring v0.17.14
-    Checking num-integer v0.1.46
-    Checking time v0.3.44
-    Checking h2 v0.4.12
-    Checking rustls-native-certs v0.6.3
-    Checking outref v0.5.2
-    Checking vsimd v0.8.0
-    Checking bytes-utils v0.1.4
-    Checking aws-lc-sys v0.32.3
-    Checking aws-smithy-async v1.2.6
-    Checking der v0.6.1
-    Checking digest v0.10.7
-    Checking crypto-bigint v0.5.5
-    Checking ff v0.13.1
-    Checking group v0.13.0
-    Checking sec1 v0.7.3
-    Checking hmac v0.12.1
-    Checking sha2 v0.10.9
-    Checking base64-simd v0.8.0
-    Checking sha3 v0.10.8
-    Checking md-5 v0.10.6
-    Checking rfc6979 v0.4.0
-    Checking hkdf v0.12.4
-    Checking signature v2.2.0
-    Checking sha1 v0.10.6
-    Checking ethabi v18.0.0
-    Checking crypto-bigint v0.4.9
-    Checking ff v0.12.1
-    Checking crc32fast v1.5.0
-    Checking spki v0.6.0
-    Checking core-foundation v0.10.1
-    Checking base16ct v0.1.1
-    Checking pkcs8 v0.9.0
-    Checking aws-lc-rs v1.14.1
-    Checking group v0.12.1
-    Checking sec1 v0.3.0
-    Checking signature v1.6.4
-    Checking sct v0.7.1
-    Checking rustls-webpki v0.101.7
-    Checking security-framework v3.5.1
-    Checking num-bigint v0.4.6
-    Checking bs58 v0.5.1
-    Checking aws-smithy-types v1.3.4
-    Checking ripemd v0.1.3
-    Checking ring v0.16.20
-    Checking rfc6979 v0.3.1
-    Checking elliptic-curve v0.12.3
-    Checking rustls v0.21.12
-    Checking elliptic-curve v0.13.8
-    Checking ecdsa v0.14.8
-    Checking rustls-webpki v0.103.6
-    Checking ecdsa v0.16.9
-    Checking aws-smithy-runtime-api v1.9.2
-    Checking aws-smithy-eventstream v0.60.13
-    Checking rustls-native-certs v0.8.2
-    Checking simple_asn1 v0.6.3
-    Checking p256 v0.11.1
-    Checking coins-core v0.8.7
-    Checking pbkdf2 v0.11.0
-    Checking pbkdf2 v0.12.2
-    Checking k256 v0.13.4
-    Checking rustls v0.23.32
-    Checking scrypt v0.10.0
-    Checking jsonwebtoken v8.3.0
-    Checking aws-smithy-json v0.61.7
-    Checking eth-keystore v0.5.0
-    Checking rand_core v0.9.3
-    Checking regex-lite v0.1.8
-    Checking xmlparser v0.13.6
-    Checking rand_chacha v0.9.0
-    Checking ethers-core v2.0.14
-    Checking enr v0.10.0
-    Checking coins-bip32 v0.8.7
-    Checking rand v0.9.2
-    Checking aws-smithy-xml v0.60.12
-    Checking blake2 v0.10.6
-    Checking foldhash v0.1.5
+   0.411775584s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint: fingerprint dirty for api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)/Check { test: false }/TargetInner { name: "api-gateway", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/api-gateway/src/main.rs", Edition2021) }
+   0.411788667s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.427429292s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint: fingerprint dirty for api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)/Check { test: true }/TargetInner { name: "api-gateway", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/api-gateway/src/main.rs", Edition2021) }
+   0.427439667s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.430300959s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint: fingerprint dirty for bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)/Check { test: false }/TargetInner { name: "bounty-manager", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/bounty-manager/src/main.rs", Edition2024) }
+   0.430310500s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.431877084s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint: fingerprint dirty for bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)/Check { test: true }/TargetInner { name: "bounty-manager", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/bounty-manager/src/main.rs", Edition2024) }
+   0.431883584s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
    Compiling yara-sys v0.18.0
-    Checking aws-smithy-http v0.62.5
-    Checking aws-credential-types v1.2.9
-    Checking aws-smithy-observability v0.1.4
-    Checking coins-bip39 v0.8.7
-    Checking crc-fast v1.3.0
-    Checking hashbrown v0.15.5
-    Checking aws-types v1.3.10
-    Checking aws-smithy-query v0.60.8
-    Checking sqlx-core v0.6.3
-    Checking aws-sigv4 v1.3.6
-    Checking tokio-rustls v0.24.1
-    Checking sqlx-core v0.7.4
-    Checking hyper-rustls v0.24.2
+    Checking api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)
+    Checking bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)
 error: failed to run custom build command for `yara-sys v0.18.0`
 note: To improve backtraces for build dependencies, set the CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG=true environment variable to enable debug information generation.
 
@@ -605,53 +169,7 @@ Caused by:
      6: core::ops::function::FnOnce::call_once
   note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
 warning: build failed, waiting for other jobs to finish...
-    Checking tungstenite v0.20.1
-    Checking aws-smithy-checksums v0.63.10
-    Checking reqwest v0.11.27
-    Checking lru v0.12.5
-    Checking hyper v1.7.0
-   Compiling ort v1.16.3
-    Checking ndarray v0.15.6
-    Checking password-hash v0.5.0
-    Checking tokio-tungstenite v0.20.1
-    Checking idna v0.4.0
-    Checking jsonwebtoken v9.3.1
-    Checking argon2 v0.5.3
-    Checking bcrypt v0.17.1
-    Checking validator v0.16.1
-    Checking ndarray v0.16.1
-    Checking hyper-util v0.1.17
-    Checking tokio-rustls v0.26.4
-    Checking ureq v2.12.1
-    Checking sqlx-postgres v0.7.4
-    Checking hyper-rustls v0.27.7
-    Checking axum v0.7.9
-    Checking axum v0.8.4
-    Checking sqlx v0.6.3
-    Checking aws-smithy-http-client v1.1.4
-    Checking ethers-providers v2.0.14
-    Checking ethers-contract-abigen v2.0.14
-    Checking ethers-etherscan v2.0.14
-    Checking ethers-signers v2.0.14
-    Checking ethers-addressbook v2.0.14
-    Checking aws-smithy-runtime v1.9.4
-    Checking sqlx v0.7.4
-    Checking aws-runtime v1.5.14
-    Checking bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)
-    Checking reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service)
-    Checking consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service)
-    Checking aws-sdk-ssooidc v1.91.0
-    Checking aws-sdk-sts v1.91.0
-    Checking aws-sdk-sso v1.89.0
-    Checking aws-sdk-s3 v1.111.0
-    Checking ethers-contract v2.0.14
-    Checking aws-config v1.8.10
 error: could not compile `bounty-manager` (bin "bounty-manager") due to 54 previous errors; 10 warnings emitted
 error: could not compile `bounty-manager` (bin "bounty-manager" test) due to 54 previous errors; 10 warnings emitted
-    Checking ethers-middleware v2.0.14
-    Checking ethers v2.0.14
-    Checking payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service)
-    Checking api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)
 error: could not compile `api-gateway` (bin "api-gateway") due to 278 previous errors; 33 warnings emitted
 error: could not compile `api-gateway` (bin "api-gateway" test) due to 278 previous errors; 32 warnings emitted
-    Checking submission-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/submission-service)

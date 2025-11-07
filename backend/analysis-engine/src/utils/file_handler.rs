@@ -161,13 +161,18 @@ impl FileHandler {
         let mut entries = async_fs::read_dir(&self.storage_path).await?;
         let mut cleaned = 0;
 
-        let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
+        let cutoff_duration = std::time::Duration::from_secs(max_age_days as u64 * 24 * 60 * 60);
 
         while let Some(entry) = entries.next_entry().await? {
             if let Ok(metadata) = entry.metadata().await {
-                if metadata.modified()?.elapsed()? > cutoff - Utc::now() { // Stub for modified time
-                    async_fs::remove_file(entry.path()).await?;
-                    cleaned += 1;
+                // Check if file modification time is older than cutoff
+                if let Ok(modified) = metadata.modified() {
+                    if let Ok(elapsed) = modified.elapsed() {
+                        if elapsed > cutoff_duration {
+                            async_fs::remove_file(entry.path()).await?;
+                            cleaned += 1;
+                        }
+                    }
                 }
             }
         }

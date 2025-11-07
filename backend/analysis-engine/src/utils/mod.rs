@@ -2,7 +2,6 @@ pub mod file_handler;
 
 // Re-export commonly used types and functions for convenience
 pub use file_handler::{FileHandler, FileMetadata as UtilsFileMetadata, AnalysisStatus};
-pub use self::utils::sanitize_filename;
 
 use anyhow::Result;
 use std::collections::HashMap;
