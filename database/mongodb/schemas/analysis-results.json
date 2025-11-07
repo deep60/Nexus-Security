@@ -1,0 +1,73 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "title": "Analysis Results Schema",
+    "required": ["submission_id", "engine_id", "verdict", "confidence", "timestamp"],
+    "properties": {
+      "submission_id": {
+        "bsonType": "string",
+        "description": "UUID of the submitted file/URL"
+      },
+      "engine_id": {
+        "bsonType": "string",
+        "description": "Unique identifier of the analysis engine"
+      },
+      "engine_name": {
+        "bsonType": "string",
+        "description": "Human-readable name of the engine"
+      },
+      "engine_type": {
+        "enum": ["human", "automated", "ml", "static", "dynamic"],
+        "description": "Category of analysis engine"
+      },
+      "verdict": {
+        "enum": ["malicious", "benign", "suspicious", "unknown"],
+        "description": "Final verdict from this engine"
+      },
+      "confidence": {
+        "bsonType": "double",
+        "minimum": 0,
+        "maximum": 1,
+        "description": "Confidence score (0.0 to 1.0)"
+      },
+      "stake_amount": {
+        "bsonType": "double",
+        "minimum": 0,
+        "description": "Amount of tokens staked on this verdict"
+      },
+      "timestamp": {
+        "bsonType": "date",
+        "description": "When the analysis was completed"
+      },
+      "analysis_duration": {
+        "bsonType": "int",
+        "description": "Time taken for analysis in seconds"
+      },
+      "details": {
+        "bsonType": "object",
+        "description": "Engine-specific detailed results",
+        "properties": {
+          "threats_detected": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "string"
+            }
+          },
+          "signatures_matched": {
+            "bsonType": "array"
+          },
+          "behavioral_indicators": {
+            "bsonType": "array"
+          },
+          "raw_output": {
+            "bsonType": "string"
+          }
+        }
+      },
+      "metadata": {
+        "bsonType": "object",
+        "description": "Additional metadata"
+      }
+    }
+  }
+}

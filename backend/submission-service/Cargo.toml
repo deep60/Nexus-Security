@@ -1,0 +1,61 @@
+[package]
+name = "submission-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+futures = { workspace = true }
+
+# Web framework
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
+hyper = "1.0"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+bytes = { workspace = true }
+
+# Database
+sqlx = { workspace = true }
+redis = { workspace = true }
+
+# File handling
+multer = "3.0"
+mime = "0.3"
+sha2 = "0.10"
+hex = "0.4"
+
+# Storage (S3/MinIO)
+aws-sdk-s3 = "1.0"
+aws-config = "1.0"
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Configuration
+config = { workspace = true }
+dotenvy = { workspace = true }
+
+# UUID
+uuid = { workspace = true }
+
+# Validation
+validator = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# Shared utilities
+shared = { path = "../shared" }
+
+[dev-dependencies]
+tokio-test = { workspace = true }

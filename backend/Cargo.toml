@@ -3,7 +3,13 @@ members = [
     "api-gateway",
     "analysis-engine",
     "bounty-manager",
-    "shared", "notification-service", "user-service",
+    "notification-service",
+    "user-service",
+    "submission-service",
+    "reputation-service",
+    "consensus-service",
+    "payment-service",
+    "shared",
 ]
 resolver = "2"
 
