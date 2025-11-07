@@ -1,0 +1,2 @@
+fn(axum::extract::State<submission::AppState>, axum::Json<Vec<CreateSubmissionRequest>>) -> impl std::future::Future<Output = std::result::Result<axum::Json<BulkSubmissionResponse>, axum::http::StatusCode>> {bulk_create_submissions}
+fn(axum::extract::State<submission::AppState>, axum::Json<Vec<CreateSubmissionRequest>>) -> impl std::future::Future<Output = std::result::Result<axum::Json<BulkSubmissionResponse>, axum::http::StatusCode>> {bulk_create_submissions}: Handler<_, _>
