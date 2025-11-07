@@ -19,11 +19,17 @@ use tracing::info;
 mod analyzers;
 mod models;
 mod utils;
+mod storage;
+mod scanners;
+mod sandbox;
 
 use crate::analyzers::{AnalysisEngine, AnalysisEngineConfig, FileAnalysisRequest, AnalysisOptions, AnalysisPriority};
 use crate::analyzers::hash_analyzer::{HashInfo, HashType};
 use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, FileMetadata};
 use crate::utils::file_handler::FileHandler;
+use crate::storage::{StorageManager, StorageConfig};
+use crate::scanners::file_scanner::{FileScanner, FileScannerConfig};
+use crate::scanners::url_scanner::{UrlScanner, UrlScannerConfig};
 use chrono::Utc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -32,6 +38,9 @@ use tokio::sync::Mutex;
 pub struct AppState {
     analysis_engine: Arc<Mutex<AnalysisEngine>>,
     file_handler: Arc<FileHandler>,
+    storage_manager: Arc<StorageManager>,
+    file_scanner: Arc<FileScanner>,
+    url_scanner: Arc<UrlScanner>,
     database_url: String,
     redis_url: String,
 }
@@ -86,10 +95,23 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let analysis_engine = Arc::new(Mutex::new(AnalysisEngine::new(config)?));
     let file_handler = Arc::new(FileHandler::new(&upload_dir)?);
 
+    // Initialize storage manager
+    info!("Initializing storage manager...");
+    let storage_config = StorageConfig::default();
+    let storage_manager = Arc::new(StorageManager::new(storage_config).await?);
+
+    // Initialize scanners
+    info!("Initializing scanners...");
+    let file_scanner = Arc::new(FileScanner::new(FileScannerConfig::default())?);
+    let url_scanner = Arc::new(UrlScanner::new(UrlScannerConfig::default())?);
+
     // Create application state
     let app_state = AppState {
         analysis_engine,
         file_handler,
+        storage_manager,
+        file_scanner,
+        url_scanner,
         database_url,
         redis_url,
     };
@@ -184,7 +206,14 @@ async fn analyze_file(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // TODO: Store in DB
+    // Store analysis result in database
+    if let Err(e) = state.storage_manager
+        .store_analysis_result(&analysis_result.analysis_id, &analysis_result, None)
+        .await
+    {
+        error!("Failed to store analysis result: {}", e);
+    }
+
     info!("Analysis completed: {:?}", analysis_result.analysis_id);
 
     Ok(Json(AnalysisResponse {
@@ -251,29 +280,25 @@ async fn analyze_hash(
 
 async fn get_analysis_result(
     Path(id): Path<String>,
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> Result<Json<AnalysisResult>, StatusCode> {
     info!("Fetching analysis result for: {}", id);
 
-    // TODO: Implement database lookup with sqlx
-    // For now, return a stub with correct structure
-    let stub_file_metadata = FileMetadata {
-        filename: Some("stub_file.exe".to_string()),
-        file_size: 1024,
-        mime_type: "application/octet-stream".to_string(),
-        md5: "d41d8cd98f00b204e9800998ecf8427e".to_string(),
-        sha1: "da39a3ee5e6b4b0d3255bfef95601890afd80709".to_string(),
-        sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
-        sha512: None,
-        entropy: Some(0.5),
-        magic_bytes: Some("4d5a".to_string()),
-        executable_info: None,
-    };
+    let analysis_id = Uuid::parse_str(&id).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    let mut stub_result = AnalysisResult::new(Uuid::parse_str(&id).unwrap_or(Uuid::new_v4()), stub_file_metadata);
-    stub_result.mark_completed();
+    // Retrieve from database
+    let result = state.storage_manager
+        .get_analysis_result(&analysis_id)
+        .await
+        .map_err(|e| {
+            error!("Failed to retrieve analysis result: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
-    Ok(Json(stub_result))
+    match result {
+        Some(analysis_result) => Ok(Json(analysis_result)),
+        None => Err(StatusCode::NOT_FOUND),
+    }
 }
 
 async fn get_detailed_analysis(
@@ -290,13 +315,15 @@ async fn get_detailed_analysis(
 }
 
 async fn engines_status(
-    State(_state): State<AppState>
+    State(state): State<AppState>
 ) -> Json<EngineStatus> {
-    // TODO: Implement actual engine health checks
+    // Check storage health
+    let storage_health = state.storage_manager.health_check().await;
+
     Json(EngineStatus {
-        static_analyzer: true,
-        hash_analyzer: true,
-        yara_engine: true,
+        static_analyzer: storage_health.database_healthy,
+        hash_analyzer: storage_health.s3_healthy,
+        yara_engine: storage_health.overall_healthy,
     })
 }
 
@@ -327,11 +354,13 @@ async fn perform_url_analysis(
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting URL analysis for: {} ({})", analysis_id, url);
 
-    // TODO: Use analyzers for URL (e.g., static on downloaded content)
-    // For now, stub
-    tokio::time::sleep(Duration::from_millis(75)).await;
-    
-    info!("URL analysis completed for: {}", analysis_id);
+    // Use URL scanner to analyze the URL
+    let scan_result = state.url_scanner.scan(url.as_bytes(), None).await?;
+
+    info!("URL analysis completed for: {} - Risk Level: {:?}", analysis_id, scan_result.risk_level);
+
+    // TODO: Store URL scan results in database with proper AnalysisResult structure
+
     Ok(())
 }
 
