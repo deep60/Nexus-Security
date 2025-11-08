@@ -356,6 +356,7 @@ impl Bounty {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
+            creator: Uuid::new_v4(), // TODO: Get from authenticated user context
             creator_address,
             title,
             description,

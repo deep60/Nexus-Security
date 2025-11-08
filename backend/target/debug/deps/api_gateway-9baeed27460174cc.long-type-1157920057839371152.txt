@@ -1,0 +1,2 @@
+fn(axum::extract::State<submission::AppState>, axum::extract::Path<Uuid>, axum::Json<UpdateSubmissionRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<submission::SubmissionResponse>, axum::http::StatusCode>> {update_submission}
+fn(axum::extract::State<submission::AppState>, axum::extract::Path<Uuid>, axum::Json<UpdateSubmissionRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<submission::SubmissionResponse>, axum::http::StatusCode>> {update_submission}: Handler<_, _>

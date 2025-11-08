@@ -167,6 +167,7 @@ pub enum SubmissionStatus {
 }
 
 // Application state
+#[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseService,
     pub blockchain: BlockchainService,

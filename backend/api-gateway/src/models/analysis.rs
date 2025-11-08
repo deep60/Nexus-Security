@@ -377,12 +377,13 @@ impl AnalysisStats {
             return (ThreatVerdict::Unknown, 0.0);
         }
 
-        let max_votes = [
+        let votes = [
             self.benign_votes,
             self.suspicious_votes,
             self.malicious_votes,
             self.unknown_votes,
-        ].iter().max().unwrap();
+        ];
+        let max_votes = votes.iter().max().unwrap();
 
         let confidence = (*max_votes as f64 / total_votes as f64) * 100.0;
 
