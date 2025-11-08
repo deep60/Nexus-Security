@@ -6,9 +6,16 @@ use axum::{
 use serde_json::json;
 use thiserror::Error;
 
+// Handler modules
+pub mod analysis;
 pub mod auth;
 pub mod bounty;
+pub mod health;
+pub mod reputation;
 pub mod submission;
+pub mod user;
+pub mod wallet;
+pub mod webhook;
 
 #[derive(Error, Debug)]
 pub enum ApiError {

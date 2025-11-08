@@ -6,6 +6,14 @@ use uuid::Uuid;
 
 // Re-export all model modules
 pub mod analysis;
+pub mod error;
+pub mod request;
+pub mod response;
+
+pub use error::*;
+pub use request::*;
+pub use response::*;
+
 pub mod bounty;
 pub mod user;
 

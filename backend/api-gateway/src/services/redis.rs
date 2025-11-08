@@ -161,7 +161,7 @@ impl RedisService {
 
     pub async fn get_session(&mut self, session_token: &str) -> Result<Option<UserSession>> {
         let key = format!("session:{}", session_token);
-        
+
         let cached: Option<String> = self.connection_pool
             .get(&key)
             .await
@@ -171,10 +171,13 @@ impl RedisService {
             Some(data) => {
                 let session: UserSession = serde_json::from_str(&data)
                     .context("Failed to deserialize session")?;
-                
+
                 // Check if session is expired
                 if session.expires_at < chrono::Utc::now() {
-                    self.invalidate_session(session_token).await?;
+                    // Delete expired session directly without recursion
+                    let _: () = self.connection_pool.del(&key).await.context("Failed to delete session")?;
+                    let user_key = format!("user_session:{}", session.user_id);
+                    let _: () = self.connection_pool.del(&user_key).await.context("Failed to remove user session")?;
                     Ok(None)
                 } else {
                     Ok(Some(session))
@@ -185,13 +188,18 @@ impl RedisService {
     }
 
     pub async fn invalidate_session(&mut self, session_token: &str) -> Result<()> {
-        // Get session data first to find user_id
-        if let Ok(Some(session)) = self.get_session(session_token).await {
-            let user_key = format!("user_session:{}", session.user_id);
-            let _: () = self.connection_pool
-                .del(&user_key)
-                .await
-                .context("Failed to remove user session mapping")?;
+        // Get session data directly without calling get_session to avoid recursion
+        let key = format!("session:{}", session_token);
+        let cached: Option<String> = self.connection_pool.get(&key).await.context("Failed to retrieve session")?;
+
+        if let Some(data) = cached {
+            if let Ok(session) = serde_json::from_str::<UserSession>(&data) {
+                let user_key = format!("user_session:{}", session.user_id);
+                let _: () = self.connection_pool
+                    .del(&user_key)
+                    .await
+                    .context("Failed to remove user session mapping")?;
+            }
         }
 
         let key = format!("session:{}", session_token);
