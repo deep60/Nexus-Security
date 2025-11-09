@@ -1,0 +1,2 @@
+fn(axum::extract::State<handlers::bounty::AppState>, axum::extract::Path<Uuid>) -> impl std::future::Future<Output = std::result::Result<axum::http::StatusCode, axum::http::StatusCode>> {finalize_bounty}
+fn(axum::extract::State<handlers::bounty::AppState>, axum::extract::Path<Uuid>) -> impl std::future::Future<Output = std::result::Result<axum::http::StatusCode, axum::http::StatusCode>> {finalize_bounty}: Handler<_, _>

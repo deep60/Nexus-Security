@@ -1,9 +1,16 @@
+pub mod circuit_breaker;
 pub mod crypto;
-pub mod validation;
 pub mod errors;
+pub mod serialization;
+pub mod validation;
 
 // Re-export commonly used types
 pub use errors::{ApiError, ApiResult, ApiResponse};
+pub use circuit_breaker::{CircuitBreaker, CircuitBreakerConfig, CircuitBreakerStats, CircuitBreakerError, State as CircuitBreakerState};
+pub use serialization::{
+    JsonUtils, Base64Utils, HexUtils, MsgPackUtils, QueryStringUtils,
+    CompressionUtils, FormatDetector, JsonBuilder, SerializationError, SerializationResult,
+};
 
 // Re-export commonly used items for convenience
 pub use crypto::{

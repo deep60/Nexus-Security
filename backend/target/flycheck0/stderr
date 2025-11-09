@@ -1,8 +1,8 @@
 warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
 package:   /Users/arjun/Developer/Nexus-Security/backend/api-gateway/Cargo.toml
 workspace: /Users/arjun/Developer/Nexus-Security/backend/Cargo.toml
-   1.578209875s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint: fingerprint error for api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)/Check { test: false }/TargetInner { name: "api-gateway", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/api-gateway/src/main.rs", Edition2021) }
-   1.578587084s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/api-gateway-fff763cbbe5efecc/bin-api-gateway`
+   0.397109583s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint: fingerprint error for analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine)/Check { test: false }/TargetInner { name: "analysis-engine", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/analysis-engine/src/main.rs", Edition2021) }
+   0.397411000s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/analysis-engine-c34c6b151ae8592a/bin-analysis-engine`
 
 Caused by:
     No such file or directory (os error 2)
@@ -25,8 +25,8 @@ Stack backtrace:
   14: std::rt::lang_start::<()>::{closure#0}
   15: std::rt::lang_start_internal
   16: _main
-   1.634844667s  INFO prepare_target{force=false package_id=ethers v2.0.14 target="ethers"}: cargo::core::compiler::fingerprint: fingerprint error for ethers v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-2.0.14/src/lib.rs", Edition2021) }
-   1.634891042s  INFO prepare_target{force=false package_id=ethers v2.0.14 target="ethers"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/ethers-59371d4a61614a73/lib-ethers`
+   0.431703291s  INFO prepare_target{force=false package_id=yara v0.18.0 target="yara"}: cargo::core::compiler::fingerprint: fingerprint error for yara v0.18.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("yara", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-0.18.0/src/lib.rs", Edition2018) }
+   0.431739291s  INFO prepare_target{force=false package_id=yara v0.18.0 target="yara"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-c70bea5a67eaba7d/lib-yara`
 
 Caused by:
     No such file or directory (os error 2)
@@ -50,8 +50,8 @@ Stack backtrace:
   15: std::rt::lang_start::<()>::{closure#0}
   16: std::rt::lang_start_internal
   17: _main
-   1.659162750s  INFO prepare_target{force=false package_id=ethers-contract v2.0.14 target="ethers_contract"}: cargo::core::compiler::fingerprint: fingerprint error for ethers-contract v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_contract", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-contract-2.0.14/src/lib.rs", Edition2021) }
-   1.659180750s  INFO prepare_target{force=false package_id=ethers-contract v2.0.14 target="ethers_contract"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/ethers-contract-34f620a2cd8ebf23/lib-ethers_contract`
+   0.432053083s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="yara_sys"}: cargo::core::compiler::fingerprint: fingerprint error for yara-sys v0.18.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("yara_sys", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-sys-0.18.0/src/lib.rs", Edition2018) }
+   0.432058833s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="yara_sys"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-sys-469705dcbe5101f1/lib-yara_sys`
 
 Caused by:
     No such file or directory (os error 2)
@@ -76,8 +76,8 @@ Stack backtrace:
   16: std::rt::lang_start::<()>::{closure#0}
   17: std::rt::lang_start_internal
   18: _main
-   1.682845250s  INFO prepare_target{force=false package_id=ethers-providers v2.0.14 target="ethers_providers"}: cargo::core::compiler::fingerprint: fingerprint error for ethers-providers v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_providers", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-providers-2.0.14/src/lib.rs", Edition2021) }
-   1.682863750s  INFO prepare_target{force=false package_id=ethers-providers v2.0.14 target="ethers_providers"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/ethers-providers-92c68c8236f94a2f/lib-ethers_providers`
+   0.432292208s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="build-script-build"}: cargo::core::compiler::fingerprint: fingerprint error for yara-sys v0.18.0/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-sys-0.18.0/build.rs", Edition2018) }
+   0.432297500s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="build-script-build"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-sys-c14bba5efbfcef22/run-build-script-build-script-build`
 
 Caused by:
     No such file or directory (os error 2)
@@ -88,34 +88,7 @@ Stack backtrace:
    2: cargo_util::paths::read
    3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
    4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: cargo::core::compiler::compile
-   7: cargo::core::compiler::compile
-   8: cargo::core::compiler::compile
-   9: <cargo::core::compiler::build_runner::BuildRunner>::compile
-  10: cargo::ops::cargo_compile::compile_ws
-  11: cargo::ops::cargo_compile::compile_with_exec
-  12: cargo::ops::cargo_compile::compile
-  13: cargo::commands::check::exec
-  14: <cargo::cli::Exec>::exec
-  15: cargo::main
-  16: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  17: std::rt::lang_start::<()>::{closure#0}
-  18: std::rt::lang_start_internal
-  19: _main
-   1.696049834s  INFO prepare_target{force=false package_id=reqwest v0.11.27 target="reqwest"}: cargo::core::compiler::fingerprint: fingerprint error for reqwest v0.11.27/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("reqwest", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.11.27/src/lib.rs", Edition2021) }
-   1.696069000s  INFO prepare_target{force=false package_id=reqwest v0.11.27 target="reqwest"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/reqwest-2347745eab3eaf66/lib-reqwest`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
+   5: cargo::core::compiler::custom_build::build_work
    6: cargo::core::compiler::compile
    7: cargo::core::compiler::compile
    8: cargo::core::compiler::compile
@@ -131,224 +104,8 @@ Stack backtrace:
   18: std::rt::lang_start::<()>::{closure#0}
   19: std::rt::lang_start_internal
   20: _main
-   1.699259334s  INFO prepare_target{force=false package_id=hyper v0.14.32 target="hyper"}: cargo::core::compiler::fingerprint: fingerprint error for hyper v0.14.32/Check { test: false }/TargetInner { ..: lib_target("hyper", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hyper-0.14.32/src/lib.rs", Edition2018) }
-   1.699271792s  INFO prepare_target{force=false package_id=hyper v0.14.32 target="hyper"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/hyper-4ea2c7e532836b79/lib-hyper`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: cargo::core::compiler::compile
-   7: cargo::core::compiler::compile
-   8: cargo::core::compiler::compile
-   9: cargo::core::compiler::compile
-  10: cargo::core::compiler::compile
-  11: <cargo::core::compiler::build_runner::BuildRunner>::compile
-  12: cargo::ops::cargo_compile::compile_ws
-  13: cargo::ops::cargo_compile::compile_with_exec
-  14: cargo::ops::cargo_compile::compile
-  15: cargo::commands::check::exec
-  16: <cargo::cli::Exec>::exec
-  17: cargo::main
-  18: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  19: std::rt::lang_start::<()>::{closure#0}
-  20: std::rt::lang_start_internal
-  21: _main
-   1.701705125s  INFO prepare_target{force=false package_id=hyper-rustls v0.24.2 target="hyper_rustls"}: cargo::core::compiler::fingerprint: fingerprint error for hyper-rustls v0.24.2/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("hyper_rustls", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hyper-rustls-0.24.2/src/lib.rs", Edition2021) }
-   1.701718542s  INFO prepare_target{force=false package_id=hyper-rustls v0.24.2 target="hyper_rustls"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/hyper-rustls-8e7fb91169e86c4e/lib-hyper_rustls`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: cargo::core::compiler::compile
-   7: cargo::core::compiler::compile
-   8: cargo::core::compiler::compile
-   9: cargo::core::compiler::compile
-  10: cargo::core::compiler::compile
-  11: <cargo::core::compiler::build_runner::BuildRunner>::compile
-  12: cargo::ops::cargo_compile::compile_ws
-  13: cargo::ops::cargo_compile::compile_with_exec
-  14: cargo::ops::cargo_compile::compile
-  15: cargo::commands::check::exec
-  16: <cargo::cli::Exec>::exec
-  17: cargo::main
-  18: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  19: std::rt::lang_start::<()>::{closure#0}
-  20: std::rt::lang_start_internal
-  21: _main
-   1.704845375s  INFO prepare_target{force=false package_id=hyper-tls v0.5.0 target="hyper_tls"}: cargo::core::compiler::fingerprint: fingerprint error for hyper-tls v0.5.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("hyper_tls", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hyper-tls-0.5.0/src/lib.rs", Edition2018) }
-   1.704861334s  INFO prepare_target{force=false package_id=hyper-tls v0.5.0 target="hyper_tls"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/hyper-tls-eacc0ef0d237bbb3/lib-hyper_tls`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: cargo::core::compiler::compile
-   7: cargo::core::compiler::compile
-   8: cargo::core::compiler::compile
-   9: cargo::core::compiler::compile
-  10: cargo::core::compiler::compile
-  11: <cargo::core::compiler::build_runner::BuildRunner>::compile
-  12: cargo::ops::cargo_compile::compile_ws
-  13: cargo::ops::cargo_compile::compile_with_exec
-  14: cargo::ops::cargo_compile::compile
-  15: cargo::commands::check::exec
-  16: <cargo::cli::Exec>::exec
-  17: cargo::main
-  18: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  19: std::rt::lang_start::<()>::{closure#0}
-  20: std::rt::lang_start_internal
-  21: _main
-   1.719378709s  INFO prepare_target{force=false package_id=ethers-etherscan v2.0.14 target="ethers_etherscan"}: cargo::core::compiler::fingerprint: fingerprint error for ethers-etherscan v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_etherscan", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-etherscan-2.0.14/src/lib.rs", Edition2021) }
-   1.719395917s  INFO prepare_target{force=false package_id=ethers-etherscan v2.0.14 target="ethers_etherscan"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/ethers-etherscan-5e9ecae10bdf06ca/lib-ethers_etherscan`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: cargo::core::compiler::compile
-   7: cargo::core::compiler::compile
-   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   9: cargo::ops::cargo_compile::compile_ws
-  10: cargo::ops::cargo_compile::compile_with_exec
-  11: cargo::ops::cargo_compile::compile
-  12: cargo::commands::check::exec
-  13: <cargo::cli::Exec>::exec
-  14: cargo::main
-  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  16: std::rt::lang_start::<()>::{closure#0}
-  17: std::rt::lang_start_internal
-  18: _main
-   1.720609750s  INFO prepare_target{force=false package_id=ethers-middleware v2.0.14 target="ethers_middleware"}: cargo::core::compiler::fingerprint: fingerprint error for ethers-middleware v2.0.14/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("ethers_middleware", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethers-middleware-2.0.14/src/lib.rs", Edition2021) }
-   1.720620417s  INFO prepare_target{force=false package_id=ethers-middleware v2.0.14 target="ethers_middleware"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/ethers-middleware-377f4e1890f425dc/lib-ethers_middleware`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: cargo::core::compiler::compile
-   7: cargo::core::compiler::compile
-   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   9: cargo::ops::cargo_compile::compile_ws
-  10: cargo::ops::cargo_compile::compile_with_exec
-  11: cargo::ops::cargo_compile::compile
-  12: cargo::commands::check::exec
-  13: <cargo::cli::Exec>::exec
-  14: cargo::main
-  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  16: std::rt::lang_start::<()>::{closure#0}
-  17: std::rt::lang_start_internal
-  18: _main
-   1.735683042s  INFO prepare_target{force=false package_id=sqlx v0.7.4 target="sqlx"}: cargo::core::compiler::fingerprint: fingerprint error for sqlx v0.7.4/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sqlx", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sqlx-0.7.4/src/lib.rs", Edition2021) }
-   1.735703125s  INFO prepare_target{force=false package_id=sqlx v0.7.4 target="sqlx"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/sqlx-48e8cf0955e31778/lib-sqlx`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   1.736789334s  INFO prepare_target{force=false package_id=sqlx-core v0.7.4 target="sqlx_core"}: cargo::core::compiler::fingerprint: fingerprint error for sqlx-core v0.7.4/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sqlx_core", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sqlx-core-0.7.4/src/lib.rs", Edition2021) }
-   1.736798375s  INFO prepare_target{force=false package_id=sqlx-core v0.7.4 target="sqlx_core"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/sqlx-core-cfff48ab8b53cb1f/lib-sqlx_core`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: cargo::core::compiler::compile
-   7: cargo::core::compiler::compile
-   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   9: cargo::ops::cargo_compile::compile_ws
-  10: cargo::ops::cargo_compile::compile_with_exec
-  11: cargo::ops::cargo_compile::compile
-  12: cargo::commands::check::exec
-  13: <cargo::cli::Exec>::exec
-  14: cargo::main
-  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  16: std::rt::lang_start::<()>::{closure#0}
-  17: std::rt::lang_start_internal
-  18: _main
-   1.836586459s  INFO prepare_target{force=false package_id=sqlx-postgres v0.7.4 target="sqlx_postgres"}: cargo::core::compiler::fingerprint: fingerprint error for sqlx-postgres v0.7.4/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sqlx_postgres", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sqlx-postgres-0.7.4/src/lib.rs", Edition2021) }
-   1.836609584s  INFO prepare_target{force=false package_id=sqlx-postgres v0.7.4 target="sqlx_postgres"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/sqlx-postgres-b35b1b81ab22fdd7/lib-sqlx_postgres`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: cargo::core::compiler::compile
-   7: cargo::core::compiler::compile
-   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   9: cargo::ops::cargo_compile::compile_ws
-  10: cargo::ops::cargo_compile::compile_with_exec
-  11: cargo::ops::cargo_compile::compile
-  12: cargo::commands::check::exec
-  13: <cargo::cli::Exec>::exec
-  14: cargo::main
-  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  16: std::rt::lang_start::<()>::{closure#0}
-  17: std::rt::lang_start_internal
-  18: _main
-   1.852667584s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint: fingerprint error for api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)/Check { test: true }/TargetInner { name: "api-gateway", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/api-gateway/src/main.rs", Edition2021) }
-   1.852694584s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/api-gateway-619761d3b2742044/test-bin-api-gateway`
+   0.433475833s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint: fingerprint error for analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine)/Check { test: true }/TargetInner { name: "analysis-engine", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/analysis-engine/src/main.rs", Edition2021) }
+   0.433481750s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/analysis-engine-bd99dd0b18b77f2f/test-bin-analysis-engine`
 
 Caused by:
     No such file or directory (os error 2)
@@ -371,19 +128,48 @@ Stack backtrace:
   14: std::rt::lang_start::<()>::{closure#0}
   15: std::rt::lang_start_internal
   16: _main
-    Checking hyper v0.14.32
-    Checking sqlx-core v0.7.4
-    Checking sqlx-postgres v0.7.4
-    Checking hyper-rustls v0.24.2
-    Checking hyper-tls v0.5.0
-    Checking reqwest v0.11.27
-    Checking ethers-providers v2.0.14
-    Checking ethers-etherscan v2.0.14
-    Checking sqlx v0.7.4
-    Checking ethers-contract v2.0.14
-    Checking ethers-middleware v2.0.14
-    Checking ethers v2.0.14
+   0.452923416s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint: fingerprint dirty for api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)/Check { test: false }/TargetInner { name: "api-gateway", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/api-gateway/src/main.rs", Edition2021) }
+   0.452940333s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.469083083s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint: fingerprint dirty for api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)/Check { test: true }/TargetInner { name: "api-gateway", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/api-gateway/src/main.rs", Edition2021) }
+   0.469096291s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.471819250s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint: fingerprint dirty for bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)/Check { test: false }/TargetInner { name: "bounty-manager", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/bounty-manager/src/main.rs", Edition2024) }
+   0.471828208s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.473223833s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint: fingerprint dirty for bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)/Check { test: true }/TargetInner { name: "bounty-manager", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/bounty-manager/src/main.rs", Edition2024) }
+   0.473232291s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   Compiling yara-sys v0.18.0
+    Checking bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)
     Checking api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)
-error: could not compile `api-gateway` (bin "api-gateway" test) due to 237 previous errors; 33 warnings emitted
+error: failed to run custom build command for `yara-sys v0.18.0`
+note: To improve backtraces for build dependencies, set the CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG=true environment variable to enable debug information generation.
+
+Caused by:
+  process didn't exit successfully: `/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/yara-sys-5e27bc07ae7545ec/build-script-build` (exit status: 101)
+  --- stdout
+  cargo:rustc-link-lib=dylib=yara
+  cargo:rustc-link-search=native=/opt/homebrew/lib
+  cargo:rerun-if-env-changed=YARA_LIBRARY_PATH
+  cargo:rerun-if-env-changed=YARA_LIBRARY_PATH_aarch64-apple-darwin
+  cargo:rerun-if-env-changed=YARA_LIBRARY_PATH_aarch64_apple_darwin
+
+  --- stderr
+  /opt/homebrew/include/yara/compiler.h:33:10: fatal error: 'setjmp.h' file not found
+
+  thread 'main' panicked at /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-sys-0.18.0/build.rs:392:43:
+  Unable to generate bindings: ClangDiagnostic("/opt/homebrew/include/yara/compiler.h:33:10: fatal error: 'setjmp.h' file not found\n")
+  stack backtrace:
+     0: __rustc::rust_begin_unwind
+               at /rustc/6b00bc3880198600130e1cf62b8f8a93494488cc/library/std/src/panicking.rs:697:5
+     1: core::panicking::panic_fmt
+               at /rustc/6b00bc3880198600130e1cf62b8f8a93494488cc/library/core/src/panicking.rs:75:14
+     2: core::result::unwrap_failed
+               at /rustc/6b00bc3880198600130e1cf62b8f8a93494488cc/library/core/src/result.rs:1732:5
+     3: core::result::Result<T,E>::expect
+     4: build_script_build::bindings::add_bindings
+     5: build_script_build::main
+     6: core::ops::function::FnOnce::call_once
+  note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
 warning: build failed, waiting for other jobs to finish...
-error: could not compile `api-gateway` (bin "api-gateway") due to 237 previous errors; 34 warnings emitted
+error: could not compile `bounty-manager` (bin "bounty-manager") due to 54 previous errors; 10 warnings emitted
+error: could not compile `bounty-manager` (bin "bounty-manager" test) due to 54 previous errors; 10 warnings emitted
+error: could not compile `api-gateway` (bin "api-gateway") due to 284 previous errors; 117 warnings emitted
+error: could not compile `api-gateway` (bin "api-gateway" test) due to 284 previous errors; 116 warnings emitted
