@@ -37,6 +37,8 @@ pub use bounty_crud::{
 pub mod submission;
 pub mod payout;
 pub mod reputation_handler;
+pub mod dispute;
+pub mod validation;
 
 // Re-export from additional handlers
 pub use submission::{
@@ -66,4 +68,33 @@ pub use reputation_handler::{
     get_engine_reputation,
     calculate_accuracy_score,
     get_reputation_leaderboard,
+};
+
+pub use dispute::{
+    Dispute,
+    DisputeType,
+    DisputeStatus,
+    DisputeSeverity,
+    DisputeResolution,
+    create_dispute,
+    get_dispute,
+    list_disputes,
+    update_dispute,
+    resolve_dispute,
+    vote_on_dispute,
+    withdraw_dispute,
+    get_dispute_stats,
+};
+
+pub use validation::{
+    ValidationResult,
+    ValidationStatus,
+    ValidationCheckType,
+    QualityMetrics,
+    validate_submission,
+    get_validation_result,
+    list_validations,
+    bulk_validate_submissions,
+    get_validation_stats,
+    revalidate_submission,
 };
