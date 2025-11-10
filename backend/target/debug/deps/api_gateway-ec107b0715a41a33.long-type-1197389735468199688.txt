@@ -1,0 +1,2 @@
+(axum::http::StatusCode, axum::Json<HealthResponse>)
+axum::Json<HealthResponse>: From<(axum::http::StatusCode, axum::Json<HealthResponse>)>

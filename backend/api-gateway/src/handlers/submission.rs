@@ -25,7 +25,7 @@ use crate::services::{
 };
 
 use crate::utils::{
-    validation::validate_file_type,
+    validation::FileValidator,
     crypto::calculate_file_hash,
 };
 
@@ -200,8 +200,11 @@ pub async fn upload_file(
             let data = field.bytes().await.map_err(|_| StatusCode::BAD_REQUEST)?;
 
             // validate file type
-            if !validate_file_type(&data, content_type.as_deref()) {
-                return Err(StatusCode::UNSUPPORTED_MEDIA_TYPE);
+            if let Some(ref fname) = filename {
+                let allowed_types = &["exe", "dll", "pdf", "doc", "docx", "zip", "rar", "7z", "tar", "gz", "bin", "apk", "ipa", "msi", "dmg"];
+                if FileValidator::validate_file_type(fname, allowed_types).is_err() {
+                    return Err(StatusCode::UNSUPPORTED_MEDIA_TYPE);
+                }
             }
 
             // Calculate file hash
@@ -211,7 +214,7 @@ pub async fn upload_file(
             // save file to disk
             let file_path = format!("{}/{}", state.upload_path, file_hash);
             let mut file = fs::File::create(&file_path).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            file.write_all(&data).await.map_err(|_| StatusCode::INERNAL_SERVER_ERROR)?;
+            file.write_all(&data).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
             // STORE FILE METADATA IN DATABASE
             let file_metadata = FileMetadata {
@@ -642,7 +645,7 @@ pub struct ProcessingMetrics {
 }
 
 // Router setup
-pub fn create_submission_router() -> Router<AppState> {
+pub fn create_submission_router() -> Router<std::sync::Arc<AppState>> {
     Router::new()
         .route("/upload", post(upload_file))
         .route("/submissions", post(create_submission))

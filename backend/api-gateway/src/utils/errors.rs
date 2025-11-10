@@ -38,7 +38,7 @@ impl IntoResponse for ApiError {
         let error_response = json!({
             "success": false,
             "error": message,
-            "data": null::<String>
+            "data": serde_json::Value::Null
         });
 
         (status, Json(error_response)).into_response()

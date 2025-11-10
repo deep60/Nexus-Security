@@ -8,7 +8,7 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct RedisService {
     client: Client,
-    connection_pool: redis::aio::MultiplexedConnection,
+    pub(crate) connection_pool: redis::aio::MultiplexedConnection,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -64,7 +64,7 @@ impl RedisService {
             .context("Failed to serialize analysis cache")?;
 
         let _: () = self.connection_pool
-            .setex(&key, ttl_seconds, serialized)
+            .set_ex(&key, serialized, ttl_seconds)
             .await
             .context("Failed to cache analysis result")?;
 
@@ -97,7 +97,7 @@ impl RedisService {
             .context("Failed to serialize bounty cache")?;
 
         let _: () = self.connection_pool
-            .setex(&key, ttl_seconds, serialized)
+            .set_ex(&key, serialized, ttl_seconds)
             .await
             .context("Failed to cache bounty")?;
 
@@ -145,13 +145,13 @@ impl RedisService {
 
         // Store session data with expiration
         let _: () = self.connection_pool
-            .setex(&key, ttl_seconds, &serialized)
+            .set_ex(&key, &serialized, ttl_seconds)
             .await
             .context("Failed to create session")?;
 
         // Store user -> session mapping
         let _: () = self.connection_pool
-            .setex(&user_key, ttl_seconds, &session.session_token)
+            .set_ex(&user_key, &session.session_token, ttl_seconds)
             .await
             .context("Failed to create user session mapping")?;
 
@@ -225,7 +225,7 @@ impl RedisService {
         if current_count == 1 {
             // Set expiration for new key
             let _: () = self.connection_pool
-                .expire(&key, window_seconds as usize)
+                .expire(&key, window_seconds as i64)
                 .await
                 .context("Failed to set rate limit expiration")?;
         }
@@ -280,7 +280,7 @@ impl RedisService {
         let key = format!("engine_reputation:{}", engine_id);
         
         let _: () = self.connection_pool
-            .setex(&key, ttl_seconds, reputation_score)
+            .set_ex(&key, reputation_score, ttl_seconds)
             .await
             .context("Failed to cache engine reputation")?;
 
@@ -324,8 +324,8 @@ impl RedisService {
 
     // Health check
     pub async fn health_check(&mut self) -> Result<bool> {
-        let result: RedisResult<String> = self.connection_pool
-            .ping()
+        let result: RedisResult<String> = redis::cmd("PING")
+            .query_async(&mut self.connection_pool)
             .await;
 
         match result {

@@ -75,14 +75,14 @@ pub struct SubmissionResponse {
     pub verdict: String,
     pub confidence: f32,
     pub stake_amount: u64,
-    pub is_submitted: DateTime<Utc>,
+    pub submitted_at: DateTime<Utc>,
     pub is_winner: Option<bool>,
 }
 
 #[derive(Serialize)]
-pub struct BountyDetailResponse {
+pub struct BountyDetailsResponse {
     pub bounty: BountyResponse,
-    pub submission: SubmissionResponse,
+    pub submissions: Vec<SubmissionResponse>,
     pub file_info: Option<FileInfo>,
 }
 
@@ -102,8 +102,8 @@ pub struct AppState {
 
 // handler Implementation
 pub async fn create_bounty(
-    State(state): State<AppState>,
-    Json(Request): Json<CreateBountyRequest>,
+    State(state): State<std::sync::Arc<AppState>>,
+    Json(request): Json<CreateBountyRequest>,
 ) -> Result<Json<BountyResponse>, StatusCode> {
     // Validate request
     if request.reward_amount == 0 {
@@ -178,12 +178,12 @@ pub async fn create_bounty(
             Ok(Json(response))
         }
 
-        Err(_) => Err(StatusCode::INERNAL_SERVER_ERROR),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
 pub async fn get_bounties(
-    State(state): State<AppState>,
+    State(state): State<std::sync::Arc<AppState>>,
     Query(filters): Query<BountyFilters>,
 ) -> Result<Json<BountListResponse>, StatusCode> {
     let page = filters.page.unwrap_or(1);
@@ -218,14 +218,14 @@ pub async fn get_bounties(
             }))
         }
 
-        Err(_) => Err(StatusCode::INERNAL_SERVER_ERROR),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
 pub async fn get_bounties_details(
-    State(state): State<AppState>,
+    State(state): State<std::sync::Arc<AppState>>,
     Path(bounty_id): Path<Uuid>,
-) -> Result<Json<BountDetailsResponse>, StatusCode> {
+) -> Result<Json<BountyDetailsResponse>, StatusCode> {
     match state.db.get_bounty_by_id(bounty_id).await {
         Ok(Some(bounty)) => {
             let submission: Vec<SubmissionResponse> = bounty
@@ -253,7 +253,7 @@ pub async fn get_bounties_details(
                 status: bounty.status,
                 created_at: bounty.created_at,
                 deadline: bounty.deadline,
-                submission_count: bounty.submissions.len() as u32,
+                submission_count: bounty.submission.len() as u32,
                 consensus_reached: bounty.final_verdict.is_some(),
                 final_verdict: bounty.final_verdict,
                 confidence_score: bounty.confidence_score,
@@ -273,12 +273,12 @@ pub async fn get_bounties_details(
             }))
         }
         Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(_) => Err(StatusCode::INERNAL_SERVER_ERROR),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
 pub async fn submit_analysis(
-    State(state): State<AppState>,
+    State(state): State<std::sync::Arc<AppState>>,
     Path(bounty_id): Path<Uuid>,
     Json(request): Json<SubmitAnalysisRequest>,
 ) -> Result<Json<SubmissionResponse>, StatusCode> {
@@ -286,7 +286,7 @@ pub async fn submit_analysis(
     let verdict = match request.verdict.as_str() {
         "malicious" => EngineVerdict::Malicious,
         "benign" => EngineVerdict::Benign,
-        "suspicious" => EngineVerdict::suspicious,
+        "suspicious" => EngineVerdict::Suspicious,
         _ => return Err(StatusCode::BAD_REQUEST),
     };
 
@@ -308,8 +308,8 @@ pub async fn submit_analysis(
             }
 
             // Check if engine already submitted
-            if bounty.submissions.iter().any(|s| s.engine_id == request.engine_id) {
-                return Err(StatusCode::CONFLICT); 
+            if bounty.submission.iter().any(|s| s.engine_id == request.engine_id) {
+                return Err(StatusCode::CONFLICT);
             }
         }
         Ok(None) => return Err(StatusCode::NOT_FOUND),
@@ -369,7 +369,7 @@ pub async fn submit_analysis(
 }
 
 pub async fn finalize_bounty(
-    State(state): State<AppState>,
+    State(state): State<std::sync::Arc<AppState>>,
     Path(bounty_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
     match state.db.get_bounty_by_id(bounty_id).await {
@@ -388,10 +388,10 @@ pub async fn finalize_bounty(
 }
 
 // Internal helper functions
-async fn check_consensus(state: &AppState, bounty_id: Uuid) {
+async fn check_consensus(state: &std::sync::Arc<AppState>, bounty_id: Uuid) {
     if let Ok(Some(bounty)) = state.db.get_bounty_by_id(bounty_id).await {
-        if bounty.submissions.len() >= bounty.required_consensus as usize {
-            let consensus = calculate_consensus(&bounty.submissions);
+        if bounty.submission.len() >= bounty.required_consensus as usize {
+            let consensus = calculate_consensus(&bounty.submission);
             
             if consensus.confidence >= bounty.confidence_threshold {
                 finalize_bounty_internal(state, bounty_id).await;
@@ -400,10 +400,10 @@ async fn check_consensus(state: &AppState, bounty_id: Uuid) {
     }
 }
 
-async fn finalize_bounty_internal(state: &AppState, bounty_id: Uuid) {
+async fn finalize_bounty_internal(state: &std::sync::Arc<AppState>, bounty_id: Uuid) {
     if let Ok(Some(bounty)) = state.db.get_bounty_by_id(bounty_id).await {
-        let consensus = calculate_consensus(&bounty.submissions);
-        
+        let consensus = calculate_consensus(&bounty.submission);
+
         // Update bounty status
         let _ = state.db.finalize_bounty(
             bounty_id,
@@ -412,7 +412,7 @@ async fn finalize_bounty_internal(state: &AppState, bounty_id: Uuid) {
         ).await;
 
         // Distribute rewards on blockchain
-        let winners = determine_winners(&bounty.submissions, &consensus.verdict);
+        let winners = determine_winners(&bounty.submission, &consensus.verdict);
         for winner in winners {
             let _ = state.blockchain.distribute_reward(
                 bounty_id,
@@ -505,7 +505,7 @@ fn determine_winners(submissions: &[BountySubmission], final_verdict: &EngineVer
 }
 
 // Router setup
-pub fn create_bounty_router() -> Router<AppState> {
+pub fn create_bounty_router() -> Router<std::sync::Arc<AppState>> {
     Router::new()
         .route("/bounties", post(create_bounty))
         .route("/bounties", get(get_bounties))

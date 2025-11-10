@@ -68,6 +68,7 @@ impl CacheStats {
 }
 
 /// Cache key prefixes for different data types
+#[derive(Clone)]
 pub enum CacheKeyPrefix {
     User,
     Analysis,
@@ -221,7 +222,7 @@ impl CacheService {
         let mut redis = self.redis.write().await;
         let _: () = redis
             .connection_pool
-            .setex(&cache_key, ttl, serialized.clone())
+            .set_ex(&cache_key, serialized.clone(), ttl)
             .await
             .context("Failed to set value in cache")?;
 
@@ -402,7 +403,7 @@ impl CacheService {
 
         let _: () = redis
             .connection_pool
-            .expire(&cache_key, ttl_seconds as usize)
+            .expire(&cache_key, ttl_seconds as i64)
             .await
             .context("Failed to set expiration")?;
 

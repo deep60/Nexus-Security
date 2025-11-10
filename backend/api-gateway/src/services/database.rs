@@ -32,22 +32,21 @@ impl DatabaseService {
 
     // User operations
     pub async fn create_user(&self, wallet_address: &str, username: &str, email: &str, password_hash: &str) -> Result<User> {
-        let user = sqlx::query_as!(
-            User,
+        let user = sqlx::query_as::<_, User>(
             r#"
             INSERT INTO users (id, wallet_address, username, email, password_hash, reputation_score, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
-            Uuid::new_v4(),
-            wallet_address,
-            username,
-            email,
-            password_hash,
-            0i32,
-            Utc::now(),
-            Utc::now()
+            "#
         )
+        .bind(Uuid::new_v4())
+        .bind(wallet_address)
+        .bind(username)
+        .bind(email)
+        .bind(password_hash)
+        .bind(0i32)
+        .bind(Utc::now())
+        .bind(Utc::now())
         .fetch_one(&self.pool)
         .await
         .context("Failed to create user")?;
@@ -56,14 +55,13 @@ impl DatabaseService {
     }
 
     pub async fn get_user_by_wallet(&self, wallet_address: &str) -> Result<Option<User>> {
-        let user = sqlx::query_as!(
-            User,
+        let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT * FROM users 
+            SELECT * FROM users
             WHERE wallet_address = $1
-            "#,
-            wallet_address
+            "#
         )
+        .bind(wallet_address)
         .fetch_optional(&self.pool)
         .await
         .context("Failed to fetch user by wallet address")?;
@@ -72,14 +70,13 @@ impl DatabaseService {
     }
 
     pub async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>> {
-        let user = sqlx::query_as!(
-            User,
+        let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT * FROM users 
+            SELECT * FROM users
             WHERE id = $1
-            "#,
-            user_id
+            "#
         )
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await
         .context("Failed to fetch user by ID")?;
@@ -88,16 +85,16 @@ impl DatabaseService {
     }
 
     pub async fn update_user_reputation(&self, user_id: Uuid, reputation_delta: i32) -> Result<()> {
-        sqlx::query!(
+        sqlx::query(
             r#"
-            UPDATE users 
+            UPDATE users
             SET reputation_score = reputation_score + $1, updated_at = $2
             WHERE id = $3
-            "#,
-            reputation_delta,
-            Utc::now(),
-            user_id
+            "#
         )
+        .bind(reputation_delta)
+        .bind(Utc::now())
+        .bind(user_id)
         .execute(&self.pool)
         .await
         .context("Failed to update user reputation")?;
@@ -107,32 +104,31 @@ impl DatabaseService {
 
     // Bounty operations
     pub async fn create_bounty(&self, request: CreateBountyRequest, creator_id: Uuid) -> Result<Bounty> {
-        let bounty = sqlx::query_as!(
-            Bounty,
+        let bounty = sqlx::query_as::<_, Bounty>(
             r#"
             INSERT INTO bounties (
-                id, title, description, reward_amount, creator_id, status, 
+                id, title, description, reward_amount, creator_id, status,
                 target_hash, target_url, target_type, expires_at, created_at, updated_at
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            RETURNING 
-                id, title, description, reward_amount, creator_id, 
-                status as "status: BountyStatus", target_hash, target_url, 
+            RETURNING
+                id, title, description, reward_amount, creator_id,
+                status as "status: BountyStatus", target_hash, target_url,
                 target_type, expires_at, created_at, updated_at
-            "#,
-            Uuid::new_v4(),
-            request.title,
-            request.description,
-            request.reward_amount,
-            creator_id,
-            BountyStatus::Active as BountyStatus,
-            request.target_hash,
-            request.target_url,
-            request.target_type,
-            request.expires_at,
-            Utc::now(),
-            Utc::now()
+            "#
         )
+        .bind(Uuid::new_v4())
+        .bind(request.title)
+        .bind(request.description)
+        .bind(request.reward_amount)
+        .bind(creator_id)
+        .bind(BountyStatus::Active as BountyStatus)
+        .bind(request.target_hash)
+        .bind(request.target_url)
+        .bind(request.target_type)
+        .bind(request.expires_at)
+        .bind(Utc::now())
+        .bind(Utc::now())
         .fetch_one(&self.pool)
         .await
         .context("Failed to create bounty")?;
@@ -141,18 +137,17 @@ impl DatabaseService {
     }
 
     pub async fn get_bounty_by_id(&self, bounty_id: Uuid) -> Result<Option<Bounty>> {
-        let bounty = sqlx::query_as!(
-            Bounty,
+        let bounty = sqlx::query_as::<_, Bounty>(
             r#"
-            SELECT 
-                id, title, description, reward_amount, creator_id, 
-                status as "status: BountyStatus", target_hash, target_url, 
+            SELECT
+                id, title, description, reward_amount, creator_id,
+                status as "status: BountyStatus", target_hash, target_url,
                 target_type, expires_at, created_at, updated_at
-            FROM bounties 
+            FROM bounties
             WHERE id = $1
-            "#,
-            bounty_id
+            "#
         )
+        .bind(bounty_id)
         .fetch_optional(&self.pool)
         .await
         .context("Failed to fetch bounty by ID")?;
@@ -161,23 +156,22 @@ impl DatabaseService {
     }
 
     pub async fn get_active_bounties(&self, limit: i64, offset: i64) -> Result<Vec<Bounty>> {
-        let bounties = sqlx::query_as!(
-            Bounty,
+        let bounties = sqlx::query_as::<_, Bounty>(
             r#"
-            SELECT 
-                id, title, description, reward_amount, creator_id, 
-                status as "status: BountyStatus", target_hash, target_url, 
+            SELECT
+                id, title, description, reward_amount, creator_id,
+                status as "status: BountyStatus", target_hash, target_url,
                 target_type, expires_at, created_at, updated_at
-            FROM bounties 
+            FROM bounties
             WHERE status = $1 AND expires_at > $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
-            BountyStatus::Active as BountyStatus,
-            Utc::now(),
-            limit,
-            offset
+            "#
         )
+        .bind(BountyStatus::Active as BountyStatus)
+        .bind(Utc::now())
+        .bind(limit)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .context("Failed to fetch active bounties")?;
@@ -186,19 +180,18 @@ impl DatabaseService {
     }
 
     pub async fn get_bounties_by_creator(&self, creator_id: Uuid) -> Result<Vec<Bounty>> {
-        let bounties = sqlx::query_as!(
-            Bounty,
+        let bounties = sqlx::query_as::<_, Bounty>(
             r#"
-            SELECT 
-                id, title, description, reward_amount, creator_id, 
-                status as "status: BountyStatus", target_hash, target_url, 
+            SELECT
+                id, title, description, reward_amount, creator_id,
+                status as "status: BountyStatus", target_hash, target_url,
                 target_type, expires_at, created_at, updated_at
-            FROM bounties 
+            FROM bounties
             WHERE creator_id = $1
             ORDER BY created_at DESC
-            "#,
-            creator_id
+            "#
         )
+        .bind(creator_id)
         .fetch_all(&self.pool)
         .await
         .context("Failed to fetch bounties by creator")?;
@@ -207,16 +200,16 @@ impl DatabaseService {
     }
 
     pub async fn update_bounty_status(&self, bounty_id: Uuid, status: BountyStatus) -> Result<()> {
-        sqlx::query!(
+        sqlx::query(
             r#"
-            UPDATE bounties 
+            UPDATE bounties
             SET status = $1, updated_at = $2
             WHERE id = $3
-            "#,
-            status as BountyStatus,
-            Utc::now(),
-            bounty_id
+            "#
         )
+        .bind(status as BountyStatus)
+        .bind(Utc::now())
+        .bind(bounty_id)
         .execute(&self.pool)
         .await
         .context("Failed to update bounty status")?;
@@ -226,39 +219,38 @@ impl DatabaseService {
 
     // Analysis operations
     pub async fn create_analysis_result(
-        &self, 
-        bounty_id: Uuid, 
+        &self,
+        bounty_id: Uuid,
         analyzer_id: Option<Uuid>,
         engine_name: &str,
         verdict: ThreatVerdict,
         confidence_score: f32,
         metadata: serde_json::Value
     ) -> Result<AnalysisResult> {
-        let analysis = sqlx::query_as!(
-            AnalysisResult,
+        let analysis = sqlx::query_as::<_, AnalysisResult>(
             r#"
             INSERT INTO analysis_results (
-                id, bounty_id, analyzer_id, engine_name, verdict, 
+                id, bounty_id, analyzer_id, engine_name, verdict,
                 confidence_score, metadata, status, created_at, updated_at
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING 
-                id, bounty_id, analyzer_id, engine_name, 
-                verdict as "verdict: ThreatVerdict", confidence_score, 
-                metadata, status as "status: AnalysisStatus", 
+            RETURNING
+                id, bounty_id, analyzer_id, engine_name,
+                verdict as "verdict: ThreatVerdict", confidence_score,
+                metadata, status as "status: AnalysisStatus",
                 created_at, updated_at
-            "#,
-            Uuid::new_v4(),
-            bounty_id,
-            analyzer_id,
-            engine_name,
-            verdict as ThreatVerdict,
-            confidence_score,
-            metadata,
-            AnalysisStatus::Completed as AnalysisStatus,
-            Utc::now(),
-            Utc::now()
+            "#
         )
+        .bind(Uuid::new_v4())
+        .bind(bounty_id)
+        .bind(analyzer_id)
+        .bind(engine_name)
+        .bind(verdict as ThreatVerdict)
+        .bind(confidence_score)
+        .bind(metadata)
+        .bind(AnalysisStatus::Completed as AnalysisStatus)
+        .bind(Utc::now())
+        .bind(Utc::now())
         .fetch_one(&self.pool)
         .await
         .context("Failed to create analysis result")?;
@@ -267,20 +259,19 @@ impl DatabaseService {
     }
 
     pub async fn get_analysis_results_by_bounty(&self, bounty_id: Uuid) -> Result<Vec<AnalysisResult>> {
-        let results = sqlx::query_as!(
-            AnalysisResult,
+        let results = sqlx::query_as::<_, AnalysisResult>(
             r#"
-            SELECT 
-                id, bounty_id, analyzer_id, engine_name, 
-                verdict as "verdict: ThreatVerdict", confidence_score, 
-                metadata, status as "status: AnalysisStatus", 
+            SELECT
+                id, bounty_id, analyzer_id, engine_name,
+                verdict as "verdict: ThreatVerdict", confidence_score,
+                metadata, status as "status: AnalysisStatus",
                 created_at, updated_at
-            FROM analysis_results 
+            FROM analysis_results
             WHERE bounty_id = $1
             ORDER BY created_at DESC
-            "#,
-            bounty_id
+            "#
         )
+        .bind(bounty_id)
         .fetch_all(&self.pool)
         .await
         .context("Failed to fetch analysis results by bounty")?;
@@ -289,20 +280,19 @@ impl DatabaseService {
     }
 
     pub async fn get_analysis_results_by_analyzer(&self, analyzer_id: Uuid) -> Result<Vec<AnalysisResult>> {
-        let results = sqlx::query_as!(
-            AnalysisResult,
+        let results = sqlx::query_as::<_, AnalysisResult>(
             r#"
-            SELECT 
-                id, bounty_id, analyzer_id, engine_name, 
-                verdict as "verdict: ThreatVerdict", confidence_score, 
-                metadata, status as "status: AnalysisStatus", 
+            SELECT
+                id, bounty_id, analyzer_id, engine_name,
+                verdict as "verdict: ThreatVerdict", confidence_score,
+                metadata, status as "status: AnalysisStatus",
                 created_at, updated_at
-            FROM analysis_results 
+            FROM analysis_results
             WHERE analyzer_id = $1
             ORDER BY created_at DESC
-            "#,
-            analyzer_id
+            "#
         )
+        .bind(analyzer_id)
         .fetch_all(&self.pool)
         .await
         .context("Failed to fetch analysis results by analyzer")?;
@@ -312,20 +302,19 @@ impl DatabaseService {
 
     // Consensus and reputation operations
     pub async fn calculate_consensus_for_bounty(&self, bounty_id: Uuid) -> Result<Option<ConsensusResult>> {
-        let consensus = sqlx::query_as!(
-            ConsensusResult,
+        let consensus = sqlx::query_as::<_, ConsensusResult>(
             r#"
-            SELECT 
+            SELECT
                 COUNT(*) as total_analyses,
                 AVG(confidence_score) as avg_confidence,
                 COUNT(CASE WHEN verdict = 'malicious' THEN 1 END) as malicious_count,
                 COUNT(CASE WHEN verdict = 'benign' THEN 1 END) as benign_count,
                 COUNT(CASE WHEN verdict = 'suspicious' THEN 1 END) as suspicious_count
-            FROM analysis_results 
+            FROM analysis_results
             WHERE bounty_id = $1 AND status = 'completed'
-            "#,
-            bounty_id
+            "#
         )
+        .bind(bounty_id)
         .fetch_optional(&self.pool)
         .await
         .context("Failed to calculate consensus")?;
@@ -334,19 +323,18 @@ impl DatabaseService {
     }
 
     pub async fn get_user_analysis_stats(&self, user_id: Uuid) -> Result<Option<UserAnalysisStats>> {
-        let stats = sqlx::query_as!(
-            UserAnalysisStats,
+        let stats = sqlx::query_as::<_, UserAnalysisStats>(
             r#"
-            SELECT 
+            SELECT
                 COUNT(*) as total_analyses,
                 AVG(confidence_score) as avg_confidence,
                 COUNT(CASE WHEN verdict = 'malicious' THEN 1 END) as malicious_detections,
                 COUNT(CASE WHEN verdict = 'benign' THEN 1 END) as benign_detections
-            FROM analysis_results 
+            FROM analysis_results
             WHERE analyzer_id = $1 AND status = 'completed'
-            "#,
-            user_id
+            "#
         )
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await
         .context("Failed to fetch user analysis stats")?;
