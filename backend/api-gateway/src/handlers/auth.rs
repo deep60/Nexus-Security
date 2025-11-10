@@ -18,7 +18,7 @@ use crate::utils::crypto::{hash_password, verify_password};
 use crate::utils::{ApiError, ApiResult};
 use crate::{AppState, ApiResponse};
 
-pub fn auth_routes() -> Router<AppState> {
+pub fn auth_routes() -> Router<std::sync::Arc<AppState>> {
     Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
@@ -115,13 +115,11 @@ pub async fn register(
     }
 
     // Check if user already exists
-    let existing_user = sqlx::query!(
-        "SELECT id FROM users WHERE username = $1 OR email = $2",
-        payload.username,
-        payload.email
-    )
-    .fetch_optional(state.db.pool())
-    .await?;
+    let existing_user = sqlx::query("SELECT id FROM users WHERE username = $1 OR email = $2")
+        .bind(&payload.username)
+        .bind(&payload.email)
+        .fetch_optional(state.db.pool())
+        .await?;
 
     if existing_user.is_some() {
         return Err(ApiError::BadRequest(
@@ -135,20 +133,19 @@ pub async fn register(
 
     // Create User
     let user_id = Uuid::new_v4();
-    let user = sqlx::query_as!(
-        User,
+    let user = sqlx::query_as::<_, User>(
         r#"
         INSERT INTO users (id, username, email, password_hash, wallet_address, created_at)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
-        "#,
-        user_id,
-        payload.username,
-        payload.email,
-        password_hash,
-        payload.wallet_address,
-        Utc::now()
+        "#
     )
+    .bind(user_id)
+    .bind(&payload.username)
+    .bind(&payload.email)
+    .bind(&password_hash)
+    .bind(&payload.wallet_address)
+    .bind(Utc::now())
     .fetch_one(state.db.pool())
     .await?;
 
@@ -170,14 +167,11 @@ pub async fn login(
     Json(payload): Json<LoginRequest>,
 ) -> ApiResult<Json<ApiResponse<AuthResponse>>> {
     // Find user by username or email
-    let user = sqlx::query_as!(
-        User,
-        "SELECT * FROM users WHERE username = $1 OR email = $1",
-        payload.identifier
-    )
-    .fetch_optional(state.db.pool())
-    .await?
-    .ok_or(ApiError::Unauthorized)?;
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = $1 OR email = $1")
+        .bind(&payload.identifier)
+        .fetch_optional(state.db.pool())
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
 
     // Verify Password
     if !verify_password(&payload.password, &user.password_hash)
@@ -187,13 +181,11 @@ pub async fn login(
     }
 
     // Update last login
-    sqlx::query!(
-        "UPDATE users SET last_login = $1 WHERE id = $2",
-        Utc::now(),
-        user.id
-    )
-    .execute(state.db.pool())
-    .await?;
+    sqlx::query("UPDATE users SET last_login = $1 WHERE id = $2")
+        .bind(Utc::now())
+        .bind(user.id)
+        .execute(state.db.pool())
+        .await?;
 
     // Generate Tokens
     let (access_token, refresh_token) = generate_tokens(&user, &state.jwt_secret)?;
@@ -234,8 +226,9 @@ pub async fn refresh_token(
     // Get user from database
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| ApiError::BadRequest("Invalid user ID in token".to_string()))?;
-    
-    let user = sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", user_id)
+
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
         .fetch_optional(state.db.pool())
         .await?
         .ok_or(ApiError::Unauthorized)?;
@@ -263,7 +256,8 @@ pub async fn verify_token(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| ApiError::BadRequest("Invalid user ID in token".to_string()))?;
 
-    let user = sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", user_id)
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
         .fetch_optional(state.db.pool())
         .await?
         .ok_or(ApiError::Unauthorized)?;
@@ -294,13 +288,11 @@ pub async fn collect_wallet(
     // Update user's wallet address
     user.wallet_address = Some(payload.wallet_address);
 
-    sqlx::query!(
-        "UPDATE users SET wallet_address = $1 WHERE id = $2",
-        user.wallet_address,
-        user.id
-    )
-    .execute(state.db.pool())
-    .await?;
+    sqlx::query("UPDATE users SET wallet_address = $1 WHERE id = $2")
+        .bind(&user.wallet_address)
+        .bind(user.id)
+        .execute(state.db.pool())
+        .await?;
 
     Ok(Json(ApiResponse::success(user.into())))
 }
@@ -312,12 +304,10 @@ pub async fn disconnect_wallet(
     let mut user = authenticate_user(&headers, &state).await?;
     user.wallet_address = None;
 
-    sqlx::query!(
-        "UPDATE users SET wallet_address = NULL WHERE id = $1",
-        user.id
-    )
-    .execute(state.db.pool())
-    .await?;
+    sqlx::query("UPDATE users SET wallet_address = NULL WHERE id = $1")
+        .bind(user.id)
+        .execute(state.db.pool())
+        .await?;
 
     Ok(Json(ApiResponse::success(user.into())))
 }
@@ -380,11 +370,12 @@ fn extract_token_from_header(headers: &HeaderMap) -> ApiResult<String> {
 async fn authenticate_user(headers: &HeaderMap, state: &Arc<AppState>) -> ApiResult<User> {
     let token = extract_token_from_header(headers)?;
     let claims = decode_token(&token, &state.jwt_secret)?;
-    
+
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| ApiError::BadRequest("Invalid user ID in token".to_string()))?;
-    
-    sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", user_id)
+
+    sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
         .fetch_optional(state.db.pool())
         .await?
         .ok_or(ApiError::Unauthorized)

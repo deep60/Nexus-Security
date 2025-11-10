@@ -23,22 +23,7 @@ use ethers::{
 };
 
 use crate::models::{TransactionStatus, ReputationScore, ThreatSeverity};
-
-/// Configuration for blockchain service
-#[derive(Debug, Clone, Deserialize)]
-pub struct BlockchainConfig {
-    pub rpc_url: String,
-    pub chain_id: u64,
-    pub private_key: String,
-    pub bounty_manager_address: String,
-    pub threat_token_address: String,
-    pub reputation_system_address: String,
-    pub gas_limit: u64,
-    pub gas_price_gwei: u64,
-    pub confirmation_blocks: u64,
-    pub retry_attempts: u32,
-    pub retry_delay_ms: u64,
-}
+use crate::config;
 
 /// Blockchain client wrapper
 type BlockchainClient = SignerMiddleware<Provider<Http>, LocalWallet>;
@@ -55,7 +40,7 @@ pub struct ContractInstances {
 pub struct BlockchainService {
     client: Arc<BlockchainClient>,
     contracts: ContractInstances,
-    config: BlockchainConfig,
+    config: config::BlockchainConfig,
     pending_transactions: Arc<RwLock<HashMap<H256, PendingTransaction>>>,
     nonce_manager: Arc<Mutex<u64>>,
 }
@@ -131,7 +116,7 @@ pub struct BountyStatus {
 
 impl BlockchainService {
     /// Create a new blockchain service instance
-    pub async fn new(config: BlockchainConfig) -> Result<Self> {
+    pub async fn new(config: config::BlockchainConfig) -> Result<Self> {
         // Setup provider
         let provider = Provider::<Http>::try_from(&config.rpc_url)
             .context("Failed to create HTTP provider")?
@@ -165,18 +150,18 @@ impl BlockchainService {
     /// Load smart contract instances
     async fn load_contracts(
         client: &Arc<BlockchainClient>,
-        config: &BlockchainConfig,
+        config: &config::BlockchainConfig,
     ) -> Result<ContractInstances> {
         // In a real implementation, you would load the ABIs from files or embedded resources
         // For now, we'll create placeholder contract instances
-        
-        let bounty_manager_address: Address = config.bounty_manager_address.parse()
+
+        let bounty_manager_address: Address = config.contracts.bounty_manager.parse()
             .context("Invalid bounty manager address")?;
-        
-        let threat_token_address: Address = config.threat_token_address.parse()
+
+        let threat_token_address: Address = config.contracts.threat_token.parse()
             .context("Invalid threat token address")?;
-        
-        let reputation_system_address: Address = config.reputation_system_address.parse()
+
+        let reputation_system_address: Address = config.contracts.reputation_system.parse()
             .context("Invalid reputation system address")?;
 
         // Load ABIs (in practice, these would come from JSON files)
@@ -211,8 +196,8 @@ impl BlockchainService {
 
     /// Create a new bounty on the blockchain
     pub async fn create_bounty(&self, params: CreateBountyParams) -> Result<H256> {
-        let bounty_id_bytes = params.bounty_id.as_bytes();
-        
+        let bounty_id_bytes = *params.bounty_id.as_bytes();
+
         let tx = self.contracts.bounty_manager
             .method::<_, H256>("createBounty", (
                 bounty_id_bytes,
@@ -244,8 +229,8 @@ impl BlockchainService {
 
     /// Submit analysis for a bounty
     pub async fn submit_analysis(&self, params: SubmitAnalysisParams) -> Result<H256> {
-        let bounty_id_bytes = params.bounty_id.as_bytes();
-        
+        let bounty_id_bytes = *params.bounty_id.as_bytes();
+
         let tx = self.contracts.bounty_manager
             .method::<_, H256>("submitAnalysis", (
                 bounty_id_bytes,
@@ -275,8 +260,8 @@ impl BlockchainService {
 
     /// Stake tokens for analysis submission
     pub async fn stake_tokens(&self, bounty_id: Uuid, amount: U256, user_id: Uuid) -> Result<H256> {
-        let bounty_id_bytes = bounty_id.as_bytes();
-        
+        let bounty_id_bytes = *bounty_id.as_bytes();
+
         let tx = self.contracts.threat_token
             .method::<_, H256>("approve", (
                 self.config.bounty_manager_address.parse::<Address>()?,
@@ -303,8 +288,8 @@ impl BlockchainService {
 
     /// Claim rewards for successful analysis
     pub async fn claim_reward(&self, bounty_id: Uuid, user_id: Uuid) -> Result<H256> {
-        let bounty_id_bytes = bounty_id.as_bytes();
-        
+        let bounty_id_bytes = *bounty_id.as_bytes();
+
         let tx = self.contracts.bounty_manager
             .method::<_, H256>("claimReward", (bounty_id_bytes,))?
             .gas(self.config.gas_limit)
@@ -353,8 +338,8 @@ impl BlockchainService {
 
     /// Get bounty status from blockchain
     pub async fn get_bounty_status(&self, bounty_id: Uuid) -> Result<BountyStatus> {
-        let bounty_id_bytes = bounty_id.as_bytes();
-        
+        let bounty_id_bytes = *bounty_id.as_bytes();
+
         let result: (Address, U256, U256, u32, bool, bool, bool, u64) = self.contracts.bounty_manager
             .method("getBountyStatus", (bounty_id_bytes,))?
             .call()

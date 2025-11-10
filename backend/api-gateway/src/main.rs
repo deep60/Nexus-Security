@@ -24,11 +24,13 @@ use uuid::Uuid;
 use anyhow::{Context, Result};
 use tracing::{info, warn, error, debug};
 
+mod config;
 mod handlers;
 mod models;
 mod services;
 mod utils;
 
+use config::AppConfig;
 use handlers::{auth, bounty, submission, health};
 use models::{bounty::Bounty, user::User, analysis::AnalysisResult};
 use services::{blockchain::BlockchainService, database::DatabaseService, redis::RedisService};
@@ -44,21 +46,6 @@ pub struct AppState {
     pub blockchain: Arc<BlockchainService>,
     pub config: Arc<AppConfig>,
     pub active_sessions: Arc<RwLock<HashMap<String, SessionInfo>>>,
-}
-
-// Configuration strucutre
-#[derive(Debug, Clone)]
-pub struct AppConfig {
-    pub server_host: String,
-    pub server_port: u16,
-    pub database_url: String,
-    pub redis_url: String,
-    pub blockchain_rpc_url: String,
-    pub jwt_secret: String,
-    pub max_file_size: usize,
-    pub analysis_timeout: u64,
-    pub cors_origins: Vec<String>,
-    pub rate_limit_per_minute: u32,
 }
 
 // Session information for active users
@@ -103,23 +90,6 @@ pub struct UploadQuery {
     pub bounty_amount: Option<f64>,
     pub priority: Option<String>,
     pub engines: Option<String>, // Comma-separated list
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self { 
-            server_host: "0.0.0.0".to_string(), 
-            server_port: 8080, 
-            database_url: "postgresql://localhost/nexus_security".to_string(), 
-            redis_url: "redis://localhost:6379".to_string(), 
-            blockchain_rpc_url: "http://localhost:8545".to_string(), 
-            jwt_secret: "your-super-secret-jwt-key".to_string(), 
-            max_file_size: 50 * 1024 * 1024, 
-            analysis_timeout: 300, 
-            cors_origins: vec!["http://localhost:3000".to_string()], 
-            rate_limit_per_minute: 60,
-        }
-    }
 }
 
 impl<T> ApiResponse<T> {
@@ -380,59 +350,38 @@ fn create_router(state: AppState) -> Router {
 // Initialize services
 async fn initialize_services(config: &AppConfig) -> Result<(DatabaseService, RedisService, BlockchainService)> {
     info!("Initializing services...");
-    
-    // Initialize database
-    let db = DatabaseService::new(&config.database_url).await
-        .context("Failed to initialize database service")?;
-    
+
+    // Initialize database with connection pool
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(config.database.max_connections.unwrap_or(5))
+        .connect(&config.database.url)
+        .await
+        .context("Failed to connect to database")?;
+
+    let db = DatabaseService::new(pool);
+
     // Run database migrations
-    db.run_migrations().await
+    sqlx::migrate!("./migrations")
+        .run(db.pool())
+        .await
         .context("Failed to run database migrations")?;
-    
+
     // Initialize Redis
-    let redis = RedisService::new(&config.redis_url).await
+    let redis = RedisService::new(&config.redis.url).await
         .context("Failed to initialize Redis service")?;
-    
+
     // Initialize blockchain service
-    let blockchain = BlockchainService::new(&config.blockchain_rpc_url).await
+    let blockchain = BlockchainService::new(config.blockchain.clone())
+        .await
         .context("Failed to initialize blockchain service")?;
-    
+
     info!("All services initialized successfully");
     Ok((db, redis, blockchain))
 }
 
 // Load configuration from environment or config files
-fn load_config() -> AppConfig {
-    let mut config = AppConfig::default();
-    
-    // Override with environment variables if present
-    if let Ok(host) = std::env::var("SERVER_HOST") {
-        config.server_host = host;
-    }
-    
-    if let Ok(port) = std::env::var("SERVER_PORT") {
-        if let Ok(port_num) = port.parse::<u16>() {
-            config.server_port = port_num;
-        }
-    }
-    
-    if let Ok(db_url) = std::env::var("DATABASE_URL") {
-        config.database_url = db_url;
-    }
-    
-    if let Ok(redis_url) = std::env::var("REDIS_URL") {
-        config.redis_url = redis_url;
-    }
-    
-    if let Ok(blockchain_url) = std::env::var("BLOCKCHAIN_RPC_URL") {
-        config.blockchain_rpc_url = blockchain_url;
-    }
-    
-    if let Ok(jwt_secret) = std::env::var("JWT_SECRET") {
-        config.jwt_secret = jwt_secret;
-    }
-    
-    config
+fn load_config() -> Result<AppConfig> {
+    AppConfig::load()
 }
 
 // // Utility function to get current timestamp
@@ -464,8 +413,8 @@ async fn main() -> Result<()> {
     info!("Starting Nexus-Security API Gateway v{}", env!("CARGO_PKG_VERSION"));
 
     // Load configuration
-    let config = load_config();
-    info!("Configuration loaded: {}:{}", config.server_host, config.server_port);
+    let config = load_config()?;
+    info!("Configuration loaded: {}:{}", config.server.host, config.server.port);
 
     // Initialize services
     let (db, redis, blockchain) = initialize_services(&config).await?;
@@ -483,7 +432,7 @@ async fn main() -> Result<()> {
     let app = create_router(state);
 
     // Create server address
-    let addr = SocketAddr::from(([0, 0, 0, 0], config.server_port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
     
     // Create TCP listener
     let listener = TcpListener::bind(addr)

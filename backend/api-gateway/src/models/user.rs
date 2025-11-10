@@ -216,60 +216,47 @@ impl User {
         pool: &sqlx::PgPool,
         user_id: Uuid,
     ) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as!(
-            User,
-            "SELECT * FROM users WHERE id = $1",
-            user_id
-        )
-        .fetch_optional(pool)
-        .await
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await
     }
 
     pub async fn find_by_email(
         pool: &sqlx::PgPool,
         email: &str,
     ) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as!(
-            User,
-            "SELECT * FROM users WHERE email = $1",
-            email
-        )
-        .fetch_optional(pool)
-        .await
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
+            .bind(email)
+            .fetch_optional(pool)
+            .await
     }
 
     pub async fn find_by_username(
         pool: &sqlx::PgPool,
         username: &str,
     ) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as!(
-            User,
-            "SELECT * FROM users WHERE username = $1",
-            username
-        )
-        .fetch_optional(pool)
-        .await
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = $1")
+            .bind(username)
+            .fetch_optional(pool)
+            .await
     }
 
     pub async fn find_by_api_key(
         pool: &sqlx::PgPool,
         api_key: &str,
     ) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as!(
-            User,
-            "SELECT * FROM users WHERE api_key = $1 AND is_active = true",
-            api_key
-        )
-        .fetch_optional(pool)
-        .await
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE api_key = $1 AND is_active = true")
+            .bind(api_key)
+            .fetch_optional(pool)
+            .await
     }
 
     pub async fn create(
         pool: &sqlx::PgPool,
         user: &User,
     ) -> Result<User, sqlx::Error> {
-        sqlx::query_as!(
-            User,
+        sqlx::query_as::<_, User>(
             r#"
             INSERT INTO users (
                 id, username, email, password_hash, wallet_address,
@@ -278,23 +265,23 @@ impl User {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             RETURNING *
-            "#,
-            user.id,
-            user.username,
-            user.email,
-            user.password_hash,
-            user.wallet_address,
-            user.reputation_score,
-            user.total_stakes,
-            user.successful_analyses,
-            user.failed_analyses,
-            user.is_verified,
-            user.is_active,
-            user.is_engine,
-            user.api_key,
-            user.created_at,
-            user.updated_at
+            "#
         )
+        .bind(user.id)
+        .bind(&user.username)
+        .bind(&user.email)
+        .bind(&user.password_hash)
+        .bind(&user.wallet_address)
+        .bind(user.reputation_score)
+        .bind(user.total_stakes)
+        .bind(user.successful_analyses)
+        .bind(user.failed_analyses)
+        .bind(user.is_verified)
+        .bind(user.is_active)
+        .bind(user.is_engine)
+        .bind(&user.api_key)
+        .bind(user.created_at)
+        .bind(user.updated_at)
         .fetch_one(pool)
         .await
     }
@@ -303,8 +290,7 @@ impl User {
         pool: &sqlx::PgPool,
         user: &User,
     ) -> Result<User, sqlx::Error> {
-        sqlx::query_as!(
-            User,
+        sqlx::query_as::<_, User>(
             r#"
             UPDATE users SET
                 username = $2,
@@ -323,23 +309,23 @@ impl User {
                 last_login = $15
             WHERE id = $1
             RETURNING *
-            "#,
-            user.id,
-            user.username,
-            user.email,
-            user.password_hash,
-            user.wallet_address,
-            user.reputation_score,
-            user.total_stakes,
-            user.successful_analyses,
-            user.failed_analyses,
-            user.is_verified,
-            user.is_active,
-            user.is_engine,
-            user.api_key,
-            user.updated_at,
-            user.last_login
+            "#
         )
+        .bind(user.id)
+        .bind(&user.username)
+        .bind(&user.email)
+        .bind(&user.password_hash)
+        .bind(&user.wallet_address)
+        .bind(user.reputation_score)
+        .bind(user.total_stakes)
+        .bind(user.successful_analyses)
+        .bind(user.failed_analyses)
+        .bind(user.is_verified)
+        .bind(user.is_active)
+        .bind(user.is_engine)
+        .bind(&user.api_key)
+        .bind(user.updated_at)
+        .bind(user.last_login)
         .fetch_one(pool)
         .await
     }
@@ -349,17 +335,16 @@ impl User {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<UserResponse>, sqlx::Error> {
-        let users = sqlx::query_as!(
-            User,
+        let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT * FROM users 
-            WHERE is_active = true 
+            SELECT * FROM users
+            WHERE is_active = true
             ORDER BY reputation_score DESC, successful_analyses DESC
             LIMIT $1 OFFSET $2
-            "#,
-            limit,
-            offset
+            "#
         )
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await?;
 
