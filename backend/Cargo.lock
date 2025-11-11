@@ -1117,6 +1117,7 @@ dependencies = [
  "sqlx 0.7.4",
  "thiserror 1.0.69",
  "tokio",
+ "toml",
  "tower 0.5.2",
  "tower-http 0.6.6",
  "tracing",
@@ -6617,9 +6618,11 @@ dependencies = [
  "bitflags 2.9.4",
  "bytes",
  "http 1.3.1",
+ "http-body 1.0.1",
  "pin-project-lite",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]

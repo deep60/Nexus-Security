@@ -16,8 +16,11 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 
+mod config;
 mod handlers;
+mod models;
 mod services;
+mod workers;
 
 use handlers::bounty_crud;
 use services::reputation;
@@ -166,12 +169,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sqlx::migrate!("./migrations").run(&db).await?;
 
     // Initialize reputation service
-    let reputation_service = Arc::new(reputation::ReputationService::new(db.clone()).await?);
+    let reputation_service = Arc::new(reputation::ReputationService::new());
 
-    // Create application state
-    let state = AppState {
-        db,
-        reputation_service,
+    // Create application state using BountyManagerState
+    let state = bounty_crud::BountyManagerState {
+        reputation_service: reputation_service.clone(),
     };
 
     // Build router
@@ -187,31 +189,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn create_router(state: AppState) -> Router {
+fn create_router(state: bounty_crud::BountyManagerState) -> Router {
     Router::new()
         // Health check
         .route("/health", get(health_check))
-        
+
         // Bounty management routes
         .route("/bounties", post(bounty_crud::create_bounty))
         .route("/bounties", get(bounty_crud::list_bounties))
         .route("/bounties/:id", get(bounty_crud::get_bounty))
         .route("/bounties/:id", put(bounty_crud::update_bounty))
         .route("/bounties/:id/cancel", post(bounty_crud::cancel_bounty))
-        
-        // Participation routes
-        .route("/bounties/:id/participate", post(bounty_crud::join_bounty))
-        .route("/bounties/:id/submit", post(bounty_crud::submit_analysis))
-        .route("/bounties/:id/participants", get(bounty_crud::get_participants))
-        
-        // Analytics routes
-        .route("/bounties/:id/consensus", get(bounty_crud::get_consensus))
-        .route("/stats/creator/:address", get(bounty_crud::get_creator_stats))
-        .route("/stats/participant/:address", get(bounty_crud::get_participant_stats))
-        
+
+        // Stats route
+        .route("/bounties/stats", get(bounty_crud::get_bounty_stats))
+
+        // TODO: Add more routes as handlers are implemented
+        // .route("/bounties/:id/submit", post(handlers::submit_analysis))
+
         // State management
         .with_state(state)
-        
+
         // Middleware
         .layer(
             ServiceBuilder::new()
@@ -230,99 +228,12 @@ async fn health_check() -> Json<ApiResponse<HashMap<String, String>>> {
 }
 
 // Database helper functions
-pub async fn get_bounty_by_id(
-    db: &PgPool, 
-    bounty_id: Uuid
-) -> Result<Option<Bounty>, sqlx::Error> {
-    let row = sqlx::query!(
-        r#"
-        SELECT 
-            id, title, description, reward_amount, token_address,
-            creator_address, artifact_hash, artifact_type as "artifact_type: ArtifactType",
-            status as "status: BountyStatus", min_reputation, max_participants,
-            current_participants, created_at, expires_at, metadata
-        FROM bounties 
-        WHERE id = $1
-        "#,
-        bounty_id
-    )
-    .fetch_optional(db)
-    .await?;
-
-    match row {
-        Some(row) => Ok(Some(Bounty {
-            id: row.id,
-            title: row.title,
-            description: row.description,
-            reward_amount: row.reward_amount,
-            token_address: row.token_address,
-            creator_address: row.creator_address,
-            artifact_hash: row.artifact_hash,
-            artifact_type: row.artifact_type,
-            status: row.status,
-            min_reputation: row.min_reputation,
-            max_participants: row.max_participants,
-            current_participants: row.current_participants,
-            created_at: row.created_at,
-            expires_at: row.expires_at,
-            metadata: row.metadata,
-        })),
-        None => Ok(None),
-    }
-}
-
-pub async fn create_bounty_in_db(
-    db: &PgPool,
-    request: &CreateBountyRequest,
-) -> Result<Bounty, sqlx::Error> {
-    let bounty_id = Uuid::new_v4();
-    let now = Utc::now();
-    
-    sqlx::query!(
-        r#"
-        INSERT INTO bounties (
-            id, title, description, reward_amount, token_address, creator_address,
-            artifact_hash, artifact_type, status, min_reputation, max_participants,
-            current_participants, created_at, expires_at, metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-        "#,
-        bounty_id,
-        request.title,
-        request.description,
-        request.reward_amount,
-        request.token_address,
-        request.creator_address,
-        request.artifact_hash,
-        request.artifact_type as ArtifactType,
-        BountyStatus::Open as BountyStatus,
-        request.min_reputation.unwrap_or(0),
-        request.max_participants.unwrap_or(10),
-        0, // current_participants starts at 0
-        now,
-        request.expires_at,
-        request.metadata
-    )
-    .execute(db)
-    .await?;
-
-    Ok(Bounty {
-        id: bounty_id,
-        title: request.title.clone(),
-        description: request.description.clone(),
-        reward_amount: request.reward_amount,
-        token_address: request.token_address.clone(),
-        creator_address: request.creator_address.clone(),
-        artifact_hash: request.artifact_hash.clone(),
-        artifact_type: request.artifact_type.clone(),
-        status: BountyStatus::Open,
-        min_reputation: request.min_reputation.unwrap_or(0),
-        max_participants: request.max_participants.unwrap_or(10),
-        current_participants: 0,
-        created_at: now,
-        expires_at: request.expires_at,
-        metadata: request.metadata.clone(),
-    })
-}
+// NOTE: These functions use sqlx::query! macro which requires DATABASE_URL to be set
+// They are commented out for now. Use the models in src/models/ instead.
+//
+// pub async fn get_bounty_by_id(db: &PgPool, bounty_id: Uuid) -> Result<Option<Bounty>, sqlx::Error> {
+//     models::bounty::BountyModel::find_by_id(db, bounty_id).await
+// }
 
 #[cfg(test)]
 mod tests {
