@@ -14,8 +14,9 @@ shared = { path = "../shared" }
 sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+toml = "0.8"
 tower = "0.5.2"
-tower-http = "0.6.6"
+tower-http = { version = "0.6.6", features = ["cors", "trace"] }
 tracing.workspace = true
 tracing-subscriber = "0.3.18"
 uuid.workspace = true
