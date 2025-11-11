@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .reputation-box { background: white; padding: 20px; margin: 15px 0; border-left: 4px solid #f59e0b; border-radius: 5px; text-align: center; }
+        .score { font-size: 48px; font-weight: bold; color: #f59e0b; }
+        .button { background: #f59e0b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Reputation Updated</h1>
+        </div>
+        <div class="content">
+            <div class="reputation-box">
+                <p style="margin: 0; color: #666;">Your reputation changed from</p>
+                <div class="score">{{old_score}} → {{new_score}}</div>
+                <p style="margin: 10px 0 0 0;"><strong>Reason:</strong> {{change_reason}}</p>
+            </div>
+            <p>Your reputation score has been updated based on your recent activity on the platform.</p>
+            <a href="https://nexus-security.io/profile" class="button">View Profile</a>
+        </div>
+        <div class="footer">
+            <p>&copy; 2025 Nexus Security. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

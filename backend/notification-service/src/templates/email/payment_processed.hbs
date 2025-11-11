@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .success-box { background: #d1fae5; padding: 20px; margin: 15px 0; border-left: 4px solid #10b981; border-radius: 5px; }
+        .button { background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Payment Processed!</h1>
+        </div>
+        <div class="content">
+            <div class="success-box">
+                <h2 style="color: #059669; margin-top: 0;">You've received {{amount}} tokens!</h2>
+                <p><strong>Transaction Hash:</strong> <code>{{tx_hash}}</code></p>
+                <p><strong>Bounty ID:</strong> {{bounty_id}}</p>
+            </div>
+            <p>Congratulations! Your payment has been successfully processed and the tokens have been transferred to your wallet.</p>
+            <a href="https://etherscan.io/tx/{{tx_hash}}" class="button">View on Blockchain</a>
+        </div>
+        <div class="footer">
+            <p>&copy; 2025 Nexus Security. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

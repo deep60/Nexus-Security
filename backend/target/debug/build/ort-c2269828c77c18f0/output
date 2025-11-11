@@ -1,0 +1,7 @@
+[ort] strategy: "unknown"
+cargo:rerun-if-env-changed=ORT_STRATEGY
+cargo:rerun-if-changed=/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/ort-c2269828c77c18f0/out/onnxruntime-osx-arm64-1.16.0.tgz
+cargo:rustc-link-lib=onnxruntime
+cargo:rustc-link-search=native=/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/ort-c2269828c77c18f0/out/onnxruntime/onnxruntime-osx-arm64-1.16.0/lib
+cargo:rerun-if-env-changed=ORT_LIB_LOCATION
+cargo:rerun-if-env-changed=ORT_STRATEGY

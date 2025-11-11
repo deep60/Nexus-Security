@@ -1,6 +1,97 @@
 [package]
 name = "notification-service"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+authors = ["Nexus-Security Team"]
+description = "Notification service for Nexus-Security platform - handles email, push, webhook, and WebSocket notifications"
+license = "MIT"
+repository = "https://github.com/nexus-security/deep60"
 
 [dependencies]
+# Web framework
+axum = { version = "0.7", features = ["ws", "multipart"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
+tower = "0.4"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
+
+# Redis for pub/sub and caching
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager", "streams"] }
+
+# Email sending
+lettre = { version = "0.11", features = ["tokio1-rustls-tls", "smtp-transport", "builder", "hostname"] }
+
+# HTTP client for webhooks and push notifications
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# WebSocket
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
+
+# UUID support
+uuid = { version = "1.0", features = ["serde", "v4"] }
+
+# Date and time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Configuration
+config = "0.14"
+dotenv = "0.15"
+
+# Template engine for email
+handlebars = "5.0"
+
+# JWT for WebSocket authentication
+jsonwebtoken = "9.0"
+
+# Async trait support
+async-trait = "0.1"
+
+# Base64 encoding
+base64 = "0.21"
+
+# HTML sanitization
+ammonia = "3.3"
+
+# Rate limiting
+governor = "0.6"
+
+# Validation
+validator = { version = "0.18", features = ["derive"] }
+
+# Shared module
+shared = { path = "../shared" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockito = "1.2"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[[bin]]
+name = "notification-service"
+path = "src/main.rs"
