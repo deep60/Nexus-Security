@@ -5,14 +5,20 @@ warning: profiles for the non root package will be ignored, specify profiles at 
 package:   /Users/arjun/Developer/Nexus-Security/backend/notification-service/Cargo.toml
 workspace: /Users/arjun/Developer/Nexus-Security/backend/Cargo.toml
 warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/arjun/Developer/Nexus-Security/backend/reputation-service/Cargo.toml
+workspace: /Users/arjun/Developer/Nexus-Security/backend/Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/arjun/Developer/Nexus-Security/backend/consensus-service/Cargo.toml
+workspace: /Users/arjun/Developer/Nexus-Security/backend/Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
 package:   /Users/arjun/Developer/Nexus-Security/backend/payment-service/Cargo.toml
 workspace: /Users/arjun/Developer/Nexus-Security/backend/Cargo.toml
     Updating crates.io index
 error: failed to select a version for `sqlx`.
-    ... required by package `payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service)`
+    ... required by package `reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service)`
 versions that meet the requirements `^0.7` are: 0.7.4, 0.7.3, 0.7.2, 0.7.1, 0.7.0
 
-package `payment-service` depends on `sqlx` with feature `decimal` but `sqlx` does not have that feature.
+package `reputation-service` depends on `sqlx` with feature `decimal` but `sqlx` does not have that feature.
  package `sqlx` does have feature `bigdecimal`
 
 
