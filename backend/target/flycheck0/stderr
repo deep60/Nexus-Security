@@ -5,6 +5,9 @@ warning: profiles for the non root package will be ignored, specify profiles at 
 package:   /Users/arjun/Developer/Nexus-Security/backend/notification-service/Cargo.toml
 workspace: /Users/arjun/Developer/Nexus-Security/backend/Cargo.toml
 warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/arjun/Developer/Nexus-Security/backend/user-service/Cargo.toml
+workspace: /Users/arjun/Developer/Nexus-Security/backend/Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
 package:   /Users/arjun/Developer/Nexus-Security/backend/reputation-service/Cargo.toml
 workspace: /Users/arjun/Developer/Nexus-Security/backend/Cargo.toml
 warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
