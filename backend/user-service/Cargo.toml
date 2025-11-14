@@ -1,6 +1,88 @@
 [package]
 name = "user-service"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+authors = ["Nexus-Security Team"]
+description = "User service for Nexus-Security - handles authentication, profiles, and KYC"
+license = "MIT"
+repository = "https://github.com/nexus-security/deep60"
 
 [dependencies]
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
+
+# Redis for sessions
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+
+# UUID support
+uuid = { version = "1.0", features = ["serde", "v4"] }
+
+# Date and time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Configuration
+config = "0.14"
+dotenv = "0.15"
+
+# Authentication
+jsonwebtoken = "9.0"
+argon2 = "0.5"
+bcrypt = "0.17"
+
+# Validation
+validator = { version = "0.18", features = ["derive"] }
+email_address = "0.2"
+
+# 2FA support
+totp-lite = "2.0"
+base32 = "0.4"
+rand = "0.8"
+
+# Ethereum/Web3
+ethers = { version = "2.0", features = ["abigen"] }
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json"] }
+
+# Async trait support
+async-trait = "0.1"
+
+# Shared module
+shared = { path = "../shared" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[[bin]]
+name = "user-service"
+path = "src/main.rs"
