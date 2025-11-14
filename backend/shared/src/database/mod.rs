@@ -1,6 +1,21 @@
-pub mod connection;
+pub mod connection_pool;
+pub mod postgres;
+pub mod redis;
+pub mod migrations;
 
-pub use connection::{};
+pub use connection_pool::{
+    DatabaseManager,
+    DbPool,
+    DbConnection,
+    DatabaseStats,
+    create_connection_pool,
+    get_connection,
+    test_connection,
+    migrate_database,
+    with_transaction,
+    health_check,
+    close_connections,
+};
 
 // Re-export common database types for convenience
 pub use sqlx::{
