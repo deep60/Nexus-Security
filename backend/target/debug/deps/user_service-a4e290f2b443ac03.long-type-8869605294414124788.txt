@@ -1,0 +1,2 @@
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<VerifyEmailRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {verify_email}
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<VerifyEmailRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {verify_email}: Handler<_, _>

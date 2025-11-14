@@ -1,0 +1,2 @@
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<models::UpdateProfileRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<models::UserProfile>, AppError>> {update_profile}
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<models::UpdateProfileRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<models::UserProfile>, AppError>> {update_profile}: Handler<_, _>

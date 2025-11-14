@@ -1,0 +1,2 @@
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<models::SubmitKycRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<SubmitKycResponse>, AppError>> {submit_kyc}
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<models::SubmitKycRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<SubmitKycResponse>, AppError>> {submit_kyc}: Handler<_, _>

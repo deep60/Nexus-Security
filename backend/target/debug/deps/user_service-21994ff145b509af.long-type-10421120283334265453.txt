@@ -1,0 +1,2 @@
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<UploadDocumentsRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {upload_documents}
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<UploadDocumentsRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {upload_documents}: Handler<_, _>

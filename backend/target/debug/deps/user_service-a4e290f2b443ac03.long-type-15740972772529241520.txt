@@ -1,0 +1,2 @@
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<LinkWalletRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {link_wallet}
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<LinkWalletRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {link_wallet}: Handler<_, _>

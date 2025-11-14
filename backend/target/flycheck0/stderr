@@ -16,18 +16,213 @@ workspace: /Users/arjun/Developer/Nexus-Security/backend/Cargo.toml
 warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
 package:   /Users/arjun/Developer/Nexus-Security/backend/payment-service/Cargo.toml
 workspace: /Users/arjun/Developer/Nexus-Security/backend/Cargo.toml
-    Updating crates.io index
-error: failed to select a version for `sqlx`.
-    ... required by package `reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service)`
-versions that meet the requirements `^0.7` are: 0.7.4, 0.7.3, 0.7.2, 0.7.1, 0.7.0
+   0.544220125s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint: fingerprint error for analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine)/Check { test: false }/TargetInner { name: "analysis-engine", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/analysis-engine/src/main.rs", Edition2021) }
+   0.544657292s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/analysis-engine-c71ceba0ead055c4/bin-analysis-engine`
 
-package `reputation-service` depends on `sqlx` with feature `decimal` but `sqlx` does not have that feature.
- package `sqlx` does have feature `bigdecimal`
+Caused by:
+    No such file or directory (os error 2)
 
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   7: cargo::ops::cargo_compile::compile_ws
+   8: cargo::ops::cargo_compile::compile_with_exec
+   9: cargo::ops::cargo_compile::compile
+  10: cargo::commands::check::exec
+  11: <cargo::cli::Exec>::exec
+  12: cargo::main
+  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  14: std::rt::lang_start::<()>::{closure#0}
+  15: std::rt::lang_start_internal
+  16: _main
+   0.643493708s  INFO prepare_target{force=false package_id=yara v0.18.0 target="yara"}: cargo::core::compiler::fingerprint: fingerprint error for yara v0.18.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("yara", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-0.18.0/src/lib.rs", Edition2018) }
+   0.643683625s  INFO prepare_target{force=false package_id=yara v0.18.0 target="yara"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-6a5c6170d7357553/lib-yara`
 
-all possible versions conflict with previously selected packages.
+Caused by:
+    No such file or directory (os error 2)
 
-  previously selected package `sqlx v0.7.0`
-    ... which satisfies dependency `sqlx = "^0.7"` of package `api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)`
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.643990583s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="yara_sys"}: cargo::core::compiler::fingerprint: fingerprint error for yara-sys v0.18.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("yara_sys", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-sys-0.18.0/src/lib.rs", Edition2018) }
+   0.643996625s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="yara_sys"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-sys-32dcccaf8e0dba7b/lib-yara_sys`
 
-failed to select a version for `sqlx` which could resolve this conflict
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   9: cargo::ops::cargo_compile::compile_ws
+  10: cargo::ops::cargo_compile::compile_with_exec
+  11: cargo::ops::cargo_compile::compile
+  12: cargo::commands::check::exec
+  13: <cargo::cli::Exec>::exec
+  14: cargo::main
+  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  16: std::rt::lang_start::<()>::{closure#0}
+  17: std::rt::lang_start_internal
+  18: _main
+   0.644254083s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="build-script-build"}: cargo::core::compiler::fingerprint: fingerprint error for yara-sys v0.18.0/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-sys-0.18.0/build.rs", Edition2018) }
+   0.644260583s  INFO prepare_target{force=false package_id=yara-sys v0.18.0 target="build-script-build"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/yara-sys-c4fe22cbcf64ba28/run-build-script-build-script-build`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::custom_build::build_work
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: cargo::core::compiler::compile
+   9: cargo::core::compiler::compile
+  10: <cargo::core::compiler::build_runner::BuildRunner>::compile
+  11: cargo::ops::cargo_compile::compile_ws
+  12: cargo::ops::cargo_compile::compile_with_exec
+  13: cargo::ops::cargo_compile::compile
+  14: cargo::commands::check::exec
+  15: <cargo::cli::Exec>::exec
+  16: cargo::main
+  17: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  18: std::rt::lang_start::<()>::{closure#0}
+  19: std::rt::lang_start_internal
+  20: _main
+   0.648602333s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint: fingerprint error for analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine)/Check { test: true }/TargetInner { name: "analysis-engine", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/analysis-engine/src/main.rs", Edition2021) }
+   0.648608167s  INFO prepare_target{force=false package_id=analysis-engine v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/analysis-engine) target="analysis-engine"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/arjun/Developer/Nexus-Security/backend/target/debug/.fingerprint/analysis-engine-ab6c2845c8a6f8a1/test-bin-analysis-engine`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   7: cargo::ops::cargo_compile::compile_ws
+   8: cargo::ops::cargo_compile::compile_with_exec
+   9: cargo::ops::cargo_compile::compile
+  10: cargo::commands::check::exec
+  11: <cargo::cli::Exec>::exec
+  12: cargo::main
+  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  14: std::rt::lang_start::<()>::{closure#0}
+  15: std::rt::lang_start_internal
+  16: _main
+   0.710102167s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint: fingerprint dirty for api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)/Check { test: false }/TargetInner { name: "api-gateway", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/api-gateway/src/main.rs", Edition2021) }
+   0.710110125s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.771753958s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint: fingerprint dirty for api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)/Check { test: true }/TargetInner { name: "api-gateway", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/api-gateway/src/main.rs", Edition2021) }
+   0.771761167s  INFO prepare_target{force=false package_id=api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway) target="api-gateway"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.775198708s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint: fingerprint dirty for bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)/Check { test: false }/TargetInner { name: "bounty-manager", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/bounty-manager/src/main.rs", Edition2021) }
+   0.775204250s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.777254083s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint: fingerprint dirty for bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)/Check { test: true }/TargetInner { name: "bounty-manager", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/bounty-manager/src/main.rs", Edition2021) }
+   0.777259125s  INFO prepare_target{force=false package_id=bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager) target="bounty-manager"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.779946375s  INFO prepare_target{force=false package_id=consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service) target="consensus-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service)/Check { test: false }/TargetInner { name: "consensus-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/consensus-service/src/main.rs", Edition2021) }
+   0.779951500s  INFO prepare_target{force=false package_id=consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service) target="consensus-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.782229625s  INFO prepare_target{force=false package_id=consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service) target="consensus-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service)/Check { test: true }/TargetInner { name: "consensus-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/consensus-service/src/main.rs", Edition2021) }
+   0.782234292s  INFO prepare_target{force=false package_id=consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service) target="consensus-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.791113833s  INFO prepare_target{force=false package_id=notification-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/notification-service) target="notification-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for notification-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/notification-service)/Check { test: false }/TargetInner { name: "notification-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/notification-service/src/main.rs", Edition2021) }
+   0.791119167s  INFO prepare_target{force=false package_id=notification-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/notification-service) target="notification-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.796264708s  INFO prepare_target{force=false package_id=lettre v0.11.19 target="lettre"}: cargo::core::compiler::fingerprint: fingerprint dirty for lettre v0.11.19/Check { test: false }/TargetInner { ..: lib_target("lettre", ["lib"], "/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lettre-0.11.19/src/lib.rs", Edition2021) }
+   0.796270708s  INFO prepare_target{force=false package_id=lettre v0.11.19 target="lettre"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.800555417s  INFO prepare_target{force=false package_id=notification-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/notification-service) target="notification-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for notification-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/notification-service)/Check { test: true }/TargetInner { name: "notification-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/notification-service/src/main.rs", Edition2021) }
+   0.800560250s  INFO prepare_target{force=false package_id=notification-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/notification-service) target="notification-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.804235542s  INFO prepare_target{force=false package_id=payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service) target="payment-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service)/Check { test: false }/TargetInner { name: "payment-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/payment-service/src/main.rs", Edition2021) }
+   0.804246833s  INFO prepare_target{force=false package_id=payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service) target="payment-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.807369458s  INFO prepare_target{force=false package_id=payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service) target="payment-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service)/Check { test: true }/TargetInner { name: "payment-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/payment-service/src/main.rs", Edition2021) }
+   0.807377583s  INFO prepare_target{force=false package_id=payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service) target="payment-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.809230417s  INFO prepare_target{force=false package_id=reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service) target="reputation-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service)/Check { test: false }/TargetInner { name: "reputation-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/reputation-service/src/main.rs", Edition2021) }
+   0.809236875s  INFO prepare_target{force=false package_id=reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service) target="reputation-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.810617458s  INFO prepare_target{force=false package_id=reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service) target="reputation-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service)/Check { test: true }/TargetInner { name: "reputation-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/reputation-service/src/main.rs", Edition2021) }
+   0.810622625s  INFO prepare_target{force=false package_id=reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service) target="reputation-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.833423125s  INFO prepare_target{force=false package_id=user-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/user-service) target="user-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for user-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/user-service)/Check { test: false }/TargetInner { name: "user-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/user-service/src/main.rs", Edition2021) }
+   0.833430375s  INFO prepare_target{force=false package_id=user-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/user-service) target="user-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   0.835623458s  INFO prepare_target{force=false package_id=user-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/user-service) target="user-service"}: cargo::core::compiler::fingerprint: fingerprint dirty for user-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/user-service)/Check { test: true }/TargetInner { name: "user-service", doc: true, ..: with_path("/Users/arjun/Developer/Nexus-Security/backend/user-service/src/main.rs", Edition2021) }
+   0.835628583s  INFO prepare_target{force=false package_id=user-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/user-service) target="user-service"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(Stale)
+   Compiling yara-sys v0.18.0
+    Checking lettre v0.11.19
+    Checking user-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/user-service)
+    Checking api-gateway v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/api-gateway)
+    Checking bounty-manager v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/bounty-manager)
+    Checking payment-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/payment-service)
+    Checking reputation-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/reputation-service)
+error: failed to run custom build command for `yara-sys v0.18.0`
+note: To improve backtraces for build dependencies, set the CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG=true environment variable to enable debug information generation.
+
+Caused by:
+  process didn't exit successfully: `/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/yara-sys-a1422509aa2b3e47/build-script-build` (exit status: 101)
+  --- stdout
+  cargo:rustc-link-lib=dylib=yara
+  cargo:rustc-link-search=native=/opt/homebrew/lib
+  cargo:rerun-if-env-changed=YARA_LIBRARY_PATH
+  cargo:rerun-if-env-changed=YARA_LIBRARY_PATH_aarch64-apple-darwin
+  cargo:rerun-if-env-changed=YARA_LIBRARY_PATH_aarch64_apple_darwin
+
+  --- stderr
+  /opt/homebrew/include/yara/compiler.h:33:10: fatal error: 'setjmp.h' file not found
+
+  thread 'main' panicked at /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yara-sys-0.18.0/build.rs:392:43:
+  Unable to generate bindings: ClangDiagnostic("/opt/homebrew/include/yara/compiler.h:33:10: fatal error: 'setjmp.h' file not found\n")
+  stack backtrace:
+     0: __rustc::rust_begin_unwind
+               at /rustc/6b00bc3880198600130e1cf62b8f8a93494488cc/library/std/src/panicking.rs:697:5
+     1: core::panicking::panic_fmt
+               at /rustc/6b00bc3880198600130e1cf62b8f8a93494488cc/library/core/src/panicking.rs:75:14
+     2: core::result::unwrap_failed
+               at /rustc/6b00bc3880198600130e1cf62b8f8a93494488cc/library/core/src/result.rs:1732:5
+     3: core::result::Result<T,E>::expect
+     4: build_script_build::bindings::add_bindings
+     5: build_script_build::main
+     6: core::ops::function::FnOnce::call_once
+  note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+warning: build failed, waiting for other jobs to finish...
+    Checking consensus-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/consensus-service)
+error: could not compile `reputation-service` (bin "reputation-service" test) due to 1 previous error
+    Checking notification-service v0.1.0 (/Users/arjun/Developer/Nexus-Security/backend/notification-service)
+error: could not compile `consensus-service` (bin "consensus-service") due to 1 previous error; 1 warning emitted
+error: could not compile `reputation-service` (bin "reputation-service") due to 1 previous error
+error: could not compile `user-service` (bin "user-service" test) due to 29 previous errors; 19 warnings emitted
+error: could not compile `user-service` (bin "user-service") due to 29 previous errors; 19 warnings emitted
+error: could not compile `payment-service` (bin "payment-service" test) due to 2 previous errors; 8 warnings emitted
+error: could not compile `consensus-service` (bin "consensus-service" test) due to 1 previous error; 1 warning emitted
+error: could not compile `notification-service` (bin "notification-service") due to 16 previous errors; 10 warnings emitted
+error: could not compile `notification-service` (bin "notification-service" test) due to 20 previous errors; 10 warnings emitted
+error: could not compile `payment-service` (bin "payment-service") due to 2 previous errors; 8 warnings emitted
+error: could not compile `bounty-manager` (bin "bounty-manager") due to 72 previous errors; 47 warnings emitted
+error: could not compile `bounty-manager` (bin "bounty-manager" test) due to 72 previous errors; 47 warnings emitted
+error: could not compile `api-gateway` (bin "api-gateway") due to 222 previous errors; 116 warnings emitted
+error: could not compile `api-gateway` (bin "api-gateway" test) due to 222 previous errors; 115 warnings emitted

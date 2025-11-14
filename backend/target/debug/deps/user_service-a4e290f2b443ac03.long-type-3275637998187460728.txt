@@ -1,0 +1,2 @@
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::extract::Path<uuid::Uuid>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {suspend_user}
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::extract::Path<uuid::Uuid>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {suspend_user}: Handler<_, _>

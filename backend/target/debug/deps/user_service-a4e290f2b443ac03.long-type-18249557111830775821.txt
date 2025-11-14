@@ -1,0 +1,2 @@
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {logout}
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {logout}: Handler<_, _>

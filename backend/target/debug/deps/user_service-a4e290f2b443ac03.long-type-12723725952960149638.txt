@@ -1,0 +1,2 @@
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<models::ChangePasswordRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {change_password}
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<models::ChangePasswordRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {change_password}: Handler<_, _>

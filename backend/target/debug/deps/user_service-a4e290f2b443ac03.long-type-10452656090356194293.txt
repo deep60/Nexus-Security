@@ -1,0 +1,2 @@
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::extract::Path<uuid::Uuid>, axum::Json<RejectKycRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {reject_kyc}
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::extract::Path<uuid::Uuid>, axum::Json<RejectKycRequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {reject_kyc}: Handler<_, _>

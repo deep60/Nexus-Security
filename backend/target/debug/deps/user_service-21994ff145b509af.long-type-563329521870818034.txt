@@ -1,0 +1,2 @@
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<Disable2FARequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {disable_2fa}
+fn(axum::extract::State<Arc<AppState>>, Extension<Claims>, axum::Json<Disable2FARequest>) -> impl std::future::Future<Output = std::result::Result<axum::Json<MessageResponse>, AppError>> {disable_2fa}: Handler<_, _>

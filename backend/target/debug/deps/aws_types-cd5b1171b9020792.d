@@ -1,0 +1,18 @@
+/Users/arjun/Developer/Nexus-Security/backend/target/debug/deps/aws_types-cd5b1171b9020792.d: /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/lib.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/app_name.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/build_metadata.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/endpoint_config.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/origin.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/os_shim_internal.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/region.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/request_id.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/sdk_config.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/service_config.rs /Users/arjun/Developer/Nexus-Security/backend/target/debug/build/aws-types-66e822e203aa054c/out/build_env.rs
+
+/Users/arjun/Developer/Nexus-Security/backend/target/debug/deps/libaws_types-cd5b1171b9020792.rmeta: /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/lib.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/app_name.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/build_metadata.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/endpoint_config.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/origin.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/os_shim_internal.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/region.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/request_id.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/sdk_config.rs /Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/service_config.rs /Users/arjun/Developer/Nexus-Security/backend/target/debug/build/aws-types-66e822e203aa054c/out/build_env.rs
+
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/lib.rs:
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/app_name.rs:
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/build_metadata.rs:
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/endpoint_config.rs:
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/origin.rs:
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/os_shim_internal.rs:
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/region.rs:
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/request_id.rs:
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/sdk_config.rs:
+/Users/arjun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-types-1.3.10/src/service_config.rs:
+/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/aws-types-66e822e203aa054c/out/build_env.rs:
+
+# env-dep:CARGO_PKG_VERSION=1.3.10
+# env-dep:OUT_DIR=/Users/arjun/Developer/Nexus-Security/backend/target/debug/build/aws-types-66e822e203aa054c/out
