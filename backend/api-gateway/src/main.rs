@@ -31,7 +31,7 @@ mod services;
 mod utils;
 
 use config::AppConfig;
-use handlers::{auth, bounty, submission, health};
+use handlers::{auth, bounty, submission, health, reputation};
 use models::{bounty::Bounty, user::User, analysis::AnalysisResult};
 use services::{blockchain::BlockchainService, database::DatabaseService, redis::RedisService};
 use utils::{crypto::JwtClaims, validation::ValidationError};
@@ -312,25 +312,30 @@ fn create_router(state: AppState) -> Router {
         // Health and monitoring
         .route("/api/v1/health", get(health_check))
         
-        // Authentication routes (using health check as placeholder - implement auth handlers)
-        .route("/api/v1/auth/login", post(health::health_check))
-        .route("/api/v1/auth/register", post(health::health_check))
-        .route("/api/v1/auth/logout", post(health::health_check))
-        .route("/api/v1/auth/refresh", post(health::health_check))
+        // Authentication routes
+        .route("/api/v1/auth/login", post(auth::login))
+        .route("/api/v1/auth/register", post(auth::register))
+        .route("/api/v1/auth/logout", post(auth::logout))
+        .route("/api/v1/auth/refresh", post(auth::refresh_token))
+        .route("/api/v1/auth/verify", post(auth::verify_token))
         
         // Analysis routes
         .route("/api/v1/analyze/file", post(analyze_file))
-        .route("/api/v1/analyze/url", post(submission::analyze_url))
+        .route("/api/v1/analyze/url", post(submission::create_submission))
         .route("/api/v1/analysis/:id", get(get_analysis_result))
-        .route("/api/v1/analysis/:id/report", get(submission::get_detailed_report))
-        
+        .route("/api/v1/analysis/:id/report", get(submission::get_submission_details))
+
         // Bounty management routes
-        .route("/api/v1/bounties", get(bounty::list_bounties))
-        .route("/api/v1/bounties/:id", get(bounty::get_bounty))
+        .route("/api/v1/bounties", get(bounty::get_bounties))
+        .route("/api/v1/bounties/:id", get(bounty::get_bounties_details))
         
-        // User and reputation routes (using health check as placeholder)
-        .route("/api/v1/profile", get(health::health_check))
-        .route("/api/v1/reputation/leaderboard", get(health::health_check))
+        // User and wallet routes
+        .route("/api/v1/profile", get(auth::get_profile))
+        .route("/api/v1/wallet/connect", post(auth::collect_wallet))
+        .route("/api/v1/wallet/disconnect", post(auth::disconnect_wallet))
+
+        // Reputation routes
+        .route("/api/v1/reputation/leaderboard", get(reputation::get_leaderboard))
         
         .layer(
             ServiceBuilder::new()

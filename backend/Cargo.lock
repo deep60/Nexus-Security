@@ -143,7 +143,7 @@ dependencies = [
  "bcrypt",
  "chrono",
  "config",
- "dotenv",
+ "dotenvy",
  "ethers",
  "flate2",
  "governor",
@@ -1478,7 +1478,7 @@ dependencies = [
  "axum 0.7.9",
  "chrono",
  "config",
- "dotenv",
+ "dotenvy",
  "redis",
  "rust_decimal",
  "serde",
@@ -1933,12 +1933,6 @@ checksum = "442039f5147480ba31067cb00ada1adae6892028e40e45fc5de7b7df6dcc1b5f"
 dependencies = [
  "const-random",
 ]
-
-[[package]]
-name = "dotenv"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
 
 [[package]]
 name = "dotenvy"
@@ -4044,7 +4038,7 @@ dependencies = [
  "base64 0.21.7",
  "chrono",
  "config",
- "dotenv",
+ "dotenvy",
  "futures-util",
  "governor",
  "handlebars",
@@ -4464,7 +4458,7 @@ dependencies = [
  "axum 0.7.9",
  "chrono",
  "config",
- "dotenv",
+ "dotenvy",
  "ethers",
  "hex",
  "mockito",
@@ -5184,7 +5178,7 @@ dependencies = [
  "axum 0.7.9",
  "chrono",
  "config",
- "dotenv",
+ "dotenvy",
  "redis",
  "rust_decimal",
  "serde",
@@ -7446,7 +7440,7 @@ dependencies = [
  "bcrypt",
  "chrono",
  "config",
- "dotenv",
+ "dotenvy",
  "email_address",
  "ethers",
  "jsonwebtoken 9.3.1",

@@ -23,7 +23,7 @@ use crate::services::payment_service::PaymentService;
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load environment variables
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     // Initialize tracing
     tracing_subscriber::fmt()

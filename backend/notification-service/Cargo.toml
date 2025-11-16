@@ -52,7 +52,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # Configuration
 config = "0.14"
-dotenv = "0.15"
+dotenvy = "0.15"
 
 # Template engine for email
 handlebars = "5.0"
@@ -81,16 +81,6 @@ shared = { path = "../shared" }
 [dev-dependencies]
 tokio-test = "0.4"
 mockito = "1.2"
-
-[profile.dev]
-opt-level = 0
-debug = true
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
 
 [[bin]]
 name = "notification-service"

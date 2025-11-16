@@ -28,7 +28,7 @@ pub struct Config {
 impl Config {
     /// Load configuration from environment variables
     pub fn from_env() -> Result<Self> {
-        dotenv::dotenv().ok(); // Load .env file if present
+        dotenvy::dotenv().ok(); // Load .env file if present
 
         Ok(Self {
             server: ServerConfig::from_env()?,

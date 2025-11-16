@@ -23,7 +23,7 @@ use crate::services::user_service::UserService;
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load environment variables
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     // Initialize tracing
     tracing_subscriber::fmt()
