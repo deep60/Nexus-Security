@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./interfaces/IBountyManager.sol";
-import "./interfaces/IReputationSystem.sol";
+import "../Interfaces/IBountyManager.sol";
+import "../Interfaces/IReputationSystem.sol";
 import "./ThreatToken.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title BountyManager
@@ -501,10 +502,4 @@ contract BountyManager is IBountyManager {
             IERC20(token).transfer(owner, amount);
         }
     }
-
-    // // Interface imports
-    // interface IERC20 {
-    //     function transfer(address to, uint256 amount) external returns (bool);
-    //     function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    // }
 }

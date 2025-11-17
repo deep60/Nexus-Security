@@ -3,7 +3,7 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./interfaces/IReputationSystem.sol";
+import "../Interfaces/IReputationSystem.sol";
 
 /**
  * @title ReputationSystem
