@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bounty-manager-config
+  namespace: nexus-security
+  labels:
+    app: bounty-manager
+    component: backend
+    service: bounty
+data:
+  # Blockchain contract addresses
+  bounty_contract_address: "0x0000000000000000000000000000000000000000"
+  token_contract_address: "0x0000000000000000000000000000000000000000"
+
+  # Network configuration
+  blockchain_network: "mainnet"
+
+  # Application configuration
+  config.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: 8083
+      workers: 4
+
+    bounty:
+      # Minimum bounty amount in tokens
+      min_reward: 10
+      # Maximum bounty amount
+      max_reward: 100000
+      # Platform fee percentage
+      platform_fee: 5
+      # Minimum stake for analysts
+      min_stake: 1
+      # Dispute resolution period in seconds
+      dispute_period: 604800  # 7 days
+      # Expiry grace period
+      expiry_grace_period: 86400  # 24 hours
+
+    consensus:
+      # Minimum analysts for consensus
+      min_analysts: 3
+      # Consensus threshold percentage
+      threshold: 66
+      # Maximum analysts per bounty
+      max_analysts: 10
+      # Staking requirements
+      require_stake: true
+
+    blockchain:
+      network: "mainnet"
+      gas_limit: 500000
+      gas_price_multiplier: 1.2
+      confirmation_blocks: 3
+      retry_attempts: 5
+      retry_delay: 5000  # ms
+
+    reputation:
+      # Points for correct analysis
+      correct_analysis_points: 10
+      # Points lost for incorrect analysis
+      incorrect_analysis_penalty: 5
+      # Bonus for early submission
+      early_submission_bonus: 2
+      # Minimum reputation to participate
+      min_reputation: 0
+
+    logging:
+      level: "info"
+      format: "json"
+
+    monitoring:
+      metrics_enabled: true
+      metrics_port: 9090
+
+    # Notification settings
+    notifications:
+      enabled: true
+      channels:
+        - email
+        - webhook
+      events:
+        - bounty_created
+        - bounty_claimed
+        - analysis_submitted
+        - consensus_reached
+        - reward_distributed
+        - dispute_raised
+
+  # Blockchain ABI for bounty contract (minimal example)
+  bounty_abi.json: |
+    [
+      {
+        "name": "createBounty",
+        "type": "function",
+        "inputs": [
+          {"name": "fileHash", "type": "bytes32"},
+          {"name": "rewardAmount", "type": "uint256"},
+          {"name": "expiry", "type": "uint256"}
+        ],
+        "outputs": [{"name": "bountyId", "type": "uint256"}]
+      },
+      {
+        "name": "submitAnalysis",
+        "type": "function",
+        "inputs": [
+          {"name": "bountyId", "type": "uint256"},
+          {"name": "verdict", "type": "uint8"},
+          {"name": "stakeAmount", "type": "uint256"}
+        ]
+      },
+      {
+        "name": "distributeRewards",
+        "type": "function",
+        "inputs": [
+          {"name": "bountyId", "type": "uint256"}
+        ]
+      },
+      {
+        "name": "BountyCreated",
+        "type": "event",
+        "inputs": [
+          {"name": "bountyId", "type": "uint256", "indexed": true},
+          {"name": "creator", "type": "address", "indexed": true},
+          {"name": "rewardAmount", "type": "uint256"}
+        ]
+      }
+    ]

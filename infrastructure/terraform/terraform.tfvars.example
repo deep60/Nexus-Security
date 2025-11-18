@@ -1,0 +1,39 @@
+# Nexus Security - Terraform Variables Example
+# Copy this file to terraform.tfvars and customize values
+
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Project Configuration
+project_name = "nexus-security"
+environment  = "development"  # development, staging, production
+
+# VPC Configuration
+vpc_cidr             = "10.0.0.0/16"
+private_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+public_subnet_cidrs  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+# EKS Configuration
+cluster_name       = "nexus-security-cluster"
+kubernetes_version = "1.28"
+node_instance_types = ["t3.large", "t3.xlarge"]
+min_node_count     = 2
+max_node_count     = 10
+desired_node_count = 3
+
+# RDS Configuration
+rds_instance_class        = "db.t3.medium"
+rds_allocated_storage     = 20
+rds_max_allocated_storage = 100
+
+# Redis Configuration
+redis_node_type = "cache.t3.medium"
+
+# Domain
+domain_name = "nexus-security.com"
+
+# Additional Tags
+additional_tags = {
+  Team        = "security"
+  CostCenter  = "engineering"
+}

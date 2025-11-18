@@ -1,0 +1,178 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bounty-manager
+  namespace: nexus-security
+  labels:
+    app: bounty-manager
+    component: backend
+    service: bounty
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: bounty-manager
+  template:
+    metadata:
+      labels:
+        app: bounty-manager
+        component: backend
+        service: bounty
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: bounty-manager-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+
+      containers:
+      - name: bounty-manager
+        image: nexus-security/bounty-manager:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: PORT
+          value: "8083"
+        - name: ENVIRONMENT
+          value: "production"
+
+        # Database
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: url
+
+        # Redis
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: nexus-redis-secret
+              key: redis_url
+
+        # Blockchain
+        - name: BLOCKCHAIN_RPC_URL
+          valueFrom:
+            secretKeyRef:
+              name: nexus-blockchain-secret
+              key: rpc_url
+        - name: PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nexus-blockchain-secret
+              key: private_key
+        - name: CONTRACT_ADDRESS_BOUNTY
+          valueFrom:
+            configMapKeyRef:
+              name: bounty-manager-config
+              key: bounty_contract_address
+        - name: CONTRACT_ADDRESS_TOKEN
+          valueFrom:
+            configMapKeyRef:
+              name: bounty-manager-config
+              key: token_contract_address
+
+        # Service discovery
+        - name: API_GATEWAY_URL
+          value: "http://nexus-api-gateway-service:8000"
+        - name: ANALYSIS_ENGINE_URL
+          value: "http://analysis-engine-service:8081"
+
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+      volumes:
+      - name: config-volume
+        configMap:
+          name: bounty-manager-config
+      - name: tmp-volume
+        emptyDir:
+          sizeLimit: 100Mi
+
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bounty-manager-hpa
+  namespace: nexus-security
+  labels:
+    app: bounty-manager
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bounty-manager
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

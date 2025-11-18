@@ -1,0 +1,288 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    build:
+      context: ../../..
+      dockerfile: infrastructure/docker/postgress.Dockerfile
+    container_name: nexus-postgres-prod
+    environment:
+      POSTGRES_DB: nexus_security
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../../database/migrations:/docker-entrypoint-initdb.d/migrations
+      - ../../../database/seeds:/docker-entrypoint-initdb.d/seeds
+    networks:
+      - nexus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus_security"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: nexus-redis-prod
+    volumes:
+      - redis_data:/data
+    networks:
+      - nexus-network
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ../../..
+      dockerfile: infrastructure/docker/production/api-gateway/api-gateway.Dockerfile
+    container_name: nexus-api-gateway-prod
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus_security
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL}
+      ANALYSIS_ENGINE_URL: http://analysis-engine:8082
+      BOUNTY_MANAGER_URL: http://bounty-manager:8083
+      RUST_LOG: info
+      PORT: 8080
+      ENVIRONMENT: production
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexus-network
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # Analysis Engine
+  analysis-engine:
+    build:
+      context: ../../..
+      dockerfile: infrastructure/docker/production/analysis-engine/analysis-engine.Dockerfile
+    container_name: nexus-analysis-engine-prod
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus_security
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      RUST_LOG: info
+      YARA_RULES_PATH: /app/rules
+      UPLOAD_DIR: /app/uploads
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-104857600}
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./uploads:/app/uploads
+      - ../../../backend/analysis-engine/rules:/app/rules
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexus-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # Bounty Manager
+  bounty-manager:
+    build:
+      context: ../../..
+      dockerfile: infrastructure/docker/production/bounty-manager/bounty-manager.Dockerfile
+    container_name: nexus-bounty-manager-prod
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus_security
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL}
+      RUST_LOG: info
+      PORT: 8083
+      ENVIRONMENT: production
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexus-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # Frontend
+  frontend:
+    build:
+      context: ../../..
+      dockerfile: infrastructure/docker/production/frontend/frontend.Dockerfile
+    container_name: nexus-frontend-prod
+    environment:
+      REACT_APP_API_URL: ${API_URL:-https://api.nexus-security.com}
+      REACT_APP_WS_URL: ${WS_URL:-wss://api.nexus-security.com}
+      REACT_APP_BLOCKCHAIN_NETWORK: ${BLOCKCHAIN_NETWORK:-mainnet}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-gateway
+    networks:
+      - nexus-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  # IPFS Node (for storing analysis reports)
+  ipfs:
+    image: ipfs/kubo:latest
+    container_name: nexus-ipfs-prod
+    ports:
+      - "4001:4001"
+      - "5001:5001"
+      - "8081:8080"
+    volumes:
+      - ipfs_data:/data/ipfs
+    networks:
+      - nexus-network
+    environment:
+      IPFS_PROFILE: server
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nexus-prometheus-prod
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - nexus-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.1'
+          memory: 256M
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nexus-grafana-prod
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://monitoring.nexus-security.com}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    networks:
+      - nexus-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  ipfs_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  nexus-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

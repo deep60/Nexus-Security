@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bounty-manager-service
+  namespace: nexus-security
+  labels:
+    app: bounty-manager
+    component: backend
+    service: bounty
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8083
+    targetPort: 8083
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: bounty-manager
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bounty-manager-sa
+  namespace: nexus-security
+  labels:
+    app: bounty-manager
+    component: backend
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: bounty-manager-role
+  namespace: nexus-security
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: bounty-manager-rolebinding
+  namespace: nexus-security
+subjects:
+- kind: ServiceAccount
+  name: bounty-manager-sa
+  namespace: nexus-security
+roleRef:
+  kind: Role
+  name: bounty-manager-role
+  apiGroup: rbac.authorization.k8s.io

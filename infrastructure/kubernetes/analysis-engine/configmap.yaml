@@ -1,0 +1,208 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: analysis-engine-config
+  namespace: nexus-security
+  labels:
+    app: analysis-engine
+    component: backend
+    service: analysis
+data:
+  # Redis configuration
+  redis-url: "redis://redis-service:6379"
+
+  # File size limits
+  max-file-size: "104857600"  # 100MB
+
+  # Analysis timeout in seconds
+  analysis-timeout: "300"
+
+  # Worker threads for parallel analysis
+  worker-threads: "4"
+
+  # API Gateway URL for callbacks
+  api-gateway-url: "http://nexus-api-gateway-service:8000"
+
+  # Application configuration
+  config.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: 8081
+      workers: 4
+
+    analysis:
+      max_file_size: 104857600  # 100MB
+      timeout: 300  # 5 minutes
+      max_concurrent: 10
+
+      # Supported file types
+      supported_types:
+        - "application/x-executable"
+        - "application/x-dosexec"
+        - "application/x-msdownload"
+        - "application/pdf"
+        - "application/zip"
+        - "application/x-rar"
+        - "application/x-7z-compressed"
+        - "text/x-python"
+        - "text/x-java"
+        - "application/javascript"
+        - "application/octet-stream"
+
+      # YARA rules configuration
+      yara:
+        rules_path: "/app/rules"
+        timeout: 60
+        max_strings_per_rule: 10000
+
+      # Static analysis settings
+      static_analysis:
+        enabled: true
+        extract_strings: true
+        min_string_length: 4
+        extract_imports: true
+        extract_exports: true
+        calculate_entropy: true
+        detect_packers: true
+
+      # Behavioral indicators
+      behavioral:
+        enabled: true
+        check_networking: true
+        check_registry: true
+        check_filesystem: true
+        check_process: true
+
+    storage:
+      temp_dir: "/tmp/analysis"
+      max_storage: 10737418240  # 10GB
+      cleanup_interval: 3600  # 1 hour
+
+    logging:
+      level: "info"
+      format: "json"
+
+    monitoring:
+      metrics_enabled: true
+      metrics_port: 9090
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yara-rules-config
+  namespace: nexus-security
+  labels:
+    app: analysis-engine
+    component: backend
+data:
+  # Sample YARA rules - in production, mount from persistent storage
+  malware_indicators.yar: |
+    rule SuspiciousStrings
+    {
+        meta:
+            description = "Detects suspicious strings commonly found in malware"
+            author = "Nexus Security"
+            severity = "medium"
+
+        strings:
+            $s1 = "cmd.exe" nocase
+            $s2 = "powershell" nocase
+            $s3 = "WScript.Shell" nocase
+            $s4 = "CreateObject" nocase
+            $s5 = "HKEY_CURRENT_USER" nocase
+            $s6 = "HKEY_LOCAL_MACHINE" nocase
+            $s7 = "RegWrite" nocase
+            $s8 = "Shell.Application" nocase
+
+        condition:
+            3 of them
+    }
+
+    rule PEFileCharacteristics
+    {
+        meta:
+            description = "Identifies PE files with suspicious characteristics"
+            author = "Nexus Security"
+            severity = "low"
+
+        condition:
+            uint16(0) == 0x5A4D and
+            filesize < 5MB
+    }
+
+    rule SuspiciousImports
+    {
+        meta:
+            description = "Detects suspicious API imports"
+            author = "Nexus Security"
+            severity = "high"
+
+        strings:
+            $api1 = "VirtualAlloc" ascii
+            $api2 = "VirtualProtect" ascii
+            $api3 = "CreateRemoteThread" ascii
+            $api4 = "WriteProcessMemory" ascii
+            $api5 = "NtUnmapViewOfSection" ascii
+            $api6 = "RtlMoveMemory" ascii
+
+        condition:
+            3 of them
+    }
+
+    rule CryptoIndicators
+    {
+        meta:
+            description = "Detects crypto-related strings (potential ransomware)"
+            author = "Nexus Security"
+            severity = "critical"
+
+        strings:
+            $btc = /[13][a-km-zA-HJ-NP-Z1-9]{25,34}/ ascii
+            $xmr = /4[0-9AB][1-9A-HJ-NP-Za-km-z]{93}/ ascii
+            $ransom1 = "Your files have been encrypted" nocase
+            $ransom2 = "bitcoin" nocase
+            $ransom3 = "decrypt" nocase
+            $ransom4 = "ransom" nocase
+
+        condition:
+            ($btc or $xmr) and 2 of ($ransom*)
+    }
+
+  network_indicators.yar: |
+    rule NetworkActivity
+    {
+        meta:
+            description = "Detects network-related functionality"
+            author = "Nexus Security"
+            severity = "medium"
+
+        strings:
+            $net1 = "socket" nocase
+            $net2 = "connect" nocase
+            $net3 = "WSAStartup" ascii
+            $net4 = "gethostbyname" ascii
+            $net5 = "InternetOpen" ascii
+            $net6 = "HttpOpenRequest" ascii
+            $net7 = "URLDownloadToFile" ascii
+
+        condition:
+            3 of them
+    }
+
+    rule SuspiciousURLs
+    {
+        meta:
+            description = "Detects suspicious URL patterns"
+            author = "Nexus Security"
+            severity = "high"
+
+        strings:
+            $url1 = /https?:\/\/[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/ ascii
+            $url2 = ".onion" ascii
+            $url3 = "pastebin.com" ascii
+            $url4 = "bit.ly" ascii
+
+        condition:
+            any of them
+    }
