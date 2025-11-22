@@ -1,0 +1,57 @@
+# Rust build artifacts
+target/
+**/target/
+**/*.rs.bk
+
+# Cargo lock files (we copy this explicitly)
+# Cargo.lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker files
+docker-compose.yml
+*/Dockerfile
+.dockerignore
+
+# Documentation
+README.md
+docs/
+
+# Environment files (sensitive)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.db
+*.sqlite
+
+# Node modules (if any frontend)
+node_modules/
+dist/
+build/
+
+# Test coverage
+coverage/
+*.profraw
+
+# Temporary files
+tmp/
+temp/

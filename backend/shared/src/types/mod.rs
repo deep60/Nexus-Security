@@ -12,10 +12,6 @@
 //! - Error types and validation utilities
 
 pub mod common;
-pub mod bounty;
-
-// Re-export bounty types
-pub use bounty::{BountyStatus, ThreatVerdict, ArtifactType, PriorityLevel, SeverityLevel};
 
 // Re-export commonly used types for easier imports
 pub use common::{

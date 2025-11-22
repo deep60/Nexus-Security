@@ -16,3 +16,14 @@ uuid = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+
+# Database dependencies
+sqlx = { workspace = true }
+redis = { workspace = true }
+tokio = { workspace = true }
+
+# Decimal arithmetic
+rust_decimal = { version = "1.33", features = ["serde-with-str"] }
+
+# Async trait support
+async-trait = "0.1"

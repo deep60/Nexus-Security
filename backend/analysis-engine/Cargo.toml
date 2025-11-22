@@ -31,5 +31,5 @@ hex = "0.4"  # For hex conversions
 tokio-test.workspace = true
 blake2 = "0.10.6"
 sha3 = "0.10.8"
-ort = "1.16.3"
+ort = "2.0.0-rc.10"
 ndarray = "0.16.1"

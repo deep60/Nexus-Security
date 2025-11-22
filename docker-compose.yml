@@ -1,296 +1,109 @@
-version: '3.8'
-
 services:
-  # ==================== DATABASES ====================
+  # PostgreSQL Database
   postgres:
-    image: postgres:15
-    container_name: nexus_postgres
+    image: postgres:16-alpine
+    container_name: nexus-postgres
     environment:
+      POSTGRES_USER: nexus_user
+      POSTGRES_PASSWORD: nexus_password
       POSTGRES_DB: nexus_security
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/postgres/migrations:/docker-entrypoint-initdb.d
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - nexus-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U nexus_user -d nexus_security"]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-    networks:
-      - nexus_network
 
-  mongodb:
-    image: mongo:7
-    container_name: nexus_mongodb
-    environment:
-      MONGO_INITDB_DATABASE: nexus_security
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-      - ./database/mongodb/init:/docker-entrypoint-initdb.d
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - nexus_network
-
+  # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: nexus_redis
-    command: redis-server /usr/local/etc/redis/redis.conf
+    container_name: nexus-redis
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-      - ./database/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - nexus-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-    networks:
-      - nexus_network
 
-  # ==================== MESSAGE QUEUE ====================
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: nexus_rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    ports:
-      - "5672:5672"   # AMQP
-      - "15672:15672" # Management UI
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - nexus_network
-
-  # ==================== STORAGE ====================
-  minio:
-    image: minio/minio:latest
-    container_name: nexus_minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000" # API
-      - "9001:9001" # Console
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - nexus_network
-
-  # ==================== BACKEND SERVICES ====================
+  # API Gateway Service
   api-gateway:
     build:
       context: ./backend
       dockerfile: ./api-gateway/Dockerfile
-    container_name: nexus_api_gateway
+    container_name: nexus-api-gateway
     ports:
       - "8080:8080"
-    env_file:
-      - .env
+    environment:
+      - RUST_LOG=info
+      - DATABASE_URL=postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      - REDIS_URL=redis://redis:6379
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
     networks:
-      - nexus_network
+      - nexus-network
+    restart: unless-stopped
 
+  # User Service
   user-service:
     build:
       context: ./backend
       dockerfile: ./user-service/Dockerfile
-    container_name: nexus_user_service
+    container_name: nexus-user-service
     ports:
-      - "8081:8081"
-    env_file:
-      - .env
+      - "8081:8080"
+    environment:
+      - RUST_LOG=info
+      - DATABASE_URL=postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      - REDIS_URL=redis://redis:6379
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
     depends_on:
       postgres:
         condition: service_healthy
-    restart: unless-stopped
+      redis:
+        condition: service_healthy
     networks:
-      - nexus_network
+      - nexus-network
+    restart: unless-stopped
 
-  analysis-engine:
-    build:
-      context: ./backend
-      dockerfile: ./analysis-engine/Dockerfile
-    container_name: nexus_analysis_engine
+  # PgAdmin (Optional - for database management)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: nexus-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@nexus-security.io
+      PGADMIN_DEFAULT_PASSWORD: admin
     ports:
-      - "8082:8082"
-    env_file:
-      - .env
+      - "5050:80"
     depends_on:
-      postgres:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    restart: unless-stopped
+      - postgres
     networks:
-      - nexus_network
+      - nexus-network
+    restart: unless-stopped
 
-  bounty-manager:
-    build:
-      context: ./backend
-      dockerfile: ./bounty-manager/Dockerfile
-    container_name: nexus_bounty_manager
-    ports:
-      - "8083:8083"
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - nexus_network
-
-  notification-service:
-    build:
-      context: ./backend
-      dockerfile: ./notification-service/Dockerfile
-    container_name: nexus_notification_service
-    ports:
-      - "8084:8084"
-    env_file:
-      - .env
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - nexus_network
-
-  submission-service:
-    build:
-      context: ./backend
-      dockerfile: ./submission-service/Dockerfile
-    container_name: nexus_submission_service
-    ports:
-      - "8085:8085"
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - nexus_network
-
-  reputation-service:
-    build:
-      context: ./backend
-      dockerfile: ./reputation-service/Dockerfile
-    container_name: nexus_reputation_service
-    ports:
-      - "8086:8086"
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - nexus_network
-
-  consensus-service:
-    build:
-      context: ./backend
-      dockerfile: ./consensus-service/Dockerfile
-    container_name: nexus_consensus_service
-    ports:
-      - "8087:8087"
-    env_file:
-      - .env
-    depends_on:
-      mongodb:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - nexus_network
-
-  payment-service:
-    build:
-      context: ./backend
-      dockerfile: ./payment-service/Dockerfile
-    container_name: nexus_payment_service
-    ports:
-      - "8088:8088"
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - nexus_network
-
-  # ==================== FRONTEND ====================
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: nexus_frontend
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    depends_on:
-      - api-gateway
-    restart: unless-stopped
-    networks:
-      - nexus_network
+networks:
+  nexus-network:
+    driver: bridge
 
 volumes:
   postgres_data:
-  mongodb_data:
   redis_data:
-  rabbitmq_data:
-  minio_data:
-
-networks:
-  nexus_network:
-    driver: bridge
