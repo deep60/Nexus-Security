@@ -62,12 +62,12 @@ pub use payout::{
 };
 
 pub use reputation_handler::{
-    ReputationUpdate,
-    ReputationMetrics,
-    update_engine_reputation,
-    get_engine_reputation,
-    calculate_accuracy_score,
-    get_reputation_leaderboard,
+    EngineReputation,
+    ReputationTier,
+    ThreatCategory,
+    ReputationUpdateRequest,
+    ReputationLeaderboard,
+    // TODO: Add more exports as handlers are implemented
 };
 
 pub use dispute::{

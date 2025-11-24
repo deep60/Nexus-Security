@@ -105,7 +105,7 @@ impl UserService {
         let verification_token = self.auth_service.generate_verification_token();
         let token_key = format!("email_verification:{}", user.id);
         let mut conn = self.redis_conn.clone();
-        conn.set_ex(&token_key, &verification_token, 3600 * 24) // 24 hours
+        conn.set_ex::<_, _, ()>(&token_key, &verification_token, 3600 * 24) // 24 hours
             .await
             .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 
@@ -163,11 +163,11 @@ impl UserService {
                 UserError::AuthenticationError("2FA code required".to_string())
             )?;
 
-            let secret = user.two_factor_secret.ok_or(
+            let secret = user.two_factor_secret.as_ref().ok_or(
                 UserError::DatabaseError("2FA secret not found".to_string())
             )?;
 
-            if !self.auth_service.verify_2fa_code(&secret, &code)? {
+            if !self.auth_service.verify_2fa_code(secret, &code)? {
                 return Err(UserError::AuthenticationError("Invalid 2FA code".to_string()));
             }
         }
@@ -197,7 +197,7 @@ impl UserService {
         // Store refresh token in Redis
         let session_key = format!("session:{}", user.id);
         let mut conn = self.redis_conn.clone();
-        conn.set_ex(&session_key, &refresh_token, self.config.redis.session_ttl_seconds)
+        conn.set_ex::<_, _, ()>(&session_key, &refresh_token, self.config.redis.session_ttl_seconds)
             .await
             .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 
@@ -214,7 +214,7 @@ impl UserService {
         let session_key = format!("session:{}", user_id);
         let mut conn = self.redis_conn.clone();
 
-        conn.del(&session_key)
+        conn.del::<_, ()>(&session_key)
             .await
             .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 
@@ -269,7 +269,7 @@ impl UserService {
         )?;
 
         // Update session in Redis
-        conn.set_ex(&session_key, &new_refresh_token, self.config.redis.session_ttl_seconds)
+        conn.set_ex::<_, _, ()>(&session_key, &new_refresh_token, self.config.redis.session_ttl_seconds)
             .await
             .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 
@@ -302,7 +302,7 @@ impl UserService {
             .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 
         // Delete token
-        conn.del(&token_key)
+        conn.del::<_, ()>(&token_key)
             .await
             .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 

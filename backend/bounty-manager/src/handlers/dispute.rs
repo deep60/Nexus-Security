@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
-use shared::types::common::{ApiResponse, PaginationParams};
+use shared::types::ApiResponse;
+use super::bounty_crud::PaginationParams;
 use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
 
 /// Represents a dispute raised against a submission or bounty outcome
@@ -300,14 +301,7 @@ pub async fn create_dispute(
     // TODO: Emit dispute created event
     // TODO: Notify relevant parties
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(dispute),
-        message: Some("Dispute created successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(dispute)))
 }
 
 /// Get a specific dispute by ID
@@ -318,14 +312,7 @@ pub async fn get_dispute(
     // TODO: Fetch from database
     let mock_dispute = create_mock_dispute(dispute_id);
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(mock_dispute),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(mock_dispute)))
 }
 
 /// List disputes with filters and pagination
@@ -350,14 +337,7 @@ pub async fn list_disputes(
         per_page,
     };
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(response_data),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(response_data)))
 }
 
 /// Update a dispute (add evidence, change status)
@@ -399,14 +379,7 @@ pub async fn update_dispute(
     // TODO: Save to database
     // TODO: Emit update event
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(dispute),
-        message: Some("Dispute updated successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(dispute)))
 }
 
 /// Resolve a dispute (admin/arbitrator only)
@@ -456,14 +429,7 @@ pub async fn resolve_dispute(
     // TODO: Emit resolution event
     // TODO: Notify all parties
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(dispute),
-        message: Some("Dispute resolved successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(dispute)))
 }
 
 /// Vote on a dispute (for community governance)
@@ -504,14 +470,7 @@ pub async fn vote_on_dispute(
     // TODO: Check if voting threshold reached
     // TODO: If threshold reached, automatically resolve
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(dispute),
-        message: Some("Vote recorded successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(dispute)))
 }
 
 /// Withdraw a dispute (disputer only)
@@ -540,14 +499,7 @@ pub async fn withdraw_dispute(
     // TODO: Return stake to disputer
     // TODO: Emit withdrawal event
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(dispute),
-        message: Some("Dispute withdrawn successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(dispute)))
 }
 
 /// Get dispute statistics
@@ -569,14 +521,7 @@ pub async fn get_dispute_stats(
         disputes_by_type,
     };
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(stats),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(stats)))
 }
 
 // Helper function for mock data

@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
-use shared::types::common::{ApiResponse, PaginationParams};
+use shared::types::ApiResponse;
+use super::bounty_crud::PaginationParams;
 use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
 use crate::handlers::submission::{Submission, AnalysisDetails};
 
@@ -246,14 +247,7 @@ pub async fn validate_submission(
     // TODO: Update submission status based on validation
     // TODO: Emit validation event
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(validation_result),
-        message: Some("Validation completed successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(validation_result)))
 }
 
 /// Get validation result for a submission
@@ -264,14 +258,7 @@ pub async fn get_validation_result(
     // TODO: Fetch from database
     let mock_result = create_mock_validation_result(validation_id);
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(mock_result),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(mock_result)))
 }
 
 /// List validation results with filters
@@ -296,14 +283,7 @@ pub async fn list_validations(
         per_page,
     };
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(response_data),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(response_data)))
 }
 
 /// Bulk validate multiple submissions
@@ -348,14 +328,7 @@ pub async fn bulk_validate_submissions(
     // TODO: Save all validation results to database
     // TODO: Emit bulk validation event
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(response_data),
-        message: Some(format!("Validated {} submissions", req.submission_ids.len())),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(response_data)))
 }
 
 /// Get validation statistics
@@ -388,14 +361,7 @@ pub async fn get_validation_stats(
         ],
     };
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(stats),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(stats)))
 }
 
 /// Re-validate a submission (admin only)
@@ -414,14 +380,7 @@ pub async fn revalidate_submission(
     // TODO: Save validation result
     // TODO: Update submission status
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(validation_result),
-        message: Some("Re-validation completed".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(validation_result)))
 }
 
 // Core validation logic

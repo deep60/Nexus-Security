@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::config::JwtConfig;
 use crate::models::{UserError, UserResult};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,        // User ID
     pub email: String,
@@ -124,7 +124,7 @@ impl AuthService {
 
         decode::<Claims>(token, &self.decoding_key, &validation)
             .map(|data| data.claims)
-            .map_err(|e| UserError::InvalidToken)
+            .map_err(|_e| UserError::InvalidToken)
     }
 
     /// Verify Ethereum wallet signature

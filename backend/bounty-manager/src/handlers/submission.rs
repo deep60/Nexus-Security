@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
-use shared::types::common::{ApiResponse, PaginationParams};
+use shared::types::ApiResponse;
+use super::bounty_crud::PaginationParams;
 use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -217,14 +218,7 @@ pub async fn submit_analysis(
     // TODO: Emit real-time event
     // TODO: Check if consensus threshold is reached
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(submission),
-        message: Some("Analysis submitted successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(submission)))
 }
 
 pub async fn get_submission(
@@ -234,14 +228,7 @@ pub async fn get_submission(
     // TODO: Fetch from database
     let mock_submission = create_mock_submission(submission_id);
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(mock_submission),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(mock_submission)))
 }
 
 pub async fn list_submissions_for_bounty(
@@ -281,14 +268,7 @@ pub async fn list_submissions_for_bounty(
         per_page,
     };
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(response_data),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(response_data)))
 }
 
 pub async fn update_submission_status(
@@ -304,14 +284,7 @@ pub async fn update_submission_status(
     submission.status = status;
     submission.processed_at = Some(Utc::now());
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(submission),
-        message: Some("Submission status updated".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(submission)))
 }
 
 // Helper function for mock data

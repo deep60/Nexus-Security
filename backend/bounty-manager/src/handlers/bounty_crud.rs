@@ -6,10 +6,18 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
-use shared::types::common::{ApiResponse, PaginationParams};
+use shared::types::ApiResponse;
 use crate::services::reputation::ReputationService;
+
+// Common types
+#[derive(Debug, Deserialize)]
+pub struct PaginationParams {
+    pub page: Option<u32>,
+    pub per_page: Option<u32>,
+}
 
 // Bounty-related types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,7 +155,7 @@ pub struct CurrencyStats {
 #[derive(Clone)]
 pub struct BountyManagerState {
     // Database connection pool, blockchain client, etc.
-    pub reputation_service: ReputationService,
+    pub reputation_service: Arc<ReputationService>,
 }
 
 // Handler implementations
@@ -194,14 +202,7 @@ pub async fn create_bounty(
     // TODO: Create blockchain transaction for bounty creation
     // TODO: Emit event for real-time updates
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(bounty),
-        message: Some("Bounty created successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(bounty)))
 }
 
 pub async fn get_bounty(
@@ -212,14 +213,7 @@ pub async fn get_bounty(
     // For now, return a mock bounty
     let mock_bounty = create_mock_bounty(bounty_id);
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(mock_bounty),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(mock_bounty)))
 }
 
 pub async fn list_bounties(
@@ -242,14 +236,7 @@ pub async fn list_bounties(
         has_more: false, // TODO: Calculate based on actual data
     };
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(response_data),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(response_data)))
 }
 
 pub async fn update_bounty(
@@ -291,14 +278,7 @@ pub async fn update_bounty(
     // TODO: Save to database
     // TODO: Emit update event
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(bounty),
-        message: Some("Bounty updated successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(bounty)))
 }
 
 pub async fn cancel_bounty(
@@ -309,15 +289,8 @@ pub async fn cancel_bounty(
     // TODO: Fetch bounty and verify ownership
     // TODO: Check if bounty can be cancelled
     // TODO: Handle refunds and blockchain transactions
-    
-    let response = ApiResponse {
-        success: true,
-        data: Some(()),
-        message: Some("Bounty cancelled successfully".to_string()),
-        errors: None,
-    };
 
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(())))
 }
 
 pub async fn get_bounty_stats(
@@ -344,14 +317,7 @@ pub async fn get_bounty_stats(
         ],
     };
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(stats),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(stats)))
 }
 
 pub async fn submit_to_bounty(
@@ -375,14 +341,7 @@ pub async fn submit_to_bounty(
         stake_transaction_hash: "0x...".to_string(), // Mock transaction hash
     };
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(response_data),
-        message: Some("Submission recorded successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(response_data)))
 }
 
 // Helper types for submission

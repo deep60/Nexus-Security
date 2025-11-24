@@ -68,7 +68,7 @@ pub enum ReputationTier {
     Diamond,  // 801-1000
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ThreatCategory {
     Malware,
     Phishing,

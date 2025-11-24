@@ -7,6 +7,7 @@ mod middleware;
 
 use anyhow::Result;
 use axum::{
+    middleware as axum_middleware,
     routing::{get, post, put, delete},
     Router,
 };
@@ -18,6 +19,7 @@ use tower_http::{
 use tracing::info;
 
 use crate::config::Config;
+use crate::middleware::{auth_middleware, admin_middleware};
 use crate::services::user_service::UserService;
 
 #[tokio::main]
@@ -46,9 +48,16 @@ async fn main() -> Result<()> {
         .await?;
     info!("Database connection pool established");
 
-    // Run migrations
-    sqlx::migrate!("./migrations").run(&db_pool).await?;
-    info!("Database migrations completed");
+    // Run migrations (if migrations directory exists and has migrations)
+    // Note: Database schema is managed centrally in /database folder
+    if std::path::Path::new("./migrations").exists() {
+        match sqlx::migrate!("./migrations").run(&db_pool).await {
+            Ok(_) => info!("Database migrations completed"),
+            Err(e) => info!("No migrations to run or already applied: {}", e),
+        }
+    } else {
+        info!("Migrations directory not found - using centralized database schema");
+    }
 
     // Initialize Redis client for sessions
     let redis_client = redis::Client::open(config.redis.url.clone())?;
@@ -80,26 +89,27 @@ async fn main() -> Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // Build router
-    let app = Router::new()
+    // Public routes (no authentication required)
+    let public_routes = Router::new()
         .route("/health", get(handlers::health::health_check))
-        
-        // Authentication endpoints
         .route("/api/v1/auth/register", post(handlers::auth::register))
         .route("/api/v1/auth/login", post(handlers::auth::login))
-        .route("/api/v1/auth/logout", post(handlers::auth::logout))
         .route("/api/v1/auth/refresh", post(handlers::auth::refresh_token))
-        .route("/api/v1/auth/verify-email", post(handlers::auth::verify_email))
         .route("/api/v1/auth/forgot-password", post(handlers::auth::forgot_password))
-        .route("/api/v1/auth/reset-password", post(handlers::auth::reset_password))
+        .route("/api/v1/auth/reset-password", post(handlers::auth::reset_password));
+
+    // Protected routes (authentication required)
+    let protected_routes = Router::new()
+        .route("/api/v1/auth/logout", post(handlers::auth::logout))
+        .route("/api/v1/auth/verify-email", post(handlers::auth::verify_email))
         .route("/api/v1/auth/wallet/verify", post(handlers::auth::verify_wallet))
-        
+
         // Profile endpoints
         .route("/api/v1/profile", get(handlers::profile::get_profile))
         .route("/api/v1/profile", put(handlers::profile::update_profile))
         .route("/api/v1/profile/avatar", post(handlers::profile::upload_avatar))
         .route("/api/v1/profile/:user_id", get(handlers::profile::get_user_profile))
-        
+
         // Settings endpoints
         .route("/api/v1/settings", get(handlers::settings::get_settings))
         .route("/api/v1/settings", put(handlers::settings::update_settings))
@@ -107,25 +117,33 @@ async fn main() -> Result<()> {
         .route("/api/v1/settings/2fa/enable", post(handlers::settings::enable_2fa))
         .route("/api/v1/settings/2fa/disable", post(handlers::settings::disable_2fa))
         .route("/api/v1/settings/2fa/verify", post(handlers::settings::verify_2fa))
-        
+
         // KYC endpoints
         .route("/api/v1/kyc/submit", post(handlers::kyc::submit_kyc))
         .route("/api/v1/kyc/status", get(handlers::kyc::get_kyc_status))
         .route("/api/v1/kyc/documents", post(handlers::kyc::upload_documents))
-        
+
         // Wallet endpoints
         .route("/api/v1/wallet/link", post(handlers::wallet::link_wallet))
         .route("/api/v1/wallet/unlink", delete(handlers::wallet::unlink_wallet))
         .route("/api/v1/wallet/list", get(handlers::wallet::list_wallets))
-        
-        // Admin endpoints
+        .layer(axum_middleware::from_fn_with_state(app_state.clone(), auth_middleware));
+
+    // Admin routes (admin role required)
+    let admin_routes = Router::new()
         .route("/api/v1/admin/users", get(handlers::admin::list_users))
         .route("/api/v1/admin/users/:user_id", get(handlers::admin::get_user))
         .route("/api/v1/admin/users/:user_id/suspend", post(handlers::admin::suspend_user))
         .route("/api/v1/admin/users/:user_id/activate", post(handlers::admin::activate_user))
         .route("/api/v1/admin/kyc/:user_id/approve", post(handlers::admin::approve_kyc))
         .route("/api/v1/admin/kyc/:user_id/reject", post(handlers::admin::reject_kyc))
-        
+        .layer(axum_middleware::from_fn_with_state(app_state.clone(), admin_middleware));
+
+    // Combine all routes
+    let app = Router::new()
+        .merge(public_routes)
+        .merge(protected_routes)
+        .merge(admin_routes)
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);

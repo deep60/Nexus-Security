@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
-use shared::types::common::{ApiResponse, PaginationParams};
+use shared::types::ApiResponse;
+use super::bounty_crud::PaginationParams;
 use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
 use crate::handlers::submission::{Submission, SubmissionStatus};
 
@@ -188,14 +189,7 @@ pub async fn process_bounty_completion(
     // TODO: Save payout info to database
     // TODO: Start async payout processing
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(payout_info),
-        message: Some("Payout processing initiated".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(payout_info)))
 }
 
 pub async fn distribute_rewards(
@@ -229,14 +223,7 @@ pub async fn distribute_rewards(
     payout_info.status = PayoutStatus::Completed;
     payout_info.completed_at = Some(Utc::now());
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(payout_info),
-        message: Some("Rewards distributed successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(payout_info)))
 }
 
 pub async fn handle_stake_slashing(
@@ -258,14 +245,7 @@ pub async fn handle_stake_slashing(
         },
     ];
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(slashed_stakes),
-        message: Some("Stakes slashed successfully".to_string()),
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(slashed_stakes)))
 }
 
 pub async fn get_payout_history(
@@ -281,14 +261,7 @@ pub async fn get_payout_history(
         create_mock_payout_info(Uuid::new_v4()),
     ];
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(payouts),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(payouts)))
 }
 
 pub async fn get_payout_summary(
@@ -306,14 +279,7 @@ pub async fn get_payout_summary(
         average_confidence: 0.82,
     };
 
-    let response = ApiResponse {
-        success: true,
-        data: Some(summary),
-        message: None,
-        errors: None,
-    };
-
-    Ok(Json(response))
+    Ok(Json(ApiResponse::success(summary)))
 }
 
 // Internal helper functions for consensus calculation
@@ -338,13 +304,14 @@ pub fn calculate_weighted_consensus(submissions: &[Submission], reputation_weigh
     }
 
     // Find consensus verdict
+    let unknown_str = "Unknown".to_string();
     let (consensus_verdict_str, consensus_score) = verdict_scores
         .iter()
         .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-        .unwrap_or((&"Unknown".to_string(), &0.0));
+        .unwrap_or((&unknown_str, &0.0));
 
     let consensus_confidence = consensus_score / total_weight;
-    
+
     let consensus_verdict = match consensus_verdict_str.as_str() {
         "Malicious" => ThreatVerdict::Malicious,
         "Benign" => ThreatVerdict::Benign,

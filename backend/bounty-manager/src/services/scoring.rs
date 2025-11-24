@@ -300,7 +300,7 @@ impl ScoringService {
         confidence: f32,
         severity: PenaltySeverity,
     ) -> u64 {
-        let base_penalty = match severity {
+        let base_penalty: f32 = match severity {
             PenaltySeverity::Minor => 0.10,      // 10% slash
             PenaltySeverity::Moderate => 0.25,   // 25% slash
             PenaltySeverity::Severe => 0.50,     // 50% slash
@@ -308,13 +308,13 @@ impl ScoringService {
         };
 
         // Increase penalty for high confidence incorrect submissions
-        let confidence_multiplier = if confidence > 0.8 {
+        let confidence_multiplier: f32 = if confidence > 0.8 {
             1.5 // Penalize overconfidence
         } else {
             1.0
         };
 
-        let penalty_rate = (base_penalty * confidence_multiplier).min(1.0);
+        let penalty_rate = (base_penalty * confidence_multiplier).min(1.0_f32);
         (stake_amount as f32 * penalty_rate) as u64
     }
 
