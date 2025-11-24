@@ -18,7 +18,7 @@ use crate::utils::crypto::{hash_password, verify_password};
 use crate::utils::{ApiError, ApiResult};
 use crate::{AppState, ApiResponse};
 
-pub fn auth_routes() -> Router<std::sync::Arc<AppState>> {
+pub fn auth_routes() -> Router<AppState> {
     Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
@@ -102,9 +102,9 @@ impl From<User> for UserResponse {
 }
 
 pub async fn register(
-    State(state): State<AppState>, 
+    State(state): State<AppState>,
     Json(payload): Json<RegisterRequest>,
-) -> Result<Json<ApiResponse<AuthResponse>>, StatusCode> {
+) -> ApiResult<Json<ApiResponse<AuthResponse>>> {
     // Validate input
 
     if payload.username.is_empty() || payload.email.is_empty() || payload.password.len() < 8 {
@@ -150,7 +150,7 @@ pub async fn register(
     .await?;
 
     // Generate Tokens
-    let (access_token, refresh_token) = generate_tokens(&user, &state.jwt_secret)?;
+    let (access_token, refresh_token) = generate_tokens(&user, &state.config.security.jwt_secret)?;
 
     let response = AuthResponse {
         user: user.into(),
@@ -163,7 +163,7 @@ pub async fn register(
 }
 
 pub async fn login(
-    State(state): State<Arc<AppState>>, 
+    State(state): State<AppState>, 
     Json(payload): Json<LoginRequest>,
 ) -> ApiResult<Json<ApiResponse<AuthResponse>>> {
     // Find user by username or email
@@ -188,7 +188,7 @@ pub async fn login(
         .await?;
 
     // Generate Tokens
-    let (access_token, refresh_token) = generate_tokens(&user, &state.jwt_secret)?;
+    let (access_token, refresh_token) = generate_tokens(&user, &state.config.security.jwt_secret)?;
 
     let response = AuthResponse {
         user: user.into(),
@@ -202,14 +202,14 @@ pub async fn login(
 
 pub async fn logout(
     headers: HeaderMap,
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
 ) -> ApiResult<Json<ApiResponse<()>>> {
     // Extract token from header
     let token = extract_token_from_header(&headers)?;
 
     // Add token to blacklist (you might want to implement a Redis-based blacklist)
     // For now, we'll just return success
-    
+
     Ok(Json(ApiResponse::success_with_message(
         (),
         "Successfully logged out".to_string(),
@@ -217,11 +217,11 @@ pub async fn logout(
 }
 
 pub async fn refresh_token(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Json(payload): Json<RefreshTokenRequest>,
 ) -> ApiResult<Json<ApiResponse<AuthResponse>>> {
     // Decode refresh token
-    let claims = decode_token(&payload.refresh_token, &state.jwt_secret)?;
+    let claims = decode_token(&payload.refresh_token, &state.config.security.jwt_secret)?;
     
     // Get user from database
     let user_id = Uuid::parse_str(&claims.sub)
@@ -234,7 +234,7 @@ pub async fn refresh_token(
         .ok_or(ApiError::Unauthorized)?;
 
     // Generate new tokens
-    let (access_token, refresh_token) = generate_tokens(&user, &state.jwt_secret)?;
+    let (access_token, refresh_token) = generate_tokens(&user, &state.config.security.jwt_secret)?;
 
     let response = AuthResponse {
         user: user.into(),
@@ -248,10 +248,10 @@ pub async fn refresh_token(
 
 pub async fn verify_token(
     headers: HeaderMap, 
-    State(state): State<Arc<AppState>>, 
+    State(state): State<AppState>, 
 ) -> ApiResult<Json<ApiResponse<UserResponse>>> {
     let token = extract_token_from_header(&headers)?;
-    let claims = decode_token(&token, &state.jwt_secret)?;
+    let claims = decode_token(&token, &state.config.security.jwt_secret)?;
 
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| ApiError::BadRequest("Invalid user ID in token".to_string()))?;
@@ -267,7 +267,7 @@ pub async fn verify_token(
 
 pub async fn get_profile(
     headers: HeaderMap, 
-    State(state): State<Arc<AppState>>, 
+    State(state): State<AppState>, 
 ) -> ApiResult<Json<ApiResponse<UserResponse>>> {
     let user = authenticate_user(&headers, &state).await?;
     Ok(Json(ApiResponse::success(user.into())))
@@ -275,7 +275,7 @@ pub async fn get_profile(
 
 pub async fn collect_wallet(
     headers: HeaderMap,
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Json(payload): Json<WalletConnectRequest>,
 ) -> ApiResult<Json<ApiResponse<UserResponse>>> {
     let mut user = authenticate_user(&headers, &state).await?;
@@ -299,7 +299,7 @@ pub async fn collect_wallet(
 
 pub async fn disconnect_wallet(
     headers: HeaderMap,
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
 ) -> ApiResult<Json<ApiResponse<UserResponse>>> {
     let mut user = authenticate_user(&headers, &state).await?;
     user.wallet_address = None;
@@ -367,9 +367,9 @@ fn extract_token_from_header(headers: &HeaderMap) -> ApiResult<String> {
     Ok(auth_header[7..].to_string())
 }
 
-async fn authenticate_user(headers: &HeaderMap, state: &Arc<AppState>) -> ApiResult<User> {
+async fn authenticate_user(headers: &HeaderMap, state: &AppState) -> ApiResult<User> {
     let token = extract_token_from_header(headers)?;
-    let claims = decode_token(&token, &state.jwt_secret)?;
+    let claims = decode_token(&token, &state.config.security.jwt_secret)?;
 
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| ApiError::BadRequest("Invalid user ID in token".to_string()))?;

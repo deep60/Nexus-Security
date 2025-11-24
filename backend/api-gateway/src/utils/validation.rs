@@ -1,9 +1,9 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::net::IpAddr;
 use thiserror::Error;
 use url::Url;
-use std::net::IpAddr;
 
 #[derive(Error, Debug)]
 pub enum ValidationError {
@@ -16,7 +16,10 @@ pub enum ValidationError {
     #[error("Invalid file size: {size} bytes (max: {max_size} bytes)")]
     InvalidFileSize { size: u64, max_size: u64 },
     #[error("Invalid file type: {file_type} (allowed: {allowed:?})")]
-    InvalidFileType { file_type: String, allowed: Vec<String> },
+    InvalidFileType {
+        file_type: String,
+        allowed: Vec<String>,
+    },
     #[error("Invalid ethereum address: {0}")]
     InvalidEthereumAddress(String),
     #[error("Invalid bounty amount: {0}")]
@@ -56,11 +59,21 @@ impl Default for FileValidationRules {
         Self {
             max_size_mb: 100, // 100MB default
             allowed_extensions: vec![
-                "exe".to_string(), "dll".to_string(), "pdf".to_string(),
-                "doc".to_string(), "docx".to_string(), "zip".to_string(),
-                "rar".to_string(), "7z".to_string(), "tar".to_string(),
-                "gz".to_string(), "bin".to_string(), "apk".to_string(),
-                "ipa".to_string(), "msi".to_string(), "dmg".to_string(),
+                "exe".to_string(),
+                "dll".to_string(),
+                "pdf".to_string(),
+                "doc".to_string(),
+                "docx".to_string(),
+                "zip".to_string(),
+                "rar".to_string(),
+                "7z".to_string(),
+                "tar".to_string(),
+                "gz".to_string(),
+                "bin".to_string(),
+                "apk".to_string(),
+                "ipa".to_string(),
+                "msi".to_string(),
+                "dmg".to_string(),
             ],
             allowed_mime_types: vec![
                 "application/octet-stream".to_string(),
@@ -78,8 +91,8 @@ impl Default for FileValidationRules {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BountyValidationRules {
-    pub min_amount_wei: u64,
-    pub max_amount_wei: u64,
+    pub min_amount_wei: u128,
+    pub max_amount_wei: u128,
     pub max_description_length: usize,
     pub max_title_length: usize,
     pub allowed_analysis_types: Vec<String>,
@@ -113,7 +126,7 @@ impl EmailValidator {
         let email_regex = Regex::new(
             r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
         ).unwrap();
-        
+
         if email_regex.is_match(email) {
             Ok(())
         } else {
@@ -124,13 +137,14 @@ impl EmailValidator {
     /// Check if email domain is in allowed list
     pub fn validate_domain(email: &str, allowed_domains: &[String]) -> ValidationResult<()> {
         Self::validate(email)?;
-        
+
         let domain = email.split('@').nth(1).unwrap_or("");
         if allowed_domains.is_empty() || allowed_domains.contains(&domain.to_string()) {
             Ok(())
         } else {
             Err(ValidationError::InvalidEmail(format!(
-                "Domain {} not in allowed list", domain
+                "Domain {} not in allowed list",
+                domain
             )))
         }
     }
@@ -149,7 +163,8 @@ impl UrlValidator {
                     Ok(url)
                 } else {
                     Err(ValidationError::InvalidUrl(format!(
-                        "Only HTTP and HTTPS schemes allowed, got: {}", url.scheme()
+                        "Only HTTP and HTTPS schemes allowed, got: {}",
+                        url.scheme()
                     )))
                 }
             }
@@ -160,17 +175,21 @@ impl UrlValidator {
     /// Validate if URL is not pointing to localhost/private networks
     pub fn validate_public_url(url_str: &str) -> ValidationResult<Url> {
         let url = Self::validate(url_str)?;
-        
+
         if let Some(host) = url.host_str() {
             // Check for localhost
-            if host == "localhost" || host == "127.0.0.1" || host.starts_with("192.168.") 
-                || host.starts_with("10.") || host.starts_with("172.") {
+            if host == "localhost"
+                || host == "127.0.0.1"
+                || host.starts_with("192.168.")
+                || host.starts_with("10.")
+                || host.starts_with("172.")
+            {
                 return Err(ValidationError::InvalidUrl(
-                    "Private/localhost URLs not allowed".to_string()
+                    "Private/localhost URLs not allowed".to_string(),
                 ));
             }
         }
-        
+
         Ok(url)
     }
 }
@@ -195,9 +214,8 @@ impl FileValidator {
     /// Validate file extension
     pub fn validate_extension(filename: &str, rules: &FileValidationRules) -> ValidationResult<()> {
         let extension = filename.split('.').last().unwrap_or("").to_lowercase();
-        
-        if rules.allowed_extensions.is_empty() || 
-           rules.allowed_extensions.contains(&extension) {
+
+        if rules.allowed_extensions.is_empty() || rules.allowed_extensions.contains(&extension) {
             Ok(())
         } else {
             Err(ValidationError::InvalidFileType {
@@ -208,9 +226,13 @@ impl FileValidator {
     }
 
     /// Validate MIME type
-    pub fn validate_mime_type(mime_type: &str, rules: &FileValidationRules) -> ValidationResult<()> {
-        if rules.allowed_mime_types.is_empty() || 
-           rules.allowed_mime_types.contains(&mime_type.to_string()) {
+    pub fn validate_mime_type(
+        mime_type: &str,
+        rules: &FileValidationRules,
+    ) -> ValidationResult<()> {
+        if rules.allowed_mime_types.is_empty()
+            || rules.allowed_mime_types.contains(&mime_type.to_string())
+        {
             Ok(())
         } else {
             Err(ValidationError::InvalidFileType {
@@ -259,16 +281,16 @@ impl HashValidator {
     pub fn validate_sha256(hash: &str) -> ValidationResult<()> {
         if hash.len() != 64 {
             return Err(ValidationError::InvalidFileHash(
-                "SHA-256 hash must be 64 characters".to_string()
+                "SHA-256 hash must be 64 characters".to_string(),
             ));
         }
-        
+
         if !hash.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err(ValidationError::InvalidFileHash(
-                "Hash contains invalid characters".to_string()
+                "Hash contains invalid characters".to_string(),
             ));
         }
-        
+
         Ok(())
     }
 
@@ -276,16 +298,16 @@ impl HashValidator {
     pub fn validate_md5(hash: &str) -> ValidationResult<()> {
         if hash.len() != 32 {
             return Err(ValidationError::InvalidFileHash(
-                "MD5 hash must be 32 characters".to_string()
+                "MD5 hash must be 32 characters".to_string(),
             ));
         }
-        
+
         if !hash.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err(ValidationError::InvalidFileHash(
-                "Hash contains invalid characters".to_string()
+                "Hash contains invalid characters".to_string(),
             ));
         }
-        
+
         Ok(())
     }
 
@@ -293,16 +315,16 @@ impl HashValidator {
     pub fn validate_sha1(hash: &str) -> ValidationResult<()> {
         if hash.len() != 40 {
             return Err(ValidationError::InvalidFileHash(
-                "SHA-1 hash must be 40 characters".to_string()
+                "SHA-1 hash must be 40 characters".to_string(),
             ));
         }
-        
+
         if !hash.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err(ValidationError::InvalidFileHash(
-                "Hash contains invalid characters".to_string()
+                "Hash contains invalid characters".to_string(),
             ));
         }
-        
+
         Ok(())
     }
 }
@@ -316,29 +338,34 @@ impl BlockchainValidator {
         if !address.starts_with("0x") || address.len() != 42 {
             return Err(ValidationError::InvalidEthereumAddress(address.to_string()));
         }
-        
+
         let addr_part = &address[2..];
         if !addr_part.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err(ValidationError::InvalidEthereumAddress(address.to_string()));
         }
-        
+
         Ok(())
     }
 
     /// Validate bounty amount in wei
-    pub fn validate_bounty_amount(amount_wei: u64, rules: &BountyValidationRules) -> ValidationResult<()> {
+    pub fn validate_bounty_amount(
+        amount_wei: u128,
+        rules: &BountyValidationRules,
+    ) -> ValidationResult<()> {
         if amount_wei < rules.min_amount_wei {
             return Err(ValidationError::InvalidBountyAmount(format!(
-                "Amount {} wei is below minimum {}", amount_wei, rules.min_amount_wei
+                "Amount {} wei is below minimum {}",
+                amount_wei, rules.min_amount_wei
             )));
         }
-        
+
         if amount_wei > rules.max_amount_wei {
             return Err(ValidationError::InvalidBountyAmount(format!(
-                "Amount {} wei exceeds maximum {}", amount_wei, rules.max_amount_wei
+                "Amount {} wei exceeds maximum {}",
+                amount_wei, rules.max_amount_wei
             )));
         }
-        
+
         Ok(())
     }
 
@@ -346,17 +373,17 @@ impl BlockchainValidator {
     pub fn validate_transaction_hash(tx_hash: &str) -> ValidationResult<()> {
         if !tx_hash.starts_with("0x") || tx_hash.len() != 66 {
             return Err(ValidationError::InvalidFileHash(
-                "Transaction hash must be 66 characters starting with 0x".to_string()
+                "Transaction hash must be 66 characters starting with 0x".to_string(),
             ));
         }
-        
+
         let hash_part = &tx_hash[2..];
         if !hash_part.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err(ValidationError::InvalidFileHash(
-                "Transaction hash contains invalid characters".to_string()
+                "Transaction hash contains invalid characters".to_string(),
             ));
         }
-        
+
         Ok(())
     }
 }
@@ -378,11 +405,14 @@ impl StringValidator {
     }
 
     /// Validate that string contains only alphanumeric characters and allowed symbols
-    pub fn validate_alphanumeric_with_symbols(s: &str, allowed_symbols: &str) -> ValidationResult<()> {
-        let is_valid = s.chars().all(|c| {
-            c.is_alphanumeric() || allowed_symbols.contains(c)
-        });
-        
+    pub fn validate_alphanumeric_with_symbols(
+        s: &str,
+        allowed_symbols: &str,
+    ) -> ValidationResult<()> {
+        let is_valid = s
+            .chars()
+            .all(|c| c.is_alphanumeric() || allowed_symbols.contains(c));
+
         if is_valid {
             Ok(())
         } else {
@@ -394,18 +424,22 @@ impl StringValidator {
     pub fn validate_username(username: &str) -> ValidationResult<()> {
         Self::validate_length(username, 3, 50)?;
         Self::validate_alphanumeric_with_symbols(username, "_-.")?;
-        
+
         // Username cannot start or end with symbols
-        if username.starts_with(|c: char| !c.is_alphanumeric()) ||
-           username.ends_with(|c: char| !c.is_alphanumeric()) {
+        if username.starts_with(|c: char| !c.is_alphanumeric())
+            || username.ends_with(|c: char| !c.is_alphanumeric())
+        {
             return Err(ValidationError::InvalidCharacters);
         }
-        
+
         Ok(())
     }
 
     /// Validate that string doesn't contain profanity or malicious content
-    pub fn validate_safe_content(content: &str, blocked_words: &HashSet<String>) -> ValidationResult<()> {
+    pub fn validate_safe_content(
+        content: &str,
+        blocked_words: &HashSet<String>,
+    ) -> ValidationResult<()> {
         let content_lower = content.to_lowercase();
         for word in blocked_words {
             if content_lower.contains(word) {
@@ -435,7 +469,8 @@ impl NumericValidator {
             Ok(())
         } else {
             Err(ValidationError::InvalidReputationScore(format!(
-                "Reputation score {} exceeds maximum 1000", score
+                "Reputation score {} exceeds maximum 1000",
+                score
             )))
         }
     }
@@ -451,10 +486,11 @@ impl NumericValidator {
         let current_time = chrono::Utc::now().timestamp();
         let one_year_ago = current_time - (365 * 24 * 60 * 60);
         let one_year_future = current_time + (365 * 24 * 60 * 60);
-        
+
         if timestamp < one_year_ago || timestamp > one_year_future {
             Err(ValidationError::InvalidTimestamp(format!(
-                "Timestamp {} is outside reasonable range", timestamp
+                "Timestamp {} is outside reasonable range",
+                timestamp
             )))
         } else {
             Ok(())
@@ -477,12 +513,8 @@ impl IpValidator {
     /// Check if IP is in private range
     pub fn is_private_ip(ip: &IpAddr) -> bool {
         match ip {
-            IpAddr::V4(ipv4) => {
-                ipv4.is_private() || ipv4.is_loopback() || ipv4.is_link_local()
-            },
-            IpAddr::V6(ipv6) => {
-                ipv6.is_loopback() || ipv6.is_multicast()
-            }
+            IpAddr::V4(ipv4) => ipv4.is_private() || ipv4.is_loopback() || ipv4.is_link_local(),
+            IpAddr::V6(ipv6) => ipv6.is_loopback() || ipv6.is_multicast(),
         }
     }
 
@@ -491,7 +523,7 @@ impl IpValidator {
         let ip = Self::validate_ip_address(ip_str)?;
         if Self::is_private_ip(&ip) {
             Err(ValidationError::InvalidIpAddress(
-                "Private IP addresses not allowed".to_string()
+                "Private IP addresses not allowed".to_string(),
             ))
         } else {
             Ok(ip)
@@ -518,7 +550,8 @@ impl UuidValidator {
             Ok(uuid)
         } else {
             Err(ValidationError::InvalidUuid(format!(
-                "Expected UUID v4, got {:?}", uuid.get_version()
+                "Expected UUID v4, got {:?}",
+                uuid.get_version()
             )))
         }
     }
@@ -532,27 +565,30 @@ impl BountyValidator {
     pub fn validate_bounty_creation(
         title: &str,
         description: &str,
-        amount_wei: u64,
+        amount_wei: u128,
         analysis_type: &str,
         rules: &BountyValidationRules,
     ) -> ValidationResult<()> {
         // Validate title
         StringValidator::validate_length(title, 5, rules.max_title_length)?;
-        
+
         // Validate description
         StringValidator::validate_length(description, 10, rules.max_description_length)?;
-        
+
         // Validate amount
         BlockchainValidator::validate_bounty_amount(amount_wei, rules)?;
-        
+
         // Validate analysis type
-        if !rules.allowed_analysis_types.contains(&analysis_type.to_string()) {
+        if !rules
+            .allowed_analysis_types
+            .contains(&analysis_type.to_string())
+        {
             return Err(ValidationError::InvalidFileType {
                 file_type: analysis_type.to_string(),
                 allowed: rules.allowed_analysis_types.clone(),
             });
         }
-        
+
         Ok(())
     }
 
@@ -565,18 +601,18 @@ impl BountyValidator {
     ) -> ValidationResult<()> {
         // Validate bounty ID format (UUID)
         UuidValidator::validate_uuid_v4(bounty_id)?;
-        
+
         // Validate analysis result length
         StringValidator::validate_length(analysis_result, 10, 10000)?;
-        
+
         // Validate confidence score
         NumericValidator::validate_confidence_score(confidence_score)?;
-        
+
         // Additional logic validation
         if confidence_score > 0.9 && analysis_result.len() < 100 {
             return Err(ValidationError::InvalidCharacters); // High confidence needs detailed analysis
         }
-        
+
         Ok(())
     }
 }
@@ -590,11 +626,11 @@ impl ApiValidator {
         if api_key.len() != 64 {
             return Err(ValidationError::InvalidCharacters);
         }
-        
+
         if !api_key.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err(ValidationError::InvalidCharacters);
         }
-        
+
         Ok(())
     }
 
@@ -607,7 +643,7 @@ impl ApiValidator {
                 max: f64::MAX,
             });
         }
-        
+
         if page_size < 1 || page_size > 100 {
             return Err(ValidationError::ValueOutOfRange {
                 value: page_size as f64,
@@ -615,20 +651,24 @@ impl ApiValidator {
                 max: 100.0,
             });
         }
-        
+
         Ok(())
     }
 
     /// Validate sorting parameters
-    pub fn validate_sort_params(sort_by: &str, sort_order: &str, allowed_fields: &[&str]) -> ValidationResult<()> {
+    pub fn validate_sort_params(
+        sort_by: &str,
+        sort_order: &str,
+        allowed_fields: &[&str],
+    ) -> ValidationResult<()> {
         if !allowed_fields.contains(&sort_by) {
             return Err(ValidationError::InvalidCharacters);
         }
-        
+
         if sort_order != "asc" && sort_order != "desc" {
             return Err(ValidationError::InvalidCharacters);
         }
-        
+
         Ok(())
     }
 }
@@ -646,18 +686,18 @@ impl ValidationSuite {
         file_hash: Option<&str>,
     ) -> ValidationResult<()> {
         let file_rules = FileValidationRules::default();
-        
+
         // Validate file metadata
         FileValidator::validate_file(filename, file_size, mime_type, &file_rules)?;
-        
+
         // Validate uploader address
         BlockchainValidator::validate_ethereum_address(uploader_address)?;
-        
+
         // Validate hash if provided
         if let Some(hash) = file_hash {
             HashValidator::validate_sha256(hash)?;
         }
-        
+
         Ok(())
     }
 
@@ -685,14 +725,15 @@ impl ValidationSuite {
         BlockchainValidator::validate_ethereum_address(analyst_address)?;
         StringValidator::validate_length(result, 50, 5000)?;
         NumericValidator::validate_confidence_score(confidence)?;
-        
+
         // Validate minimum stake amount
-        if stake_amount < 1000000000000000 { // 0.001 ETH minimum
+        if stake_amount < 1000000000000000 {
+            // 0.001 ETH minimum
             return Err(ValidationError::InvalidBountyAmount(
-                "Stake amount too low".to_string()
+                "Stake amount too low".to_string(),
             ));
         }
-        
+
         Ok(())
     }
 }
@@ -718,7 +759,10 @@ mod tests {
 
     #[test]
     fn test_ethereum_address_validation() {
-        assert!(BlockchainValidator::validate_ethereum_address("0x742d35Cc6435C2cb62fb0CF4cE385FA4d8457B5a").is_ok());
+        assert!(BlockchainValidator::validate_ethereum_address(
+            "0x742d35Cc6435C2cb62fb0CF4cE385FA4d8457B5a"
+        )
+        .is_ok());
         assert!(BlockchainValidator::validate_ethereum_address("0x123").is_err());
         assert!(BlockchainValidator::validate_ethereum_address("invalid_address").is_err());
     }
@@ -735,7 +779,8 @@ mod tests {
     fn test_file_size_validation() {
         let rules = FileValidationRules::default();
         assert!(FileValidator::validate_size(1024 * 1024, &rules).is_ok()); // 1MB
-        assert!(FileValidator::validate_size(200 * 1024 * 1024, &rules).is_err()); // 200MB
+        assert!(FileValidator::validate_size(200 * 1024 * 1024, &rules).is_err());
+        // 200MB
     }
 
     #[test]
@@ -758,7 +803,8 @@ mod tests {
     fn test_bounty_amount_validation() {
         let rules = BountyValidationRules::default();
         assert!(BlockchainValidator::validate_bounty_amount(1_000_000_000_000_000, &rules).is_ok());
-        assert!(BlockchainValidator::validate_bounty_amount(100, &rules).is_err()); // Too small
+        assert!(BlockchainValidator::validate_bounty_amount(100, &rules).is_err());
+        // Too small
     }
 
     #[test]
@@ -777,12 +823,14 @@ mod tests {
             "application/octet-stream",
             "0x742d35Cc6435C2cb62fb0CF4cE385FA4d8457B5a",
             Some("a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3")
-        ).is_ok());
+        )
+        .is_ok());
 
         assert!(ValidationSuite::validate_user_registration(
             "test_user",
             "test@example.com",
             "0x742d35Cc6435C2cb62fb0CF4cE385FA4d8457B5a"
-        ).is_ok());
+        )
+        .is_ok());
     }
 }

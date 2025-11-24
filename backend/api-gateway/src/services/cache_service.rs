@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -156,7 +157,7 @@ impl CacheService {
         let mut redis = self.redis.write().await;
         let cached: Option<String> = redis
             .connection_pool
-            .get(&cache_key)
+            .get::<_, Option<String>>(&cache_key)
             .await
             .context("Failed to get value from cache")?;
 
@@ -326,7 +327,7 @@ impl CacheService {
     pub async fn invalidate_group(&self, prefix: CacheKeyPrefix, identifiers: Vec<&str>) -> Result<()> {
         debug!("Invalidating cache group: {:?} ({} entries)", prefix.as_str(), identifiers.len());
 
-        for identifier in identifiers {
+        for identifier in &identifiers {
             self.delete(prefix.clone(), identifier).await?;
         }
 
@@ -351,7 +352,8 @@ impl CacheService {
             return Ok(0);
         }
 
-        info!("Warming cache with {} entries", entries.len());
+        let total_entries = entries.len();
+        info!("Warming cache with {} entries", total_entries);
         let mut warmed = 0;
 
         for (key, fetch_fn) in entries {
@@ -366,7 +368,7 @@ impl CacheService {
             }
         }
 
-        info!("Cache warming complete: {}/{} entries warmed", warmed, entries.len());
+        info!("Cache warming complete: {}/{} entries warmed", warmed, total_entries);
         Ok(warmed)
     }
 

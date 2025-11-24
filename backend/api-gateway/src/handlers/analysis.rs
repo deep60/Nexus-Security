@@ -3,13 +3,13 @@ use axum::{
     http::StatusCode,
     response::Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
-use crate::AppState;
 use crate::models::analysis::{AnalysisResult, AnalysisStatus, ThreatVerdict};
+use crate::AppState;
 
 /// Query parameters for listing analyses
 #[derive(Debug, Deserialize)]
@@ -83,7 +83,7 @@ pub struct ThreatIndicator {
 ///
 /// GET /api/v1/analysis/:id
 pub async fn get_analysis(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(analysis_id): Path<Uuid>,
 ) -> Result<Json<DetailedAnalysisResponse>, StatusCode> {
     // TODO: Fetch from database
@@ -95,7 +95,7 @@ pub async fn get_analysis(
 ///
 /// GET /api/v1/analysis
 pub async fn list_analyses(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Query(params): Query<ListAnalysesQuery>,
 ) -> Result<Json<AnalysisListResponse>, StatusCode> {
     let page = params.page.unwrap_or(1);
@@ -115,7 +115,7 @@ pub async fn list_analyses(
 ///
 /// GET /api/v1/analysis/stats
 pub async fn get_analysis_stats(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
 ) -> Result<Json<AnalysisStats>, StatusCode> {
     // TODO: Calculate real stats from database
     Ok(Json(AnalysisStats {
@@ -148,7 +148,7 @@ pub struct AnalysisStats {
 ///
 /// POST /api/v1/analysis/:id/cancel
 pub async fn cancel_analysis(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(analysis_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // TODO: Implement analysis cancellation
@@ -159,7 +159,7 @@ pub async fn cancel_analysis(
 ///
 /// POST /api/v1/analysis/:id/resubmit
 pub async fn resubmit_analysis(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(analysis_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // TODO: Implement analysis resubmission
@@ -170,7 +170,7 @@ pub async fn resubmit_analysis(
 ///
 /// GET /api/v1/analysis/:id/report
 pub async fn download_report(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(analysis_id): Path<Uuid>,
 ) -> Result<Json<AnalysisReport>, StatusCode> {
     // TODO: Generate and return report

@@ -42,15 +42,15 @@ pub struct UserSession {
 
 impl RedisService {
     pub async fn new(redis_url: &str) -> Result<Self> {
-        let client = Client::open(redis_url)
-            .context("Failed to create Redis client")?;
-        
-        let connection_pool = client.get_multiplexed_async_connection()
+        let client = Client::open(redis_url).context("Failed to create Redis client")?;
+
+        let connection_pool = client
+            .get_multiplexed_async_connection()
             .await
             .context("Failed to establish Redis connection pool")?;
 
         info!("Redis service initialized successfully");
-        
+
         Ok(RedisService {
             client,
             connection_pool,
@@ -58,12 +58,18 @@ impl RedisService {
     }
 
     // Analysis result caching
-    pub async fn cache_analysis(&mut self, file_hash: &str, analysis: &AnalysisCache, ttl_seconds: u64) -> Result<()> {
+    pub async fn cache_analysis(
+        &self,
+        file_hash: &str,
+        analysis: &AnalysisCache,
+        ttl_seconds: u64,
+    ) -> Result<()> {
         let key = format!("analysis:{}", file_hash);
-        let serialized = serde_json::to_string(analysis)
-            .context("Failed to serialize analysis cache")?;
+        let serialized =
+            serde_json::to_string(analysis).context("Failed to serialize analysis cache")?;
 
-        let _: () = self.connection_pool
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
             .set_ex(&key, serialized, ttl_seconds)
             .await
             .context("Failed to cache analysis result")?;
@@ -72,31 +78,33 @@ impl RedisService {
         Ok(())
     }
 
-    pub async fn get_cached_analysis(&mut self, file_hash: &str) -> Result<Option<AnalysisCache>> {
+    pub async fn get_cached_analysis(&self, file_hash: &str) -> Result<Option<AnalysisCache>> {
         let key = format!("analysis:{}", file_hash);
-        
-        let cached: Option<String> = self.connection_pool
+
+        let mut conn = self.connection_pool.clone();
+        let cached: Option<String> = conn
             .get(&key)
             .await
             .context("Failed to retrieve cached analysis")?;
 
         match cached {
             Some(data) => {
-                let analysis: AnalysisCache = serde_json::from_str(&data)
-                    .context("Failed to deserialize cached analysis")?;
+                let analysis: AnalysisCache =
+                    serde_json::from_str(&data).context("Failed to deserialize cached analysis")?;
                 Ok(Some(analysis))
             }
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
     // Bounty caching
-    pub async fn cache_bounty(&mut self, bounty: &BountyCache, ttl_seconds: u64) -> Result<()> {
+    pub async fn cache_bounty(&self, bounty: &BountyCache, ttl_seconds: u64) -> Result<()> {
         let key = format!("bounty:{}", bounty.bounty_id);
-        let serialized = serde_json::to_string(bounty)
-            .context("Failed to serialize bounty cache")?;
+        let serialized =
+            serde_json::to_string(bounty).context("Failed to serialize bounty cache")?;
 
-        let _: () = self.connection_pool
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
             .set_ex(&key, serialized, ttl_seconds)
             .await
             .context("Failed to cache bounty")?;
@@ -105,28 +113,30 @@ impl RedisService {
         Ok(())
     }
 
-    pub async fn get_cached_bounty(&mut self, bounty_id: &Uuid) -> Result<Option<BountyCache>> {
+    pub async fn get_cached_bounty(&self, bounty_id: &Uuid) -> Result<Option<BountyCache>> {
         let key = format!("bounty:{}", bounty_id);
-        
-        let cached: Option<String> = self.connection_pool
+
+        let mut conn = self.connection_pool.clone();
+        let cached: Option<String> = conn
             .get(&key)
             .await
             .context("Failed to retrieve cached bounty")?;
 
         match cached {
             Some(data) => {
-                let bounty: BountyCache = serde_json::from_str(&data)
-                    .context("Failed to deserialize cached bounty")?;
+                let bounty: BountyCache =
+                    serde_json::from_str(&data).context("Failed to deserialize cached bounty")?;
                 Ok(Some(bounty))
             }
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
-    pub async fn invalidate_bounty_cache(&mut self, bounty_id: &Uuid) -> Result<()> {
+    pub async fn invalidate_bounty_cache(&self, bounty_id: &Uuid) -> Result<()> {
         let key = format!("bounty:{}", bounty_id);
-        
-        let _: () = self.connection_pool
+
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
             .del(&key)
             .await
             .context("Failed to invalidate bounty cache")?;
@@ -136,21 +146,22 @@ impl RedisService {
     }
 
     // User session management
-    pub async fn create_session(&mut self, session: &UserSession, ttl_seconds: u64) -> Result<()> {
+    pub async fn create_session(&self, session: &UserSession, ttl_seconds: u64) -> Result<()> {
         let key = format!("session:{}", session.session_token);
         let user_key = format!("user_session:{}", session.user_id);
-        
-        let serialized = serde_json::to_string(session)
-            .context("Failed to serialize user session")?;
 
+        let serialized =
+            serde_json::to_string(session).context("Failed to serialize user session")?;
+
+        let mut conn = self.connection_pool.clone();
         // Store session data with expiration
-        let _: () = self.connection_pool
+        let _: () = conn
             .set_ex(&key, &serialized, ttl_seconds)
             .await
             .context("Failed to create session")?;
 
         // Store user -> session mapping
-        let _: () = self.connection_pool
+        let _: () = conn
             .set_ex(&user_key, &session.session_token, ttl_seconds)
             .await
             .context("Failed to create user session mapping")?;
@@ -159,43 +170,45 @@ impl RedisService {
         Ok(())
     }
 
-    pub async fn get_session(&mut self, session_token: &str) -> Result<Option<UserSession>> {
+    pub async fn get_session(&self, session_token: &str) -> Result<Option<UserSession>> {
         let key = format!("session:{}", session_token);
 
-        let cached: Option<String> = self.connection_pool
-            .get(&key)
-            .await
-            .context("Failed to retrieve session")?;
+        let mut conn = self.connection_pool.clone();
+        let cached: Option<String> = conn.get(&key).await.context("Failed to retrieve session")?;
 
         match cached {
             Some(data) => {
-                let session: UserSession = serde_json::from_str(&data)
-                    .context("Failed to deserialize session")?;
+                let session: UserSession =
+                    serde_json::from_str(&data).context("Failed to deserialize session")?;
 
                 // Check if session is expired
                 if session.expires_at < chrono::Utc::now() {
                     // Delete expired session directly without recursion
-                    let _: () = self.connection_pool.del(&key).await.context("Failed to delete session")?;
+                    let _: () = conn.del(&key).await.context("Failed to delete session")?;
                     let user_key = format!("user_session:{}", session.user_id);
-                    let _: () = self.connection_pool.del(&user_key).await.context("Failed to remove user session")?;
+                    let _: () = conn
+                        .del(&user_key)
+                        .await
+                        .context("Failed to remove user session")?;
                     Ok(None)
                 } else {
                     Ok(Some(session))
                 }
             }
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
-    pub async fn invalidate_session(&mut self, session_token: &str) -> Result<()> {
+    pub async fn invalidate_session(&self, session_token: &str) -> Result<()> {
         // Get session data directly without calling get_session to avoid recursion
         let key = format!("session:{}", session_token);
-        let cached: Option<String> = self.connection_pool.get(&key).await.context("Failed to retrieve session")?;
+        let mut conn = self.connection_pool.clone();
+        let cached: Option<String> = conn.get(&key).await.context("Failed to retrieve session")?;
 
         if let Some(data) = cached {
             if let Ok(session) = serde_json::from_str::<UserSession>(&data) {
                 let user_key = format!("user_session:{}", session.user_id);
-                let _: () = self.connection_pool
+                let _: () = conn
                     .del(&user_key)
                     .await
                     .context("Failed to remove user session mapping")?;
@@ -203,7 +216,7 @@ impl RedisService {
         }
 
         let key = format!("session:{}", session_token);
-        let _: () = self.connection_pool
+        let _: () = conn
             .del(&key)
             .await
             .context("Failed to invalidate session")?;
@@ -213,34 +226,47 @@ impl RedisService {
     }
 
     // Rate limiting
-    pub async fn check_rate_limit(&mut self, identifier: &str, max_requests: u32, window_seconds: u64) -> Result<bool> {
+    pub async fn check_rate_limit(
+        &self,
+        identifier: &str,
+        max_requests: u32,
+        window_seconds: u64,
+    ) -> Result<bool> {
         let key = format!("rate_limit:{}", identifier);
-        
+
+        let mut conn = self.connection_pool.clone();
         // Use Redis sliding window rate limiting
-        let current_count: u32 = self.connection_pool
+        let current_count: u32 = conn
             .incr(&key, 1)
             .await
             .context("Failed to increment rate limit counter")?;
 
         if current_count == 1 {
             // Set expiration for new key
-            let _: () = self.connection_pool
+            let _: () = conn
                 .expire(&key, window_seconds as i64)
                 .await
                 .context("Failed to set rate limit expiration")?;
         }
 
         let allowed = current_count <= max_requests;
-        
+
         if !allowed {
-            warn!("Rate limit exceeded for identifier: {} ({}/{})", identifier, current_count, max_requests);
+            warn!(
+                "Rate limit exceeded for identifier: {} ({}/{})",
+                identifier, current_count, max_requests
+            );
         }
 
         Ok(allowed)
     }
 
     // Real-time notifications and pub/sub
-    pub async fn publish_analysis_complete(&mut self, file_hash: &str, analysis_id: &Uuid) -> Result<()> {
+    pub async fn publish_analysis_complete(
+        &self,
+        file_hash: &str,
+        analysis_id: &Uuid,
+    ) -> Result<()> {
         let channel = "analysis_complete";
         let message = serde_json::json!({
             "file_hash": file_hash,
@@ -248,16 +274,25 @@ impl RedisService {
             "timestamp": chrono::Utc::now()
         });
 
-        let _: () = self.connection_pool
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
             .publish(channel, message.to_string())
             .await
             .context("Failed to publish analysis complete notification")?;
 
-        info!("Published analysis complete notification for file: {}", file_hash);
+        info!(
+            "Published analysis complete notification for file: {}",
+            file_hash
+        );
         Ok(())
     }
 
-    pub async fn publish_bounty_update(&mut self, bounty_id: &Uuid, update_type: &str, data: serde_json::Value) -> Result<()> {
+    pub async fn publish_bounty_update(
+        &self,
+        bounty_id: &Uuid,
+        update_type: &str,
+        data: serde_json::Value,
+    ) -> Result<()> {
         let channel = format!("bounty_updates:{}", bounty_id);
         let message = serde_json::json!({
             "bounty_id": bounty_id,
@@ -266,32 +301,46 @@ impl RedisService {
             "timestamp": chrono::Utc::now()
         });
 
-        let _: () = self.connection_pool
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
             .publish(&channel, message.to_string())
             .await
             .context("Failed to publish bounty update")?;
 
-        info!("Published bounty update for bounty: {} ({})", bounty_id, update_type);
+        info!(
+            "Published bounty update for bounty: {} ({})",
+            bounty_id, update_type
+        );
         Ok(())
     }
 
     // Engine reputation caching
-    pub async fn cache_engine_reputation(&mut self, engine_id: &str, reputation_score: f64, ttl_seconds: u64) -> Result<()> {
+    pub async fn cache_engine_reputation(
+        &self,
+        engine_id: &str,
+        reputation_score: f64,
+        ttl_seconds: u64,
+    ) -> Result<()> {
         let key = format!("engine_reputation:{}", engine_id);
-        
-        let _: () = self.connection_pool
+
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
             .set_ex(&key, reputation_score, ttl_seconds)
             .await
             .context("Failed to cache engine reputation")?;
 
-        info!("Cached reputation for engine: {} (score: {})", engine_id, reputation_score);
+        info!(
+            "Cached reputation for engine: {} (score: {})",
+            engine_id, reputation_score
+        );
         Ok(())
     }
 
-    pub async fn get_engine_reputation(&mut self, engine_id: &str) -> Result<Option<f64>> {
+    pub async fn get_engine_reputation(&self, engine_id: &str) -> Result<Option<f64>> {
         let key = format!("engine_reputation:{}", engine_id);
-        
-        let reputation: Option<f64> = self.connection_pool
+
+        let mut conn = self.connection_pool.clone();
+        let reputation: Option<f64> = conn
             .get(&key)
             .await
             .context("Failed to retrieve engine reputation")?;
@@ -300,10 +349,16 @@ impl RedisService {
     }
 
     // Leaderboard functionality
-    pub async fn update_leaderboard(&mut self, leaderboard_name: &str, member: &str, score: f64) -> Result<()> {
+    pub async fn update_leaderboard(
+        &self,
+        leaderboard_name: &str,
+        member: &str,
+        score: f64,
+    ) -> Result<()> {
         let key = format!("leaderboard:{}", leaderboard_name);
-        
-        let _: () = self.connection_pool
+
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
             .zadd(&key, member, score)
             .await
             .context("Failed to update leaderboard")?;
@@ -311,10 +366,15 @@ impl RedisService {
         Ok(())
     }
 
-    pub async fn get_leaderboard(&mut self, leaderboard_name: &str, limit: isize) -> Result<Vec<(String, f64)>> {
+    pub async fn get_leaderboard(
+        &self,
+        leaderboard_name: &str,
+        limit: isize,
+    ) -> Result<Vec<(String, f64)>> {
         let key = format!("leaderboard:{}", leaderboard_name);
-        
-        let results: Vec<(String, f64)> = self.connection_pool
+
+        let mut conn = self.connection_pool.clone();
+        let results: Vec<(String, f64)> = conn
             .zrevrange_withscores(&key, 0, limit - 1)
             .await
             .context("Failed to retrieve leaderboard")?;
@@ -323,10 +383,9 @@ impl RedisService {
     }
 
     // Health check
-    pub async fn health_check(&mut self) -> Result<bool> {
-        let result: RedisResult<String> = redis::cmd("PING")
-            .query_async(&mut self.connection_pool)
-            .await;
+    pub async fn health_check(&self) -> Result<bool> {
+        let mut conn = self.connection_pool.clone();
+        let result: RedisResult<String> = redis::cmd("PING").query_async(&mut conn).await;
 
         match result {
             Ok(_) => Ok(true),
@@ -338,24 +397,32 @@ impl RedisService {
     }
 
     // Cache statistics
-    pub async fn get_cache_stats(&mut self) -> Result<serde_json::Value> {
+    pub async fn get_cache_stats(&self) -> Result<serde_json::Value> {
+        let mut conn = self.connection_pool.clone();
         let info: String = redis::cmd("INFO")
             .arg("memory")
-            .query_async(&mut self.connection_pool)
+            .query_async(&mut conn)
             .await
             .context("Failed to get Redis memory info")?;
 
         // Parse basic stats from Redis INFO command
         let mut stats = serde_json::Map::new();
-        
+
         for line in info.lines() {
             if line.contains(':') {
                 let parts: Vec<&str> = line.split(':').collect();
                 if parts.len() == 2 {
                     match parts[0] {
-                        "used_memory" | "used_memory_human" | "used_memory_peak" | 
-                        "used_memory_peak_human" | "maxmemory" | "maxmemory_human" => {
-                            stats.insert(parts[0].to_string(), serde_json::Value::String(parts[1].to_string()));
+                        "used_memory"
+                        | "used_memory_human"
+                        | "used_memory_peak"
+                        | "used_memory_peak_human"
+                        | "maxmemory"
+                        | "maxmemory_human" => {
+                            stats.insert(
+                                parts[0].to_string(),
+                                serde_json::Value::String(parts[1].to_string()),
+                            );
                         }
                         _ => {}
                     }
@@ -364,5 +431,82 @@ impl RedisService {
         }
 
         Ok(serde_json::Value::Object(stats))
+    }
+
+    // === Submission-related caching methods (stubs for compilation) ===
+
+    /// Push item to queue
+    /// TODO: Implement actual Redis LPUSH/RPUSH
+    pub async fn push_to_queue(&self, _queue_name: &str, _item: &str) -> Result<()> {
+        anyhow::bail!("push_to_queue not yet implemented")
+    }
+
+    /// Queue item for analysis
+    /// TODO: Implement actual Redis queue operation
+    pub async fn queue_for_analysis(&self, _analysis_id: uuid::Uuid, _priority: i32) -> Result<()> {
+        anyhow::bail!("queue_for_analysis not yet implemented")
+    }
+
+    /// Cache file info
+    /// TODO: Implement actual Redis caching
+    pub async fn cache_file_info(
+        &self,
+        _file_hash: &str,
+        _file_info: &crate::handlers::submission::FileInfo,
+    ) -> Result<()> {
+        anyhow::bail!("cache_file_info not yet implemented")
+    }
+
+    /// Get cached file info
+    /// TODO: Implement actual Redis retrieval
+    pub async fn get_cached_file_info(
+        &self,
+        _file_hash: &str,
+    ) -> Result<Option<crate::handlers::submission::FileInfo>> {
+        Ok(None)
+    }
+
+    /// Cache submission
+    /// TODO: Implement actual Redis caching
+    pub async fn cache_submission(
+        &self,
+        _submission_id: uuid::Uuid,
+        _submission: &crate::handlers::submission::SubmissionResponse,
+    ) -> Result<()> {
+        anyhow::bail!("cache_submission not yet implemented")
+    }
+
+    /// Cache detailed submission
+    /// TODO: Implement actual Redis caching
+    pub async fn cache_detailed_submission(
+        &self,
+        _submission_id: uuid::Uuid,
+        _submission: &crate::handlers::submission::DetailedSubmissionResponse,
+    ) -> Result<()> {
+        anyhow::bail!("cache_detailed_submission not yet implemented")
+    }
+
+    /// Get cached submission
+    /// TODO: Implement actual Redis retrieval
+    pub async fn get_cached_submission(
+        &self,
+        _submission_id: uuid::Uuid,
+    ) -> Result<Option<crate::handlers::submission::SubmissionResponse>> {
+        Ok(None)
+    }
+
+    /// Get cached detailed submission
+    /// TODO: Implement actual Redis retrieval
+    pub async fn get_cached_detailed_submission(
+        &self,
+        _submission_id: uuid::Uuid,
+    ) -> Result<Option<crate::handlers::submission::DetailedSubmissionResponse>> {
+        Ok(None)
+    }
+
+    /// Invalidate submission cache
+    /// TODO: Implement actual Redis deletion
+    pub async fn invalidate_submission_cache(&self, _submission_id: uuid::Uuid) -> Result<()> {
+        Ok(())
     }
 }

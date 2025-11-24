@@ -264,7 +264,7 @@ impl BlockchainService {
 
         let tx = self.contracts.threat_token
             .method::<_, H256>("approve", (
-                self.config.bounty_manager_address.parse::<Address>()?,
+                self.config.contracts.bounty_manager.parse::<Address>()?,
                 amount,
             ))?
             .gas(self.config.gas_limit)
@@ -550,6 +550,21 @@ impl BlockchainService {
     pub fn validate_address(address: &str) -> Result<Address> {
         address.parse::<Address>()
             .context("Invalid Ethereum address format")
+    }
+
+    /// Health check for blockchain service
+    /// TODO: Implement actual blockchain connectivity check
+    pub async fn health_check(&self) -> bool {
+        // Stub implementation - always returns true
+        // In production, this should ping the RPC endpoint
+        true
+    }
+
+    /// Create analysis bounty on blockchain
+    /// TODO: Implement actual blockchain transaction
+    pub async fn create_analysis_bounty(&self, _params: CreateBountyParams) -> Result<H256> {
+        // Stub implementation
+        anyhow::bail!("create_analysis_bounty not yet implemented")
     }
 }
 

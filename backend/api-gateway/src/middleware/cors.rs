@@ -6,7 +6,7 @@ use axum::{
             ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
             ACCESS_CONTROL_EXPOSE_HEADERS, ACCESS_CONTROL_MAX_AGE,
         },
-        HeaderValue, Method, StatusCode,
+        HeaderName, HeaderValue, Method, StatusCode,
     },
     response::{IntoResponse, Response},
 };
@@ -70,14 +70,14 @@ pub fn development_cors() -> CorsLayer {
             CONTENT_TYPE,
             ACCEPT,
             ORIGIN,
-            HeaderValue::from_static("x-api-key"),
-            HeaderValue::from_static("x-request-id"),
+            HeaderName::from_static("x-api-key"),
+            HeaderName::from_static("x-request-id"),
         ])
         .expose_headers([
-            HeaderValue::from_static("x-request-id"),
-            HeaderValue::from_static("x-rate-limit-limit"),
-            HeaderValue::from_static("x-rate-limit-remaining"),
-            HeaderValue::from_static("x-rate-limit-reset"),
+            HeaderName::from_static("x-request-id"),
+            HeaderName::from_static("x-rate-limit-limit"),
+            HeaderName::from_static("x-rate-limit-remaining"),
+            HeaderName::from_static("x-rate-limit-reset"),
         ])
         .allow_credentials(true)
         .max_age(Duration::from_secs(3600)) // 1 hour
@@ -112,14 +112,14 @@ pub fn staging_cors() -> CorsLayer {
             CONTENT_TYPE,
             ACCEPT,
             ORIGIN,
-            HeaderValue::from_static("x-api-key"),
-            HeaderValue::from_static("x-request-id"),
+            HeaderName::from_static("x-api-key"),
+            HeaderName::from_static("x-request-id"),
         ])
         .expose_headers([
-            HeaderValue::from_static("x-request-id"),
-            HeaderValue::from_static("x-rate-limit-limit"),
-            HeaderValue::from_static("x-rate-limit-remaining"),
-            HeaderValue::from_static("x-rate-limit-reset"),
+            HeaderName::from_static("x-request-id"),
+            HeaderName::from_static("x-rate-limit-limit"),
+            HeaderName::from_static("x-rate-limit-remaining"),
+            HeaderName::from_static("x-rate-limit-reset"),
         ])
         .allow_credentials(true)
         .max_age(Duration::from_secs(3600))
@@ -146,14 +146,14 @@ pub fn production_cors(allowed_origins: Vec<String>) -> CorsLayer {
             AUTHORIZATION,
             CONTENT_TYPE,
             ACCEPT,
-            HeaderValue::from_static("x-api-key"),
-            HeaderValue::from_static("x-request-id"),
+            HeaderName::from_static("x-api-key"),
+            HeaderName::from_static("x-request-id"),
         ])
         .expose_headers([
-            HeaderValue::from_static("x-request-id"),
-            HeaderValue::from_static("x-rate-limit-limit"),
-            HeaderValue::from_static("x-rate-limit-remaining"),
-            HeaderValue::from_static("x-rate-limit-reset"),
+            HeaderName::from_static("x-request-id"),
+            HeaderName::from_static("x-rate-limit-limit"),
+            HeaderName::from_static("x-rate-limit-remaining"),
+            HeaderName::from_static("x-rate-limit-reset"),
         ])
         .allow_credentials(true)
         .max_age(Duration::from_secs(7200)) // 2 hours
@@ -165,7 +165,7 @@ pub fn public_api_cors() -> CorsLayer {
         .allow_origin(Any)
         .allow_methods([Method::GET, Method::OPTIONS])
         .allow_headers([CONTENT_TYPE, ACCEPT])
-        .expose_headers([HeaderValue::from_static("x-rate-limit-remaining")])
+        .expose_headers([HeaderName::from_static("x-rate-limit-remaining")])
         .allow_credentials(false)
         .max_age(Duration::from_secs(86400)) // 24 hours
 }
@@ -182,7 +182,7 @@ pub fn webhook_cors(allowed_origins: Vec<String>) -> CorsLayer {
         .allow_methods([Method::POST, Method::OPTIONS])
         .allow_headers([
             CONTENT_TYPE,
-            HeaderValue::from_static("x-webhook-signature"),
+            HeaderName::from_static("x-webhook-signature"),
         ])
         .allow_credentials(false)
         .max_age(Duration::from_secs(3600))

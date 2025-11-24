@@ -3,13 +3,13 @@ use axum::{
     http::StatusCode,
     response::Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
-use crate::AppState;
 use crate::models::user::User;
+use crate::AppState;
 
 /// User profile response
 #[derive(Debug, Serialize)]
@@ -54,7 +54,7 @@ pub struct UserStats {
 ///
 /// GET /api/v1/users/me
 pub async fn get_current_user(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     // TODO: Extract user from JWT claims
 ) -> Result<Json<UserProfile>, StatusCode> {
     // TODO: Fetch user from database
@@ -65,7 +65,7 @@ pub async fn get_current_user(
 ///
 /// GET /api/v1/users/:id
 pub async fn get_user_by_id(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<UserProfile>, StatusCode> {
     // TODO: Fetch user from database
@@ -76,7 +76,7 @@ pub async fn get_user_by_id(
 ///
 /// PUT /api/v1/users/me
 pub async fn update_profile(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Json(payload): Json<UpdateProfileRequest>,
 ) -> Result<Json<UserProfile>, StatusCode> {
     // TODO: Update user in database
@@ -86,9 +86,7 @@ pub async fn update_profile(
 /// Get user statistics
 ///
 /// GET /api/v1/users/me/stats
-pub async fn get_user_stats(
-    State(state): State<Arc<AppState>>,
-) -> Result<Json<UserStats>, StatusCode> {
+pub async fn get_user_stats(State(state): State<AppState>) -> Result<Json<UserStats>, StatusCode> {
     // TODO: Calculate user statistics
     Ok(Json(UserStats {
         total_analyses: 0,
@@ -105,7 +103,7 @@ pub async fn get_user_stats(
 ///
 /// GET /api/v1/users/me/activity
 pub async fn get_user_activity(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Query(params): Query<ActivityQuery>,
 ) -> Result<Json<ActivityListResponse>, StatusCode> {
     // TODO: Fetch activity from database
@@ -144,9 +142,7 @@ pub struct Activity {
 /// Delete user account
 ///
 /// DELETE /api/v1/users/me
-pub async fn delete_account(
-    State(state): State<Arc<AppState>>,
-) -> Result<StatusCode, StatusCode> {
+pub async fn delete_account(State(state): State<AppState>) -> Result<StatusCode, StatusCode> {
     // TODO: Implement account deletion
     Err(StatusCode::NOT_IMPLEMENTED)
 }

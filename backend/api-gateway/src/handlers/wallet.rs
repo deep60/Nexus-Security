@@ -3,10 +3,10 @@ use axum::{
     http::StatusCode,
     response::Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use crate::AppState;
 
@@ -72,9 +72,7 @@ pub struct StakeRequest {
 /// Get wallet balance
 ///
 /// GET /api/v1/wallet/balance
-pub async fn get_balance(
-    State(state): State<Arc<AppState>>,
-) -> Result<Json<WalletBalance>, StatusCode> {
+pub async fn get_balance(State(state): State<AppState>) -> Result<Json<WalletBalance>, StatusCode> {
     // TODO: Fetch balance from blockchain
     Err(StatusCode::NOT_IMPLEMENTED)
 }
@@ -83,7 +81,7 @@ pub async fn get_balance(
 ///
 /// GET /api/v1/wallet/transactions
 pub async fn get_transactions(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Query(params): Query<TransactionQuery>,
 ) -> Result<Json<TransactionListResponse>, StatusCode> {
     let page = params.page.unwrap_or(1);
@@ -102,7 +100,7 @@ pub async fn get_transactions(
 ///
 /// POST /api/v1/wallet/connect
 pub async fn connect_wallet(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Json(payload): Json<ConnectWalletRequest>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // TODO: Verify signature and connect wallet
@@ -119,9 +117,7 @@ pub struct ConnectWalletRequest {
 /// Disconnect wallet
 ///
 /// POST /api/v1/wallet/disconnect
-pub async fn disconnect_wallet(
-    State(state): State<Arc<AppState>>,
-) -> Result<StatusCode, StatusCode> {
+pub async fn disconnect_wallet(State(state): State<AppState>) -> Result<StatusCode, StatusCode> {
     // TODO: Disconnect wallet
     Err(StatusCode::NOT_IMPLEMENTED)
 }
@@ -130,7 +126,7 @@ pub async fn disconnect_wallet(
 ///
 /// POST /api/v1/wallet/withdraw
 pub async fn withdraw(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Json(payload): Json<WithdrawRequest>,
 ) -> Result<Json<Transaction>, StatusCode> {
     // TODO: Process withdrawal
@@ -141,7 +137,7 @@ pub async fn withdraw(
 ///
 /// POST /api/v1/wallet/stake
 pub async fn stake_tokens(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Json(payload): Json<StakeRequest>,
 ) -> Result<Json<Transaction>, StatusCode> {
     // TODO: Stake tokens
@@ -152,7 +148,7 @@ pub async fn stake_tokens(
 ///
 /// POST /api/v1/wallet/unstake/:bounty_id
 pub async fn unstake_tokens(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(bounty_id): Path<Uuid>,
 ) -> Result<Json<Transaction>, StatusCode> {
     // TODO: Unstake tokens
@@ -162,9 +158,7 @@ pub async fn unstake_tokens(
 /// Claim rewards
 ///
 /// POST /api/v1/wallet/claim-rewards
-pub async fn claim_rewards(
-    State(state): State<Arc<AppState>>,
-) -> Result<Json<Transaction>, StatusCode> {
+pub async fn claim_rewards(State(state): State<AppState>) -> Result<Json<Transaction>, StatusCode> {
     // TODO: Claim pending rewards
     Err(StatusCode::NOT_IMPLEMENTED)
 }

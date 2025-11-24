@@ -1,13 +1,13 @@
-use sqlx::{PgPool, Row};
-use anyhow::{Result, Context};
-use uuid::Uuid;
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::{FromRow, PgPool, Row};
+use uuid::Uuid;
 
 use crate::models::{
+    analysis::{AnalysisResult, AnalysisStatus, ThreatVerdict},
     bounty::{Bounty, BountyStatus, CreateBountyRequest},
     user::{User, UserRole},
-    analysis::{AnalysisResult, AnalysisStatus, ThreatVerdict}
 };
 
 #[derive(Clone)]
@@ -24,14 +24,20 @@ impl DatabaseService {
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
-    
+
     /// Get database connection pool for use as executor
     pub fn executor(&self) -> &PgPool {
         &self.pool
     }
 
     // User operations
-    pub async fn create_user(&self, wallet_address: &str, username: &str, email: &str, password_hash: &str) -> Result<User> {
+    pub async fn create_user(
+        &self,
+        wallet_address: &str,
+        username: &str,
+        email: &str,
+        password_hash: &str,
+    ) -> Result<User> {
         let user = sqlx::query_as::<_, User>(
             r#"
             INSERT INTO users (id, wallet_address, username, email, password_hash, reputation_score, created_at, updated_at)
@@ -59,7 +65,7 @@ impl DatabaseService {
             r#"
             SELECT * FROM users
             WHERE wallet_address = $1
-            "#
+            "#,
         )
         .bind(wallet_address)
         .fetch_optional(&self.pool)
@@ -74,7 +80,7 @@ impl DatabaseService {
             r#"
             SELECT * FROM users
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(user_id)
         .fetch_optional(&self.pool)
@@ -90,7 +96,7 @@ impl DatabaseService {
             UPDATE users
             SET reputation_score = reputation_score + $1, updated_at = $2
             WHERE id = $3
-            "#
+            "#,
         )
         .bind(reputation_delta)
         .bind(Utc::now())
@@ -103,37 +109,14 @@ impl DatabaseService {
     }
 
     // Bounty operations
-    pub async fn create_bounty(&self, request: CreateBountyRequest, creator_id: Uuid) -> Result<Bounty> {
-        let bounty = sqlx::query_as::<_, Bounty>(
-            r#"
-            INSERT INTO bounties (
-                id, title, description, reward_amount, creator_id, status,
-                target_hash, target_url, target_type, expires_at, created_at, updated_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            RETURNING
-                id, title, description, reward_amount, creator_id,
-                status as "status: BountyStatus", target_hash, target_url,
-                target_type, expires_at, created_at, updated_at
-            "#
-        )
-        .bind(Uuid::new_v4())
-        .bind(request.title)
-        .bind(request.description)
-        .bind(request.reward_amount)
-        .bind(creator_id)
-        .bind(BountyStatus::Active as BountyStatus)
-        .bind(request.target_hash)
-        .bind(request.target_url)
-        .bind(request.target_type)
-        .bind(request.expires_at)
-        .bind(Utc::now())
-        .bind(Utc::now())
-        .fetch_one(&self.pool)
-        .await
-        .context("Failed to create bounty")?;
-
-        Ok(bounty)
+    pub async fn create_bounty(
+        &self,
+        _request: CreateBountyRequest,
+        _creator_id: Uuid,
+    ) -> Result<Bounty> {
+        // TODO: This is a placeholder - the actual database schema needs to be updated
+        // to match the Bounty model. For now, returning an error.
+        anyhow::bail!("create_bounty not yet implemented with correct schema")
     }
 
     pub async fn get_bounty_by_id(&self, bounty_id: Uuid) -> Result<Option<Bounty>> {
@@ -145,7 +128,7 @@ impl DatabaseService {
                 target_type, expires_at, created_at, updated_at
             FROM bounties
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(bounty_id)
         .fetch_optional(&self.pool)
@@ -166,7 +149,7 @@ impl DatabaseService {
             WHERE status = $1 AND expires_at > $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#
+            "#,
         )
         .bind(BountyStatus::Active as BountyStatus)
         .bind(Utc::now())
@@ -189,7 +172,7 @@ impl DatabaseService {
             FROM bounties
             WHERE creator_id = $1
             ORDER BY created_at DESC
-            "#
+            "#,
         )
         .bind(creator_id)
         .fetch_all(&self.pool)
@@ -205,7 +188,7 @@ impl DatabaseService {
             UPDATE bounties
             SET status = $1, updated_at = $2
             WHERE id = $3
-            "#
+            "#,
         )
         .bind(status as BountyStatus)
         .bind(Utc::now())
@@ -225,7 +208,7 @@ impl DatabaseService {
         engine_name: &str,
         verdict: ThreatVerdict,
         confidence_score: f32,
-        metadata: serde_json::Value
+        metadata: serde_json::Value,
     ) -> Result<AnalysisResult> {
         let analysis = sqlx::query_as::<_, AnalysisResult>(
             r#"
@@ -239,7 +222,7 @@ impl DatabaseService {
                 verdict as "verdict: ThreatVerdict", confidence_score,
                 metadata, status as "status: AnalysisStatus",
                 created_at, updated_at
-            "#
+            "#,
         )
         .bind(Uuid::new_v4())
         .bind(bounty_id)
@@ -258,7 +241,10 @@ impl DatabaseService {
         Ok(analysis)
     }
 
-    pub async fn get_analysis_results_by_bounty(&self, bounty_id: Uuid) -> Result<Vec<AnalysisResult>> {
+    pub async fn get_analysis_results_by_bounty(
+        &self,
+        bounty_id: Uuid,
+    ) -> Result<Vec<AnalysisResult>> {
         let results = sqlx::query_as::<_, AnalysisResult>(
             r#"
             SELECT
@@ -269,7 +255,7 @@ impl DatabaseService {
             FROM analysis_results
             WHERE bounty_id = $1
             ORDER BY created_at DESC
-            "#
+            "#,
         )
         .bind(bounty_id)
         .fetch_all(&self.pool)
@@ -279,7 +265,10 @@ impl DatabaseService {
         Ok(results)
     }
 
-    pub async fn get_analysis_results_by_analyzer(&self, analyzer_id: Uuid) -> Result<Vec<AnalysisResult>> {
+    pub async fn get_analysis_results_by_analyzer(
+        &self,
+        analyzer_id: Uuid,
+    ) -> Result<Vec<AnalysisResult>> {
         let results = sqlx::query_as::<_, AnalysisResult>(
             r#"
             SELECT
@@ -290,7 +279,7 @@ impl DatabaseService {
             FROM analysis_results
             WHERE analyzer_id = $1
             ORDER BY created_at DESC
-            "#
+            "#,
         )
         .bind(analyzer_id)
         .fetch_all(&self.pool)
@@ -301,7 +290,10 @@ impl DatabaseService {
     }
 
     // Consensus and reputation operations
-    pub async fn calculate_consensus_for_bounty(&self, bounty_id: Uuid) -> Result<Option<ConsensusResult>> {
+    pub async fn calculate_consensus_for_bounty(
+        &self,
+        bounty_id: Uuid,
+    ) -> Result<Option<ConsensusResult>> {
         let consensus = sqlx::query_as::<_, ConsensusResult>(
             r#"
             SELECT
@@ -312,7 +304,7 @@ impl DatabaseService {
                 COUNT(CASE WHEN verdict = 'suspicious' THEN 1 END) as suspicious_count
             FROM analysis_results
             WHERE bounty_id = $1 AND status = 'completed'
-            "#
+            "#,
         )
         .bind(bounty_id)
         .fetch_optional(&self.pool)
@@ -322,7 +314,10 @@ impl DatabaseService {
         Ok(consensus)
     }
 
-    pub async fn get_user_analysis_stats(&self, user_id: Uuid) -> Result<Option<UserAnalysisStats>> {
+    pub async fn get_user_analysis_stats(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Option<UserAnalysisStats>> {
         let stats = sqlx::query_as::<_, UserAnalysisStats>(
             r#"
             SELECT
@@ -332,7 +327,7 @@ impl DatabaseService {
                 COUNT(CASE WHEN verdict = 'benign' THEN 1 END) as benign_detections
             FROM analysis_results
             WHERE analyzer_id = $1 AND status = 'completed'
-            "#
+            "#,
         )
         .bind(user_id)
         .fetch_optional(&self.pool)
@@ -344,7 +339,10 @@ impl DatabaseService {
 
     // Transaction management
     pub async fn begin_transaction(&self) -> Result<sqlx::Transaction<'_, sqlx::Postgres>> {
-        self.pool.begin().await.context("Failed to begin transaction")
+        self.pool
+            .begin()
+            .await
+            .context("Failed to begin transaction")
     }
 
     // Health check
@@ -353,13 +351,85 @@ impl DatabaseService {
             .execute(&self.pool)
             .await
             .context("Database health check failed")?;
-        
+
         Ok(())
+    }
+
+    // === Submission-related methods (stubs for compilation) ===
+
+    /// Get analysis result by ID
+    /// TODO: Implement actual database query
+    pub async fn get_analysis_result(&self, _analysis_id: Uuid) -> Result<AnalysisResult> {
+        anyhow::bail!("get_analysis_result not yet implemented")
+    }
+
+    /// Store file metadata
+    /// TODO: Implement actual database insert
+    pub async fn store_file_metadata(
+        &self,
+        _file_id: Uuid,
+        _metadata: &crate::models::analysis::FileMetadata,
+    ) -> Result<()> {
+        anyhow::bail!("store_file_metadata not yet implemented")
+    }
+
+    /// Get file info by hash
+    /// TODO: Implement actual database query
+    pub async fn get_file_info(
+        &self,
+        _file_hash: &str,
+    ) -> Result<Option<crate::handlers::submission::FileInfo>> {
+        Ok(None)
+    }
+
+    /// Create extended submission
+    /// TODO: Implement actual database insert
+    pub async fn create_extended_submission(
+        &self,
+        _submission: &crate::models::bounty::BountySubmission,
+    ) -> Result<()> {
+        anyhow::bail!("create_extended_submission not yet implemented")
+    }
+
+    /// Get submissions with filters
+    /// TODO: Implement actual database query with filtering
+    pub async fn get_submissions_with_filters(
+        &self,
+        _filters: &crate::handlers::submission::SubmissionFilters,
+        _page: u32,
+        _limit: u32,
+    ) -> Result<(Vec<crate::models::bounty::BountySubmission>, u32)> {
+        Ok((Vec::new(), 0))
+    }
+
+    /// Get extended submission by ID
+    /// TODO: Implement actual database query
+    pub async fn get_extended_submission_by_id(
+        &self,
+        _submission_id: Uuid,
+    ) -> Result<Option<crate::models::bounty::ExtendedSubmission>> {
+        Ok(None)
+    }
+
+    /// Update submission
+    /// TODO: Implement actual database update
+    pub async fn update_submission(
+        &self,
+        _submission_id: Uuid,
+        _updates: &crate::handlers::submission::UpdateSubmissionRequest,
+    ) -> Result<crate::models::bounty::ExtendedSubmission> {
+        anyhow::bail!("update_submission not yet implemented")
+    }
+
+    /// Delete submission
+    /// TODO: Implement actual database delete
+    pub async fn delete_submission(&self, _submission_id: Uuid) -> Result<()> {
+        anyhow::bail!("delete_submission not yet implemented")
     }
 }
 
 // Helper structs for complex queries
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ConsensusResult {
     pub total_analyses: Option<i64>,
     pub avg_confidence: Option<f64>,
@@ -393,7 +463,7 @@ impl ConsensusResult {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserAnalysisStats {
     pub total_analyses: Option<i64>,
     pub avg_confidence: Option<f64>,
@@ -414,6 +484,6 @@ pub async fn run_migrations(pool: &PgPool) -> Result<()> {
         .run(pool)
         .await
         .context("Failed to run database migrations")?;
-    
+
     Ok(())
 }

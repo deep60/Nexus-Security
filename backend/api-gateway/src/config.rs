@@ -147,6 +147,7 @@ pub struct ServicesConfig {
     pub max_file_size_mb: usize,
     pub supported_file_types: Vec<String>,
     pub analysis_timeout_seconds: u64,
+    pub upload_path: String,
 }
 
 /// Feature flags configuration
@@ -275,7 +276,8 @@ impl Default for BlockchainConfig {
         Self {
             rpc_url: "http://localhost:8545".to_string(),
             chain_id: 1337, // Local development chain
-            private_key: "0x0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+            private_key: "0x0000000000000000000000000000000000000000000000000000000000000000"
+                .to_string(),
             contracts: ContractsConfig::default(),
             gas_limit: 500000,
             gas_price_gwei: 20,
@@ -324,7 +326,13 @@ impl Default for CorsConfig {
     fn default() -> Self {
         Self {
             allowed_origins: vec!["http://localhost:3000".to_string()],
-            allowed_methods: vec!["GET".to_string(), "POST".to_string(), "PUT".to_string(), "DELETE".to_string(), "OPTIONS".to_string()],
+            allowed_methods: vec![
+                "GET".to_string(),
+                "POST".to_string(),
+                "PUT".to_string(),
+                "DELETE".to_string(),
+                "OPTIONS".to_string(),
+            ],
             allowed_headers: vec!["*".to_string()],
             expose_headers: vec![],
             allow_credentials: true,
@@ -363,6 +371,7 @@ impl Default for ServicesConfig {
                 "zip".to_string(),
             ],
             analysis_timeout_seconds: 300,
+            upload_path: "./uploads".to_string(),
         }
     }
 }
@@ -418,9 +427,9 @@ impl AppConfig {
             config.server.host = host;
         }
         if let Ok(port) = std::env::var("SERVER_PORT") {
-            config.server.port = port.parse().map_err(|_| {
-                ConfigError::InvalidValue("Invalid SERVER_PORT".to_string())
-            })?;
+            config.server.port = port
+                .parse()
+                .map_err(|_| ConfigError::InvalidValue("Invalid SERVER_PORT".to_string()))?;
         }
         if let Ok(env) = std::env::var("ENVIRONMENT") {
             config.server.environment = match env.to_lowercase().as_str() {
@@ -428,7 +437,12 @@ impl AppConfig {
                 "staging" => Environment::Staging,
                 "production" | "prod" => Environment::Production,
                 "testing" | "test" => Environment::Testing,
-                _ => return Err(ConfigError::InvalidValue(format!("Invalid ENVIRONMENT: {}", env))),
+                _ => {
+                    return Err(ConfigError::InvalidValue(format!(
+                        "Invalid ENVIRONMENT: {}",
+                        env
+                    )))
+                }
             };
         }
 
@@ -452,9 +466,9 @@ impl AppConfig {
             config.blockchain.rpc_url = rpc_url;
         }
         if let Ok(chain_id) = std::env::var("CHAIN_ID") {
-            config.blockchain.chain_id = chain_id.parse().map_err(|_| {
-                ConfigError::InvalidValue("Invalid CHAIN_ID".to_string())
-            })?;
+            config.blockchain.chain_id = chain_id
+                .parse()
+                .map_err(|_| ConfigError::InvalidValue("Invalid CHAIN_ID".to_string()))?;
         }
 
         // Contract addresses
@@ -472,15 +486,15 @@ impl AppConfig {
         if let Ok(jwt_secret) = std::env::var("JWT_SECRET") {
             config.security.jwt_secret = jwt_secret;
         } else if config.server.environment.is_production() {
-            return Err(ConfigError::MissingField("JWT_SECRET is required in production".to_string()));
+            return Err(ConfigError::MissingField(
+                "JWT_SECRET is required in production".to_string(),
+            ));
         }
 
         // CORS origins
         if let Ok(origins) = std::env::var("CORS_ALLOWED_ORIGINS") {
-            config.security.cors.allowed_origins = origins
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
+            config.security.cors.allowed_origins =
+                origins.split(',').map(|s| s.trim().to_string()).collect();
         }
 
         // Services configuration
@@ -521,7 +535,11 @@ impl AppConfig {
         }
 
         // Check default locations
-        for path in &["config.toml", "config/production.toml", "config/development.toml"] {
+        for path in &[
+            "config.toml",
+            "config/production.toml",
+            "config/development.toml",
+        ] {
             if Path::new(path).exists() {
                 match Self::from_file(path) {
                     Ok(mut config) => {
@@ -565,7 +583,9 @@ impl AppConfig {
     pub fn validate(&self) -> ConfigResult<()> {
         // Validate server configuration
         if self.server.port == 0 {
-            return Err(ConfigError::InvalidValue("Server port cannot be 0".to_string()));
+            return Err(ConfigError::InvalidValue(
+                "Server port cannot be 0".to_string(),
+            ));
         }
 
         // Validate database URL
@@ -582,12 +602,12 @@ impl AppConfig {
         if self.server.environment.is_production() {
             if self.security.jwt_secret == "change-me-in-production" {
                 return Err(ConfigError::InvalidValue(
-                    "JWT_SECRET must be changed in production".to_string()
+                    "JWT_SECRET must be changed in production".to_string(),
                 ));
             }
             if self.security.jwt_secret.len() < 32 {
                 return Err(ConfigError::InvalidValue(
-                    "JWT_SECRET must be at least 32 characters in production".to_string()
+                    "JWT_SECRET must be at least 32 characters in production".to_string(),
                 ));
             }
         }
@@ -603,7 +623,7 @@ impl AppConfig {
         if self.security.rate_limiting.enabled {
             if self.security.rate_limiting.requests_per_minute == 0 {
                 return Err(ConfigError::InvalidValue(
-                    "Rate limit requests_per_minute cannot be 0".to_string()
+                    "Rate limit requests_per_minute cannot be 0".to_string(),
                 ));
             }
         }
@@ -644,17 +664,28 @@ impl AppConfig {
         println!("=== Nexus Security API Gateway Configuration ===");
         println!("Environment: {:?}", self.server.environment);
         println!("Server: {}:{}", self.server.host, self.server.port);
-        println!("Database: {} (max_conn: {})",
+        println!(
+            "Database: {} (max_conn: {})",
             self.mask_credentials(&self.database.url),
             self.database.max_connections
         );
         println!("Redis: {}", self.mask_credentials(&self.redis.url));
         println!("Blockchain RPC: {}", self.blockchain.rpc_url);
         println!("Max file size: {} MB", self.services.max_file_size_mb);
-        println!("Rate limiting: {}", if self.security.rate_limiting.enabled { "enabled" } else { "disabled" });
+        println!(
+            "Rate limiting: {}",
+            if self.security.rate_limiting.enabled {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
         println!("Features enabled:");
         println!("  - File uploads: {}", self.features.enable_file_uploads);
-        println!("  - Blockchain: {}", self.features.enable_blockchain_integration);
+        println!(
+            "  - Blockchain: {}",
+            self.features.enable_blockchain_integration
+        );
         println!("  - Webhooks: {}", self.features.enable_webhooks);
         println!("  - MFA: {}", self.features.enable_mfa);
         println!("  - Analytics: {}", self.features.enable_analytics);

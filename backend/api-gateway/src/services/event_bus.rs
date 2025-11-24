@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
+use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -312,7 +313,7 @@ impl EventBus {
         let mut redis = self.redis.write().await;
         let _: () = redis
             .connection_pool
-            .setex(&key, ttl, serialized)
+            .set_ex(&key, serialized, ttl)
             .await
             .context("Failed to store event history")?;
 

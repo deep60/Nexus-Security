@@ -123,7 +123,7 @@ pub struct UserBadgesResponse {
 ///
 /// GET /api/v1/reputation/leaderboard
 pub async fn get_leaderboard(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Query(params): Query<LeaderboardQuery>,
 ) -> Result<Json<LeaderboardResponse>, StatusCode> {
     let page = params.page.unwrap_or(1);
@@ -150,7 +150,7 @@ pub async fn get_leaderboard(
 ///
 /// GET /api/v1/reputation/engines
 pub async fn get_engine_reputation(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Query(params): Query<LeaderboardQuery>,
 ) -> Result<Json<Vec<EngineReputation>>, StatusCode> {
     // TODO: Fetch engine reputation from database
@@ -165,7 +165,7 @@ pub async fn get_engine_reputation(
 ///
 /// GET /api/v1/reputation/engines/:engine_id
 pub async fn get_engine_by_id(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(engine_id): Path<Uuid>,
 ) -> Result<Json<EngineReputation>, StatusCode> {
     // TODO: Fetch specific engine reputation
@@ -176,7 +176,7 @@ pub async fn get_engine_by_id(
 ///
 /// POST /api/v1/reputation/update
 pub async fn update_reputation_score(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Json(payload): Json<UpdateReputationRequest>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // TODO: Update user reputation
@@ -193,7 +193,7 @@ pub async fn update_reputation_score(
 ///
 /// GET /api/v1/reputation/history/:user_id
 pub async fn get_reputation_history(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
     Query(params): Query<ReputationHistoryQuery>,
 ) -> Result<Json<ReputationHistoryResponse>, StatusCode> {
@@ -218,7 +218,7 @@ pub async fn get_reputation_history(
 ///
 /// GET /api/v1/reputation/me/history
 pub async fn get_my_reputation_history(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Query(params): Query<ReputationHistoryQuery>,
 ) -> Result<Json<ReputationHistoryResponse>, StatusCode> {
     // TODO: Extract user ID from JWT claims
@@ -230,7 +230,7 @@ pub async fn get_my_reputation_history(
 ///
 /// GET /api/v1/reputation/badges/:user_id
 pub async fn get_user_badges(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<UserBadgesResponse>, StatusCode> {
     // TODO: Fetch user badges
@@ -249,7 +249,7 @@ pub async fn get_user_badges(
 ///
 /// GET /api/v1/reputation/me/badges
 pub async fn get_my_badges(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
 ) -> Result<Json<UserBadgesResponse>, StatusCode> {
     // TODO: Extract user ID from JWT and fetch badges
     Err(StatusCode::NOT_IMPLEMENTED)
@@ -259,7 +259,7 @@ pub async fn get_my_badges(
 ///
 /// GET /api/v1/reputation/stats
 pub async fn get_reputation_stats(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // TODO: Calculate global reputation statistics
     Ok(Json(serde_json::json!({

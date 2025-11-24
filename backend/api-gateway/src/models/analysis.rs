@@ -196,6 +196,7 @@ pub struct AnalysisResult {
     pub confidence: f64,
     pub stake_amount: String,
     pub details: serde_json::Value,
+    #[sqlx(json)]
     pub threat_indicators: Vec<ThreatIndicator>,
     pub submitted_at: DateTime<Utc>,
     pub verified_at: Option<DateTime<Utc>>,

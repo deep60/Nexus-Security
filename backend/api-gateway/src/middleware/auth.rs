@@ -7,25 +7,25 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
-use chrono::{DateTime, Duration, Utc};
 
-use crate::AppState;
 use crate::models::error::ApiError;
+use crate::AppState;
 
 /// JWT Claims structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: Uuid,           // Subject (user ID)
-    pub email: String,       // User email
-    pub role: String,        // User role
-    pub exp: i64,            // Expiration time
-    pub iat: i64,            // Issued at
-    pub nbf: i64,            // Not before
-    pub jti: String,         // JWT ID (unique token identifier)
+    pub sub: Uuid,     // Subject (user ID)
+    pub email: String, // User email
+    pub role: String,  // User role
+    pub exp: i64,      // Expiration time
+    pub iat: i64,      // Issued at
+    pub nbf: i64,      // Not before
+    pub jti: String,   // JWT ID (unique token identifier)
 }
 
 impl Claims {
@@ -100,7 +100,7 @@ impl JwtService {
 
 /// Authentication middleware
 pub async fn auth_middleware(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     mut request: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
@@ -138,7 +138,7 @@ pub async fn auth_middleware(
 
 /// Optional authentication middleware (doesn't fail on missing token)
 pub async fn optional_auth_middleware(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     mut request: Request<Body>,
     next: Next,
 ) -> Response {
@@ -172,10 +172,7 @@ pub async fn optional_auth_middleware(
 }
 
 /// Admin role middleware (must be used after auth_middleware)
-pub async fn require_admin(
-    mut request: Request<Body>,
-    next: Next,
-) -> Result<Response, StatusCode> {
+pub async fn require_admin(mut request: Request<Body>, next: Next) -> Result<Response, StatusCode> {
     let claims = request
         .extensions()
         .get::<Claims>()
@@ -190,7 +187,7 @@ pub async fn require_admin(
 
 /// API key authentication middleware
 pub async fn api_key_middleware(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     mut request: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {

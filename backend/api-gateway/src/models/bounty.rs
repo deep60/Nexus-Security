@@ -422,7 +422,8 @@ impl Bounty {
 impl BountyStats {
     pub fn avg_reward_per_participant(&self) -> Option<f64> {
         if self.unique_participants > 0 {
-            self.rewards_distributed.parse::<f64>()
+            self.rewards_distributed
+                .parse::<f64>()
                 .map(|total| total / self.unique_participants as f64)
                 .ok()
         } else {
@@ -433,7 +434,7 @@ impl BountyStats {
     pub fn roi_percentage(&self) -> Option<f64> {
         let rewards = self.rewards_distributed.parse::<f64>().ok()?;
         let stakes = self.total_stake_pool.parse::<f64>().ok()?;
-        
+
         if stakes > 0.0 {
             Some((rewards / stakes) * 100.0)
         } else {
@@ -504,4 +505,25 @@ impl CreateBountyRequest {
 
         Ok(())
     }
+}
+
+// Extended submission data for detailed views
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtendedSubmission {
+    pub submission: BountySubmission,
+    pub engine_name: String,
+    pub engine_version: String,
+    pub threat_types: Vec<String>,
+    pub risk_score: u8,
+    pub analysis_summary: String,
+    pub signatures: Vec<String>,
+    pub status: crate::handlers::submission::SubmissionStatus,
+    pub processing_metrics: Option<ProcessingMetrics>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessingMetrics {
+    pub processing_time_ms: u64,
+    pub start_time: DateTime<Utc>,
+    pub end_time: DateTime<Utc>,
 }
