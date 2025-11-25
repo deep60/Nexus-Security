@@ -126,7 +126,7 @@ impl ConsensusAggregator {
     fn build_distribution(
         &self,
         verdict_map: HashMap<String, Vec<WeightedVote>>,
-        total_votes: usize,
+        _total_votes: usize,
     ) -> VerdictDistribution {
         let mut distribution = VerdictDistribution::default();
         

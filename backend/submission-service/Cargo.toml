@@ -9,7 +9,7 @@ tokio = { workspace = true }
 futures = { workspace = true }
 
 # Web framework
-axum = "0.7"
+axum = { version = "0.7", features = ["multipart"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
 hyper = "1.0"

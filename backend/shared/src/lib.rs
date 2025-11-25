@@ -30,5 +30,6 @@ pub enum NexusError {
 
 pub type Result<T> = std::result::Result<T, NexusError>;
 
-// Export types module
+// Export modules
 pub mod types;
+pub mod messaging;

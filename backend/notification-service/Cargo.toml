@@ -75,6 +75,13 @@ governor = "0.6"
 # Validation
 validator = { version = "0.18", features = ["derive"] }
 
+# Cryptography for webhook signatures
+ring = "0.17"
+hex = "0.4"
+
+# URL parsing
+url = "2.5"
+
 # Shared module
 shared = { path = "../shared" }
 

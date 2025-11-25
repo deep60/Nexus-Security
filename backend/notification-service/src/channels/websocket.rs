@@ -136,7 +136,7 @@ impl WebSocketChannel {
         let mut failed_connections = Vec::new();
 
         for conn in user_connections {
-            match conn.sender.send(message_json.clone()).await {
+            match conn.sender.send(message_json.clone()) {
                 Ok(_) => {
                     successful_sends += 1;
                 }
