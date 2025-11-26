@@ -60,7 +60,7 @@ pub async fn wait_for_confirmations(
         let tx_block = receipt.block_number.unwrap_or_default();
 
         if current_block.as_u64() >= tx_block.as_u64() + confirmations as u64 {
-            return Ok(receipt);
+            return Ok(Some(receipt.clone()));
         }
     }
 

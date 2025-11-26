@@ -67,7 +67,7 @@ pub async fn send_transaction(
 pub async fn wait_for_confirmation(
     provider: &Provider<Ws>,
     tx_hash: H256,
-    confirmations: usize,
+    _confirmations: usize,
 ) -> Result<TransactionReceipt> {
     info!("Waiting for confirmation of tx {}", tx_hash);
     
