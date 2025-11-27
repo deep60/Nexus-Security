@@ -192,7 +192,18 @@ interface IBountyManager {
     /**
      * @dev Gets bounty information
      * @param bountyId ID of the bounty
-     * @return Bounty details (excluding mapping fields)
+     * @return id Bounty ID
+     * @return creator Creator address
+     * @return targetHash Hash of target
+     * @return targetType Type of target
+     * @return reward Reward amount
+     * @return minimumStake Minimum stake required
+     * @return deadline Analysis deadline
+     * @return createdAt Creation timestamp
+     * @return status Bounty status
+     * @return consensus Consensus verdict
+     * @return confidenceScore Confidence score
+     * @return totalAnalyses Total number of analyses
      */
     function getBounty(uint256 bountyId) external view returns (
         uint256 id,
@@ -213,7 +224,12 @@ interface IBountyManager {
      * @dev Gets analysis information
      * @param bountyId ID of the bounty
      * @param engine Address of the analyzing engine
-     * @return Analysis details
+     * @return verdict Analysis verdict
+     * @return stake Stake amount
+     * @return confidence Confidence level
+     * @return analysisData Analysis data hash
+     * @return submittedAt Submission timestamp
+     * @return isRewarded Whether rewarded
      */
     function getAnalysis(uint256 bountyId, address engine) external view returns (
         ThreatVerdict verdict,

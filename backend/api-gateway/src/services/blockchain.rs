@@ -495,20 +495,20 @@ impl BlockchainService {
         nonce
     }
 
-    // Placeholder ABI methods - in practice, these would load from JSON files
+    // Load real ABIs from compiled contract artifacts
     fn get_bounty_manager_abi() -> Abi {
-        // This would load the actual ABI from your smart contract compilation artifacts
-        serde_json::from_str(r#"[]"#).unwrap()
+        crate::services::abi_loader::load_bounty_manager_abi()
+            .expect("Failed to load BountyManager ABI - run blockchain/scripts/extract-abis.sh")
     }
 
     fn get_threat_token_abi() -> Abi {
-        // This would load the actual ABI from your smart contract compilation artifacts
-        serde_json::from_str(r#"[]"#).unwrap()
+        crate::services::abi_loader::load_threat_token_abi()
+            .expect("Failed to load ThreatToken ABI - run blockchain/scripts/extract-abis.sh")
     }
 
     fn get_reputation_system_abi() -> Abi {
-        // This would load the actual ABI from your smart contract compilation artifacts
-        serde_json::from_str(r#"[]"#).unwrap()
+        crate::services::abi_loader::load_reputation_system_abi()
+            .expect("Failed to load ReputationSystem ABI - run blockchain/scripts/extract-abis.sh")
     }
 }
 

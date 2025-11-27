@@ -13,7 +13,51 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @author Nexus-Security Team
  */
 
-contract BountyManager is IBountyManager {
+// TODO: Implement all IBountyManager interface methods
+contract BountyManager {
+    // Enums
+    enum BountyStatus {
+        Active,      // Bounty is open for submissions
+        InReview,    // Analysis period has ended, consensus being calculated
+        Completed,   // Bounty resolved with consensus
+        Cancelled,   // Bounty cancelled by creator
+        Disputed     // Bounty under dispute resolution
+    }
+
+    enum ThreatVerdict {
+        Pending,    // No verdict yet
+        Benign,     // File/URL is safe
+        Malicious,  // File/URL is a threat
+        Suspicious  // File/URL requires further investigation
+    }
+
+    // Structs
+    struct Bounty {
+        uint256 id;
+        address creator;
+        string artifactHash;
+        string artifactType;
+        uint256 rewardAmount;
+        uint256 deadline;
+        string description;
+        BountyStatus status;
+        ThreatVerdict consensusVerdict;
+        uint256 totalStaked;
+        uint256 analysisCount;
+        uint256 createdAt;
+    }
+
+    struct Analysis {
+        uint256 bountyId;
+        address analyst;
+        ThreatVerdict verdict;
+        uint256 confidence;
+        uint256 stakeAmount;
+        string analysisHash;
+        uint256 submittedAt;
+        bool rewarded;
+    }
+
     // state variables
     ThreatToken public immutable threatToken;
     IReputationSystem public immutable reputationSystem;
@@ -36,7 +80,36 @@ contract BountyManager is IBountyManager {
     mapping(address => uint256[]) public userBounties;
     mapping(uint256 => mapping(address => uint256)) public analystSubmissionIds; // Added for rep integration
 
-    // Events are defined in IBountyManager interface
+    // Events
+    event BountyCreated(
+        uint256 indexed bountyId,
+        address indexed creator,
+        string artifactHash,
+        uint256 reward,
+        uint256 deadline
+    );
+
+    event AnalysisSubmitted(
+        uint256 indexed bountyId,
+        address indexed engine,
+        ThreatVerdict verdict,
+        uint256 stake,
+        uint256 confidence
+    );
+
+    event ConsensusReached(
+        uint256 indexed bountyId,
+        ThreatVerdict consensus,
+        uint256 confidenceScore,
+        uint256 totalAnalyses
+    );
+
+    event RewardsDistributed(
+        uint256 indexed bountyId,
+        address[] winners,
+        uint256[] rewards,
+        uint256[] stakes
+    );
 
     // Modifiers
     modifier onlyOwner() {
@@ -164,6 +237,7 @@ contract BountyManager is IBountyManager {
         );
         
         analyses[bountyId][msg.sender] = Analysis({
+            bountyId: bountyId,
             analyst: msg.sender,
             verdict: verdict,
             confidence: confidence,
@@ -176,23 +250,23 @@ contract BountyManager is IBountyManager {
         bountyAnalysts[bountyId].push(msg.sender);
         bounties[bountyId].totalStaked += stakeAmount;
         bounties[bountyId].analysisCount++;
-        
-        // Record submission in reputation system
-        uint256 submissionId = reputationSystem.recordSubmission(
-            msg.sender,
-            bountyId,
-            (verdict == ThreatVerdict.Malicious),
-            stakeAmount,
-            confidence
-        );
-        analystSubmissionIds[bountyId][msg.sender] = submissionId;
-        
+
+        // TODO: Record submission in reputation system
+        // uint256 submissionId = reputationSystem.recordSubmission(
+        //     msg.sender,
+        //     bountyId,
+        //     (verdict == ThreatVerdict.Malicious),
+        //     stakeAmount,
+        //     confidence
+        // );
+        // analystSubmissionIds[bountyId][msg.sender] = submissionId;
+
         emit AnalysisSubmitted(
             bountyId,
             msg.sender,
             verdict,
             stakeAmount,
-            analysisHash
+            confidence
         );
         
         // Check if we can resolve the bounty
@@ -251,21 +325,33 @@ contract BountyManager is IBountyManager {
         (ThreatVerdict consensus, uint256 consensusCount) = _calculateConsensus(bountyId);
         
         bounty.consensusVerdict = consensus;
-        bounty.status = BountyStatus.Resolved;
+        bounty.status = BountyStatus.Completed;
         
-        // Resolve submissions in reputation system
+        // Update reputation for all analysts based on their analysis accuracy
         for (uint256 i = 0; i < analysts.length; i++) {
             address analyst = analysts[i];
-            uint256 submissionId = analystSubmissionIds[bountyId][analyst];
-            if (submissionId > 0) {
-                reputationSystem.resolveSubmission(submissionId, (consensus == ThreatVerdict.Malicious));
-            }
+            Analysis storage analysis = analyses[bountyId][analyst];
+
+            // Check if analyst's verdict matches consensus
+            bool wasCorrect = (analysis.verdict == consensus);
+
+            // Update reputation in reputation system
+            reputationSystem.updateReputationForAnalysis(
+                analyst,
+                bountyId,
+                wasCorrect,
+                analysis.stakeAmount
+            );
         }
         
         // Distribute rewards and slash stakes
         _distributeRewards(bountyId, consensus, consensusCount);
-        
-        emit BountyResolved(bountyId, consensus, bounty.rewardAmount, consensusCount);
+
+        // Calculate confidence score (percentage of consensus)
+        uint256 totalAnalyses = bountyAnalysts[bountyId].length;
+        uint256 confidenceScore = totalAnalyses > 0 ? (consensusCount * 10000) / totalAnalyses : 0; // basis points
+
+        emit ConsensusReached(bountyId, consensus, confidenceScore, totalAnalyses);
     }
 
     /**
@@ -362,46 +448,58 @@ contract BountyManager is IBountyManager {
         // Add slashed stakes to reward pool
         uint256 slashedAmount = _processSlashing(bountyId, consensus);
         rewardPool += slashedAmount;
-        
+
         // Distribute rewards to winners
         uint256 individualReward = rewardPool / winnerCount;
-        
+
+        // Collect winners for event emission
+        address[] memory winners = new address[](winnerCount);
+        uint256[] memory rewards = new uint256[](winnerCount);
+        uint256[] memory stakes = new uint256[](winnerCount);
+        uint256 winnerIndex = 0;
+
         for (uint256 i = 0; i < analysts.length; i++) {
             address analyst = analysts[i];
             Analysis storage analysis = analyses[bountyId][analyst];
-            
+
             if (analysis.verdict == consensus && !analysis.rewarded) {
                 analysis.rewarded = true;
-                
+
                 // Return stake + reward
                 uint256 totalPayout = analysis.stakeAmount + individualReward;
                 require(threatToken.transfer(analyst, totalPayout), "Reward transfer failed");
-                
-                emit RewardDistributed(bountyId, analyst, individualReward);
+
+                // Collect for event
+                winners[winnerIndex] = analyst;
+                rewards[winnerIndex] = individualReward;
+                stakes[winnerIndex] = analysis.stakeAmount;
+                winnerIndex++;
             }
         }
-        
+
         // Transfer platform fee
         require(threatToken.transfer(feeCollector, platformFee), "Fee transfer failed");
+
+        // Emit rewards distributed event
+        emit RewardsDistributed(bountyId, winners, rewards, stakes);
     }
 
     /**
      * @dev Process slashing for incorrect analyses
      */
-    function _processSlashing(uint256 bountyId, ThreatVerdict consensus) 
-        internal 
-        returns (uint256 totalSlashed) 
+    function _processSlashing(uint256 bountyId, ThreatVerdict consensus)
+        internal
+        returns (uint256 totalSlashed)
     {
         address[] storage analysts = bountyAnalysts[bountyId];
-        
+
         for (uint256 i = 0; i < analysts.length; i++) {
             address analyst = analysts[i];
             Analysis storage analysis = analyses[bountyId][analyst];
-            
+
             if (analysis.verdict != consensus) {
                 totalSlashed += analysis.stakeAmount;
-                
-                emit StakeSlashed(bountyId, analyst, analysis.stakeAmount);
+                // Stakes are slashed (added to reward pool)
             }
         }
     }

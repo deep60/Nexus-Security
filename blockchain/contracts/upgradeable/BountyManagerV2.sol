@@ -315,14 +315,16 @@ contract BountyManagerV2 is
         bounties[bountyId].totalStaked += stakeAmount;
         bounties[bountyId].analysisCount++;
 
-        uint256 submissionId = reputationSystem.recordSubmission(
-            msg.sender,
-            bountyId,
-            (verdict == ThreatVerdict.Malicious),
-            stakeAmount,
-            confidence
-        );
-        analystSubmissionIds[bountyId][msg.sender] = submissionId;
+        // TODO: recordSubmission is not part of IReputationSystem interface
+        // Reputation updates are handled in resolveBounty via updateReputationForAnalysis
+        // uint256 submissionId = reputationSystem.recordSubmission(
+        //     msg.sender,
+        //     bountyId,
+        //     (verdict == ThreatVerdict.Malicious),
+        //     stakeAmount,
+        //     confidence
+        // );
+        // analystSubmissionIds[bountyId][msg.sender] = submissionId;
 
         emit AnalysisSubmitted(bountyId, msg.sender, verdict, stakeAmount, analysisHash);
 
@@ -445,12 +447,21 @@ contract BountyManagerV2 is
         bounty.consensusVerdict = consensus;
         bounty.status = BountyStatus.Resolved;
 
+        // Update reputation for all analysts based on their analysis accuracy
         for (uint256 i = 0; i < analysts.length; i++) {
             address analyst = analysts[i];
-            uint256 submissionId = analystSubmissionIds[bountyId][analyst];
-            if (submissionId > 0) {
-                reputationSystem.resolveSubmission(submissionId, (consensus == ThreatVerdict.Malicious));
-            }
+            Analysis storage analysis = analyses[bountyId][analyst];
+
+            // Check if analyst's verdict matches consensus
+            bool wasCorrect = (analysis.verdict == consensus);
+
+            // Update reputation in reputation system
+            reputationSystem.updateReputationForAnalysis(
+                analyst,
+                bountyId,
+                wasCorrect,
+                analysis.stakeAmount
+            );
         }
 
         _distributeRewards(bountyId, consensus, consensusCount);

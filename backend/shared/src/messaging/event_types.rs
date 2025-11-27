@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::types::common::{
     UserId, BountyId, SubmissionId, EngineId, ThreatVerdict,
-    TokenAmount, TransactionHash, BountyStatus, SubmissionStatus
+    TokenAmount, TransactionHash
 };
 
 /// Core event types for the Nexus-Security platform

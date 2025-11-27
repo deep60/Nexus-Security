@@ -163,11 +163,10 @@ contract ReputationSystem is IReputationSystem, AccessControl {
         return 90; // Hybrid
     }
 
-    function getEngineInfo(address engineAddress) 
-        external 
-        view 
-        override
-        returns (EngineInfo memory) 
+    function getEngineInfo(address engineAddress)
+        external
+        view
+        returns (EngineInfo memory)
     {
         EngineProfile storage profile = engines[engineAddress];
         return EngineInfo({
@@ -283,7 +282,7 @@ contract ReputationSystem is IReputationSystem, AccessControl {
         bool prediction,
         uint256 stakeAmount,
         uint256 confidenceScore
-    ) external override onlyRole(BOUNTY_MANAGER_ROLE) returns (uint256) {
+    ) external onlyRole(BOUNTY_MANAGER_ROLE) returns (uint256) {
         require(engines[engine].isActive, "Engine not active");
         require(confidenceScore <= 100, "Invalid confidence score");
 
@@ -309,10 +308,9 @@ contract ReputationSystem is IReputationSystem, AccessControl {
         return submissionId;
     }
 
-    function resolveSubmission(uint256 submissionId, bool actualResult) 
-        external 
-        override 
-        onlyRole(BOUNTY_MANAGER_ROLE) 
+    function resolveSubmission(uint256 submissionId, bool actualResult)
+        external
+        onlyRole(BOUNTY_MANAGER_ROLE)
     {
         SubmissionRecord storage submission = submissions[submissionId];
         require(!submission.isResolved, "Submission already resolved");
@@ -327,7 +325,7 @@ contract ReputationSystem is IReputationSystem, AccessControl {
         emit SubmissionResolved(submissionId, isCorrect, reputationChange);
     }
 
-    function updateReputation(address engine, bool success) external override onlyRole(BOUNTY_MANAGER_ROLE) {
+    function updateReputation(address engine, bool success) external onlyRole(BOUNTY_MANAGER_ROLE) {
         // Wrapper for compatibility if needed, but prefer resolveSubmission
         EngineProfile storage profile = engines[engine];
         uint256 oldReputation = profile.reputation;
@@ -338,6 +336,88 @@ contract ReputationSystem is IReputationSystem, AccessControl {
             profile.reputation = (profile.reputation > change) ? profile.reputation - change : MIN_REPUTATION;
         }
         emit ReputationUpdated(engine, oldReputation, profile.reputation, success ? "Success" : "Failure");
+    }
+
+    /**
+     * @notice Update engine reputation based on analysis accuracy (interface implementation)
+     * @param engineAddress Address of the engine
+     * @param bountyId ID of the bounty being analyzed
+     * @param wasCorrect Whether the engine's analysis was correct
+     * @param stakeAmount Amount staked by the engine
+     * @return newReputation Updated reputation score
+     */
+    function updateReputationForAnalysis(
+        address engineAddress,
+        uint256 bountyId,
+        bool wasCorrect,
+        uint256 stakeAmount
+    ) external override onlyRole(BOUNTY_MANAGER_ROLE) returns (uint256 newReputation) {
+        EngineProfile storage profile = engines[engineAddress];
+        require(profile.isActive, "Engine not active");
+
+        uint256 oldReputation = profile.reputation;
+
+        // Calculate reputation change based on correctness and stake
+        uint256 change;
+        if (wasCorrect) {
+            // Base gain + stake-based bonus
+            change = 5 + (stakeAmount / 1000);
+            if (change > 20) change = 20; // Cap gain
+            profile.reputation = (profile.reputation + change > MAX_REPUTATION) ? MAX_REPUTATION : profile.reputation + change;
+            profile.correctPredictions += 1;
+        } else {
+            // Base loss + stake-based penalty
+            change = 10 + (stakeAmount / 500);
+            if (change > 30) change = 30; // Cap loss
+            profile.reputation = (profile.reputation > change) ? profile.reputation - change : MIN_REPUTATION;
+        }
+
+        profile.totalSubmissions += 1;
+        profile.lastActiveTimestamp = block.timestamp;
+
+        reputationHistory[engineAddress].push(ReputationRecord({
+            timestamp: block.timestamp,
+            oldReputation: oldReputation,
+            newReputation: profile.reputation,
+            changeType: wasCorrect ? uint8(0) : uint8(2), // 0 = reward, 2 = incorrect
+            bountyId: bountyId
+        }));
+
+        emit ReputationUpdated(engineAddress, oldReputation, profile.reputation, wasCorrect ? "Correct analysis" : "Incorrect analysis");
+        return profile.reputation;
+    }
+
+    /**
+     * @notice Apply reputation decay for a specific inactive engine (interface implementation)
+     * @param engineAddress Address of the engine
+     * @return newReputation Updated reputation after decay
+     */
+    function applyReputationDecay(address engineAddress) external override onlyRole(ADMIN_ROLE) returns (uint256 newReputation) {
+        EngineProfile storage profile = engines[engineAddress];
+        require(profile.isRegistered, "Engine not registered");
+        require(block.timestamp >= profile.lastActiveTimestamp + 30 days, "Decay not due yet");
+
+        uint256 oldReputation = profile.reputation;
+        uint256 decayAmount = profile.reputation * DECAY_RATE / 100;
+
+        if (profile.reputation > decayAmount) {
+            profile.reputation -= decayAmount;
+        } else {
+            profile.reputation = MIN_REPUTATION;
+        }
+
+        reputationHistory[engineAddress].push(ReputationRecord({
+            timestamp: block.timestamp,
+            oldReputation: oldReputation,
+            newReputation: profile.reputation,
+            changeType: 3, // 3 = decay
+            bountyId: 0
+        }));
+
+        emit ReputationDecayed(engineAddress, decayAmount);
+        emit ReputationUpdated(engineAddress, oldReputation, profile.reputation, "Reputation decay");
+
+        return profile.reputation;
     }
 
     function _updateEngineReputation(address engine, uint256 submissionId, bool isCorrect) internal returns (uint256 reputationChange) {
@@ -470,13 +550,17 @@ contract ReputationSystem is IReputationSystem, AccessControl {
         return 0;
     }
 
-    function applyReputationDecay() external onlyRole(ADMIN_ROLE) {
+    /**
+     * @notice Apply reputation decay for all inactive engines (batch operation)
+     * @dev This is a convenience function to apply decay to all engines at once
+     */
+    function applyReputationDecayAll() external onlyRole(ADMIN_ROLE) {
         require(block.timestamp >= decayTimestamp + 30 days, "Decay not due yet");
-        
+
         for (uint256 i = 0; i < activeEngines.length; i++) {
             address engine = activeEngines[i];
             EngineProfile storage profile = engines[engine];
-            
+
             if (block.timestamp >= profile.lastActiveTimestamp + 30 days) {
                 uint256 oldReputation = profile.reputation;
                 uint256 decayAmount = profile.reputation * DECAY_RATE / 100;
@@ -485,7 +569,7 @@ contract ReputationSystem is IReputationSystem, AccessControl {
                 } else {
                     profile.reputation = MIN_REPUTATION;
                 }
-                
+
                 reputationHistory[engine].push(ReputationRecord({
                     timestamp: block.timestamp,
                     oldReputation: oldReputation,
@@ -493,11 +577,11 @@ contract ReputationSystem is IReputationSystem, AccessControl {
                     changeType: 3, // 3 = decay
                     bountyId: 0 // not tied to specific bounty
                 }));
-                
+
                 emit ReputationDecayed(engine, decayAmount);
             }
         }
-        
+
         decayTimestamp = block.timestamp;
     }
 
