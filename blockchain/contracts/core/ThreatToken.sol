@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Fixed ThreatToken.sol
 pragma solidity ^0.8.19;
 
@@ -5,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title ThreatToken
@@ -362,12 +363,12 @@ contract ThreatToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl, Reen
         }
     }
     
-    // Override functions for pausable functionality
-    function _beforeTokenTransfer(
+    // Override functions for pausable functionality (OpenZeppelin v5)
+    function _update(
         address from,
         address to,
         uint256 amount
     ) internal override(ERC20, ERC20Pausable) {
-        super._beforeTokenTransfer(from, to, amount);
+        super._update(from, to, amount);
     }
 }

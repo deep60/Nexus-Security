@@ -17,24 +17,7 @@ contract MockToken is ERC20 {
      * @param name Token name
      * @param symbol Token symbol
      * @param initialSupply Initial supply to mint to deployer
-     */
-    constructor(
-        string memory name,
-        string memory symbol,
-        uint256 initialSupply
-    ) ERC20(name, symbol) {
-        _decimals = 18;
-        if (initialSupply > 0) {
-            _mint(msg.sender, initialSupply);
-        }
-    }
-
-    /**
-     * @dev Constructor with custom decimals
-     * @param name Token name
-     * @param symbol Token symbol
-     * @param initialSupply Initial supply to mint to deployer
-     * @param decimals_ Number of decimals
+     * @param decimals_ Number of decimals (use 18 if not specified)
      */
     constructor(
         string memory name,

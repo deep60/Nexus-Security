@@ -36,41 +36,7 @@ contract BountyManager is IBountyManager {
     mapping(address => uint256[]) public userBounties;
     mapping(uint256 => mapping(address => uint256)) public analystSubmissionIds; // Added for rep integration
 
-    // Events
-    event BountyCreated(
-        uint256 indexed bountyId,
-        address indexed creator,
-        string artifactHash,
-        uint256 reward,
-        uint256 deadline
-    );
-
-    event AnalysisSubmitted(
-        uint256 indexed bountyId,
-        address indexed analyst,
-        ThreatVerdict verdict,
-        uint256 stakeAmount,
-        string analysisHash
-    );
-
-    event BountyResolved(
-        uint256 indexed bountyId,
-        ThreatVerdict consensusVerdict,
-        uint256 totalReward,
-        uint256 winnerCount
-    );
-
-    event StakeSlashed(
-        uint256 indexed bountyId,
-        address indexed analyst,
-        uint256 slashedAmount
-    );
-
-    event RewardDistributed(
-        uint256 indexed bountyId,
-        address indexed analyst,
-        uint256 rewardAmount
-    );
+    // Events are defined in IBountyManager interface
 
     // Modifiers
     modifier onlyOwner() {
@@ -120,7 +86,7 @@ contract BountyManager is IBountyManager {
 
      function createBounty(
         string memory artifactHash,
-        ArtifactType artifactType,
+        string memory artifactType,
         uint256 rewardAmount,
         uint256 deadline,
         string memory description

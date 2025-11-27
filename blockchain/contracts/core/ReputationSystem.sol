@@ -44,12 +44,7 @@ contract ReputationSystem is IReputationSystem, AccessControl {
        uint256 maxConsecutiveCorrect;
     }
 
-    struct ReputationRecord {
-        uint256 timestamp;
-        uint256 oldValue;
-        uint256 newValue;
-        string reason;
-    }
+    // ReputationRecord is defined in IReputationSystem interface
 
     struct SubmissionRecord {
         address engine;
@@ -69,16 +64,7 @@ contract ReputationSystem is IReputationSystem, AccessControl {
         string tierName;
     }
 
-    struct EngineInfo {
-        bool isRegistered;
-        uint8 engineType;
-        uint256 reputation;
-        uint256 totalAnalyses;
-        uint256 correctAnalyses;
-        uint256 lastActivityTimestamp;
-        uint256 registrationTimestamp;
-        bool isActive;
-    }
+    // EngineInfo is defined in IReputationSystem interface
 
     enum EngineCategory {
         Human,
@@ -99,36 +85,7 @@ contract ReputationSystem is IReputationSystem, AccessControl {
     uint256 public totalActiveEngines;
     uint256 public decayTimestamp;
 
-    // Events
-    event EngineRegistered(
-        address indexed engineAddress,
-        uint8 engineType,
-        uint256 initialReputation
-    );
-
-    event ReputationUpdated(
-        address indexed engineAddress,
-        uint256 oldValue,
-        uint256 newValue,
-        string reason
-    );
-
-    event EnginePenalized(
-        address indexed engineAddress,
-        uint256 penaltyAmount,
-        string reason
-    );
-
-    event EngineRewarded(
-        address indexed engineAddress,
-        uint256 rewardAmount,
-        uint256 indexed bountyId
-    );
-
-    event ReputationDecayed(
-        address indexed engineAddress,
-        uint256 decayAmount
-    );
+    // Events are defined in IReputationSystem interface
 
     event SubmissionRecorded(
         uint256 indexed submissionId,
@@ -309,9 +266,10 @@ contract ReputationSystem is IReputationSystem, AccessControl {
 
         reputationHistory[engineAddress].push(ReputationRecord({
             timestamp: block.timestamp,
-            oldValue: oldReputation,
-            newValue: profile.reputation,
-            reason: reason
+            oldReputation: oldReputation,
+            newReputation: profile.reputation,
+            changeType: 1, // 1 = penalty
+            bountyId: 0 // not tied to specific bounty
         }));
 
         emit EnginePenalized(engineAddress, penaltyAmount, reason);
@@ -425,9 +383,10 @@ contract ReputationSystem is IReputationSystem, AccessControl {
 
         reputationHistory[engine].push(ReputationRecord({
             timestamp: block.timestamp,
-            oldValue: oldReputation,
-            newValue: profile.reputation,
-            reason: isCorrect ? "Correct prediction" : "Incorrect prediction"
+            oldReputation: oldReputation,
+            newReputation: profile.reputation,
+            changeType: isCorrect ? uint8(0) : uint8(2), // 0 = reward, 2 = incorrect prediction
+            bountyId: submission.bountyId
         }));
 
         emit ReputationUpdated(engine, oldReputation, profile.reputation, isCorrect ? "Correct prediction" : "Incorrect prediction");
@@ -529,9 +488,10 @@ contract ReputationSystem is IReputationSystem, AccessControl {
                 
                 reputationHistory[engine].push(ReputationRecord({
                     timestamp: block.timestamp,
-                    oldValue: oldReputation,
-                    newValue: profile.reputation,
-                    reason: "Monthly decay"
+                    oldReputation: oldReputation,
+                    newReputation: profile.reputation,
+                    changeType: 3, // 3 = decay
+                    bountyId: 0 // not tied to specific bounty
                 }));
                 
                 emit ReputationDecayed(engine, decayAmount);
