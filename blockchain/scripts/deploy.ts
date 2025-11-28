@@ -41,9 +41,7 @@ async function main() {
     console.log("🗒️ Deploying ThreatToken...");
     const ThreatTokenFactory = await ethers.getContractFactory("ThreatToken");
     const threatToken = await ThreatTokenFactory.deploy(
-        "ThreatToken",      // name
-        "THREAT",          // symbol
-        ethers.parseEther("1000000")      // initial supply: 1M tokens
+        deployer.address    // admin address (name and symbol are hardcoded in contract)
     );
     await threatToken.waitForDeployment();
     const threatTokenAddress = await threatToken.getAddress();
@@ -57,12 +55,13 @@ async function main() {
   const reputationSystemAddress = await reputationSystem.getAddress();
   console.log(`✅ ReputationSystem deployed at: ${reputationSystemAddress}`);
 
-  // Deploy BountyManager 
+  // Deploy BountyManager
   console.log("\n 📋 Deploying BountyManager...");
   const BountyManagerFactory = await ethers.getContractFactory("BountyManager");
   const bountyManager = await BountyManagerFactory.deploy(
     threatTokenAddress,
-    reputationSystemAddress
+    reputationSystemAddress,
+    deployer.address  // feeCollector address
   );
   await bountyManager.waitForDeployment();
   const bountyManagerAddress = await bountyManager.getAddress();
@@ -70,16 +69,14 @@ async function main() {
 
   // Setup initial configuration
   console.log("\n⚙️  Setting up initial configuration...");
-  
-  // Grant BountyManager role in ReputationSystem
-  const MANAGER_ROLE = await reputationSystem.MANAGER_ROLE();
-  await reputationSystem.grantRole(MANAGER_ROLE, bountyManagerAddress);
-  console.log("✅ Granted MANAGER_ROLE to BountyManager in ReputationSystem");
 
-  // Setup BountyManager with initial parameters
-  await bountyManager.setMinimumStake(ethers.parseEther("10")); // 10 THREAT tokens minimum stake
-  await bountyManager.setAnalysisTimeout(3600); // 1 hour analysis timeout
-  console.log("✅ Set initial BountyManager parameters");
+  // Grant BountyManager role in ReputationSystem
+  const BOUNTY_MANAGER_ROLE = await reputationSystem.BOUNTY_MANAGER_ROLE();
+  await reputationSystem.grantRole(BOUNTY_MANAGER_ROLE, bountyManagerAddress);
+  console.log("✅ Granted BOUNTY_MANAGER_ROLE to BountyManager in ReputationSystem");
+
+  // Note: ANALYSIS_TIMEOUT and MINIMUM_STAKE are constants in the contract
+  console.log("✅ Contract deployed with default parameters (ANALYSIS_TIMEOUT: 24 hours, MINIMUM_STAKE: 100 THREAT)");
 
   // Transfer some tokens to BountyManager for rewards
   const rewardPoolAmount = ethers.parseEther("100000"); // 100K tokens for reward pool
@@ -140,7 +137,7 @@ async function main() {
 
   // Print verification commands
   console.log("\n🔍 To verify contracts, run:");
-  console.log(`npx hardhat verify --network ${network.name} ${threatTokenAddress} "ThreatToken" "THREAT" "${ethers.parseEther("1000000")}"`);
+  console.log(`npx hardhat verify --network ${network.name} ${threatTokenAddress} ${deployer.address}`);
   console.log(`npx hardhat verify --network ${network.name} ${reputationSystemAddress}`);
   console.log(`npx hardhat verify --network ${network.name} ${bountyManagerAddress} ${threatTokenAddress} ${reputationSystemAddress}`);
 
