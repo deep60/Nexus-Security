@@ -1,2 +1,29 @@
 /target
 backend/target/
+
+# Environment variables (contains sensitive data)
+.env
+.env.local
+.env.*.local
+blockchain/.env
+backend/.env
+
+# Node modules
+node_modules/
+blockchain/node_modules/
+frontend/node_modules/
+
+# Build outputs
+dist/
+build/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

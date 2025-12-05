@@ -1,8 +1,9 @@
 use axum::{
+    extract::State,
     routing::{get, post},
     Router,
 };
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber;
 
@@ -10,12 +11,29 @@ mod handlers;
 mod models;
 mod storage;
 
+use storage::s3_client::S3Client;
+
+/// Application state shared across handlers
+#[derive(Clone)]
+pub struct AppState {
+    pub s3_client: Arc<S3Client>,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing
     tracing_subscriber::fmt::init();
 
     tracing::info!("Starting Submission Service...");
+
+    // Initialize S3 client
+    let s3_client = S3Client::new().await?;
+    tracing::info!("S3 client initialized successfully");
+
+    // Create app state
+    let state = AppState {
+        s3_client: Arc::new(s3_client),
+    };
 
     // Build CORS layer
     let cors = CorsLayer::new()
@@ -28,7 +46,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/health", get(health_check))
         .route("/submit/file", post(handlers::file_upload::submit_file))
         .route("/submit/url", post(handlers::url_submission::submit_url))
-        .layer(cors);
+        .layer(cors)
+        .with_state(state);
 
     // Get port from environment or use default
     let port = std::env::var("SUBMISSION_SERVICE_PORT")

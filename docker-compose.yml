@@ -52,6 +52,12 @@ services:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      # Blockchain Configuration
+      - BLOCKCHAIN_RPC_URL=http://host.docker.internal:8545
+      - THREAT_TOKEN_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+      - REPUTATION_SYSTEM_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+      - BOUNTY_MANAGER_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+      - CHAIN_ID=31337
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,10 +82,64 @@ services:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      # Blockchain Configuration
+      - BLOCKCHAIN_RPC_URL=http://host.docker.internal:8545
+      - THREAT_TOKEN_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+      - REPUTATION_SYSTEM_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+      - BOUNTY_MANAGER_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+      - CHAIN_ID=31337
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+    networks:
+      - nexus-network
+    restart: unless-stopped
+
+  # MinIO (S3-compatible object storage)
+  minio:
+    image: minio/minio:latest
+    container_name: nexus-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    environment:
+      MINIO_ROOT_USER: nexus_admin
+      MINIO_ROOT_PASSWORD: nexus_secret_key_2024
+    volumes:
+      - minio_data:/data
+    networks:
+      - nexus-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Submission Service
+  submission-service:
+    build:
+      context: ./backend
+      dockerfile: ./submission-service/Dockerfile
+    container_name: nexus-submission-service
+    ports:
+      - "8085:8080"
+    environment:
+      - RUST_LOG=info
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - SUBMISSION_SERVICE_PORT=8080
+      # S3/MinIO Configuration
+      - S3_ENDPOINT=http://minio:9000
+      - S3_REGION=us-east-1
+      - S3_BUCKET=nexus-submissions
+      - S3_ACCESS_KEY=nexus_admin
+      - S3_SECRET_KEY=nexus_secret_key_2024
+    depends_on:
+      minio:
         condition: service_healthy
     networks:
       - nexus-network
@@ -107,3 +167,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  minio_data:

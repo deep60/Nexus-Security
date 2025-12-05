@@ -60,7 +60,7 @@ pub struct SubmissionFilters {
     pub limit: Option<u32>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct SubmissionResponse {
     pub id: Uuid,
     pub bounty_id: Uuid,
@@ -81,7 +81,7 @@ pub struct SubmissionResponse {
     pub reputation_change: Option<i32>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct DetailedSubmissionResponse {
     pub submission: SubmissionResponse,
     pub technical_details: serde_json::Value,
@@ -123,7 +123,7 @@ pub struct SubmissionError {
     pub request_data: serde_json::Value,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct AnalysisMetrics {
     pub processing_time_ms: u64,
     pub signatures_matched: u32,
@@ -132,14 +132,14 @@ pub struct AnalysisMetrics {
     pub resource_usage: ResourceUsage,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ResourceUsage {
     pub cpu_time_ms: u64,
     pub memory_usage_mb: u64,
     pub disk_io_mb: u64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct FileInfo {
     pub hash: String,
     pub size: u64,

@@ -433,80 +433,227 @@ impl RedisService {
         Ok(serde_json::Value::Object(stats))
     }
 
-    // === Submission-related caching methods (stubs for compilation) ===
+    // === Submission-related caching methods ===
 
-    /// Push item to queue
-    /// TODO: Implement actual Redis LPUSH/RPUSH
-    pub async fn push_to_queue(&self, _queue_name: &str, _item: &str) -> Result<()> {
-        anyhow::bail!("push_to_queue not yet implemented")
+    /// Push item to queue (FIFO using RPUSH/LPOP)
+    /// Uses Redis list as a queue
+    pub async fn push_to_queue(&self, queue_name: &str, item: &str) -> Result<()> {
+        let key = format!("queue:{}", queue_name);
+
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
+            .rpush(&key, item)
+            .await
+            .context("Failed to push item to queue")?;
+
+        info!("Pushed item to queue: {}", queue_name);
+        Ok(())
     }
 
-    /// Queue item for analysis
-    /// TODO: Implement actual Redis queue operation
-    pub async fn queue_for_analysis(&self, _analysis_id: uuid::Uuid, _priority: i32) -> Result<()> {
-        anyhow::bail!("queue_for_analysis not yet implemented")
+    /// Pop item from queue (FIFO using LPOP)
+    pub async fn pop_from_queue(&self, queue_name: &str) -> Result<Option<String>> {
+        let key = format!("queue:{}", queue_name);
+
+        let mut conn = self.connection_pool.clone();
+        let item: Option<String> = conn
+            .lpop(&key, None)
+            .await
+            .context("Failed to pop item from queue")?;
+
+        if item.is_some() {
+            info!("Popped item from queue: {}", queue_name);
+        }
+
+        Ok(item)
     }
 
-    /// Cache file info
-    /// TODO: Implement actual Redis caching
+    /// Queue item for analysis with priority
+    /// Uses Redis sorted set for priority queue (higher priority = higher score)
+    pub async fn queue_for_analysis(&self, analysis_id: uuid::Uuid, priority: i32) -> Result<()> {
+        let key = "queue:analysis";
+        let member = analysis_id.to_string();
+
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
+            .zadd(key, &member, priority as f64)
+            .await
+            .context("Failed to queue analysis")?;
+
+        info!("Queued analysis: {} with priority: {}", analysis_id, priority);
+        Ok(())
+    }
+
+    /// Dequeue highest priority analysis
+    /// Pops item with highest score from sorted set
+    pub async fn dequeue_analysis(&self) -> Result<Option<uuid::Uuid>> {
+        let key = "queue:analysis";
+
+        let mut conn = self.connection_pool.clone();
+        // ZPOPMAX removes and returns highest score member
+        let result: Option<(String, f64)> = conn
+            .zpopmax(key, None)
+            .await
+            .context("Failed to dequeue analysis")?;
+
+        match result {
+            Some((member, priority)) => {
+                let analysis_id = uuid::Uuid::parse_str(&member)
+                    .context("Failed to parse analysis ID")?;
+                info!("Dequeued analysis: {} (priority: {})", analysis_id, priority);
+                Ok(Some(analysis_id))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Cache file info with TTL (default: 1 hour)
     pub async fn cache_file_info(
         &self,
-        _file_hash: &str,
-        _file_info: &crate::handlers::submission::FileInfo,
+        file_hash: &str,
+        file_info: &crate::handlers::submission::FileInfo,
     ) -> Result<()> {
-        anyhow::bail!("cache_file_info not yet implemented")
+        let key = format!("file_info:{}", file_hash);
+        let serialized = serde_json::to_string(file_info)
+            .context("Failed to serialize file info")?;
+
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
+            .set_ex(&key, serialized, 3600) // 1 hour TTL
+            .await
+            .context("Failed to cache file info")?;
+
+        info!("Cached file info for hash: {}", file_hash);
+        Ok(())
     }
 
     /// Get cached file info
-    /// TODO: Implement actual Redis retrieval
     pub async fn get_cached_file_info(
         &self,
-        _file_hash: &str,
+        file_hash: &str,
     ) -> Result<Option<crate::handlers::submission::FileInfo>> {
-        Ok(None)
+        let key = format!("file_info:{}", file_hash);
+
+        let mut conn = self.connection_pool.clone();
+        let cached: Option<String> = conn
+            .get(&key)
+            .await
+            .context("Failed to retrieve cached file info")?;
+
+        match cached {
+            Some(data) => {
+                let file_info: crate::handlers::submission::FileInfo =
+                    serde_json::from_str(&data)
+                        .context("Failed to deserialize file info")?;
+                Ok(Some(file_info))
+            }
+            None => Ok(None),
+        }
     }
 
-    /// Cache submission
-    /// TODO: Implement actual Redis caching
+    /// Cache submission response with TTL (default: 5 minutes)
     pub async fn cache_submission(
         &self,
-        _submission_id: uuid::Uuid,
-        _submission: &crate::handlers::submission::SubmissionResponse,
+        submission_id: uuid::Uuid,
+        submission: &crate::handlers::submission::SubmissionResponse,
     ) -> Result<()> {
-        anyhow::bail!("cache_submission not yet implemented")
+        let key = format!("submission:{}", submission_id);
+        let serialized = serde_json::to_string(submission)
+            .context("Failed to serialize submission")?;
+
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
+            .set_ex(&key, serialized, 300) // 5 minutes TTL
+            .await
+            .context("Failed to cache submission")?;
+
+        info!("Cached submission: {}", submission_id);
+        Ok(())
     }
 
-    /// Cache detailed submission
-    /// TODO: Implement actual Redis caching
+    /// Cache detailed submission response with TTL (default: 10 minutes)
     pub async fn cache_detailed_submission(
         &self,
-        _submission_id: uuid::Uuid,
-        _submission: &crate::handlers::submission::DetailedSubmissionResponse,
+        submission_id: uuid::Uuid,
+        submission: &crate::handlers::submission::DetailedSubmissionResponse,
     ) -> Result<()> {
-        anyhow::bail!("cache_detailed_submission not yet implemented")
+        let key = format!("submission:detailed:{}", submission_id);
+        let serialized = serde_json::to_string(submission)
+            .context("Failed to serialize detailed submission")?;
+
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
+            .set_ex(&key, serialized, 600) // 10 minutes TTL
+            .await
+            .context("Failed to cache detailed submission")?;
+
+        info!("Cached detailed submission: {}", submission_id);
+        Ok(())
     }
 
-    /// Get cached submission
-    /// TODO: Implement actual Redis retrieval
+    /// Get cached submission response
     pub async fn get_cached_submission(
         &self,
-        _submission_id: uuid::Uuid,
+        submission_id: uuid::Uuid,
     ) -> Result<Option<crate::handlers::submission::SubmissionResponse>> {
-        Ok(None)
+        let key = format!("submission:{}", submission_id);
+
+        let mut conn = self.connection_pool.clone();
+        let cached: Option<String> = conn
+            .get(&key)
+            .await
+            .context("Failed to retrieve cached submission")?;
+
+        match cached {
+            Some(data) => {
+                let submission: crate::handlers::submission::SubmissionResponse =
+                    serde_json::from_str(&data)
+                        .context("Failed to deserialize submission")?;
+                Ok(Some(submission))
+            }
+            None => Ok(None),
+        }
     }
 
-    /// Get cached detailed submission
-    /// TODO: Implement actual Redis retrieval
+    /// Get cached detailed submission response
     pub async fn get_cached_detailed_submission(
         &self,
-        _submission_id: uuid::Uuid,
+        submission_id: uuid::Uuid,
     ) -> Result<Option<crate::handlers::submission::DetailedSubmissionResponse>> {
-        Ok(None)
+        let key = format!("submission:detailed:{}", submission_id);
+
+        let mut conn = self.connection_pool.clone();
+        let cached: Option<String> = conn
+            .get(&key)
+            .await
+            .context("Failed to retrieve cached detailed submission")?;
+
+        match cached {
+            Some(data) => {
+                let submission: crate::handlers::submission::DetailedSubmissionResponse =
+                    serde_json::from_str(&data)
+                        .context("Failed to deserialize detailed submission")?;
+                Ok(Some(submission))
+            }
+            None => Ok(None),
+        }
     }
 
-    /// Invalidate submission cache
-    /// TODO: Implement actual Redis deletion
-    pub async fn invalidate_submission_cache(&self, _submission_id: uuid::Uuid) -> Result<()> {
+    /// Invalidate all caches for a submission
+    pub async fn invalidate_submission_cache(&self, submission_id: uuid::Uuid) -> Result<()> {
+        let keys = vec![
+            format!("submission:{}", submission_id),
+            format!("submission:detailed:{}", submission_id),
+        ];
+
+        let mut conn = self.connection_pool.clone();
+        for key in &keys {
+            let _: () = conn
+                .del(key)
+                .await
+                .context("Failed to delete submission cache")?;
+        }
+
+        info!("Invalidated caches for submission: {}", submission_id);
         Ok(())
     }
 }
