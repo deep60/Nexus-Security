@@ -2,22 +2,42 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertSubmissionSchema, insertAnalysisSchema, insertSecurityEngineSchema } from "@shared/schema";
+import { insertSubmissionSchema, insertAnalysisSchema, insertSecurityEngineSchema, insertUserSchema } from "@shared/schema";
 import { randomUUID } from "crypto";
+
+// Simple session storage (in production, use Redis or similar)
+const sessions = new Map<string, { userId: string, expiresAt: number }>();
+
+// Middleware to check authentication
+const requireAuth = (req: any, res: any, next: any) => {
+  const sessionId = req.headers.authorization?.replace('Bearer ', '');
+  if (!sessionId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const session = sessions.get(sessionId);
+  if (!session || session.expiresAt < Date.now()) {
+    sessions.delete(sessionId);
+    return res.status(401).json({ error: "Session expired" });
+  }
+
+  req.userId = session.userId;
+  next();
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
-  
+
   // WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-  
+
   // Store connected clients
   const clients = new Set<WebSocket>();
-  
+
   wss.on('connection', (ws) => {
     clients.add(ws);
     console.log('Client connected to WebSocket');
-    
+
     ws.on('close', () => {
       clients.delete(ws);
       console.log('Client disconnected from WebSocket');
@@ -33,6 +53,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   };
+
+  // Authentication endpoints
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { username, email, password } = req.body;
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+
+      const existingUsername = await storage.getUserByUsername(username);
+      if (existingUsername) {
+        return res.status(400).json({ error: "Username already taken" });
+      }
+
+      // In production, hash the password with bcrypt
+      const userData = insertUserSchema.parse({ username, email, password });
+      const user = await storage.createUser(userData);
+
+      // Create session
+      const sessionId = randomUUID();
+      sessions.set(sessionId, {
+        userId: user.id,
+        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      // Remove password from response
+      const { password: _, ...userWithoutPassword } = user;
+
+      res.status(201).json({
+        user: userWithoutPassword,
+        sessionId,
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(400).json({ error: "Registration failed" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      const user = await storage.getUserByEmail(email);
+      if (!user || user.password !== password) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Create session
+      const sessionId = randomUUID();
+      sessions.set(sessionId, {
+        userId: user.id,
+        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      // Remove password from response
+      const { password: _, ...userWithoutPassword } = user;
+
+      res.json({
+        user: userWithoutPassword,
+        sessionId,
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    const sessionId = req.headers.authorization?.replace('Bearer ', '');
+    if (sessionId) {
+      sessions.delete(sessionId);
+    }
+    res.json({ message: "Logged out successfully" });
+  });
+
+  app.get("/api/auth/me", requireAuth, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  app.patch("/api/auth/wallet", requireAuth, async (req: any, res) => {
+    try {
+      const { walletAddress } = req.body;
+      const updated = await storage.updateUser(req.userId, { walletAddress });
+
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { password: _, ...userWithoutPassword } = updated;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update wallet" });
+    }
+  });
 
   // Security Engines endpoints
   app.get("/api/engines", async (req, res) => {
@@ -189,6 +316,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(analysis);
     } catch (error) {
       res.status(400).json({ error: "Invalid analysis data" });
+    }
+  });
+
+  // Consensus endpoint
+  app.get("/api/submissions/:id/consensus", async (req, res) => {
+    try {
+      const consensus = await storage.getConsensusResult(req.params.id);
+      if (!consensus) {
+        return res.status(404).json({ error: "Consensus result not found" });
+      }
+      res.json(consensus);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch consensus" });
     }
   });
 

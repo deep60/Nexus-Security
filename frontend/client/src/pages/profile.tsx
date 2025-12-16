@@ -10,8 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Wallet, Shield, Award, TrendingUp, FileText, CheckCircle2 } from "lucide-react";
+import { User, Mail, Wallet, Shield, Award, TrendingUp, FileText, CheckCircle2, BarChart3 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { UserAnalyticsDashboard } from "@/components/user-analytics-dashboard";
 
 export default function Profile() {
   const { user, connectWallet, disconnectWallet } = useAuth();
@@ -131,8 +132,12 @@ export default function Profile() {
           {/* Profile Content */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="overview" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="analytics">
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Analytics
+                </TabsTrigger>
                 <TabsTrigger value="submissions">Submissions</TabsTrigger>
                 <TabsTrigger value="settings">Settings</TabsTrigger>
               </TabsList>
@@ -188,6 +193,11 @@ export default function Profile() {
                     </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              {/* Analytics Tab */}
+              <TabsContent value="analytics" className="space-y-6">
+                <UserAnalyticsDashboard />
               </TabsContent>
 
               {/* Submissions Tab */}

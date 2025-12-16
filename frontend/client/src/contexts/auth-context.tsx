@@ -34,12 +34,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuthStatus = async () => {
     try {
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+      const sessionId = localStorage.getItem("sessionId");
+      if (!sessionId) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Validate session with backend
+      const response = await fetch("/api/auth/me", {
+        headers: {
+          Authorization: `Bearer ${sessionId}`,
+        },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      } else {
+        // Session expired or invalid
+        localStorage.removeItem("sessionId");
+        localStorage.removeItem("user");
       }
     } catch (error) {
       console.error("Auth check failed:", error);
+      localStorage.removeItem("sessionId");
+      localStorage.removeItem("user");
     } finally {
       setIsLoading(false);
     }
@@ -47,30 +66,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      // TODO: Replace with actual API call
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
-        credentials: "include",
       });
 
       if (!response.ok) {
-        throw new Error("Login failed");
+        const error = await response.json();
+        throw new Error(error.error || "Login failed");
       }
 
       const data = await response.json();
       setUser(data.user);
+      localStorage.setItem("sessionId", data.sessionId);
       localStorage.setItem("user", JSON.stringify(data.user));
 
       toast({
         title: "Welcome back!",
         description: `Logged in as ${data.user.username}`,
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Login failed",
-        description: "Invalid email or password",
+        description: error.message || "Invalid email or password",
         variant: "destructive",
       });
       throw error;
@@ -79,43 +98,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (username: string, email: string, password: string) => {
     try {
-      // TODO: Replace with actual API call
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, email, password }),
-        credentials: "include",
       });
 
       if (!response.ok) {
-        throw new Error("Registration failed");
+        const error = await response.json();
+        throw new Error(error.error || "Registration failed");
       }
 
       const data = await response.json();
       setUser(data.user);
+      localStorage.setItem("sessionId", data.sessionId);
       localStorage.setItem("user", JSON.stringify(data.user));
 
       toast({
         title: "Account created!",
         description: "Welcome to Nexus-Security",
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Registration failed",
-        description: "Email may already be in use",
+        description: error.message || "Email may already be in use",
         variant: "destructive",
       });
       throw error;
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
-    toast({
-      title: "Logged out",
-      description: "See you soon!",
-    });
+  const logout = async () => {
+    try {
+      const sessionId = localStorage.getItem("sessionId");
+      if (sessionId) {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${sessionId}`,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setUser(null);
+      localStorage.removeItem("sessionId");
+      localStorage.removeItem("user");
+      toast({
+        title: "Logged out",
+        description: "See you soon!",
+      });
+    }
   };
 
   const connectWallet = async () => {
@@ -135,11 +169,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const walletAddress = accounts[0];
 
-      // TODO: Update user with wallet address via API
-      if (user) {
-        const updatedUser = { ...user, walletAddress };
-        setUser(updatedUser);
-        localStorage.setItem("user", JSON.stringify(updatedUser));
+      // Update wallet address via API
+      const sessionId = localStorage.getItem("sessionId");
+      if (sessionId) {
+        const response = await fetch("/api/auth/wallet", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionId}`,
+          },
+          body: JSON.stringify({ walletAddress }),
+        });
+
+        if (response.ok) {
+          const updatedUser = await response.json();
+          setUser(updatedUser);
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+        }
       }
 
       toast({
@@ -155,15 +201,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const disconnectWallet = () => {
-    if (user) {
-      const updatedUser = { ...user, walletAddress: undefined };
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+  const disconnectWallet = async () => {
+    try {
+      const sessionId = localStorage.getItem("sessionId");
+      if (sessionId) {
+        const response = await fetch("/api/auth/wallet", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionId}`,
+          },
+          body: JSON.stringify({ walletAddress: null }),
+        });
 
+        if (response.ok) {
+          const updatedUser = await response.json();
+          setUser(updatedUser);
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+
+          toast({
+            title: "Wallet disconnected",
+            description: "Your wallet has been disconnected",
+          });
+        }
+      }
+    } catch (error) {
       toast({
-        title: "Wallet disconnected",
-        description: "Your wallet has been disconnected",
+        title: "Error",
+        description: "Failed to disconnect wallet",
+        variant: "destructive",
       });
     }
   };

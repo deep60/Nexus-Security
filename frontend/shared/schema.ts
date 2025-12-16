@@ -6,11 +6,13 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
   password: text("password").notNull(),
   walletAddress: text("wallet_address"),
   reputation: decimal("reputation", { precision: 10, scale: 2 }).default("0"),
   totalStaked: decimal("total_staked", { precision: 18, scale: 8 }).default("0"),
   totalEarned: decimal("total_earned", { precision: 18, scale: 8 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const securityEngines = pgTable("security_engines", {
