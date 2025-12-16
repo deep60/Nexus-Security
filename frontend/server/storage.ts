@@ -329,4 +329,16 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Storage instance will be initialized by the application
+let storageInstance: IStorage = new MemStorage();
+
+export function setStorage(storage: IStorage) {
+  storageInstance = storage;
+}
+
+export function getStorage(): IStorage {
+  return storageInstance;
+}
+
+// For backwards compatibility - proxy to current storage instance
+export { storageInstance as storage };

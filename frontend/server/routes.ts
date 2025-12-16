@@ -1,23 +1,44 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { storage } from "./storage";
+import { MemStorage } from "./storage";
 import { insertSubmissionSchema, insertAnalysisSchema, insertSecurityEngineSchema, insertUserSchema } from "@shared/schema";
 import { randomUUID } from "crypto";
+import bcrypt from "bcrypt";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import cors from "cors";
+import { config } from "./config";
+import { initializeDatabase, getDatabase } from "./db";
+import { initializeRedis, getSessionStore } from "./redis";
+import { PostgresStorage } from "./pg-storage";
 
-// Simple session storage (in production, use Redis or similar)
-const sessions = new Map<string, { userId: string, expiresAt: number }>();
+// Initialize database and Redis connections
+initializeDatabase();
+initializeRedis();
+
+// Get the appropriate storage implementation
+const db = getDatabase();
+let storageInstance = db ? new PostgresStorage(db) : new MemStorage();
+
+// Initialize mock data if using PostgreSQL
+if (db && storageInstance instanceof PostgresStorage) {
+  storageInstance.initializeMockData().catch(console.error);
+}
+
+// Get session store (Redis or in-memory)
+const sessionStore = getSessionStore();
 
 // Middleware to check authentication
-const requireAuth = (req: any, res: any, next: any) => {
+const requireAuth = async (req: any, res: any, next: any) => {
   const sessionId = req.headers.authorization?.replace('Bearer ', '');
   if (!sessionId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const session = sessions.get(sessionId);
+  const session = await sessionStore.get(sessionId);
   if (!session || session.expiresAt < Date.now()) {
-    sessions.delete(sessionId);
+    await sessionStore.delete(sessionId);
     return res.status(401).json({ error: "Session expired" });
   }
 
@@ -26,6 +47,51 @@ const requireAuth = (req: any, res: any, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Security middleware - Helmet for HTTP headers
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "ws:", "wss:"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  }));
+
+  // CORS configuration
+  app.use(cors({
+    origin: config.isProduction
+      ? [config.frontendUrl]
+      : [config.frontendUrl, "http://localhost:5173", "http://127.0.0.1:5173"],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
+
+  // Rate limiting for API routes
+  const apiLimiter = rateLimit({
+    windowMs: config.rateLimitWindowMs, // 15 minutes
+    max: config.rateLimitMaxRequests, // limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Apply rate limiting to all API routes
+  app.use('/api/', apiLimiter);
+
+  // Stricter rate limiting for authentication endpoints
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // limit each IP to 5 requests per windowMs
+    message: 'Too many authentication attempts, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time updates
@@ -54,31 +120,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
 
-  // Authentication endpoints
-  app.post("/api/auth/register", async (req, res) => {
+  // Authentication endpoints with stricter rate limiting
+  app.post("/api/auth/register", authLimiter, async (req, res) => {
     try {
       const { username, email, password } = req.body;
 
+      // Validate input
+      if (!username || !email || !password) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Check password strength
+      if (password.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters" });
+      }
+
       // Check if user already exists
-      const existingUser = await storage.getUserByEmail(email);
+      const existingUser = await storageInstance.getUserByEmail(email);
       if (existingUser) {
         return res.status(400).json({ error: "Email already registered" });
       }
 
-      const existingUsername = await storage.getUserByUsername(username);
+      const existingUsername = await storageInstance.getUserByUsername(username);
       if (existingUsername) {
         return res.status(400).json({ error: "Username already taken" });
       }
 
-      // In production, hash the password with bcrypt
-      const userData = insertUserSchema.parse({ username, email, password });
-      const user = await storage.createUser(userData);
+      // Hash password with bcrypt
+      const hashedPassword = await bcrypt.hash(password, config.bcryptSaltRounds);
+
+      // Create user with hashed password
+      const userData = insertUserSchema.parse({ username, email, password: hashedPassword });
+      const user = await storageInstance.createUser(userData);
 
       // Create session
       const sessionId = randomUUID();
-      sessions.set(sessionId, {
+      await sessionStore.set(sessionId, {
         userId: user.id,
-        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+        expiresAt: Date.now() + config.sessionExpiry,
       });
 
       // Remove password from response
@@ -94,20 +173,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", authLimiter, async (req, res) => {
     try {
       const { email, password } = req.body;
 
-      const user = await storage.getUserByEmail(email);
-      if (!user || user.password !== password) {
+      // Validate input
+      if (!email || !password) {
+        return res.status(400).json({ error: "Missing email or password" });
+      }
+
+      const user = await storageInstance.getUserByEmail(email);
+      if (!user) {
+        // Use generic error to prevent user enumeration
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Compare password with bcrypt
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
       // Create session
       const sessionId = randomUUID();
-      sessions.set(sessionId, {
+      await sessionStore.set(sessionId, {
         userId: user.id,
-        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+        expiresAt: Date.now() + config.sessionExpiry,
       });
 
       // Remove password from response
@@ -123,17 +214,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/logout", (req, res) => {
+  app.post("/api/auth/logout", async (req, res) => {
     const sessionId = req.headers.authorization?.replace('Bearer ', '');
     if (sessionId) {
-      sessions.delete(sessionId);
+      await sessionStore.delete(sessionId);
     }
     res.json({ message: "Logged out successfully" });
   });
 
   app.get("/api/auth/me", requireAuth, async (req: any, res) => {
     try {
-      const user = await storage.getUser(req.userId);
+      const user = await storageInstance.getUser(req.userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -148,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/auth/wallet", requireAuth, async (req: any, res) => {
     try {
       const { walletAddress } = req.body;
-      const updated = await storage.updateUser(req.userId, { walletAddress });
+      const updated = await storageInstance.updateUser(req.userId, { walletAddress });
 
       if (!updated) {
         return res.status(404).json({ error: "User not found" });
@@ -164,7 +255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Security Engines endpoints
   app.get("/api/engines", async (req, res) => {
     try {
-      const engines = await storage.getSecurityEngines();
+      const engines = await storageInstance.getSecurityEngines();
       res.json(engines);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch security engines" });
@@ -174,7 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/engines", async (req, res) => {
     try {
       const engineData = insertSecurityEngineSchema.parse(req.body);
-      const engine = await storage.createSecurityEngine(engineData);
+      const engine = await storageInstance.createSecurityEngine(engineData);
       res.status(201).json(engine);
     } catch (error) {
       res.status(400).json({ error: "Invalid engine data" });
@@ -184,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Submissions endpoints
   app.get("/api/submissions", async (req, res) => {
     try {
-      const submissions = await storage.getSubmissions();
+      const submissions = await storageInstance.getSubmissions();
       res.json(submissions);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch submissions" });
@@ -193,7 +284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/submissions/:id", async (req, res) => {
     try {
-      const submission = await storage.getSubmission(req.params.id);
+      const submission = await storageInstance.getSubmission(req.params.id);
       if (!submission) {
         return res.status(404).json({ error: "Submission not found" });
       }
@@ -206,14 +297,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/submissions", async (req, res) => {
     try {
       const submissionData = insertSubmissionSchema.parse(req.body);
-      const submission = await storage.createSubmission({
+      const submission = await storageInstance.createSubmission({
         ...submissionData,
         fileHash: `sha256_${randomUUID()}`, // Mock file hash
         submitterId: null, // In real app, get from authenticated user
       });
 
       // Create associated bounty
-      await storage.createBounty({
+      await storageInstance.createBounty({
         submissionId: submission.id,
         amount: submissionData.bountyAmount,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
@@ -234,7 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Analysis endpoints
   app.get("/api/submissions/:id/analyses", async (req, res) => {
     try {
-      const analyses = await storage.getAnalysesBySubmission(req.params.id);
+      const analyses = await storageInstance.getAnalysesBySubmission(req.params.id);
       res.json(analyses);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch analyses" });
@@ -244,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/submissions/:submissionId/analyses", async (req, res) => {
     try {
       const analysisData = insertAnalysisSchema.parse(req.body);
-      const analysis = await storage.createAnalysis({
+      const analysis = await storageInstance.createAnalysis({
         ...analysisData,
         submissionId: req.params.submissionId,
       });
@@ -255,7 +346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const verdict = verdicts[Math.floor(Math.random() * verdicts.length)];
         const confidence = (Math.random() * 40 + 60).toFixed(1); // 60-100%
         
-        await storage.updateAnalysis(analysis.id, {
+        await storageInstance.updateAnalysis(analysis.id, {
           verdict,
           confidence,
           status: "completed",
@@ -263,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Check if all engines have completed analysis
-        const allAnalyses = await storage.getAnalysesBySubmission(req.params.submissionId);
+        const allAnalyses = await storageInstance.getAnalysesBySubmission(req.params.submissionId);
         const completedAnalyses = allAnalyses.filter(a => a.status === "completed");
         
         if (completedAnalyses.length >= 4) { // Assume 4 engines minimum for consensus
@@ -278,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const confidenceScore = ((Math.max(maliciousVotes, cleanVotes, suspiciousVotes) / completedAnalyses.length) * 100).toFixed(1);
           
-          const consensusResult = await storage.createConsensusResult({
+          const consensusResult = await storageInstance.createConsensusResult({
             submissionId: req.params.submissionId,
             finalVerdict,
             confidenceScore,
@@ -290,7 +381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
 
           // Update submission status
-          await storage.updateSubmission(req.params.submissionId, {
+          await storageInstance.updateSubmission(req.params.submissionId, {
             status: "completed",
             completedAt: new Date(),
           });
@@ -322,7 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Consensus endpoint
   app.get("/api/submissions/:id/consensus", async (req, res) => {
     try {
-      const consensus = await storage.getConsensusResult(req.params.id);
+      const consensus = await storageInstance.getConsensusResult(req.params.id);
       if (!consensus) {
         return res.status(404).json({ error: "Consensus result not found" });
       }
@@ -335,7 +426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bounties endpoints
   app.get("/api/bounties", async (req, res) => {
     try {
-      const bounties = await storage.getActiveBounties();
+      const bounties = await storageInstance.getActiveBounties();
       res.json(bounties);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch bounties" });
@@ -345,9 +436,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Statistics endpoints
   app.get("/api/stats", async (req, res) => {
     try {
-      const submissions = await storage.getSubmissions();
-      const engines = await storage.getSecurityEngines();
-      const bounties = await storage.getActiveBounties();
+      const submissions = await storageInstance.getSubmissions();
+      const engines = await storageInstance.getSecurityEngines();
+      const bounties = await storageInstance.getActiveBounties();
       
       const stats = {
         totalSubmissions: submissions.length,
@@ -372,17 +463,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mock endpoint to start analysis for demo purposes
   app.post("/api/submissions/:id/start-analysis", async (req, res) => {
     try {
-      const submission = await storage.getSubmission(req.params.id);
+      const submission = await storageInstance.getSubmission(req.params.id);
       if (!submission) {
         return res.status(404).json({ error: "Submission not found" });
       }
 
-      await storage.updateSubmission(req.params.id, { status: "analyzing" });
+      await storageInstance.updateSubmission(req.params.id, { status: "analyzing" });
 
       // Create analyses for all engines
-      const engines = await storage.getSecurityEngines();
+      const engines = await storageInstance.getSecurityEngines();
       for (const engine of engines.slice(0, 4)) { // Use first 4 engines
-        await storage.createAnalysis({
+        await storageInstance.createAnalysis({
           submissionId: req.params.id,
           engineId: engine.id,
           stakeAmount: (Math.random() * 0.1 + 0.05).toFixed(3), // 0.05-0.15 ETH
