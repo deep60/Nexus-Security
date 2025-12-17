@@ -20,14 +20,19 @@ md5 = "0.7"
 sha1 = "0.10"
 reqwest = { version = "0.11", features = ["json"] }
 yara = "0.18"  # For YARA engine
+clamav-client = "0.3"  # For ClamAV integration
 goblin = "0.6"  # For PE/ELF parsing
 lazy_static = "1.4"
 regex = "1"
 mime = "0.3"  # For MIME parsing
-sqlx = { version = "0.6", features = ["postgres", "runtime-tokio-native-tls"] }  # For DB
+sqlx = { version = "0.6", features = ["postgres", "runtime-tokio-native-tls", "chrono", "uuid"] }  # For DB
+redis = { version = "0.24", features = ["aio", "tokio-comp"] }  # For queue and pub/sub
 tower-http = { version = "0.4", features = ["cors", "trace"] }
 rand = "0.8"  # For nonce generation
 hex = "0.4"  # For hex conversions
+# S3/MinIO storage
+aws-sdk-s3 = "1.0"
+aws-config = "1.0"
 tokio-test.workspace = true
 blake2 = "0.10.6"
 sha3 = "0.10.8"

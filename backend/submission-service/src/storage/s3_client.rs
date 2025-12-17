@@ -19,7 +19,7 @@ pub struct S3Client {
     bucket: String,
 }
 
-/// File metadata returned from S3
+/// File metadata returned from S3/MinIO
 #[derive(Debug, Clone)]
 pub struct FileMetadata {
     pub key: String,

@@ -11,11 +11,13 @@ use uuid::Uuid;
 pub mod hash_analyzer;
 pub mod static_analyzer;
 pub mod yara_engine;
+pub mod clamav_analyzer;
 
 // Re-export commonly used types
 pub use hash_analyzer::{HashAnalyzer, HashAnalyzerConfig, HashInfo, HashType};
 pub use static_analyzer::{StaticAnalyzer, StaticAnalyzerConfig, FileType, PEAnalysis, StringAnalysis, EntropyAnalysis};
 pub use yara_engine::{YaraEngine, YaraEngineConfig, YaraMatch, YaraRule, YaraEngineError};
+pub use clamav_analyzer::{ClamAvAnalyzer, ClamAvAnalyzerConfig};
 
 use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, ConfidenceLevel, DetectionResult, FileMetadata, AnalysisStatus, EngineType, SeverityLevel, ThreatCategory};
 
@@ -25,6 +27,7 @@ pub struct AnalysisEngineConfig {
     pub hash_analyzer: HashAnalyzerConfig,
     pub static_analyzer: StaticAnalyzerConfig,
     pub yara_engine: YaraEngineConfig,
+    pub clamav_analyzer: ClamAvAnalyzerConfig,
     pub enable_parallel_analysis: bool,
     pub analysis_timeout_seconds: u64,
     pub require_all_analyzers: bool,
@@ -36,6 +39,7 @@ impl Default for AnalysisEngineConfig {
             hash_analyzer: HashAnalyzerConfig::default(),
             static_analyzer: StaticAnalyzerConfig::default(),
             yara_engine: YaraEngineConfig::default(),
+            clamav_analyzer: ClamAvAnalyzerConfig::default(),
             enable_parallel_analysis: true,
             analysis_timeout_seconds: 120,
             require_all_analyzers: false,
@@ -58,6 +62,7 @@ pub struct AnalysisOptions {
     pub enable_hash_analysis: bool,
     pub enable_static_analysis: bool,
     pub enable_yara_analysis: bool,
+    pub enable_clamav_analysis: bool,
     pub priority: AnalysisPriority,
     pub custom_metadata: HashMap<String, String>,
 }
@@ -75,6 +80,7 @@ impl Default for AnalysisOptions {
             enable_hash_analysis: true,
             enable_static_analysis: true,
             enable_yara_analysis: true,
+            enable_clamav_analysis: true,
             priority: AnalysisPriority::Normal,
             custom_metadata: HashMap::new(),
         }
@@ -87,6 +93,7 @@ pub struct AnalysisEngine {
     hash_analyzer: HashAnalyzer,
     static_analyzer: StaticAnalyzer,
     yara_engine: YaraEngine,
+    clamav_analyzer: ClamAvAnalyzer,
 }
 
 impl AnalysisEngine {
@@ -96,15 +103,18 @@ impl AnalysisEngine {
 
         let hash_analyzer = HashAnalyzer::new(config.hash_analyzer.clone());
         let static_analyzer = StaticAnalyzer::new(config.static_analyzer.clone());
-        
+
         let yara_engine = YaraEngine::new(config.yara_engine.clone())
             .map_err(|e| anyhow!("Failed to initialize YARA engine: {}", e))?;
+
+        let clamav_analyzer = ClamAvAnalyzer::new(config.clamav_analyzer.clone());
 
         Ok(Self {
             config,
             hash_analyzer,
             static_analyzer,
             yara_engine,
+            clamav_analyzer,
         })
     }
 
@@ -144,8 +154,10 @@ impl AnalysisEngine {
             let hash_future = self.run_hash_analysis(request);
             let static_future = self.run_static_analysis(request);
             let yara_future = self.run_yara_analysis(request);
+            let clamav_future = self.run_clamav_analysis(request);
 
-            let (hash_res, static_res, yara_res) = join!(hash_future, static_future, yara_future);
+            let (hash_res, static_res, yara_res, clamav_res) =
+                tokio::join!(hash_future, static_future, yara_future, clamav_future);
 
             // Collect results and errors
             match hash_res {
@@ -169,6 +181,13 @@ impl AnalysisEngine {
                     analysis_errors.push(format!("Yara: {}", e));
                 }
             }
+            match clamav_res {
+                Ok(det) => detections.push(det),
+                Err(e) => {
+                    warn!("ClamAV analysis failed: {}", e);
+                    analysis_errors.push(format!("ClamAV: {}", e));
+                }
+            }
         } else {
             // Run sequentially
             if let Ok(mut dets) = self.run_hash_analysis(request).await {
@@ -178,6 +197,9 @@ impl AnalysisEngine {
                 detections.push(det);
             }
             if let Ok(det) = self.run_yara_analysis(request).await {
+                detections.push(det);
+            }
+            if let Ok(det) = self.run_clamav_analysis(request).await {
                 detections.push(det);
             }
         }
@@ -223,6 +245,14 @@ impl AnalysisEngine {
             self.yara_engine.analyze_file_data(&request.file_data, &request.filename).await // Assume method updated
         } else {
             Err(anyhow!("Yara analysis disabled"))
+        }
+    }
+
+    async fn run_clamav_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
+        if request.analysis_options.enable_clamav_analysis {
+            self.clamav_analyzer.scan_file(&request.file_data, &request.filename).await
+        } else {
+            Err(anyhow!("ClamAV analysis disabled"))
         }
     }
 

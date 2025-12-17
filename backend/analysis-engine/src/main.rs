@@ -22,6 +22,7 @@ mod utils;
 mod storage;
 mod scanners;
 mod sandbox;
+mod queue;
 
 use crate::analyzers::{AnalysisEngine, AnalysisEngineConfig, FileAnalysisRequest, AnalysisOptions, AnalysisPriority};
 use crate::analyzers::hash_analyzer::{HashInfo, HashType};
@@ -82,11 +83,40 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     info!("Starting Nexus-Security Analysis Engine");
 
     // Load configuration
-    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| "".to_string());
-    let redis_url = env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
-    let port = env::var("PORT").unwrap_or_else(|_| "8002".to_string()).parse::<u16>().unwrap_or(8002);
-    let yara_rule_path = env::var("YARA_RULE_PATH").unwrap_or_else(|_| "./rules".to_string());
-    let upload_dir = env::var("UPLOAD_DIR").unwrap_or_else(|_| "./temp/nexus-uploads".to_string());
+    let database_url = env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set");
+    let redis_url = env::var("REDIS_URL")
+        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let port = env::var("PORT")
+        .unwrap_or_else(|_| "8002".to_string())
+        .parse::<u16>()
+        .unwrap_or(8002);
+    let yara_rule_path = env::var("YARA_RULE_PATH")
+        .unwrap_or_else(|_| "./rules".to_string());
+    let upload_dir = env::var("UPLOAD_DIR")
+        .unwrap_or_else(|_| "./temp/nexus-uploads".to_string());
+
+    // Initialize database connection pool
+    info!("Connecting to database...");
+    let db_pool = sqlx::PgPool::connect(&database_url)
+        .await
+        .expect("Failed to connect to database");
+    info!("Database connection established");
+
+    // Initialize Redis client
+    info!("Connecting to Redis...");
+    let redis_client = redis::Client::open(redis_url.clone())
+        .expect("Failed to create Redis client");
+    redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .expect("Failed to connect to Redis");
+    info!("Redis connection established");
+
+    // Initialize S3 client
+    info!("Initializing S3 client...");
+    let s3_client = Arc::new(crate::storage::S3Client::new().await?);
+    info!("S3 client initialized");
 
     // Initialize analyzers via combined engine
     info!("Initializing analysis engines...");
@@ -117,6 +147,27 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     };
 
     info!("Analysis engines initialized successfully");
+
+    // Spawn queue consumer worker in background
+    info!("Starting analysis queue consumer worker...");
+    let consumer_redis_client = redis_client.clone();
+    let consumer_db_pool = db_pool.clone();
+    let consumer_s3_client = s3_client.clone();
+    let consumer_analysis_engine = app_state.analysis_engine.clone();
+
+    tokio::spawn(async move {
+        if let Err(e) = crate::queue::consumer::start_analysis_worker(
+            consumer_redis_client,
+            consumer_db_pool,
+            consumer_s3_client,
+            consumer_analysis_engine,
+        )
+        .await
+        {
+            error!("Queue consumer worker failed: {}", e);
+        }
+    });
+    info!("Queue consumer worker started");
 
     // Build the application router
     let app = Router::new()

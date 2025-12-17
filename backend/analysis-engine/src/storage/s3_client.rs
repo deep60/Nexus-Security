@@ -1,514 +1,280 @@
-/// S3-compatible object storage client for file artifacts
-///
-/// This module provides object storage operations using AWS S3 or compatible services
-/// (MinIO, DigitalOcean Spaces, etc.) for storing analysis artifacts and files.
+// S3/MinIO client implementation
+//! Complete S3/MinIO integration for file storage
 
-use anyhow::{anyhow, Context, Result};
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use anyhow::{Context, Result};
+use aws_config::{BehaviorVersion, Region};
+use aws_sdk_s3::{
+    config::{Credentials, SharedCredentialsProvider},
+    primitives::ByteStream,
+    Client, Config,
+};
 use sha2::{Digest, Sha256};
-use std::time::SystemTime;
-use thiserror::Error;
-use tracing::{debug, error, info, warn};
+use std::env;
+use tracing::{debug, info};
 
-/// S3 error types
-#[derive(Debug, Error)]
-pub enum S3Error {
-    #[error("Upload error: {0}")]
-    UploadError(String),
-
-    #[error("Download error: {0}")]
-    DownloadError(String),
-
-    #[error("Authentication error: {0}")]
-    AuthError(String),
-
-    #[error("Not found: {0}")]
-    NotFound(String),
-
-    #[error("S3 error: {0}")]
-    Other(#[from] anyhow::Error),
-}
-
-/// S3 configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct S3Config {
-    pub endpoint: String,
-    pub region: String,
-    pub bucket: String,
-    pub access_key_id: String,
-    pub secret_access_key: String,
-    pub use_ssl: bool,
-    pub path_style: bool,
-    pub upload_timeout_seconds: u64,
-    pub download_timeout_seconds: u64,
-    pub max_file_size_mb: u64,
-}
-
-impl Default for S3Config {
-    fn default() -> Self {
-        Self {
-            endpoint: "http://localhost:9000".to_string(), // MinIO default
-            region: "us-east-1".to_string(),
-            bucket: "nexus-security-artifacts".to_string(),
-            access_key_id: "minioadmin".to_string(),
-            secret_access_key: "minioadmin".to_string(),
-            use_ssl: false,
-            path_style: true,
-            upload_timeout_seconds: 300,
-            download_timeout_seconds: 300,
-            max_file_size_mb: 500,
-        }
-    }
-}
-
-/// S3 client for object storage operations
+/// S3 client for file storage operations
+#[derive(Clone)]
 pub struct S3Client {
-    config: S3Config,
-    http_client: Client,
-    base_url: String,
+    client: Client,
+    bucket: String,
+}
+
+/// File metadata returned from S3/MinIO
+#[derive(Debug, Clone)]
+pub struct FileMetadata {
+    pub key: String,
+    pub size: i64,
+    pub content_type: Option<String>,
+    pub etag: Option<String>,
+    pub last_modified: Option<chrono::DateTime<chrono::Utc>>,
+    pub sha256_hash: String,
 }
 
 impl S3Client {
-    /// Create a new S3 client
-    pub fn new(config: S3Config) -> Result<Self> {
-        info!("Initializing S3 client for bucket: {}", config.bucket);
+    /// Create a new S3 client configured for MinIO or AWS S3
+    pub async fn new() -> Result<Self> {
+        let endpoint = env::var("S3_ENDPOINT")
+            .unwrap_or_else(|_| "http://minio:9000".to_string());
+        let region = env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
+        let bucket = env::var("S3_BUCKET").unwrap_or_else(|_| "nexus-submissions".to_string());
+        let access_key = env::var("S3_ACCESS_KEY").unwrap_or_else(|_| "nexus_admin".to_string());
+        let secret_key = env::var("S3_SECRET_KEY")
+            .unwrap_or_else(|_| "nexus_secret_key_2024".to_string());
 
-        let http_client = Client::builder()
-            .timeout(std::time::Duration::from_secs(config.upload_timeout_seconds))
-            .build()
-            .context("Failed to create HTTP client")?;
+        info!(
+            "Initializing S3 client with endpoint: {}, region: {}, bucket: {}",
+            endpoint, region, bucket
+        );
 
-        let base_url = if config.path_style {
-            format!("{}/{}", config.endpoint, config.bucket)
-        } else {
-            format!("{}", config.endpoint)
+        // Create credentials
+        let credentials = Credentials::new(
+            access_key,
+            secret_key,
+            None,
+            None,
+            "nexus-security",
+        );
+
+        // Build S3 config
+        let s3_config = Config::builder()
+            .region(Region::new(region))
+            .endpoint_url(endpoint)
+            .credentials_provider(SharedCredentialsProvider::new(credentials))
+            .force_path_style(true) // Required for MinIO
+            .behavior_version(BehaviorVersion::latest())
+            .build();
+
+        let client = Client::from_conf(s3_config);
+
+        // Ensure bucket exists
+        let s3_client = Self { client, bucket };
+        s3_client.ensure_bucket_exists().await?;
+
+        info!("S3 client initialized successfully");
+        Ok(s3_client)
+    }
+
+    /// Ensure the bucket exists, create if it doesn't
+    async fn ensure_bucket_exists(&self) -> Result<()> {
+        match self.client.head_bucket().bucket(&self.bucket).send().await {
+            Ok(_) => {
+                debug!("Bucket '{}' exists", self.bucket);
+                Ok(())
+            }
+            Err(_) => {
+                info!("Bucket '{}' doesn't exist, creating...", self.bucket);
+                self.client
+                    .create_bucket()
+                    .bucket(&self.bucket)
+                    .send()
+                    .await
+                    .context("Failed to create bucket")?;
+                info!("Bucket '{}' created successfully", self.bucket);
+                Ok(())
+            }
+        }
+    }
+
+    /// Upload a file to S3/MinIO and return the SHA256 hash
+    pub async fn upload_file(
+        &self,
+        key: &str,
+        data: Vec<u8>,
+        content_type: Option<String>,
+    ) -> Result<String> {
+        // Calculate SHA256 hash
+        let mut hasher = Sha256::new();
+        hasher.update(&data);
+        let hash = hex::encode(hasher.finalize());
+
+        debug!(
+            "Uploading file: key={}, size={} bytes, hash={}",
+            key,
+            data.len(),
+            hash
+        );
+
+        // Create byte stream
+        let body = ByteStream::from(data);
+
+        // Build put object request
+        let mut request = self
+            .client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .body(body);
+
+        // Add content type if provided
+        if let Some(ct) = content_type {
+            request = request.content_type(ct);
+        }
+
+        // Add SHA256 hash as metadata
+        request = request.metadata("sha256", &hash);
+
+        // Execute upload
+        request
+            .send()
+            .await
+            .with_context(|| format!("Failed to upload file with key: {}", key))?;
+
+        info!("File uploaded successfully: key={}, hash={}", key, hash);
+        Ok(hash)
+    }
+
+    /// Download a file from S3/MinIO
+    pub async fn download_file(&self, key: &str) -> Result<Vec<u8>> {
+        debug!("Downloading file: key={}", key);
+
+        let response = self
+            .client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await
+            .with_context(|| format!("Failed to download file with key: {}", key))?;
+
+        let bytes = response
+            .body
+            .collect()
+            .await
+            .context("Failed to read file body")?
+            .into_bytes()
+            .to_vec();
+
+        info!("File downloaded successfully: key={}, size={} bytes", key, bytes.len());
+        Ok(bytes)
+    }
+
+    /// Delete a file from S3/MinIO
+    pub async fn delete_file(&self, key: &str) -> Result<()> {
+        debug!("Deleting file: key={}", key);
+
+        self.client
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await
+            .with_context(|| format!("Failed to delete file with key: {}", key))?;
+
+        info!("File deleted successfully: key={}", key);
+        Ok(())
+    }
+
+    /// Get file metadata without downloading the entire file
+    pub async fn get_file_metadata(&self, key: &str) -> Result<FileMetadata> {
+        debug!("Getting metadata for file: key={}", key);
+
+        let response = self
+            .client
+            .head_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await
+            .with_context(|| format!("Failed to get metadata for file with key: {}", key))?;
+
+        // Extract SHA256 from metadata
+        let sha256_hash = response
+            .metadata()
+            .and_then(|m| m.get("sha256"))
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_string());
+
+        let metadata = FileMetadata {
+            key: key.to_string(),
+            size: response.content_length().unwrap_or(0),
+            content_type: response.content_type().map(|s| s.to_string()),
+            etag: response.e_tag().map(|s| s.to_string()),
+            last_modified: response.last_modified().and_then(|dt| {
+                chrono::DateTime::from_timestamp(dt.secs(), 0)
+            }),
+            sha256_hash,
         };
 
-        Ok(Self {
-            config,
-            http_client,
-            base_url,
-        })
+        debug!("File metadata: {:?}", metadata);
+        Ok(metadata)
     }
 
-    /// Upload file to S3
-    pub async fn upload_file(&self, key: &str, data: &[u8]) -> Result<String> {
-        debug!("Uploading file to S3: {} ({} bytes)", key, data.len());
+    /// List all files in the bucket with optional prefix
+    pub async fn list_files(&self, prefix: Option<&str>, max_keys: Option<i32>) -> Result<Vec<String>> {
+        debug!("Listing files with prefix: {:?}", prefix);
 
-        // Check file size limit
-        let size_mb = data.len() as u64 / (1024 * 1024);
-        if size_mb > self.config.max_file_size_mb {
-            return Err(anyhow!(
-                "File size {} MB exceeds limit of {} MB",
-                size_mb,
-                self.config.max_file_size_mb
-            ));
+        let mut request = self.client.list_objects_v2().bucket(&self.bucket);
+
+        if let Some(p) = prefix {
+            request = request.prefix(p);
         }
 
-        let url = format!("{}/{}", self.base_url, key);
-        let content_type = self.detect_content_type(data);
-
-        // Calculate content hash for integrity
-        let content_hash = self.calculate_sha256(data);
-
-        // Generate authorization headers (simplified - in production use proper AWS SigV4)
-        let headers = self.build_headers("PUT", key, &content_type, data.len());
-
-        let response = self
-            .http_client
-            .put(&url)
-            .headers(headers)
-            .body(data.to_vec())
-            .send()
-            .await
-            .context("Failed to upload file to S3")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            error!("S3 upload failed: {} - {}", status, error_text);
-            return Err(anyhow!("S3 upload failed: {}", status));
+        if let Some(max) = max_keys {
+            request = request.max_keys(max);
         }
 
-        info!("File uploaded successfully: {}", key);
-        Ok(content_hash)
-    }
-
-    /// Download file from S3
-    pub async fn download_file(&self, key: &str) -> Result<Option<Vec<u8>>> {
-        debug!("Downloading file from S3: {}", key);
-
-        let url = format!("{}/{}", self.base_url, key);
-        let headers = self.build_headers("GET", key, "application/octet-stream", 0);
-
-        let response = self
-            .http_client
-            .get(&url)
-            .headers(headers)
-            .timeout(std::time::Duration::from_secs(
-                self.config.download_timeout_seconds,
-            ))
+        let response = request
             .send()
             .await
-            .context("Failed to download file from S3")?;
+            .context("Failed to list files")?;
 
-        match response.status() {
-            status if status.is_success() => {
-                let data = response
-                    .bytes()
-                    .await
-                    .context("Failed to read response body")?
-                    .to_vec();
+        let keys: Vec<String> = response
+            .contents()
+            .iter()
+            .filter_map(|obj| obj.key().map(|k| k.to_string()))
+            .collect();
 
-                debug!("File downloaded successfully: {} ({} bytes)", key, data.len());
-                Ok(Some(data))
-            }
-            reqwest::StatusCode::NOT_FOUND => {
-                debug!("File not found in S3: {}", key);
-                Ok(None)
-            }
-            status => {
-                let error_text = response.text().await.unwrap_or_default();
-                error!("S3 download failed: {} - {}", status, error_text);
-                Err(anyhow!("S3 download failed: {}", status))
-            }
-        }
-    }
-
-    /// Delete file from S3
-    pub async fn delete_file(&self, key: &str) -> Result<bool> {
-        debug!("Deleting file from S3: {}", key);
-
-        let url = format!("{}/{}", self.base_url, key);
-        let headers = self.build_headers("DELETE", key, "application/octet-stream", 0);
-
-        let response = self
-            .http_client
-            .delete(&url)
-            .headers(headers)
-            .send()
-            .await
-            .context("Failed to delete file from S3")?;
-
-        if response.status().is_success() || response.status() == reqwest::StatusCode::NOT_FOUND {
-            info!("File deleted successfully: {}", key);
-            Ok(true)
-        } else {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            error!("S3 delete failed: {} - {}", status, error_text);
-            Err(anyhow!("S3 delete failed: {}", status))
-        }
-    }
-
-    /// Check if file exists in S3
-    pub async fn file_exists(&self, key: &str) -> Result<bool> {
-        debug!("Checking if file exists in S3: {}", key);
-
-        let url = format!("{}/{}", self.base_url, key);
-        let headers = self.build_headers("HEAD", key, "application/octet-stream", 0);
-
-        let response = self
-            .http_client
-            .head(&url)
-            .headers(headers)
-            .send()
-            .await
-            .context("Failed to check file existence")?;
-
-        Ok(response.status().is_success())
-    }
-
-    /// List objects with prefix
-    pub async fn list_objects(&self, prefix: &str) -> Result<Vec<String>> {
-        debug!("Listing objects with prefix: {}", prefix);
-
-        let url = format!("{}?prefix={}", self.base_url, prefix);
-        let headers = self.build_headers("GET", "", "application/octet-stream", 0);
-
-        let response = self
-            .http_client
-            .get(&url)
-            .headers(headers)
-            .send()
-            .await
-            .context("Failed to list objects")?;
-
-        if !response.status().is_success() {
-            return Err(anyhow!("Failed to list objects: {}", response.status()));
-        }
-
-        // Parse XML response (simplified - in production use proper XML parser)
-        let body = response.text().await?;
-        let keys = self.parse_list_objects_response(&body);
-
+        info!("Listed {} files", keys.len());
         Ok(keys)
     }
 
-    /// Get object metadata
-    pub async fn get_metadata(&self, key: &str) -> Result<ObjectMetadata> {
-        debug!("Getting metadata for object: {}", key);
-
-        let url = format!("{}/{}", self.base_url, key);
-        let headers = self.build_headers("HEAD", key, "application/octet-stream", 0);
-
-        let response = self
-            .http_client
-            .head(&url)
-            .headers(headers)
+    /// Check if a file exists in S3/MinIO
+    pub async fn file_exists(&self, key: &str) -> bool {
+        self.client
+            .head_object()
+            .bucket(&self.bucket)
+            .key(key)
             .send()
             .await
-            .context("Failed to get object metadata")?;
-
-        if !response.status().is_success() {
-            return Err(anyhow!("Object not found: {}", key));
-        }
-
-        let content_length = response
-            .headers()
-            .get("content-length")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
-
-        let content_type = response
-            .headers()
-            .get("content-type")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("application/octet-stream")
-            .to_string();
-
-        let last_modified = response
-            .headers()
-            .get("last-modified")
-            .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string());
-
-        let etag = response
-            .headers()
-            .get("etag")
-            .and_then(|v| v.to_str().ok())
-            .map(|s| s.trim_matches('"').to_string());
-
-        Ok(ObjectMetadata {
-            key: key.to_string(),
-            size: content_length,
-            content_type,
-            last_modified,
-            etag,
-        })
+            .is_ok()
     }
 
-    /// Generate presigned URL for temporary access (simplified)
-    pub fn generate_presigned_url(&self, key: &str, expiry_seconds: u64) -> Result<String> {
-        // Simplified presigned URL generation
-        // In production, implement proper AWS SigV4 URL signing
-        let expires = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            + expiry_seconds;
+    /// Generate a pre-signed URL for file download (valid for 1 hour)
+    pub async fn generate_presigned_url(&self, key: &str, expires_in_secs: Option<u64>) -> Result<String> {
+        let expires = std::time::Duration::from_secs(expires_in_secs.unwrap_or(3600));
 
-        let url = format!(
-            "{}/{}?X-Amz-Expires={}",
-            self.base_url, key, expires
-        );
-
-        Ok(url)
-    }
-
-    /// Health check
-    pub async fn health_check(&self) -> bool {
-        // Try to list objects in bucket
-        let url = format!("{}?max-keys=1", self.base_url);
-        let headers = self.build_headers("GET", "", "application/octet-stream", 0);
-
-        self.http_client
-            .get(&url)
-            .headers(headers)
-            .send()
-            .await
-            .map(|r| r.status().is_success())
-            .unwrap_or(false)
-    }
-
-    /// Build HTTP headers for S3 request
-    fn build_headers(
-        &self,
-        method: &str,
-        key: &str,
-        content_type: &str,
-        content_length: usize,
-    ) -> reqwest::header::HeaderMap {
-        let mut headers = reqwest::header::HeaderMap::new();
-
-        headers.insert(
-            reqwest::header::CONTENT_TYPE,
-            content_type.parse().unwrap(),
-        );
-
-        if content_length > 0 {
-            headers.insert(
-                reqwest::header::CONTENT_LENGTH,
-                content_length.to_string().parse().unwrap(),
-            );
-        }
-
-        // Add AWS authentication headers (simplified)
-        // In production, implement proper AWS SigV4 signing
-        headers.insert(
-            "x-amz-date",
-            chrono::Utc::now()
-                .format("%Y%m%dT%H%M%SZ")
-                .to_string()
-                .parse()
-                .unwrap(),
-        );
-
-        headers.insert(
-            reqwest::header::AUTHORIZATION,
-            format!(
-                "AWS {}:{}",
-                self.config.access_key_id, "simplified-signature"
+        let presigned = self
+            .client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .presigned(
+                aws_sdk_s3::presigning::PresigningConfig::expires_in(expires)
+                    .context("Failed to create presigning config")?,
             )
-            .parse()
-            .unwrap(),
-        );
+            .await
+            .context("Failed to generate presigned URL")?;
 
-        headers
-    }
-
-    /// Detect content type from file data
-    fn detect_content_type(&self, data: &[u8]) -> String {
-        if data.len() < 4 {
-            return "application/octet-stream".to_string();
-        }
-
-        // Check magic bytes
-        match &data[0..2] {
-            b"PK" => "application/zip".to_string(),
-            b"MZ" => "application/x-msdownload".to_string(),
-            [0x1f, 0x8b] => "application/gzip".to_string(),
-            _ => {
-                if data.len() >= 4 {
-                    match &data[0..4] {
-                        [0x89, 0x50, 0x4E, 0x47] => "image/png".to_string(),
-                        [0xFF, 0xD8, 0xFF, _] => "image/jpeg".to_string(),
-                        [0x25, 0x50, 0x44, 0x46] => "application/pdf".to_string(),
-                        _ => "application/octet-stream".to_string(),
-                    }
-                } else {
-                    "application/octet-stream".to_string()
-                }
-            }
-        }
-    }
-
-    /// Calculate SHA256 hash
-    fn calculate_sha256(&self, data: &[u8]) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        format!("{:x}", hasher.finalize())
-    }
-
-    /// Parse list objects XML response (simplified)
-    fn parse_list_objects_response(&self, xml: &str) -> Vec<String> {
-        let mut keys = Vec::new();
-
-        // Very simplified XML parsing - in production use proper XML parser
-        for line in xml.lines() {
-            if line.contains("<Key>") {
-                if let Some(start) = line.find("<Key>") {
-                    if let Some(end) = line.find("</Key>") {
-                        let key = line[start + 5..end].trim().to_string();
-                        keys.push(key);
-                    }
-                }
-            }
-        }
-
-        keys
-    }
-
-    /// Get S3 statistics
-    pub async fn get_stats(&self) -> S3Stats {
-        S3Stats {
-            bucket: self.config.bucket.clone(),
-            endpoint: self.config.endpoint.clone(),
-            region: self.config.region.clone(),
-            max_file_size_mb: self.config.max_file_size_mb,
-        }
-    }
-}
-
-/// Object metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ObjectMetadata {
-    pub key: String,
-    pub size: u64,
-    pub content_type: String,
-    pub last_modified: Option<String>,
-    pub etag: Option<String>,
-}
-
-/// S3 statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct S3Stats {
-    pub bucket: String,
-    pub endpoint: String,
-    pub region: String,
-    pub max_file_size_mb: u64,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_s3_config_default() {
-        let config = S3Config::default();
-        assert_eq!(config.bucket, "nexus-security-artifacts");
-        assert_eq!(config.region, "us-east-1");
-        assert!(config.path_style);
-    }
-
-    #[test]
-    fn test_content_type_detection() {
-        let client = S3Client::new(S3Config::default()).unwrap();
-
-        // ZIP file
-        let zip_data = b"PK\x03\x04";
-        assert_eq!(client.detect_content_type(zip_data), "application/zip");
-
-        // PNG image
-        let png_data = b"\x89PNG";
-        assert_eq!(client.detect_content_type(png_data), "image/png");
-
-        // Unknown
-        let unknown_data = b"TEST";
-        assert_eq!(
-            client.detect_content_type(unknown_data),
-            "application/octet-stream"
-        );
-    }
-
-    #[test]
-    fn test_sha256_calculation() {
-        let client = S3Client::new(S3Config::default()).unwrap();
-        let data = b"Hello, World!";
-        let hash = client.calculate_sha256(data);
-
-        assert_eq!(hash.len(), 64); // SHA256 produces 64 hex characters
-        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
-    }
-
-    #[test]
-    fn test_presigned_url_generation() {
-        let client = S3Client::new(S3Config::default()).unwrap();
-        let url = client.generate_presigned_url("test/file.txt", 3600).unwrap();
-
-        assert!(url.contains("test/file.txt"));
-        assert!(url.contains("X-Amz-Expires="));
+        Ok(presigned.uri().to_string())
     }
 }
