@@ -1,0 +1,44 @@
+# Node modules
+node_modules/
+npm-debug.log*
+
+# Build output
+dist/
+
+# Test files
+tests/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+coverage/
+
+# Development files
+.env.local
+.env.development
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+*.md
+!DATABASE_SETUP.md
+!SECURITY_IMPLEMENTATION.md
+
+# macOS
+.DS_Store
+
+# Temp files
+*.tmp
+*.temp
+.cache/

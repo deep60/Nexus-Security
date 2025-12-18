@@ -1,15 +1,9 @@
-use axum::{
-    body::Body,
-    extract::MatchedPath,
-    http::{Request, StatusCode},
-    middleware::Next,
-    response::{IntoResponse, Response},
-};
+use axum::{body::Body, extract::MatchedPath, http::Request, middleware::Next, response::Response};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
-use std::collections::HashMap;
 
 /// Global metrics collector
 #[derive(Debug, Clone)]
@@ -51,7 +45,9 @@ impl MetricsCollector {
 
         // Update endpoint stats
         let mut endpoint_stats = self.endpoint_stats.write().await;
-        let stats = endpoint_stats.entry(endpoint).or_insert_with(EndpointMetrics::new);
+        let stats = endpoint_stats
+            .entry(endpoint)
+            .or_insert_with(EndpointMetrics::new);
         stats.record_request(duration_ms, status_code);
         drop(endpoint_stats);
 
@@ -130,7 +126,7 @@ impl Default for MetricsCollector {
 }
 
 /// Per-endpoint metrics
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct EndpointMetrics {
     pub total_requests: u64,
     pub total_errors: u64,
@@ -228,7 +224,9 @@ pub async fn metrics_middleware(
     let duration = start.elapsed().as_millis() as u64;
     let collector_clone = collector.clone();
     tokio::spawn(async move {
-        collector_clone.record_request(path, duration, status.as_u16()).await;
+        collector_clone
+            .record_request(path, duration, status.as_u16())
+            .await;
     });
 
     response
@@ -248,44 +246,82 @@ fn calculate_percentile(durations: &[u64], percentile: f64) -> u64 {
 }
 
 /// Prometheus-compatible metrics export
-pub fn export_prometheus_metrics(snapshot: &MetricsSnapshot, endpoint_metrics: &HashMap<String, EndpointMetrics>) -> String {
+pub fn export_prometheus_metrics(
+    snapshot: &MetricsSnapshot,
+    endpoint_metrics: &HashMap<String, EndpointMetrics>,
+) -> String {
     let mut output = String::new();
 
     // Total requests
-    output.push_str(&format!("# HELP http_requests_total Total number of HTTP requests\n"));
+    output.push_str(&format!(
+        "# HELP http_requests_total Total number of HTTP requests\n"
+    ));
     output.push_str(&format!("# TYPE http_requests_total counter\n"));
-    output.push_str(&format!("http_requests_total {}\n\n", snapshot.total_requests));
+    output.push_str(&format!(
+        "http_requests_total {}\n\n",
+        snapshot.total_requests
+    ));
 
     // Active requests
-    output.push_str(&format!("# HELP http_requests_active Number of active HTTP requests\n"));
+    output.push_str(&format!(
+        "# HELP http_requests_active Number of active HTTP requests\n"
+    ));
     output.push_str(&format!("# TYPE http_requests_active gauge\n"));
-    output.push_str(&format!("http_requests_active {}\n\n", snapshot.active_requests));
+    output.push_str(&format!(
+        "http_requests_active {}\n\n",
+        snapshot.active_requests
+    ));
 
     // Total errors
-    output.push_str(&format!("# HELP http_requests_errors_total Total number of HTTP errors\n"));
+    output.push_str(&format!(
+        "# HELP http_requests_errors_total Total number of HTTP errors\n"
+    ));
     output.push_str(&format!("# TYPE http_requests_errors_total counter\n"));
-    output.push_str(&format!("http_requests_errors_total {}\n\n", snapshot.total_errors));
+    output.push_str(&format!(
+        "http_requests_errors_total {}\n\n",
+        snapshot.total_errors
+    ));
 
     // Average response time
-    output.push_str(&format!("# HELP http_response_time_ms_avg Average response time in milliseconds\n"));
+    output.push_str(&format!(
+        "# HELP http_response_time_ms_avg Average response time in milliseconds\n"
+    ));
     output.push_str(&format!("# TYPE http_response_time_ms_avg gauge\n"));
-    output.push_str(&format!("http_response_time_ms_avg {}\n\n", snapshot.avg_response_time_ms));
+    output.push_str(&format!(
+        "http_response_time_ms_avg {}\n\n",
+        snapshot.avg_response_time_ms
+    ));
 
     // P95 response time
-    output.push_str(&format!("# HELP http_response_time_ms_p95 95th percentile response time\n"));
+    output.push_str(&format!(
+        "# HELP http_response_time_ms_p95 95th percentile response time\n"
+    ));
     output.push_str(&format!("# TYPE http_response_time_ms_p95 gauge\n"));
-    output.push_str(&format!("http_response_time_ms_p95 {}\n\n", snapshot.p95_response_time_ms));
+    output.push_str(&format!(
+        "http_response_time_ms_p95 {}\n\n",
+        snapshot.p95_response_time_ms
+    ));
 
     // Error rate
-    output.push_str(&format!("# HELP http_error_rate_percent Error rate percentage\n"));
+    output.push_str(&format!(
+        "# HELP http_error_rate_percent Error rate percentage\n"
+    ));
     output.push_str(&format!("# TYPE http_error_rate_percent gauge\n"));
-    output.push_str(&format!("http_error_rate_percent {}\n\n", snapshot.error_rate));
+    output.push_str(&format!(
+        "http_error_rate_percent {}\n\n",
+        snapshot.error_rate
+    ));
 
     // Per-endpoint metrics
-    output.push_str(&format!("# HELP http_requests_by_endpoint_total Requests per endpoint\n"));
+    output.push_str(&format!(
+        "# HELP http_requests_by_endpoint_total Requests per endpoint\n"
+    ));
     output.push_str(&format!("# TYPE http_requests_by_endpoint_total counter\n"));
     for (endpoint, metrics) in endpoint_metrics {
-        output.push_str(&format!("http_requests_by_endpoint_total{{endpoint=\"{}\"}} {}\n", endpoint, metrics.total_requests));
+        output.push_str(&format!(
+            "http_requests_by_endpoint_total{{endpoint=\"{}\"}} {}\n",
+            endpoint, metrics.total_requests
+        ));
     }
 
     output
@@ -299,8 +335,12 @@ mod tests {
     async fn test_metrics_collector() {
         let collector = MetricsCollector::new();
 
-        collector.record_request("/api/test".to_string(), 100, 200).await;
-        collector.record_request("/api/test".to_string(), 150, 200).await;
+        collector
+            .record_request("/api/test".to_string(), 100, 200)
+            .await;
+        collector
+            .record_request("/api/test".to_string(), 150, 200)
+            .await;
 
         let snapshot = collector.get_snapshot().await;
         assert_eq!(snapshot.total_requests, 2);
@@ -311,8 +351,12 @@ mod tests {
     async fn test_error_tracking() {
         let collector = MetricsCollector::new();
 
-        collector.record_request("/api/test".to_string(), 100, 200).await;
-        collector.record_request("/api/test".to_string(), 150, 500).await;
+        collector
+            .record_request("/api/test".to_string(), 100, 200)
+            .await;
+        collector
+            .record_request("/api/test".to_string(), 150, 500)
+            .await;
 
         let snapshot = collector.get_snapshot().await;
         assert_eq!(snapshot.total_errors, 1);

@@ -72,7 +72,9 @@ pub struct StakeRequest {
 /// Get wallet balance
 ///
 /// GET /api/v1/wallet/balance
-pub async fn get_balance(State(state): State<AppState>) -> Result<Json<WalletBalance>, StatusCode> {
+pub async fn get_balance(
+    State(_state): State<AppState>,
+) -> Result<Json<WalletBalance>, StatusCode> {
     // TODO: Fetch balance from blockchain
     Err(StatusCode::NOT_IMPLEMENTED)
 }
@@ -81,7 +83,7 @@ pub async fn get_balance(State(state): State<AppState>) -> Result<Json<WalletBal
 ///
 /// GET /api/v1/wallet/transactions
 pub async fn get_transactions(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     Query(params): Query<TransactionQuery>,
 ) -> Result<Json<TransactionListResponse>, StatusCode> {
     let page = params.page.unwrap_or(1);
@@ -100,8 +102,8 @@ pub async fn get_transactions(
 ///
 /// POST /api/v1/wallet/connect
 pub async fn connect_wallet(
-    State(state): State<AppState>,
-    Json(payload): Json<ConnectWalletRequest>,
+    State(_state): State<AppState>,
+    Json(_payload): Json<ConnectWalletRequest>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // TODO: Verify signature and connect wallet
     Err(StatusCode::NOT_IMPLEMENTED)
@@ -117,7 +119,7 @@ pub struct ConnectWalletRequest {
 /// Disconnect wallet
 ///
 /// POST /api/v1/wallet/disconnect
-pub async fn disconnect_wallet(State(state): State<AppState>) -> Result<StatusCode, StatusCode> {
+pub async fn disconnect_wallet(State(_state): State<AppState>) -> Result<StatusCode, StatusCode> {
     // TODO: Disconnect wallet
     Err(StatusCode::NOT_IMPLEMENTED)
 }
@@ -126,8 +128,8 @@ pub async fn disconnect_wallet(State(state): State<AppState>) -> Result<StatusCo
 ///
 /// POST /api/v1/wallet/withdraw
 pub async fn withdraw(
-    State(state): State<AppState>,
-    Json(payload): Json<WithdrawRequest>,
+    State(_state): State<AppState>,
+    Json(_payload): Json<WithdrawRequest>,
 ) -> Result<Json<Transaction>, StatusCode> {
     // TODO: Process withdrawal
     Err(StatusCode::NOT_IMPLEMENTED)
@@ -137,8 +139,8 @@ pub async fn withdraw(
 ///
 /// POST /api/v1/wallet/stake
 pub async fn stake_tokens(
-    State(state): State<AppState>,
-    Json(payload): Json<StakeRequest>,
+    State(_state): State<AppState>,
+    Json(_payload): Json<StakeRequest>,
 ) -> Result<Json<Transaction>, StatusCode> {
     // TODO: Stake tokens
     Err(StatusCode::NOT_IMPLEMENTED)
@@ -148,8 +150,8 @@ pub async fn stake_tokens(
 ///
 /// POST /api/v1/wallet/unstake/:bounty_id
 pub async fn unstake_tokens(
-    State(state): State<AppState>,
-    Path(bounty_id): Path<Uuid>,
+    State(_state): State<AppState>,
+    Path(_bounty_id): Path<Uuid>,
 ) -> Result<Json<Transaction>, StatusCode> {
     // TODO: Unstake tokens
     Err(StatusCode::NOT_IMPLEMENTED)
@@ -158,7 +160,9 @@ pub async fn unstake_tokens(
 /// Claim rewards
 ///
 /// POST /api/v1/wallet/claim-rewards
-pub async fn claim_rewards(State(state): State<AppState>) -> Result<Json<Transaction>, StatusCode> {
+pub async fn claim_rewards(
+    State(_state): State<AppState>,
+) -> Result<Json<Transaction>, StatusCode> {
     // TODO: Claim pending rewards
     Err(StatusCode::NOT_IMPLEMENTED)
 }

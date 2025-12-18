@@ -145,8 +145,8 @@ pub struct WebhookEvent {
 ///
 /// POST /api/v1/webhooks
 pub async fn register_webhook(
-    State(state): State<AppState>,
-    Json(payload): Json<RegisterWebhookRequest>,
+    State(_state): State<AppState>,
+    Json(_payload): Json<RegisterWebhookRequest>,
 ) -> Result<Json<Webhook>, StatusCode> {
     // TODO: Validate webhook URL
     // TODO: Validate event types
@@ -161,7 +161,7 @@ pub async fn register_webhook(
 ///
 /// GET /api/v1/webhooks
 pub async fn list_webhooks(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     Query(params): Query<WebhookQuery>,
 ) -> Result<Json<WebhookListResponse>, StatusCode> {
     let page = params.page.unwrap_or(1);
@@ -183,8 +183,8 @@ pub async fn list_webhooks(
 ///
 /// GET /api/v1/webhooks/:id
 pub async fn get_webhook(
-    State(state): State<AppState>,
-    Path(webhook_id): Path<Uuid>,
+    State(_state): State<AppState>,
+    Path(_webhook_id): Path<Uuid>,
 ) -> Result<Json<Webhook>, StatusCode> {
     // TODO: Fetch webhook from database
     // TODO: Verify user ownership
@@ -195,9 +195,9 @@ pub async fn get_webhook(
 ///
 /// PUT /api/v1/webhooks/:id
 pub async fn update_webhook(
-    State(state): State<AppState>,
-    Path(webhook_id): Path<Uuid>,
-    Json(payload): Json<UpdateWebhookRequest>,
+    State(_state): State<AppState>,
+    Path(_webhook_id): Path<Uuid>,
+    Json(_payload): Json<UpdateWebhookRequest>,
 ) -> Result<Json<Webhook>, StatusCode> {
     // TODO: Verify user ownership
     // TODO: Validate updated fields
@@ -209,8 +209,8 @@ pub async fn update_webhook(
 ///
 /// DELETE /api/v1/webhooks/:id
 pub async fn delete_webhook(
-    State(state): State<AppState>,
-    Path(webhook_id): Path<Uuid>,
+    State(_state): State<AppState>,
+    Path(_webhook_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
     // TODO: Verify user ownership
     // TODO: Delete from database
@@ -222,9 +222,9 @@ pub async fn delete_webhook(
 ///
 /// POST /api/v1/webhooks/:id/test
 pub async fn test_webhook(
-    State(state): State<AppState>,
-    Path(webhook_id): Path<Uuid>,
-    Json(payload): Json<TestWebhookRequest>,
+    State(_state): State<AppState>,
+    Path(_webhook_id): Path<Uuid>,
+    Json(_payload): Json<TestWebhookRequest>,
 ) -> Result<Json<WebhookDelivery>, StatusCode> {
     // TODO: Verify user ownership
     // TODO: Generate sample payload for event type
@@ -238,8 +238,8 @@ pub async fn test_webhook(
 ///
 /// GET /api/v1/webhooks/:id/deliveries
 pub async fn get_webhook_deliveries(
-    State(state): State<AppState>,
-    Path(webhook_id): Path<Uuid>,
+    State(_state): State<AppState>,
+    Path(_webhook_id): Path<Uuid>,
     Query(params): Query<DeliveryQuery>,
 ) -> Result<Json<DeliveryListResponse>, StatusCode> {
     let page = params.page.unwrap_or(1);
@@ -261,8 +261,8 @@ pub async fn get_webhook_deliveries(
 ///
 /// POST /api/v1/webhooks/deliveries/:delivery_id/retry
 pub async fn retry_delivery(
-    State(state): State<AppState>,
-    Path(delivery_id): Path<Uuid>,
+    State(_state): State<AppState>,
+    Path(_delivery_id): Path<Uuid>,
 ) -> Result<Json<WebhookDelivery>, StatusCode> {
     // TODO: Verify user ownership
     // TODO: Check if delivery is eligible for retry
@@ -276,7 +276,7 @@ pub async fn retry_delivery(
 ///
 /// GET /api/v1/webhooks/events
 pub async fn get_available_events(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
 ) -> Result<Json<AvailableEvents>, StatusCode> {
     // TODO: Return list of all available webhook events with descriptions
     let events = vec![
@@ -352,7 +352,7 @@ pub async fn get_available_events(
 ///
 /// GET /api/v1/webhooks/stats
 pub async fn get_webhook_stats(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // TODO: Calculate webhook statistics for current user
     Ok(Json(serde_json::json!({

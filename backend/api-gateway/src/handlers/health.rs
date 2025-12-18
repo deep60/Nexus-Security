@@ -122,15 +122,15 @@ pub async fn liveness_check() -> Json<serde_json::Value> {
 ///
 /// GET /api/v1/metrics
 pub async fn metrics(State(state): State<AppState>) -> Result<Json<serde_json::Value>, StatusCode> {
-    // TODO: Implement actual metrics collection
+    let snapshot = state.metrics.get_snapshot().await;
+    let endpoint_metrics = state.metrics.get_endpoint_metrics().await;
+    let status_codes = state.metrics.get_status_code_distribution().await;
+
     Ok(Json(serde_json::json!({
         "timestamp": Utc::now(),
         "version": env!("CARGO_PKG_VERSION"),
-        "metrics": {
-            "requests_total": 0,
-            "requests_active": 0,
-            "errors_total": 0,
-            "response_time_avg_ms": 0,
-        }
+        "global": snapshot,
+        "endpoints": endpoint_metrics,
+        "status_codes": status_codes,
     })))
 }

@@ -1,10 +1,12 @@
 /// Messaging and event handling utilities
 pub mod event_types;
+pub mod publisher;
 
 // Kafka client module - currently stubbed for future implementation
 // pub mod kafka_client;
 
 pub use event_types::*;
+pub use publisher::*;
 
 /// Message queue trait for abstracting different messaging backends
 #[async_trait::async_trait]

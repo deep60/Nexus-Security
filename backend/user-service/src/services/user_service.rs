@@ -109,7 +109,25 @@ impl UserService {
             .await
             .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 
-        // TODO: Send verification email via notification service
+        // Publish UserRegistered event for email notification
+        let user_registered_event = shared::messaging::event_types::UserRegisteredEvent {
+            user_id: user.id,
+            username: user.username.clone(),
+            email: user.email.clone(),
+            ethereum_address: user.ethereum_address.clone().unwrap_or_default(),
+            registered_at: user.created_at,
+        };
+
+        if let Err(e) = shared::messaging::publish_event(
+            &redis::Client::open(self.config.redis.url.clone())
+                .map_err(|e| UserError::DatabaseError(e.to_string()))?,
+            &shared::messaging::event_types::NexusEvent::UserRegistered(user_registered_event),
+        )
+        .await
+        {
+            tracing::error!("Failed to publish UserRegistered event: {}", e);
+            // Don't fail registration if event publish fails
+        }
 
         // Generate tokens
         let access_token = self.auth_service.generate_access_token(

@@ -110,30 +110,28 @@ pub async fn auth_middleware(
         .get(header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok());
 
-    let token = match auth_header {
-        Some(header) if header.starts_with("Bearer ") => &header[7..],
-        _ => return Err(StatusCode::UNAUTHORIZED),
-    };
+    match auth_header {
+        Some(header) if header.starts_with("Bearer ") => {
+            let token = &header[7..];
 
-    // Validate token
-    // TODO: Implement actual JWT validation with state.jwt_service
-    // For now, we'll add the user context to request extensions
+            // Recreate JwtService here (in production, this should ideally be in AppState but for now we create it on fly or cached)
+            // However, JwtService construction is cheap (key derivation), or we can move it to AppState.
+            // Since AppState doesn't have it, we'll verify using the secret from config.
 
-    // Mock claims for compilation (replace with actual validation)
-    let claims = Claims {
-        sub: Uuid::new_v4(),
-        email: "user@example.com".to_string(),
-        role: "user".to_string(),
-        exp: (Utc::now() + Duration::hours(24)).timestamp(),
-        iat: Utc::now().timestamp(),
-        nbf: Utc::now().timestamp(),
-        jti: Uuid::new_v4().to_string(),
-    };
+            // NOTE: Ideally JwtService should be in AppState to avoid re-hashing key.
+            // But for this refactor, we instantiate it.
+            let jwt_service = JwtService::new(&state.config.security.jwt_secret);
 
-    // Add claims to request extensions for handlers to access
-    request.extensions_mut().insert(claims);
-
-    Ok(next.run(request).await)
+            match jwt_service.validate_token(token) {
+                Ok(claims) => {
+                    request.extensions_mut().insert(claims);
+                    Ok(next.run(request).await)
+                }
+                Err(_) => Err(StatusCode::UNAUTHORIZED),
+            }
+        }
+        _ => Err(StatusCode::UNAUTHORIZED),
+    }
 }
 
 /// Optional authentication middleware (doesn't fail on missing token)
@@ -151,20 +149,11 @@ pub async fn optional_auth_middleware(
     if let Some(header) = auth_header {
         if header.starts_with("Bearer ") {
             let token = &header[7..];
+            let jwt_service = JwtService::new(&state.config.security.jwt_secret);
 
-            // Try to validate token, but don't fail if invalid
-            // TODO: Implement actual JWT validation
-            let claims = Claims {
-                sub: Uuid::new_v4(),
-                email: "user@example.com".to_string(),
-                role: "user".to_string(),
-                exp: (Utc::now() + Duration::hours(24)).timestamp(),
-                iat: Utc::now().timestamp(),
-                nbf: Utc::now().timestamp(),
-                jti: Uuid::new_v4().to_string(),
-            };
-
-            request.extensions_mut().insert(claims);
+            if let Ok(claims) = jwt_service.validate_token(token) {
+                request.extensions_mut().insert(claims);
+            }
         }
     }
 

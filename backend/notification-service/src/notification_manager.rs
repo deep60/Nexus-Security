@@ -1,4 +1,5 @@
 use anyhow::Result;
+use futures_util::StreamExt;
 use redis::aio::ConnectionManager;
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -86,8 +87,109 @@ impl NotificationManager {
     }
 
     pub async fn start_event_listener(&self) -> Result<()> {
-        info!("Starting event listener...");
-        // TODO: Listen to Redis pub/sub or Kafka for events
+        info!("Starting Redis Pub/Sub event listener...");
+
+        // Channels we're interested in for email notifications
+        let channels = vec![
+            "events:user_registered",
+            "events:payment_processed",
+        ];
+
+        // Get a new Redis connection for Pub/Sub (must be dedicated)
+        let redis_client = redis::Client::open(self.config.redis.url.clone())?;
+        let mut pubsub = redis_client.get_async_pubsub().await?;
+
+        // Subscribe to all channels
+        for channel in &channels {
+            pubsub.subscribe(channel).await?;
+            info!("Subscribed to channel: {}", channel);
+        }
+
+        info!("Event listener started successfully, waiting for events...");
+
+        // Listen for messages in an infinite loop
+        loop {
+            match pubsub.on_message().next().await {
+                Some(msg) => {
+                    let channel = msg.get_channel_name();
+                    let payload: String = match msg.get_payload() {
+                        Ok(p) => p,
+                        Err(e) => {
+                            error!("Failed to get message payload from {}: {}", channel, e);
+                            continue;
+                        }
+                    };
+
+                    info!("Received event from channel: {}", channel);
+
+                    // Process the event
+                    if let Err(e) = self.process_event(channel, &payload).await {
+                        error!("Failed to process event from {}: {}", channel, e);
+                    }
+                }
+                None => {
+                    error!("Pub/Sub message stream ended unexpectedly");
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn process_event(&self, channel: &str, payload: &str) -> Result<()> {
+        use shared::messaging::event_types::{NexusEvent, UserRegisteredEvent, PaymentProcessedEvent, NotificationChannel, NotificationPriority, NotificationPayload};
+
+        // Deserialize the event based on channel
+        let event: NexusEvent = match channel {
+            "events:user_registered" => {
+                let user_event: UserRegisteredEvent = serde_json::from_str(payload)?;
+                NexusEvent::UserRegistered(user_event)
+            }
+            "events:payment_processed" => {
+                let payment_event: PaymentProcessedEvent = serde_json::from_str(payload)?;
+                NexusEvent::PaymentProcessed(payment_event)
+            }
+            _ => {
+                info!("Ignoring unhandled channel: {}", channel);
+                return Ok(());
+            }
+        };
+
+        // Extract user_id from event
+        let user_id = match &event {
+            NexusEvent::UserRegistered(e) => e.user_id,
+            NexusEvent::PaymentProcessed(e) => e.recipient_id,
+            _ => {
+                error!("Unexpected event type for channel: {}", channel);
+                return Ok(());
+            }
+        };
+
+        // Create notification payload
+        let notification_payload = NotificationPayload {
+            notification_id: Uuid::new_v4(),
+            user_id,
+            channels: vec![NotificationChannel::Email], // Email only for now
+            event: event.clone(),
+            priority: match &event {
+                NexusEvent::UserRegistered(_) => NotificationPriority::Normal,
+                NexusEvent::PaymentProcessed(_) => NotificationPriority::High,
+                _ => NotificationPriority::Normal,
+            },
+            created_at: chrono::Utc::now(),
+        };
+
+        info!(
+            "Processing notification for user {} via email: {}",
+            user_id,
+            event.get_title()
+        );
+
+        // Send notification
+        self.send_notification(&notification_payload).await?;
+
+        info!("Notification sent successfully for user {}", user_id);
         Ok(())
     }
 

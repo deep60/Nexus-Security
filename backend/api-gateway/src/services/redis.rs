@@ -485,26 +485,26 @@ impl RedisService {
 
     /// Dequeue highest priority analysis
     /// Pops item with highest score from sorted set
-    pub async fn dequeue_analysis(&self) -> Result<Option<uuid::Uuid>> {
-        let key = "queue:analysis";
+    // pub async fn dequeue_analysis(&self) -> Result<Option<uuid::Uuid>> {
+    //     let key = "queue:analysis";
 
-        let mut conn = self.connection_pool.clone();
-        // ZPOPMAX removes and returns highest score member
-        let result: Option<(String, f64)> = conn
-            .zpopmax(key, None)
-            .await
-            .context("Failed to dequeue analysis")?;
+    //     let mut conn = self.connection_pool.clone();
+    //     // ZPOPMAX removes and returns highest score member
+    //     let result: Option<(String, f64)> = conn
+    //         .zpopmax(key, None)
+    //         .await
+    //         .context("Failed to dequeue analysis")?;
 
-        match result {
-            Some((member, priority)) => {
-                let analysis_id = uuid::Uuid::parse_str(&member)
-                    .context("Failed to parse analysis ID")?;
-                info!("Dequeued analysis: {} (priority: {})", analysis_id, priority);
-                Ok(Some(analysis_id))
-            }
-            None => Ok(None),
-        }
-    }
+    //     match result {
+    //         Some((member, priority)) => {
+    //             let analysis_id = uuid::Uuid::parse_str(&member)
+    //                 .context("Failed to parse analysis ID")?;
+    //             info!("Dequeued analysis: {} (priority: {})", analysis_id, priority);
+    //             Ok(Some(analysis_id))
+    //         }
+    //         None => Ok(None),
+    //     }
+    // }
 
     /// Cache file info with TTL (default: 1 hour)
     pub async fn cache_file_info(

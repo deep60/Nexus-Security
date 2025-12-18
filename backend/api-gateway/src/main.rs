@@ -27,15 +27,18 @@ use uuid::Uuid;
 mod config;
 mod handlers;
 mod middleware;
+use middleware::metrics::{metrics_middleware, MetricsCollector};
 mod models;
 mod services;
 mod utils;
 
 use config::AppConfig;
-use handlers::{auth, bounty, health, reputation, submission};
+use handlers::{auth, bounty, health, reputation, submission, user};
 use models::{analysis::AnalysisResult, bounty::Bounty, user::User};
 use services::{blockchain::BlockchainService, database::DatabaseService, redis::RedisService};
 use utils::{crypto::JwtClaims, validation::ValidationError};
+
+use crate::models::response::ApiResponse;
 
 use crate::utils::helpers::current_timestamp;
 
@@ -47,6 +50,7 @@ pub struct AppState {
     pub blockchain: Arc<BlockchainService>,
     pub config: Arc<AppConfig>,
     pub active_sessions: Arc<RwLock<HashMap<String, SessionInfo>>>,
+    pub metrics: Arc<MetricsCollector>,
 }
 
 // Session information for active users
@@ -59,68 +63,7 @@ pub struct SessionInfo {
     pub permissions: Vec<String>,
 }
 
-// Standard API response wrapper
-#[derive(Serialize)]
-pub struct ApiResponse<T> {
-    pub success: bool,
-    pub data: Option<T>,
-    pub message: Option<String>,
-    pub timestamp: u64,
-}
-
-// Error response structure
-#[derive(Serialize)]
-pub struct ErrorResponse {
-    pub error: String,
-    pub code: u16,
-    pub details: Option<serde_json::Value>,
-}
-
-// Health check response
-#[derive(Serialize)]
-pub struct HealthCheck {
-    pub status: String,
-    pub version: String,
-    pub uptime: u64,
-    pub services: HashMap<String, bool>,
-}
-
-// File upload query parameters
-#[derive(Deserialize)]
-pub struct UploadQuery {
-    pub bounty_amount: Option<f64>,
-    pub priority: Option<String>,
-    pub engines: Option<String>, // Comma-separated list
-}
-
-impl<T> ApiResponse<T> {
-    pub fn success(data: T) -> Self {
-        Self {
-            success: true,
-            data: Some(data),
-            message: None,
-            timestamp: current_timestamp() as u64,
-        }
-    }
-
-    pub fn success_with_message(data: T, message: String) -> Self {
-        Self {
-            success: true,
-            data: Some(data),
-            message: Some(message),
-            timestamp: current_timestamp() as u64,
-        }
-    }
-
-    pub fn error(message: String) -> ApiResponse<()> {
-        ApiResponse {
-            success: false,
-            data: None,
-            message: Some(message),
-            timestamp: current_timestamp() as u64,
-        }
-    }
-}
+// ApiResponse moved to models::response
 
 // Middleware for authentication
 async fn auth_middleware(
@@ -188,48 +131,12 @@ async fn logging_middleware(request: axum::extract::Request, next: Next) -> Resp
     response
 }
 
-// health check endpoint
-async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
-    // Uptime calculation
-    let uptime = (current_timestamp() as u64).saturating_sub(state.config.server.port as u64); // Placeholder logic fixed
-
-    let mut services = HashMap::new();
-
-    // Check database connection
-    let db_health = match state.db.health_check().await {
-        Ok(_) => true,
-        Err(_) => false,
-    };
-    services.insert("database".to_string(), db_health);
-
-    // Check Redis connection
-    let redis_health = match state.redis.health_check().await {
-        Ok(healthy) => healthy,
-        Err(_) => false,
-    };
-    services.insert("redis".to_string(), redis_health);
-
-    // Check blockchain connection
-    let blockchain_health = state.blockchain.health_check().await;
-    services.insert("blockchain".to_string(), blockchain_health);
-
-    let all_healthy = services.values().all(|&healthy| healthy);
-    let status = if all_healthy { "ok" } else { "degraded" };
-
-    let health = HealthCheck {
-        status: status.to_string(),
-        version: env!("CARGO_PKG_VERSION").to_string(),
-        uptime,
-        services,
-    };
-
-    let status_code = if all_healthy {
-        StatusCode::OK
-    } else {
-        StatusCode::SERVICE_UNAVAILABLE
-    };
-
-    (status_code, Json(ApiResponse::success(health)))
+// File upload query parameters
+#[derive(Deserialize)]
+pub struct UploadQuery {
+    pub bounty_amount: Option<f64>,
+    pub priority: Option<String>,
+    pub engines: Option<String>, // Comma-separated list
 }
 
 // File analysis endpoint
@@ -279,9 +186,12 @@ async fn get_analysis_result(
 
 // Build application router
 fn create_router(state: AppState) -> Router {
+    let metrics = state.metrics.clone();
+
     Router::new()
         // Health and monitoring
-        .route("/api/v1/health", get(health_check))
+        .route("/api/v1/health", get(health::health_check))
+        .route("/api/v1/metrics", get(health::metrics))
         // Authentication routes
         .route("/api/v1/auth/login", post(auth::login))
         .route("/api/v1/auth/register", post(auth::register))
@@ -289,19 +199,19 @@ fn create_router(state: AppState) -> Router {
         .route("/api/v1/auth/refresh", post(auth::refresh_token))
         .route("/api/v1/auth/verify", post(auth::verify_token))
         // Analysis routes
-        .route("/api/v1/analyze/file", post(analyze_file))
+        .route("/api/v1/analyze/file", post(analyze_file)) // Keep stub for now
         .route("/api/v1/analyze/url", post(submission::create_submission))
-        .route("/api/v1/analysis/:id", get(get_analysis_result))
+        .route("/api/v1/analysis/:id", get(get_analysis_result)) // Keep local stub or move to handler
         .route(
             "/api/v1/analysis/:id/report",
             get(submission::get_submission_details),
         )
         // Bounty management routes
-        .route("/api/v1/bounties", get(bounty::get_bounties))
-        .route("/api/v1/bounties/:id", get(bounty::get_bounties_details))
+        .route("/api/v1/bounties", get(bounty::list_bounties)) // Fixed name
+        .route("/api/v1/bounties/:id", get(bounty::get_bounty)) // Fixed name
         // User and wallet routes
-        .route("/api/v1/profile", get(auth::get_profile))
-        .route("/api/v1/wallet/connect", post(auth::collect_wallet))
+        .route("/api/v1/profile", get(user::get_current_user)) // Use user handler
+        .route("/api/v1/wallet/connect", post(auth::collect_wallet)) // Assuming auth handles wallet for now
         .route("/api/v1/wallet/disconnect", post(auth::disconnect_wallet))
         // Reputation routes
         .route(
@@ -312,6 +222,9 @@ fn create_router(state: AppState) -> Router {
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(axum_middleware::from_fn(logging_middleware))
+                .layer(axum_middleware::from_fn(move |req, next| {
+                    metrics_middleware(metrics.clone(), None, req, next)
+                })) // Add metrics middleware
                 .layer(DefaultBodyLimit::max(50 * 1024 * 1024)) // 50MB limit
                 .layer(
                     CorsLayer::new()
@@ -396,10 +309,10 @@ async fn main() -> Result<()> {
 
     // Load configuration
     let config = load_config()?;
-    info!(
-        "Configuration loaded: {}:{}",
-        config.server.host, config.server.port
-    );
+    info!(config.server.host, config.server.port);
+
+    // Initialize metrics collector
+    let metrics_collector = Arc::new(MetricsCollector::new());
 
     // Initialize services
     let (db, redis, blockchain) = initialize_services(&config).await?;
@@ -411,6 +324,7 @@ async fn main() -> Result<()> {
         blockchain: Arc::new(blockchain),
         config: Arc::new(config.clone()),
         active_sessions: Arc::new(RwLock::new(HashMap::new())),
+        metrics: metrics_collector.clone(),
     };
 
     // Create router with all routes and middleware
