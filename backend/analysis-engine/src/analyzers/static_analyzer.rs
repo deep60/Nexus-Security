@@ -151,7 +151,7 @@ lazy_static! {
     static ref CRYPTO_REGEX: Regex = Regex::new(r"(?i)(aes|des|rsa|md5|sha\d+|base64|encrypt|decrypt|cipher)").unwrap();
     static ref BITCOIN_REGEX: Regex = Regex::new(r"\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b").unwrap();
     static ref ETHEREUM_REGEX: Regex = Regex::new(r"\b0x[a-fA-F0-9]{40}\b").unwrap();
-    static ref FILE_PATH_REGEX: Regex = Regex::new(r"[A-Za-z]:\\[^<>:\"|?*\n\r]+|/(?:usr|home|etc|var|tmp)/[^\s<>:\"|?*\n\r]+").unwrap();
+    static ref FILE_PATH_REGEX: Regex = Regex::new(r#"[A-Za-z]:\\[^<>:"|?*\r\n]+|/(?:usr|home|etc|var|tmp)/[^\s<>:"|?*\r\n]+"#).unwrap();
     
     // Extended suspicious string patterns with severity ratings
     static ref MALWARE_PATTERNS: Vec<(Regex, StringCategory, u8)> = vec![

@@ -97,7 +97,8 @@ impl NotificationManager {
 
         // Get a new Redis connection for Pub/Sub (must be dedicated)
         let redis_client = redis::Client::open(self.config.redis.url.clone())?;
-        let mut pubsub = redis_client.get_async_pubsub().await?;
+        let conn = redis_client.get_async_connection().await?;
+        let mut pubsub = conn.into_pubsub();
 
         // Subscribe to all channels
         for channel in &channels {

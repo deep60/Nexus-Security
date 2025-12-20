@@ -37,7 +37,7 @@ impl EventPublisher {
             .await
             .map_err(|e| anyhow!("Failed to connect to Redis: {}", e))?;
 
-        conn.publish(&channel, payload)
+        conn.publish::<_, _, ()>(&channel, payload)
             .await
             .map_err(|e| anyhow!("Failed to publish event to {}: {}", channel, e))?;
 
@@ -51,6 +51,8 @@ impl EventPublisher {
             return Ok(());
         }
 
+        let event_count = events.len();
+
         let mut conn = self.redis_client
             .get_multiplexed_async_connection()
             .await
@@ -61,12 +63,12 @@ impl EventPublisher {
             let payload = serde_json::to_string(&event)
                 .map_err(|e| anyhow!("Failed to serialize event: {}", e))?;
 
-            if let Err(e) = conn.publish(&channel, payload).await {
+            if let Err(e) = conn.publish::<_, _, ()>(&channel, payload).await {
                 error!("Failed to publish event to {}: {}", channel, e);
             }
         }
 
-        info!("Published {} events in batch", events.len());
+        info!("Published {} events in batch", event_count);
         Ok(())
     }
 
@@ -127,7 +129,7 @@ pub async fn publish_to_channel<T: Serialize>(
         .await
         .map_err(|e| anyhow!("Failed to connect to Redis: {}", e))?;
 
-    conn.publish(channel, message)
+    conn.publish::<_, _, ()>(channel, message)
         .await
         .map_err(|e| anyhow!("Failed to publish to channel {}: {}", channel, e))?;
 
