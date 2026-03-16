@@ -146,9 +146,40 @@ impl BlockchainSyncService {
 
     /// Get events from a specific block
     async fn get_block_events(&self, block_number: u64) -> Result<Vec<BlockchainEvent>, SyncError> {
-        // TODO: Implement actual blockchain event fetching
-        // This is a placeholder that returns empty events
-        Ok(Vec::new())
+        // Use the blockchain service client to fetch event logs
+        // This implementation fetches BountyManager contract logs for the block
+        use ethers::types::{Filter, BlockNumber, H256};
+
+        let client = self.blockchain.get_client();
+        let filter = Filter::new()
+            .from_block(BlockNumber::Number(block_number.into()))
+            .to_block(BlockNumber::Number(block_number.into()));
+
+        let logs = client
+            .get_logs(&filter)
+            .await
+            .map_err(|e| SyncError::BlockchainError(format!("Failed to fetch logs: {}", e)))?;
+
+        let events: Vec<BlockchainEvent> = logs
+            .iter()
+            .filter_map(|log| {
+                let event_type = classify_event_topic(log.topics.first()?);
+                let tx_hash = log.transaction_hash.map(|h| format!("{:?}", h)).unwrap_or_default();
+
+                Some(BlockchainEvent {
+                    event_type: event_type?,
+                    block_number,
+                    transaction_hash: tx_hash,
+                    timestamp: chrono::Utc::now().timestamp(),
+                    data: serde_json::json!({
+                        "log_index": log.log_index,
+                        "address": format!("{:?}", log.address),
+                    }),
+                })
+            })
+            .collect();
+
+        Ok(events)
     }
 
     /// Process a blockchain event
@@ -263,9 +294,12 @@ impl BlockchainSyncService {
 
     /// Get current block number from blockchain
     async fn get_current_block_number(&self) -> Result<u64, SyncError> {
-        // TODO: Implement actual blockchain query
-        // For now, return a mock value
-        Ok(1000)
+        let client = self.blockchain.get_client();
+        let block_number = client
+            .get_block_number()
+            .await
+            .map_err(|e| SyncError::BlockchainError(format!("Failed to get block number: {}", e)))?;
+        Ok(block_number.as_u64())
     }
 
     /// Get last synced block from database
@@ -340,6 +374,32 @@ impl From<sqlx::Error> for SyncError {
 impl From<uuid::Error> for SyncError {
     fn from(err: uuid::Error) -> Self {
         SyncError::ParseError(err.to_string())
+    }
+}
+
+/// Classify a Solidity event log topic to a BlockchainEventType
+/// Topic[0] = keccak256(event_signature)
+fn classify_event_topic(topic: &ethers::types::H256) -> Option<BlockchainEventType> {
+    use ethers::utils::keccak256;
+
+    let bounty_created = ethers::types::H256::from(keccak256("BountyCreated(uint256,address,uint256,uint256)"));
+    let analysis_submitted = ethers::types::H256::from(keccak256("AnalysisSubmitted(uint256,address,uint8,uint256)"));
+    let bounty_resolved = ethers::types::H256::from(keccak256("BountyResolved(uint256,uint8)"));
+    let rewards_distributed = ethers::types::H256::from(keccak256("RewardsDistributed(uint256,uint256)"));
+    let stake_slashed = ethers::types::H256::from(keccak256("StakeSlashed(uint256,address,uint256)"));
+
+    if *topic == bounty_created {
+        Some(BlockchainEventType::BountyCreated)
+    } else if *topic == analysis_submitted {
+        Some(BlockchainEventType::SubmissionStaked)
+    } else if *topic == bounty_resolved {
+        Some(BlockchainEventType::ConsensusReached)
+    } else if *topic == rewards_distributed {
+        Some(BlockchainEventType::PayoutDistributed)
+    } else if *topic == stake_slashed {
+        Some(BlockchainEventType::StakeSlashed)
+    } else {
+        None // Unknown event
     }
 }
 

@@ -37,7 +37,7 @@ describe("BountyFlow Integration", function () {
 
             // Step 3: Check bounty resolved
             const bounty = await bountyManager.getBounty(bountyId);
-            expect(bounty.status).to.equal(1); // Resolved
+            expect(bounty.status).to.equal(2); // Completed
             expect(bounty.consensusVerdict).to.equal(1); // Malicious
 
             console.log(" Bounty resolved with consensus: Malicious");

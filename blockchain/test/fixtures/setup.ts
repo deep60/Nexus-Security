@@ -49,6 +49,9 @@ export async function deployFixture(): Promise<TestFixture> {
     const BOUNTY_MANAGER_ROLE_REP = await reputationSystem.BOUNTY_MANAGER_ROLE();
     await reputationSystem.grantRole(BOUNTY_MANAGER_ROLE_REP, await bountyManager.getAddress());
 
+    // Also grant deployer the BOUNTY_MANAGER_ROLE so direct registerEngine calls succeed in tests
+    await reputationSystem.grantRole(BOUNTY_MANAGER_ROLE_REP, deployer.address);
+
     // Authorize analysts
     await threatToken.setEngineAuthorization(analyst1.address, true);
     await threatToken.setEngineAuthorization(analyst2.address, true);
@@ -96,7 +99,7 @@ export async function createTestBounty(
     const deadline = Math.floor(Date.now() / 1000) + 86400; // 24 hours from now
     const tx = await bountyManager.connect(creator).createBounty(
         "QmTest123456789",
-        0, // File type
+        "file", // artifactType is string, not enum
         rewardAmount,
         deadline,
         "Test malware sample"

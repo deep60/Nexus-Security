@@ -24,12 +24,12 @@ describe("BountyManager", function () {
             await expect(
                 bountyManager.connect(submitter).createBounty(
                     "QmTest",
-                    0,
+                    "file",
                     ethers.parseEther("100"),
                     deadline,
                     "Test"
                 )
-            ).to.be.revertedWith("Token transfer failed");
+            ).to.be.reverted; // Custom error from ERC20 InsufficientAllowance
         });
 
         it("Should reject deadline that is too soon", async function () {
@@ -42,7 +42,7 @@ describe("BountyManager", function () {
             await expect(
                 bountyManager.connect(submitter).createBounty(
                     "QmTest",
-                    0,
+                    "file",
                     rewardAmount,
                     deadline,
                     "Test"
@@ -115,7 +115,7 @@ describe("BountyManager", function () {
 
             const bounty = await bountyManager.getBounty(bountyId);
             expect(bounty.consensusVerdict).to.equal(1); // Malicious
-            expect(bounty.status).to.equal(1); // Resolved
+            expect(bounty.status).to.equal(2); // Completed
         });
 
         it("Should distribute rewards to correct analysts", async function () {
@@ -166,8 +166,9 @@ describe("BountyManager", function () {
             await submitTestAnalysis(bountyManager, threatToken, analyst2, bountyId, 1); // Malicious
             await submitTestAnalysis(bountyManager, threatToken, analyst3, bountyId, 2, 90); // Benign - wrong!
 
-            // Add more correct submissions
-            for (let i = 3; i <= 10; i++) {
+            // Add more correct submissions — keep under auto-resolve threshold (10 total)
+            // 3 already submitted above, add 4 more = 7 total (under 10)
+            for (let i = 3; i <= 6; i++) {
                 const [, , , , , , ...users] = await ethers.getSigners();
                 const analyst = users[i];
 
@@ -177,6 +178,10 @@ describe("BountyManager", function () {
 
                 await submitTestAnalysis(bountyManager, threatToken, analyst, bountyId, 1); // Malicious
             }
+
+            // Advance time past deadline and resolve manually
+            await advanceTime(86400 + 1);
+            await bountyManager.resolveBounty(bountyId);
 
             // Analyst3's balance should be less (stake slashed)
             const finalBalance = await threatToken.balanceOf(analyst3.address);

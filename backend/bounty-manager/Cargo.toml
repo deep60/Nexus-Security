@@ -20,3 +20,5 @@ tower-http = { version = "0.6.6", features = ["cors", "trace"] }
 tracing.workspace = true
 tracing-subscriber = "0.3.18"
 uuid.workspace = true
+ethers = { version = "2.0", features = ["ws", "rustls"] }
+anyhow = "1"

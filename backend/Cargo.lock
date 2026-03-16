@@ -1127,8 +1127,10 @@ dependencies = [
 name = "bounty-manager"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "axum 0.8.7",
  "chrono",
+ "ethers",
  "rand 0.8.5",
  "rust_decimal",
  "serde",

@@ -471,15 +471,28 @@ impl AppConfig {
                 .map_err(|_| ConfigError::InvalidValue("Invalid CHAIN_ID".to_string()))?;
         }
 
-        // Contract addresses
-        if let Ok(addr) = std::env::var("CONTRACT_BOUNTY_MANAGER") {
+        // Contract addresses (accept both naming conventions for compatibility)
+        if let Ok(addr) = std::env::var("BOUNTY_MANAGER_ADDRESS")
+            .or_else(|_| std::env::var("CONTRACT_BOUNTY_MANAGER"))
+        {
             config.blockchain.contracts.bounty_manager = addr;
         }
-        if let Ok(addr) = std::env::var("CONTRACT_THREAT_TOKEN") {
+        if let Ok(addr) = std::env::var("THREAT_TOKEN_ADDRESS")
+            .or_else(|_| std::env::var("CONTRACT_THREAT_TOKEN"))
+        {
             config.blockchain.contracts.threat_token = addr;
         }
-        if let Ok(addr) = std::env::var("CONTRACT_REPUTATION_SYSTEM") {
+        if let Ok(addr) = std::env::var("REPUTATION_SYSTEM_ADDRESS")
+            .or_else(|_| std::env::var("CONTRACT_REPUTATION_SYSTEM"))
+        {
             config.blockchain.contracts.reputation_system = addr;
+        }
+
+        // Blockchain private key
+        if let Ok(key) = std::env::var("BLOCKCHAIN_PRIVATE_KEY")
+            .or_else(|_| std::env::var("TREASURY_PRIVATE_KEY"))
+        {
+            config.blockchain.private_key = key;
         }
 
         // Security configuration

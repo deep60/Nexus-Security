@@ -67,27 +67,24 @@ pub enum TransactionType {
     TokenTransfer,
 }
 
-/// Bounty creation parameters
+/// Bounty creation parameters (matches BountyManager.createBounty ABI)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateBountyParams {
-    pub bounty_id: Uuid,
-    pub creator: Address,
-    pub reward_amount: U256,
-    pub file_hash: H256,
-    pub deadline: u64,
-    pub minimum_stake: U256,
-    pub required_consensus: u8,
+    pub artifact_hash: String,     // IPFS hash of the artifact
+    pub artifact_type: String,     // "file", "url", etc.
+    pub reward_amount: U256,       // Token reward amount
+    pub deadline: U256,            // Unix timestamp deadline
+    pub description: String,       // Bounty description
 }
 
-/// Analysis submission parameters
+/// Analysis submission parameters (matches BountyManager.submitAnalysis ABI)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SubmitAnalysisParams {
-    pub bounty_id: Uuid,
-    pub analyst: Address,
-    pub is_malicious: bool,
-    pub confidence: u8,
-    pub stake_amount: U256,
-    pub analysis_data: String,
+    pub bounty_id: U256,           // On-chain bounty ID
+    pub verdict: u8,               // ThreatVerdict enum: 0=Pending, 1=Benign, 2=Malicious, 3=Suspicious
+    pub confidence: U256,          // Confidence 0-100
+    pub stake_amount: U256,        // Tokens to stake (ERC20 transferFrom, not msg.value)
+    pub analysis_hash: String,     // IPFS hash of detailed analysis
 }
 
 /// Blockchain transaction result
@@ -100,18 +97,21 @@ pub struct TransactionResult {
     pub confirmations: u64,
 }
 
-/// Bounty status from blockchain
+/// Bounty info from blockchain (matches BountyManager.Bounty struct)
 #[derive(Debug, Serialize, Deserialize)]
-pub struct BountyStatus {
-    pub id: Uuid,
+pub struct BountyOnChain {
+    pub id: U256,
     pub creator: Address,
+    pub artifact_hash: String,
+    pub artifact_type: String,
     pub reward_amount: U256,
-    pub total_stake: U256,
-    pub submissions_count: u32,
-    pub consensus_reached: bool,
-    pub is_resolved: bool,
-    pub resolution: Option<bool>,
-    pub deadline: u64,
+    pub deadline: U256,
+    pub description: String,
+    pub status: u8,                // BountyStatus enum: 0=Active, 1=InReview, 2=Completed, 3=Cancelled, 4=Disputed
+    pub consensus_verdict: u8,     // ThreatVerdict enum
+    pub total_staked: U256,
+    pub analysis_count: U256,
+    pub created_at: U256,
 }
 
 impl BlockchainService {
@@ -195,17 +195,15 @@ impl BlockchainService {
     }
 
     /// Create a new bounty on the blockchain
+    /// ABI: createBounty(string artifactHash, string artifactType, uint256 rewardAmount, uint256 deadline, string description) returns (uint256)
     pub async fn create_bounty(&self, params: CreateBountyParams) -> Result<H256> {
-        let bounty_id_bytes = *params.bounty_id.as_bytes();
-
         let tx = self.contracts.bounty_manager
-            .method::<_, H256>("createBounty", (
-                bounty_id_bytes,
+            .method::<_, U256>("createBounty", (
+                params.artifact_hash,
+                params.artifact_type,
                 params.reward_amount,
-                params.file_hash,
                 params.deadline,
-                params.minimum_stake,
-                params.required_consensus,
+                params.description,
             ))?
             .gas(self.config.gas_limit)
             .gas_price(self.config.gas_price_gwei * 1_000_000_000);
@@ -215,12 +213,11 @@ impl BlockchainService {
 
         let tx_hash = pending_tx.tx_hash();
         
-        // Track pending transaction
         self.track_pending_transaction(
             tx_hash,
             TransactionType::CreateBounty,
             None,
-            Some(params.bounty_id),
+            None,
         ).await;
 
         tracing::info!("Created bounty transaction: {:?}", tx_hash);
@@ -228,17 +225,17 @@ impl BlockchainService {
     }
 
     /// Submit analysis for a bounty
+    /// ABI: submitAnalysis(uint256 bountyId, uint8 verdict, uint256 confidence, uint256 stakeAmount, string analysisHash)
+    /// Note: The contract uses ERC20 transferFrom for staking, NOT msg.value
     pub async fn submit_analysis(&self, params: SubmitAnalysisParams) -> Result<H256> {
-        let bounty_id_bytes = *params.bounty_id.as_bytes();
-
         let tx = self.contracts.bounty_manager
-            .method::<_, H256>("submitAnalysis", (
-                bounty_id_bytes,
-                params.is_malicious,
+            .method::<_, ()>("submitAnalysis", (
+                params.bounty_id,
+                params.verdict,
                 params.confidence,
-                params.analysis_data,
+                params.stake_amount,
+                params.analysis_hash,
             ))?
-            .value(params.stake_amount)
             .gas(self.config.gas_limit)
             .gas_price(self.config.gas_price_gwei * 1_000_000_000);
 
@@ -251,19 +248,17 @@ impl BlockchainService {
             tx_hash,
             TransactionType::SubmitAnalysis,
             None,
-            Some(params.bounty_id),
+            None,
         ).await;
 
         tracing::info!("Submitted analysis transaction: {:?}", tx_hash);
         Ok(tx_hash)
     }
 
-    /// Stake tokens for analysis submission
-    pub async fn stake_tokens(&self, bounty_id: Uuid, amount: U256, user_id: Uuid) -> Result<H256> {
-        let bounty_id_bytes = *bounty_id.as_bytes();
-
+    /// Stake tokens for analysis submission (approve BountyManager to spend tokens)
+    pub async fn stake_tokens(&self, amount: U256, user_id: Uuid) -> Result<H256> {
         let tx = self.contracts.threat_token
-            .method::<_, H256>("approve", (
+            .method::<_, bool>("approve", (
                 self.config.contracts.bounty_manager.parse::<Address>()?,
                 amount,
             ))?
@@ -279,44 +274,43 @@ impl BlockchainService {
             tx_hash,
             TransactionType::StakeTokens,
             Some(user_id),
-            Some(bounty_id),
+            None,
         ).await;
 
         tracing::info!("Staked tokens transaction: {:?}", tx_hash);
         Ok(tx_hash)
     }
 
-    /// Claim rewards for successful analysis
-    pub async fn claim_reward(&self, bounty_id: Uuid, user_id: Uuid) -> Result<H256> {
-        let bounty_id_bytes = *bounty_id.as_bytes();
-
+    /// Resolve a bounty (triggers consensus calculation and reward distribution)
+    /// ABI: resolveBounty(uint256 bountyId)
+    /// Note: There is no "claimReward" in the contract — rewards are distributed automatically when bounty resolves
+    pub async fn resolve_bounty(&self, bounty_id: U256) -> Result<H256> {
         let tx = self.contracts.bounty_manager
-            .method::<_, H256>("claimReward", (bounty_id_bytes,))?
+            .method::<_, ()>("resolveBounty", (bounty_id,))?
             .gas(self.config.gas_limit)
             .gas_price(self.config.gas_price_gwei * 1_000_000_000);
 
         let pending_tx = tx.send().await
-            .context("Failed to send claim reward transaction")?;
+            .context("Failed to send resolve bounty transaction")?;
 
         let tx_hash = pending_tx.tx_hash();
         
         self.track_pending_transaction(
             tx_hash,
-            TransactionType::ClaimReward,
-            Some(user_id),
-            Some(bounty_id),
+            TransactionType::ClaimReward, // Reusing enum for now
+            None,
+            None,
         ).await;
 
-        tracing::info!("Claimed reward transaction: {:?}", tx_hash);
+        tracing::info!("Resolved bounty transaction: {:?}", tx_hash);
         Ok(tx_hash)
     }
 
     /// Update user reputation on blockchain
-    pub async fn update_reputation(&self, user_address: Address, new_score: f64) -> Result<H256> {
-        let score_scaled = U256::from((new_score * 100.0) as u64); // Scale to avoid decimals
-        
+    /// ABI: updateReputation(address engine, bool success)
+    pub async fn update_reputation(&self, user_address: Address, success: bool) -> Result<H256> {
         let tx = self.contracts.reputation_system
-            .method::<_, H256>("updateReputation", (user_address, score_scaled))?
+            .method::<_, ()>("updateReputation", (user_address, success))?
             .gas(self.config.gas_limit)
             .gas_price(self.config.gas_price_gwei * 1_000_000_000);
 
@@ -336,28 +330,31 @@ impl BlockchainService {
         Ok(tx_hash)
     }
 
-    /// Get bounty status from blockchain
-    pub async fn get_bounty_status(&self, bounty_id: Uuid) -> Result<BountyStatus> {
-        let bounty_id_bytes = *bounty_id.as_bytes();
-
-        let result: (Address, U256, U256, u32, bool, bool, bool, u64) = self.contracts.bounty_manager
-            .method("getBountyStatus", (bounty_id_bytes,))?
+    /// Get bounty info from blockchain
+    /// ABI: getBounty(uint256 bountyId) returns (Bounty)
+    /// Returns full Bounty struct as a tuple of 12 values
+    pub async fn get_bounty(&self, bounty_id: U256) -> Result<BountyOnChain> {
+        let result: (
+            U256, Address, String, String, U256, U256, String, u8, u8, U256, U256, U256
+        ) = self.contracts.bounty_manager
+            .method("getBounty", (bounty_id,))?
             .call()
             .await
-            .context("Failed to get bounty status")?;
+            .context("Failed to get bounty")?;
 
-        let (creator, reward_amount, total_stake, submissions_count, consensus_reached, is_resolved, resolution, deadline) = result;
-
-        Ok(BountyStatus {
-            id: bounty_id,
-            creator,
-            reward_amount,
-            total_stake,
-            submissions_count,
-            consensus_reached,
-            is_resolved,
-            resolution: if is_resolved { Some(resolution) } else { None },
-            deadline,
+        Ok(BountyOnChain {
+            id: result.0,
+            creator: result.1,
+            artifact_hash: result.2,
+            artifact_type: result.3,
+            reward_amount: result.4,
+            deadline: result.5,
+            description: result.6,
+            status: result.7,
+            consensus_verdict: result.8,
+            total_staked: result.9,
+            analysis_count: result.10,
+            created_at: result.11,
         })
     }
 
@@ -373,24 +370,15 @@ impl BlockchainService {
     }
 
     /// Get user's reputation score from blockchain
-    pub async fn get_reputation_score(&self, user_address: Address) -> Result<ReputationScore> {
-        let result: (u64, u32, u32, u64) = self.contracts.reputation_system
+    /// ABI: getReputation(address engine) returns (uint256)
+    pub async fn get_reputation_score(&self, user_address: Address) -> Result<U256> {
+        let reputation: U256 = self.contracts.reputation_system
             .method("getReputation", (user_address,))?
             .call()
             .await
             .context("Failed to get reputation score")?;
 
-        let (score_scaled, total_submissions, successful_submissions, last_updated_timestamp) = result;
-        
-        let last_updated = DateTime::from_timestamp(last_updated_timestamp as i64, 0)
-            .unwrap_or_else(Utc::now);
-
-        Ok(ReputationScore {
-            score: (score_scaled as f64) / 100.0, // Unscale the score
-            total_submissions,
-            successful_submissions,
-            last_updated,
-        })
+        Ok(reputation)
     }
 
     /// Check transaction status
@@ -514,29 +502,6 @@ impl BlockchainService {
 
 /// Helper functions for blockchain operations
 impl BlockchainService {
-    /// Convert reputation score to blockchain format
-    pub fn encode_reputation_score(score: &ReputationScore) -> U256 {
-        U256::from((score.score * 100.0) as u64)
-    }
-
-    /// Convert blockchain format to reputation score
-    pub fn decode_reputation_score(
-        score_scaled: U256,
-        total_submissions: u32,
-        successful_submissions: u32,
-        last_updated_timestamp: u64,
-    ) -> ReputationScore {
-        let last_updated = DateTime::from_timestamp(last_updated_timestamp as i64, 0)
-            .unwrap_or_else(Utc::now);
-
-        ReputationScore {
-            score: score_scaled.as_u64() as f64 / 100.0,
-            total_submissions,
-            successful_submissions,
-            last_updated,
-        }
-    }
-
     /// Calculate gas price based on network conditions
     pub async fn estimate_gas_price(&self) -> Result<U256> {
         let gas_price = self.client.get_gas_price().await
@@ -553,46 +518,30 @@ impl BlockchainService {
     }
 
     /// Health check for blockchain service
-    /// TODO: Implement actual blockchain connectivity check
+    /// Pings the RPC endpoint with a 5-second timeout to verify connectivity
     pub async fn health_check(&self) -> bool {
-        // Stub implementation - always returns true
-        // In production, this should ping the RPC endpoint
-        true
-    }
-
-    /// Create analysis bounty on blockchain
-    /// TODO: Implement actual blockchain transaction
-    pub async fn create_analysis_bounty(&self, _params: CreateBountyParams) -> Result<H256> {
-        // Stub implementation
-        anyhow::bail!("create_analysis_bounty not yet implemented")
+        match tokio::time::timeout(
+            Duration::from_secs(5),
+            self.client.get_block_number(),
+        )
+        .await
+        {
+            Ok(Ok(_)) => true,
+            Ok(Err(e)) => {
+                tracing::warn!("Blockchain health check failed: {}", e);
+                false
+            }
+            Err(_) => {
+                tracing::warn!("Blockchain health check timed out");
+                false
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_encode_decode_reputation_score() {
-        let original_score = ReputationScore {
-            score: 85.5,
-            total_submissions: 100,
-            successful_submissions: 85,
-            last_updated: Utc::now(),
-        };
-
-        let encoded = BlockchainService::encode_reputation_score(&original_score);
-        let decoded = BlockchainService::decode_reputation_score(
-            encoded,
-            original_score.total_submissions,
-            original_score.successful_submissions,
-            original_score.last_updated.timestamp() as u64,
-        );
-
-        assert_eq!((original_score.score * 100.0) as u64, (decoded.score * 100.0) as u64);
-        assert_eq!(original_score.total_submissions, decoded.total_submissions);
-        assert_eq!(original_score.successful_submissions, decoded.successful_submissions);
-    }
 
     #[test]
     fn test_validate_address() {

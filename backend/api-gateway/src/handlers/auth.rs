@@ -11,6 +11,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{DateTime, Utc, Duration};
 use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
+use ethers::core::types::Signature;
 
 use crate::models::user::User;
 use crate::services::database::DatabaseService;
@@ -381,8 +382,21 @@ async fn authenticate_user(headers: &HeaderMap, state: &AppState) -> ApiResult<U
         .ok_or(ApiError::Unauthorized)
 }
 
-fn verify_wallet_signature(_address: &str, _signature: &str, _message: &str) -> bool {
-    // TODO: Implement proper wallet signature verification using ethers or web3
-    // This is a placeholder implementation
-    true
+fn verify_wallet_signature(address: &str, signature: &str, message: &str) -> bool {
+    // Parse the hex signature
+    let sig = match signature.parse::<Signature>() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    // Recover the signer address from the signature
+    // This uses EIP-191 personal_sign recovery (prefix "\x19Ethereum Signed Message:\n")
+    let recovered = match sig.recover(message) {
+        Ok(addr) => addr,
+        Err(_) => return false,
+    };
+
+    // Compare recovered address to claimed address (case-insensitive hex comparison)
+    let recovered_hex = format!("{:?}", recovered); // "0x..." lowercase
+    recovered_hex.eq_ignore_ascii_case(address)
 }
