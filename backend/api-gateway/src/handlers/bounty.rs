@@ -198,19 +198,62 @@ pub async fn get_bounty(
 
 // TODO: Rewrite to match actual Bounty model
 pub async fn submit_analysis(
-    State(_state): State<crate::AppState>,
-    Path(_bounty_id): Path<Uuid>,
-    Json(_request): Json<SubmitAnalysisRequest>,
+    State(state): State<crate::AppState>,
+    Path(bounty_id): Path<Uuid>,
+    Json(request): Json<SubmitAnalysisRequest>,
 ) -> Result<Json<SubmissionResponse>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    use crate::services::blockchain::{SubmitAnalysisParams};
+    use ethers::types::U256;
+
+    // Map verdict string to uint8 enum value
+    let verdict: u8 = match request.verdict.as_str() {
+        "benign" => 1,
+        "malicious" => 2,
+        "suspicious" => 3,
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
+
+    let params = SubmitAnalysisParams {
+        bounty_id: U256::from(bounty_id.as_u128()),
+        verdict,
+        confidence: U256::from((request.confidence * 100.0) as u64),
+        stake_amount: U256::from(request.stake_amount),
+        analysis_hash: serde_json::to_string(&request.analysis_details)
+            .unwrap_or_default(),
+    };
+
+    let tx_hash = state.blockchain.submit_analysis(params).await.map_err(|e| {
+        tracing::error!("Failed to submit analysis on-chain: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(SubmissionResponse {
+        id: Uuid::new_v4(),
+        bounty_id,
+        engine_id: request.engine_id,
+        verdict: request.verdict,
+        confidence: request.confidence,
+        stake_amount: request.stake_amount,
+        submitted_at: chrono::Utc::now(),
+        is_winner: None,
+    }))
 }
 
 // TODO: Rewrite to match actual Bounty model
 pub async fn finalize_bounty(
-    State(_state): State<crate::AppState>,
-    Path(_bounty_id): Path<Uuid>,
+    State(state): State<crate::AppState>,
+    Path(bounty_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    use ethers::types::U256;
+
+    let on_chain_id = U256::from(bounty_id.as_u128());
+
+    state.blockchain.resolve_bounty(on_chain_id).await.map_err(|e| {
+        tracing::error!("Failed to finalize bounty on-chain: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(StatusCode::OK)
 }
 
 // Router setup
@@ -219,6 +262,6 @@ pub fn create_bounty_router() -> Router<AppState> {
         .route("/bounties", post(create_bounty))
         .route("/bounties", get(list_bounties))
         .route("/bounties/:id", get(get_bounty))
-    // .route("/bounties/:id/submit", post(submit_analysis)) // TODO: Implement submit_analysis
-    // .route("/bounties/:id/finalize", put(finalize_bounty)) // TODO: Implement finalize_bounty
+        .route("/bounties/:id/submit", post(submit_analysis))
+        .route("/bounties/:id/finalize", put(finalize_bounty))
 }

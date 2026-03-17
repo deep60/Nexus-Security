@@ -95,8 +95,10 @@ export async function createTestBounty(
     // Approve tokens
     await threatToken.connect(creator).approve(await bountyManager.getAddress(), rewardAmount);
 
-    // Create bounty
-    const deadline = Math.floor(Date.now() / 1000) + 86400; // 24 hours from now
+    // Use the EVM's latest block timestamp (not JS Date.now) to avoid issues
+    // when advanceTime() has been called — Date.now() would be far behind EVM time
+    const latestBlock = await ethers.provider.getBlock("latest");
+    const deadline = (latestBlock?.timestamp ?? Math.floor(Date.now() / 1000)) + 86400;
     const tx = await bountyManager.connect(creator).createBounty(
         "QmTest123456789",
         "file", // artifactType is string, not enum

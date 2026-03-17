@@ -8,6 +8,7 @@ use tokio::time::{interval, Duration};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 use chrono::Utc;
+use ethers::providers::Middleware;
 
 use crate::services::blockchain::BlockchainService;
 use crate::models::{bounty::BountyModel, submission::SubmissionModel, payout::PayoutModel};
@@ -382,22 +383,21 @@ impl From<uuid::Error> for SyncError {
 fn classify_event_topic(topic: &ethers::types::H256) -> Option<BlockchainEventType> {
     use ethers::utils::keccak256;
 
-    let bounty_created = ethers::types::H256::from(keccak256("BountyCreated(uint256,address,uint256,uint256)"));
-    let analysis_submitted = ethers::types::H256::from(keccak256("AnalysisSubmitted(uint256,address,uint8,uint256)"));
-    let bounty_resolved = ethers::types::H256::from(keccak256("BountyResolved(uint256,uint8)"));
-    let rewards_distributed = ethers::types::H256::from(keccak256("RewardsDistributed(uint256,uint256)"));
-    let stake_slashed = ethers::types::H256::from(keccak256("StakeSlashed(uint256,address,uint256)"));
+    // Canonical ABI signatures from BountyManager.sol
+    // Note: ThreatVerdict = uint8, array types use brackets
+    let bounty_created = ethers::types::H256::from(keccak256("BountyCreated(uint256,address,string,uint256,uint256)"));
+    let analysis_submitted = ethers::types::H256::from(keccak256("AnalysisSubmitted(uint256,address,uint8,uint256,uint256)"));
+    let consensus_reached = ethers::types::H256::from(keccak256("ConsensusReached(uint256,uint8,uint256,uint256)"));
+    let rewards_distributed = ethers::types::H256::from(keccak256("RewardsDistributed(uint256,address[],uint256[],uint256[])"));
 
     if *topic == bounty_created {
         Some(BlockchainEventType::BountyCreated)
     } else if *topic == analysis_submitted {
         Some(BlockchainEventType::SubmissionStaked)
-    } else if *topic == bounty_resolved {
+    } else if *topic == consensus_reached {
         Some(BlockchainEventType::ConsensusReached)
     } else if *topic == rewards_distributed {
         Some(BlockchainEventType::PayoutDistributed)
-    } else if *topic == stake_slashed {
-        Some(BlockchainEventType::StakeSlashed)
     } else {
         None // Unknown event
     }

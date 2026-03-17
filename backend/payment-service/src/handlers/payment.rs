@@ -8,9 +8,8 @@ pub async fn deposit_bounty_reward(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<DepositBountyRequest>,
 ) -> (StatusCode, Json<Value>) {
-    // Deposit is handled by the smart contract's createBounty function
-    // which pulls tokens via transferFrom. The frontend should call approve first.
-    match state.payment_service.get_token_balance(&payload.from_address).await {
+    // Pre-flight check: verify the creator has sufficient token balance
+    match state.payment_service.get_token_balance(&payload.creator_address).await {
         Ok(balance) => {
             let required = ethers::types::U256::from_dec_str(&payload.amount.to_string()).unwrap_or_default();
             if balance < required {
@@ -37,7 +36,6 @@ pub async fn distribute_bounty_reward(
     Json(payload): Json<DistributeBountyRequest>,
 ) -> (StatusCode, Json<Value>) {
     // Distribution is handled by BountyManager.resolveBounty() on-chain
-    // This endpoint records the intent in the database
     (StatusCode::OK, Json(json!({
         "message": "Bounty distribution queued — will be processed by on-chain resolveBounty",
         "bounty_id": payload.bounty_id
@@ -48,9 +46,8 @@ pub async fn lock_stake(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<LockStakeRequest>,
 ) -> (StatusCode, Json<Value>) {
-    // Staking is done via BountyManager.submitAnalysis which calls transferFrom
-    // Pre-check: user must have sufficient balance
-    match state.payment_service.get_token_balance(&payload.from_address).await {
+    // Pre-check: user must have sufficient balance for staking
+    match state.payment_service.get_token_balance(&payload.address).await {
         Ok(balance) => {
             let required = ethers::types::U256::from_dec_str(&payload.amount.to_string()).unwrap_or_default();
             if balance < required {
@@ -61,7 +58,8 @@ pub async fn lock_stake(
             }
             (StatusCode::OK, Json(json!({
                 "message": "Stake pre-check passed",
-                "balance": format!("{}", balance)
+                "balance": format!("{}", balance),
+                "bounty_id": payload.bounty_id
             })))
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
@@ -74,11 +72,10 @@ pub async fn unlock_stake(
     State(_state): State<Arc<AppState>>,
     Json(payload): Json<UnlockStakeRequest>,
 ) -> (StatusCode, Json<Value>) {
-    // Stake unlocking is handled automatically by the smart contract
-    // when a bounty resolves (correct analysts get stake returned)
+    // Stake unlocking is handled by the smart contract during bounty resolution
     (StatusCode::OK, Json(json!({
         "message": "Stake unlock is handled by on-chain bounty resolution",
-        "bounty_id": payload.bounty_id
+        "stake_id": payload.stake_id
     })))
 }
 
@@ -86,11 +83,11 @@ pub async fn slash_stake(
     State(_state): State<Arc<AppState>>,
     Json(payload): Json<SlashStakeRequest>,
 ) -> (StatusCode, Json<Value>) {
-    // Stake slashing is handled automatically by the smart contract
-    // when incorrect analysts are penalized during bounty resolution
+    // Stake slashing is handled by the smart contract during bounty resolution
     (StatusCode::OK, Json(json!({
         "message": "Stake slashing is handled by on-chain bounty resolution",
-        "bounty_id": payload.bounty_id
+        "stake_id": payload.stake_id,
+        "slash_amount": payload.slash_amount.to_string()
     })))
 }
 
@@ -98,11 +95,10 @@ pub async fn withdraw_funds(
     State(_state): State<Arc<AppState>>,
     Json(payload): Json<WithdrawRequest>,
 ) -> (StatusCode, Json<Value>) {
-    // Withdrawals would use ThreatToken.transfer
-    // In practice, users withdraw through the frontend which interacts with their wallet
     (StatusCode::OK, Json(json!({
         "message": "Withdrawal queued for processing",
-        "to_address": payload.to_address
+        "to_address": payload.to_address,
+        "amount": payload.amount.to_string()
     })))
 }
 
@@ -126,8 +122,7 @@ pub async fn get_transactions(
     State(_state): State<Arc<AppState>>,
     Path(address): Path<String>,
 ) -> (StatusCode, Json<Value>) {
-    // Query transaction history from database
-    // On-chain events are synced to DB by the blockchain sync service
+    // Transaction history is populated by blockchain event sync
     (StatusCode::OK, Json(json!({
         "address": address,
         "transactions": [],

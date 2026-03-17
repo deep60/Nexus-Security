@@ -27,8 +27,8 @@ pub struct BlockchainService {
 pub struct StakeTransaction {
     pub transaction_hash: String,
     pub from_address: String,
-    pub amount: U256,
-    pub bounty_id: U256,
+    pub amount: u64,
+    pub bounty_id: Uuid,
     pub block_number: Option<u64>,
 }
 
@@ -36,8 +36,8 @@ pub struct StakeTransaction {
 pub struct PayoutTransaction {
     pub transaction_hash: String,
     pub to_address: String,
-    pub amount: U256,
-    pub bounty_id: U256,
+    pub amount: u64,
+    pub bounty_id: Uuid,
     pub block_number: Option<u64>,
 }
 
@@ -116,13 +116,15 @@ impl BlockchainService {
     pub async fn create_stake_transaction(
         &self,
         _from_address: &str,
-        bounty_id: U256,
-        amount: U256,
+        bounty_id: Uuid,
+        amount: u64,
     ) -> Result<StakeTransaction, BlockchainError> {
+        let amount_u256 = U256::from(amount);
+
         // Approve BountyManager to spend tokens
         let bm_address = self.bounty_manager.address();
         let tx = self.threat_token
-            .method::<_, bool>("approve", (bm_address, amount))
+            .method::<_, bool>("approve", (bm_address, amount_u256))
             .map_err(|e| BlockchainError::ContractError(e.to_string()))?;
 
         let pending_tx = tx.send().await
@@ -150,15 +152,17 @@ impl BlockchainService {
     pub async fn create_payout_transaction(
         &self,
         to_address: &str,
-        bounty_id: U256,
-        amount: U256,
+        bounty_id: Uuid,
+        amount: u64,
     ) -> Result<PayoutTransaction, BlockchainError> {
         let to: Address = to_address
             .parse()
             .map_err(|_| BlockchainError::InvalidAddress(to_address.to_string()))?;
 
+        let amount_u256 = U256::from(amount);
+
         let tx = self.threat_token
-            .method::<_, bool>("transfer", (to, amount))
+            .method::<_, bool>("transfer", (to, amount_u256))
             .map_err(|e| BlockchainError::ContractError(e.to_string()))?;
 
         let pending_tx = tx.send().await
@@ -221,7 +225,7 @@ impl BlockchainService {
     }
 
     /// Get token balance for an address
-    pub async fn get_balance(&self, address: &str) -> Result<U256, BlockchainError> {
+    pub async fn get_balance(&self, address: &str) -> Result<u64, BlockchainError> {
         let addr: Address = address
             .parse()
             .map_err(|_| BlockchainError::InvalidAddress(address.to_string()))?;
@@ -233,7 +237,7 @@ impl BlockchainService {
             .await
             .map_err(|e| BlockchainError::ConnectionError(e.to_string()))?;
 
-        Ok(balance)
+        Ok(balance.as_u64())
     }
 
     /// Expose the client for use by sync services
