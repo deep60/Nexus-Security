@@ -224,23 +224,28 @@ const _abi = [
     inputs: [
       {
         internalType: "string",
-        name: "targetHash",
+        name: "artifactHash",
         type: "string",
       },
       {
         internalType: "string",
-        name: "targetType",
+        name: "artifactType",
         type: "string",
       },
       {
         internalType: "uint256",
-        name: "minimumStake",
+        name: "rewardAmount",
         type: "uint256",
       },
       {
         internalType: "uint256",
-        name: "analysisDeadline",
+        name: "deadline",
         type: "uint256",
+      },
+      {
+        internalType: "string",
+        name: "description",
+        type: "string",
       },
     ],
     name: "createBounty",
@@ -251,19 +256,6 @@ const _abi = [
         type: "uint256",
       },
     ],
-    stateMutability: "payable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "bountyId",
-        type: "uint256",
-      },
-    ],
-    name: "emergencyWithdraw",
-    outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
@@ -275,7 +267,7 @@ const _abi = [
         type: "uint256",
       },
     ],
-    name: "finalizeBounty",
+    name: "emergencyWithdraw",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -555,6 +547,19 @@ const _abi = [
     inputs: [
       {
         internalType: "uint256",
+        name: "bountyId",
+        type: "uint256",
+      },
+    ],
+    name: "resolveBounty",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
         name: "newMinimumStake",
         type: "uint256",
       },
@@ -595,14 +600,19 @@ const _abi = [
         type: "uint256",
       },
       {
+        internalType: "uint256",
+        name: "stakeAmount",
+        type: "uint256",
+      },
+      {
         internalType: "string",
-        name: "analysisData",
+        name: "analysisHash",
         type: "string",
       },
     ],
     name: "submitAnalysis",
     outputs: [],
-    stateMutability: "payable",
+    stateMutability: "nonpayable",
     type: "function",
   },
   {

@@ -179,6 +179,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build router
     let app = create_router(state);
 
+    // Start blockchain sync service in the background
+    let sync_db = db.clone();
+    tokio::spawn(async move {
+        // Initialize blockchain service for sync
+        let rpc_url = std::env::var("BLOCKCHAIN_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string());
+        let private_key = std::env::var("BLOCKCHAIN_PRIVATE_KEY").unwrap_or_default();
+        let chain_id: u64 = std::env::var("CHAIN_ID").unwrap_or_else(|_| "31337".to_string()).parse().unwrap_or(31337);
+        let bounty_manager_addr = std::env::var("BOUNTY_MANAGER_ADDRESS").unwrap_or_default();
+        let threat_token_addr = std::env::var("THREAT_TOKEN_ADDRESS").unwrap_or_default();
+
+        if private_key.is_empty() || bounty_manager_addr.is_empty() {
+            warn!("Blockchain sync not started: BLOCKCHAIN_PRIVATE_KEY or BOUNTY_MANAGER_ADDRESS not set");
+            return;
+        }
+
+        // Use empty ABIs as defaults — in production these should be loaded from JSON
+        let bounty_abi = ethers::abi::Abi::default();
+        let token_abi = ethers::abi::Abi::default();
+
+        match services::blockchain::BlockchainService::new(
+            &rpc_url,
+            &private_key,
+            chain_id,
+            &bounty_manager_addr,
+            &threat_token_addr,
+            bounty_abi,
+            token_abi,
+        ).await {
+            Ok(blockchain_service) => {
+                let sync_service = services::blockchain_sync::BlockchainSyncService::new(
+                    sync_db,
+                    Arc::new(blockchain_service),
+                );
+                info!("Blockchain sync service starting...");
+                if let Err(e) = sync_service.start().await {
+                    error!("Blockchain sync service failed: {}", e);
+                }
+            }
+            Err(e) => {
+                warn!("Could not start blockchain sync: {}", e);
+            }
+        }
+    });
+
     // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!("Bounty Manager service starting on {}", addr);

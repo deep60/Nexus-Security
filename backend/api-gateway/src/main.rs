@@ -207,8 +207,11 @@ fn create_router(state: AppState) -> Router {
             get(submission::get_submission_details),
         )
         // Bounty management routes
-        .route("/api/v1/bounties", get(bounty::list_bounties)) // Fixed name
-        .route("/api/v1/bounties/:id", get(bounty::get_bounty)) // Fixed name
+        .route("/api/v1/bounties", get(bounty::list_bounties))
+        .route("/api/v1/bounties", post(bounty::create_bounty))
+        .route("/api/v1/bounties/:id", get(bounty::get_bounty))
+        .route("/api/v1/bounties/:id/submit", post(bounty::submit_analysis))
+        .route("/api/v1/bounties/:id/finalize", axum::routing::put(bounty::finalize_bounty))
         // User and wallet routes
         .route("/api/v1/profile", get(user::get_current_user)) // Use user handler
         .route("/api/v1/wallet/connect", post(auth::collect_wallet)) // Assuming auth handles wallet for now

@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/Users/arjun/Developer/Nexus-Security/blockchain/contracts/Interfaces/IBountyManager.sol": {
-      "lastModificationDate": 1764211938438,
-      "contentHash": "b00295696b3e66defca2698436d29148",
+      "lastModificationDate": 1773803980399,
+      "contentHash": "7ec419d924cd4b5749636154330036a0",
       "sourceName": "contracts/Interfaces/IBountyManager.sol",
       "solcConfig": {
         "version": "0.8.28",

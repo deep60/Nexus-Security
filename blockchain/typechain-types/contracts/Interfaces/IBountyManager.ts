@@ -30,7 +30,6 @@ export interface IBountyManagerInterface extends Interface {
       | "claimRewards"
       | "createBounty"
       | "emergencyWithdraw"
-      | "finalizeBounty"
       | "getActiveBountiesCount"
       | "getAnalysis"
       | "getBountiesByCreator"
@@ -41,6 +40,7 @@ export interface IBountyManagerInterface extends Interface {
       | "getPendingRewards"
       | "hasEngineAnalyzed"
       | "pause"
+      | "resolveBounty"
       | "setMinimumStake"
       | "setReputationSystem"
       | "submitAnalysis"
@@ -68,14 +68,10 @@ export interface IBountyManagerInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "createBounty",
-    values: [string, string, BigNumberish, BigNumberish]
+    values: [string, string, BigNumberish, BigNumberish, string]
   ): string;
   encodeFunctionData(
     functionFragment: "emergencyWithdraw",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "finalizeBounty",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
@@ -116,6 +112,10 @@ export interface IBountyManagerInterface extends Interface {
   ): string;
   encodeFunctionData(functionFragment: "pause", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "resolveBounty",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "setMinimumStake",
     values: [BigNumberish]
   ): string;
@@ -125,7 +125,7 @@ export interface IBountyManagerInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "submitAnalysis",
-    values: [BigNumberish, BigNumberish, BigNumberish, string]
+    values: [BigNumberish, BigNumberish, BigNumberish, BigNumberish, string]
   ): string;
   encodeFunctionData(functionFragment: "unpause", values?: undefined): string;
   encodeFunctionData(
@@ -147,10 +147,6 @@ export interface IBountyManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "emergencyWithdraw",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "finalizeBounty",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -187,6 +183,10 @@ export interface IBountyManagerInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "pause", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "resolveBounty",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "setMinimumStake",
     data: BytesLike
@@ -400,22 +400,17 @@ export interface IBountyManager extends BaseContract {
 
   createBounty: TypedContractMethod<
     [
-      targetHash: string,
-      targetType: string,
-      minimumStake: BigNumberish,
-      analysisDeadline: BigNumberish
+      artifactHash: string,
+      artifactType: string,
+      rewardAmount: BigNumberish,
+      deadline: BigNumberish,
+      description: string
     ],
     [bigint],
-    "payable"
-  >;
-
-  emergencyWithdraw: TypedContractMethod<
-    [bountyId: BigNumberish],
-    [void],
     "nonpayable"
   >;
 
-  finalizeBounty: TypedContractMethod<
+  emergencyWithdraw: TypedContractMethod<
     [bountyId: BigNumberish],
     [void],
     "nonpayable"
@@ -513,6 +508,12 @@ export interface IBountyManager extends BaseContract {
 
   pause: TypedContractMethod<[], [void], "nonpayable">;
 
+  resolveBounty: TypedContractMethod<
+    [bountyId: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
   setMinimumStake: TypedContractMethod<
     [newMinimumStake: BigNumberish],
     [void],
@@ -530,10 +531,11 @@ export interface IBountyManager extends BaseContract {
       bountyId: BigNumberish,
       verdict: BigNumberish,
       confidence: BigNumberish,
-      analysisData: string
+      stakeAmount: BigNumberish,
+      analysisHash: string
     ],
     [void],
-    "payable"
+    "nonpayable"
   >;
 
   unpause: TypedContractMethod<[], [void], "nonpayable">;
@@ -562,19 +564,17 @@ export interface IBountyManager extends BaseContract {
     nameOrSignature: "createBounty"
   ): TypedContractMethod<
     [
-      targetHash: string,
-      targetType: string,
-      minimumStake: BigNumberish,
-      analysisDeadline: BigNumberish
+      artifactHash: string,
+      artifactType: string,
+      rewardAmount: BigNumberish,
+      deadline: BigNumberish,
+      description: string
     ],
     [bigint],
-    "payable"
+    "nonpayable"
   >;
   getFunction(
     nameOrSignature: "emergencyWithdraw"
-  ): TypedContractMethod<[bountyId: BigNumberish], [void], "nonpayable">;
-  getFunction(
-    nameOrSignature: "finalizeBounty"
   ): TypedContractMethod<[bountyId: BigNumberish], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "getActiveBountiesCount"
@@ -667,6 +667,9 @@ export interface IBountyManager extends BaseContract {
     nameOrSignature: "pause"
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
+    nameOrSignature: "resolveBounty"
+  ): TypedContractMethod<[bountyId: BigNumberish], [void], "nonpayable">;
+  getFunction(
     nameOrSignature: "setMinimumStake"
   ): TypedContractMethod<[newMinimumStake: BigNumberish], [void], "nonpayable">;
   getFunction(
@@ -683,10 +686,11 @@ export interface IBountyManager extends BaseContract {
       bountyId: BigNumberish,
       verdict: BigNumberish,
       confidence: BigNumberish,
-      analysisData: string
+      stakeAmount: BigNumberish,
+      analysisHash: string
     ],
     [void],
-    "payable"
+    "nonpayable"
   >;
   getFunction(
     nameOrSignature: "unpause"

@@ -155,6 +155,44 @@ pub async fn create_bounty(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
+    // Submit on-chain createBounty
+    let artifact_hash = metadata.get("target_hash")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let artifact_type = metadata.get("target_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("file")
+        .to_string();
+    let reward_str = &bounty.total_reward;
+    let reward_amount = ethers::types::U256::from_dec_str(reward_str).unwrap_or_default();
+    let deadline_ts = bounty.deadline
+        .map(|d| ethers::types::U256::from(d.timestamp() as u64))
+        .unwrap_or(ethers::types::U256::from(
+            (chrono::Utc::now() + chrono::Duration::hours(24)).timestamp() as u64
+        ));
+
+    let bc_params = crate::services::blockchain::CreateBountyParams {
+        artifact_hash,
+        artifact_type,
+        reward_amount,
+        deadline: deadline_ts,
+        description: bounty.description.clone(),
+    };
+
+    match state.blockchain.create_bounty(bc_params).await {
+        Ok(tx_hash) => {
+            let hash_str = format!("{:?}", tx_hash);
+            if let Err(e) = state.db.update_bounty_on_chain_id(bounty.id, &hash_str).await {
+                tracing::warn!("Bounty created on-chain but failed to store tx hash: {}", e);
+            }
+        }
+        Err(e) => {
+            tracing::warn!("On-chain bounty creation failed (DB record exists): {}", e);
+            // Continue — DB record exists, on-chain can be retried
+        }
+    }
+
     Ok(Json(bounty))
 }
 

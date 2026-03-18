@@ -24,7 +24,7 @@ interface IBountyManager {
      * @dev Enumeration of threat verdicts
      */
     enum ThreatVerdict {
-        Unknown,    // No verdict yet
+        Pending,    // No verdict yet
         Benign,     // File/URL is safe
         Malicious,  // File/URL is a threat
         Suspicious  // File/URL requires further investigation
@@ -38,17 +38,16 @@ interface IBountyManager {
     struct Bounty {
         uint256 id;                    // Unique bounty identifier
         address creator;               // Address that created the bounty
-        string targetHash;             // Hash of the file/URL being analyzed
-        string targetType;             // Type: "file", "url", "hash", etc.
-        uint256 reward;                // Total reward amount in wei
-        uint256 minimumStake;          // Minimum stake required for analysis
+        string artifactHash;           // Hash of the artifact being analyzed
+        string artifactType;           // Type: "file", "url", "hash", etc.
+        uint256 rewardAmount;          // Total reward amount in tokens
         uint256 deadline;              // Timestamp when analysis period ends
-        uint256 createdAt;             // Timestamp when bounty was created
+        string description;            // Description of the bounty
         BountyStatus status;           // Current status of the bounty
-        ThreatVerdict consensus;       // Final consensus verdict
-        uint256 confidenceScore;       // Confidence in consensus (0-10000 basis points)
-        uint256 totalAnalyses;         // Number of analyses submitted
-        mapping(address => bool) hasAnalyzed; // Track which engines analyzed
+        ThreatVerdict consensusVerdict;// Final consensus verdict
+        uint256 totalStaked;           // Total tokens staked
+        uint256 analysisCount;         // Number of analyses submitted
+        uint256 createdAt;             // Timestamp when bounty was created
     }
 
     /**
@@ -56,13 +55,13 @@ interface IBountyManager {
      */
     struct Analysis {
         uint256 bountyId;              // ID of the associated bounty
-        address engine;                // Address of the analyzing engine
+        address analyst;               // Address of the analyzing engine
         ThreatVerdict verdict;         // Engine's verdict
-        uint256 stake;                 // Amount staked by engine
-        uint256 confidence;            // Engine's confidence (0-10000 basis points)
-        string analysisData;           // IPFS hash or analysis details
+        uint256 confidence;            // Engine's confidence (0-100)
+        uint256 stakeAmount;           // Amount staked by engine
+        string analysisHash;           // IPFS hash or analysis details
         uint256 submittedAt;           // Timestamp of submission
-        bool isRewarded;               // Whether engine has been rewarded
+        bool rewarded;                 // Whether engine has been rewarded
     }
 
     // ============ EVENTS ============
@@ -127,38 +126,42 @@ interface IBountyManager {
     
     /**
      * @dev Creates a new threat analysis bounty
-     * @param targetHash Hash or identifier of the target to analyze
-     * @param targetType Type of target ("file", "url", "domain", etc.)
-     * @param minimumStake Minimum stake required for engines to participate
-     * @param analysisDeadline Timestamp when analysis period ends
+     * @param artifactHash Hash or identifier of the artifact to analyze
+     * @param artifactType Type of artifact ("file", "url", "domain", etc.)
+     * @param rewardAmount Reward amount in tokens
+     * @param deadline Timestamp when analysis period ends
+     * @param description Description of the bounty
      * @return bountyId The ID of the created bounty
      */
     function createBounty(
-        string calldata targetHash,
-        string calldata targetType,
-        uint256 minimumStake,
-        uint256 analysisDeadline
-    ) external payable returns (uint256 bountyId);
+        string calldata artifactHash,
+        string calldata artifactType,
+        uint256 rewardAmount,
+        uint256 deadline,
+        string calldata description
+    ) external returns (uint256 bountyId);
 
     /**
      * @dev Submits an analysis for a bounty
      * @param bountyId ID of the bounty to analyze
      * @param verdict The engine's verdict on the threat
-     * @param confidence Confidence level (0-10000 basis points)
-     * @param analysisData IPFS hash or analysis details
+     * @param confidence Confidence level (0-100)
+     * @param stakeAmount Amount of tokens to stake
+     * @param analysisHash IPFS hash or analysis details
      */
     function submitAnalysis(
         uint256 bountyId,
         ThreatVerdict verdict,
         uint256 confidence,
-        string calldata analysisData
-    ) external payable;
+        uint256 stakeAmount,
+        string calldata analysisHash
+    ) external;
 
     /**
-     * @dev Finalizes a bounty by calculating consensus and distributing rewards
-     * @param bountyId ID of the bounty to finalize
+     * @dev Resolves a bounty by calculating consensus and distributing rewards
+     * @param bountyId ID of the bounty to resolve
      */
-    function finalizeBounty(uint256 bountyId) external;
+    function resolveBounty(uint256 bountyId) external;
 
     /**
      * @dev Cancels a bounty (only by creator before deadline)

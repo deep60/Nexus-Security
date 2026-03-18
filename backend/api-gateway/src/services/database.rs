@@ -111,12 +111,93 @@ impl DatabaseService {
     // Bounty operations
     pub async fn create_bounty(
         &self,
-        _request: CreateBountyRequest,
-        _creator_id: Uuid,
+        request: CreateBountyRequest,
+        creator_id: Uuid,
     ) -> Result<Bounty> {
-        // TODO: This is a placeholder - the actual database schema needs to be updated
-        // to match the Bounty model. For now, returning an error.
-        anyhow::bail!("create_bounty not yet implemented with correct schema")
+        let now = Utc::now();
+        let bounty_id = Uuid::new_v4();
+        let deadline = request.deadline_hours.map(|h| now + chrono::Duration::hours(h as i64));
+
+        let bounty = sqlx::query_as::<_, Bounty>(
+            r#"
+            INSERT INTO bounties (
+                id, creator, creator_address, title, description, bounty_type, priority,
+                status, total_reward, minimum_stake, distribution_method,
+                max_participants, current_participants, required_consensus,
+                minimum_reputation, deadline, auto_finalize, requires_human_analysis,
+                file_types_allowed, max_file_size, tags, metadata,
+                blockchain_tx_hash, escrow_address, created_at, updated_at,
+                started_at, completed_at
+            )
+            VALUES (
+                $1, $2, '', $3, $4, $5, $6,
+                'active', $7, $8, $9,
+                $10, 0, $11,
+                $12, $13, $14, $15,
+                $16, $17, $18, $19,
+                NULL, NULL, $20, $21,
+                NULL, NULL
+            )
+            RETURNING
+                id, creator, creator_address, title, description,
+                bounty_type as "bounty_type: BountyType",
+                priority as "priority: BountyPriority",
+                status as "status: BountyStatus",
+                total_reward, minimum_stake,
+                distribution_method as "distribution_method: DistributionMethod",
+                max_participants, current_participants,
+                required_consensus, minimum_reputation,
+                deadline, auto_finalize, requires_human_analysis,
+                file_types_allowed, max_file_size, tags, metadata,
+                blockchain_tx_hash, escrow_address,
+                created_at, updated_at, started_at, completed_at
+            "#,
+        )
+        .bind(bounty_id)
+        .bind(creator_id)
+        .bind(&request.title)
+        .bind(&request.description)
+        .bind(&request.bounty_type)
+        .bind(&request.priority)
+        .bind(&request.total_reward)
+        .bind(&request.minimum_stake)
+        .bind(&request.distribution_method)
+        .bind(request.max_participants)
+        .bind(request.required_consensus.unwrap_or(70.0))
+        .bind(request.minimum_reputation.unwrap_or(0.0))
+        .bind(deadline)
+        .bind(request.auto_finalize.unwrap_or(true))
+        .bind(request.requires_human_analysis.unwrap_or(false))
+        .bind(request.file_types_allowed.as_deref().unwrap_or(&[]))
+        .bind(request.max_file_size)
+        .bind(request.tags.as_deref().unwrap_or(&[]))
+        .bind(request.metadata.unwrap_or(serde_json::Value::Object(serde_json::Map::new())))
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to create bounty")?;
+
+        Ok(bounty)
+    }
+
+    /// Store the on-chain bounty ID (incremental counter from BountyManager)
+    pub async fn update_bounty_on_chain_id(
+        &self,
+        bounty_id: Uuid,
+        tx_hash: &str,
+    ) -> Result<()> {
+        sqlx::query(
+            "UPDATE bounties SET blockchain_tx_hash = $1, updated_at = $2 WHERE id = $3"
+        )
+        .bind(tx_hash)
+        .bind(Utc::now())
+        .bind(bounty_id)
+        .execute(&self.pool)
+        .await
+        .context("Failed to update bounty on_chain_id")?;
+
+        Ok(())
     }
 
     pub async fn get_bounty_by_id(&self, bounty_id: Uuid) -> Result<Option<Bounty>> {
