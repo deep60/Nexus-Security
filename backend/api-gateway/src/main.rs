@@ -29,11 +29,12 @@ mod handlers;
 mod middleware;
 use middleware::metrics::{metrics_middleware, MetricsCollector};
 mod models;
+mod routes;
 mod services;
 mod utils;
 
 use config::AppConfig;
-use handlers::{auth, bounty, health, reputation, submission, user};
+use handlers::{auth, health, reputation, user};
 use models::{analysis::AnalysisResult, bounty::Bounty, user::User};
 use services::{blockchain::BlockchainService, database::DatabaseService, redis::RedisService};
 use utils::{crypto::JwtClaims, validation::ValidationError};
@@ -131,113 +132,8 @@ async fn logging_middleware(request: axum::extract::Request, next: Next) -> Resp
     response
 }
 
-// File upload query parameters
-#[derive(Deserialize)]
-pub struct UploadQuery {
-    pub bounty_amount: Option<f64>,
-    pub priority: Option<String>,
-    pub engines: Option<String>, // Comma-separated list
-}
 
-// File analysis endpoint
-// TODO: Rewrite to match actual AnalysisRequest model structure
-async fn analyze_file(
-    State(_state): State<AppState>,
-    Query(_params): Query<UploadQuery>,
-    mut _multipart: Multipart,
-) -> Result<impl IntoResponse, StatusCode> {
-    // Stub implementation - needs rewrite to match actual AnalysisRequest model
-    Err::<axum::Json<serde_json::Value>, StatusCode>(StatusCode::NOT_IMPLEMENTED)
-}
 
-// Get analysis results
-async fn get_analysis_result(
-    State(state): State<AppState>,
-    Path(analysis_id): Path<Uuid>,
-) -> Result<impl IntoResponse, StatusCode> {
-    match state.db.get_analysis_result(analysis_id).await {
-        Ok(result) => Ok(Json(ApiResponse::success(result))),
-        Err(_) => Err(StatusCode::NOT_FOUND),
-    }
-}
-
-// Trigger analysis pipeline
-// async fn trigger_analysis(
-//     state: &AppState,
-//     request: &models::analysis::AnalysisRequest,
-// ) -> Result<()> {
-//     // Queue analysis request in Redis
-//     let analysis_queue_key = "analysis:queue";
-//     let request_json = serde_json::to_string(request)?;
-
-//     state
-//         .redis
-//         .push_to_queue(analysis_queue_key, &request_json)
-//         .await?;
-
-//     // If blockchain bounty is specified, create smart contract interaction
-//     if request.bounty_amount > 0.0 {
-//         state.blockchain.create_analysis_bounty(request).await?;
-//     }
-
-//     info!("Analysis request {} queued successfully", request.id);
-//     Ok(())
-// }
-
-// Build application router
-fn create_router(state: AppState) -> Router {
-    let metrics = state.metrics.clone();
-
-    Router::new()
-        // Health and monitoring
-        .route("/api/v1/health", get(health::health_check))
-        .route("/api/v1/metrics", get(health::metrics))
-        // Authentication routes
-        .route("/api/v1/auth/login", post(auth::login))
-        .route("/api/v1/auth/register", post(auth::register))
-        .route("/api/v1/auth/logout", post(auth::logout))
-        .route("/api/v1/auth/refresh", post(auth::refresh_token))
-        .route("/api/v1/auth/verify", post(auth::verify_token))
-        // Analysis routes
-        .route("/api/v1/analyze/file", post(analyze_file)) // Keep stub for now
-        .route("/api/v1/analyze/url", post(submission::create_submission))
-        .route("/api/v1/analysis/:id", get(get_analysis_result)) // Keep local stub or move to handler
-        .route(
-            "/api/v1/analysis/:id/report",
-            get(submission::get_submission_details),
-        )
-        // Bounty management routes
-        .route("/api/v1/bounties", get(bounty::list_bounties))
-        .route("/api/v1/bounties", post(bounty::create_bounty))
-        .route("/api/v1/bounties/:id", get(bounty::get_bounty))
-        .route("/api/v1/bounties/:id/submit", post(bounty::submit_analysis))
-        .route("/api/v1/bounties/:id/finalize", axum::routing::put(bounty::finalize_bounty))
-        // User and wallet routes
-        .route("/api/v1/profile", get(user::get_current_user)) // Use user handler
-        .route("/api/v1/wallet/connect", post(auth::collect_wallet)) // Assuming auth handles wallet for now
-        .route("/api/v1/wallet/disconnect", post(auth::disconnect_wallet))
-        // Reputation routes
-        .route(
-            "/api/v1/reputation/leaderboard",
-            get(reputation::get_leaderboard),
-        )
-        .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
-                .layer(axum_middleware::from_fn(logging_middleware))
-                .layer(axum_middleware::from_fn(move |req, next| {
-                    metrics_middleware(metrics.clone(), None, req, next)
-                })) // Add metrics middleware
-                .layer(DefaultBodyLimit::max(50 * 1024 * 1024)) // 50MB limit
-                .layer(
-                    CorsLayer::new()
-                        .allow_origin(Any)
-                        .allow_methods(Any)
-                        .allow_headers(Any),
-                ),
-        )
-        .with_state(state)
-}
 
 // Initialize services
 async fn initialize_services(
@@ -331,7 +227,7 @@ async fn main() -> Result<()> {
     };
 
     // Create router with all routes and middleware
-    let app = create_router(state);
+    let app = routes::create_router(state);
 
     // Create server address
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));

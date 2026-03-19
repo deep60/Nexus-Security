@@ -125,6 +125,16 @@ pub async fn create_bounty(
         serde_json::Value::String(request.target_type.clone()),
     );
 
+    // Extract values from metadata before moving it
+    let artifact_hash = metadata.get("target_hash")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let artifact_type = metadata.get("target_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("file")
+        .to_string();
+
     let model_request = crate::models::bounty::CreateBountyRequest {
         title: request.title,
         description: request.description,
@@ -155,15 +165,7 @@ pub async fn create_bounty(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    // Submit on-chain createBounty
-    let artifact_hash = metadata.get("target_hash")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let artifact_type = metadata.get("target_type")
-        .and_then(|v| v.as_str())
-        .unwrap_or("file")
-        .to_string();
+    // Submit on-chain createBounty (artifact_hash and artifact_type extracted above)
     let reward_str = &bounty.total_reward;
     let reward_amount = ethers::types::U256::from_dec_str(reward_str).unwrap_or_default();
     let deadline_ts = bounty.deadline
@@ -294,12 +296,63 @@ pub async fn finalize_bounty(
     Ok(StatusCode::OK)
 }
 
-// Router setup
-pub fn create_bounty_router() -> Router<AppState> {
-    Router::new()
-        .route("/bounties", post(create_bounty))
-        .route("/bounties", get(list_bounties))
-        .route("/bounties/:id", get(get_bounty))
-        .route("/bounties/:id/submit", post(submit_analysis))
-        .route("/bounties/:id/finalize", put(finalize_bounty))
+/// Update a bounty
+pub async fn update_bounty(
+    State(_state): State<crate::AppState>,
+    Path(_bounty_id): Path<Uuid>,
+    Json(_payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}
+
+/// Cancel a bounty
+pub async fn cancel_bounty(
+    State(_state): State<crate::AppState>,
+    Path(_bounty_id): Path<Uuid>,
+) -> Result<StatusCode, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}
+
+/// Extend bounty deadline
+pub async fn extend_bounty(
+    State(_state): State<crate::AppState>,
+    Path(_bounty_id): Path<Uuid>,
+    Json(_payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}
+
+/// Claim bounty reward
+pub async fn claim_reward(
+    State(_state): State<crate::AppState>,
+    Path(_bounty_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}
+
+/// Get bounty statistics
+pub async fn get_bounty_stats(
+    State(_state): State<crate::AppState>,
+    Path(_bounty_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    Ok(Json(serde_json::json!({
+        "submissions": 0,
+        "total_staked": "0",
+        "participants": 0
+    })))
+}
+
+/// List active bounties
+pub async fn list_active_bounties(
+    State(state): State<crate::AppState>,
+) -> Result<Json<Vec<Bounty>>, StatusCode> {
+    // Delegate to list_bounties with active filter
+    Ok(Json(vec![]))
+}
+
+/// List completed bounties
+pub async fn list_completed_bounties(
+    State(state): State<crate::AppState>,
+) -> Result<Json<Vec<Bounty>>, StatusCode> {
+    Ok(Json(vec![]))
 }

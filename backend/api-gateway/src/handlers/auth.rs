@@ -400,3 +400,34 @@ fn verify_wallet_signature(address: &str, signature: &str, message: &str) -> boo
     let recovered_hex = format!("{:?}", recovered); // "0x..." lowercase
     recovered_hex.eq_ignore_ascii_case(address)
 }
+
+/// Verify email address
+pub async fn verify_email(
+    State(_state): State<AppState>,
+    Json(_payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}
+
+/// Forgot password — send reset link
+pub async fn forgot_password(
+    State(_state): State<AppState>,
+    Json(_payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}
+
+/// Reset password
+pub async fn reset_password(
+    State(_state): State<AppState>,
+    Json(_payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}
+
+/// Generate API key
+pub async fn generate_api_key(
+    State(_state): State<AppState>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}

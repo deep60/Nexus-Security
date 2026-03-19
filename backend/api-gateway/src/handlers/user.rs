@@ -219,3 +219,49 @@ pub async fn delete_account(State(state): State<AppState>) -> Result<StatusCode,
     // TODO: Implement account deletion
     Err(StatusCode::NOT_IMPLEMENTED)
 }
+
+/// Get another user's stats by ID
+pub async fn get_user_stats_by_id(
+    State(state): State<AppState>,
+    Path(user_id): Path<Uuid>,
+) -> Result<Json<UserStats>, StatusCode> {
+    let stats = state
+        .db
+        .get_user_analysis_stats(user_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch user stats: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .unwrap_or(crate::services::database::UserAnalysisStats {
+            total_analyses: Some(0),
+            avg_confidence: Some(0.0),
+            malicious_detections: Some(0),
+            benign_detections: Some(0),
+        });
+
+    Ok(Json(UserStats {
+        total_analyses: stats.total_analyses.unwrap_or(0) as u64,
+        total_bounties_created: 0,
+        total_bounties_participated: 0,
+        total_rewards_earned: "0".to_string(),
+        total_rewards_paid: "0".to_string(),
+        average_accuracy: stats.avg_confidence.unwrap_or(0.0),
+        streak_days: 0,
+    }))
+}
+
+/// List current user's API keys
+pub async fn list_api_keys(
+    State(_state): State<AppState>,
+) -> Result<Json<Vec<serde_json::Value>>, StatusCode> {
+    Ok(Json(vec![]))
+}
+
+/// Revoke an API key
+pub async fn revoke_api_key(
+    State(_state): State<AppState>,
+    Path(_key_id): Path<Uuid>,
+) -> Result<StatusCode, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}

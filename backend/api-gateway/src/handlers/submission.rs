@@ -587,3 +587,62 @@ pub fn create_submission_router() -> Router<AppState> {
         .route("/files/:hash", get(get_file_info))
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100MB max file size
 }
+
+// Aliases / stubs for v1 routes
+
+/// List submissions (alias for get_submissions)
+pub async fn list_submissions(
+    state: State<AppState>,
+    query: Query<SubmissionFilters>,
+) -> Result<Json<SubmissionListResponse>, StatusCode> {
+    get_submissions(state, query).await
+}
+
+/// Get single submission (alias for get_submission_details)
+pub async fn get_submission(
+    state: State<AppState>,
+    path: Path<Uuid>,
+) -> Result<Json<DetailedSubmissionResponse>, StatusCode> {
+    get_submission_details(state, path).await
+}
+
+/// Vote on a submission
+pub async fn vote_on_submission(
+    State(_state): State<AppState>,
+    Path(_submission_id): Path<Uuid>,
+    Json(_payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}
+
+/// Verify a submission
+pub async fn verify_submission(
+    State(_state): State<AppState>,
+    Path(_submission_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}
+
+/// Get current user's submissions
+pub async fn get_my_submissions(
+    State(_state): State<AppState>,
+) -> Result<Json<SubmissionListResponse>, StatusCode> {
+    Ok(Json(SubmissionListResponse {
+        submissions: vec![],
+        total_count: 0,
+        page: 1,
+        limit: 20,
+        filters_applied: SubmissionFilters {
+            bounty_id: None,
+            engine_id: None,
+            verdict: None,
+            min_confidence: None,
+            max_confidence: None,
+            status: None,
+            date_from: None,
+            date_to: None,
+            page: None,
+            limit: None,
+        },
+    }))
+}

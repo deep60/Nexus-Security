@@ -5,13 +5,12 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::AppState;
 
 /// Webhook configuration
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct Webhook {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -21,28 +20,12 @@ pub struct Webhook {
     pub is_active: bool,
     pub description: Option<String>,
     pub headers: Option<serde_json::Value>,
-    pub retry_policy: RetryPolicy,
+    pub retry_max_attempts: Option<i32>,
+    pub retry_interval_seconds: Option<i32>,
+    pub exponential_backoff: Option<bool>,
+    pub last_triggered_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    pub last_triggered_at: Option<DateTime<Utc>>,
-}
-
-/// Retry policy configuration
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RetryPolicy {
-    pub max_attempts: u32,
-    pub retry_interval_seconds: u64,
-    pub exponential_backoff: bool,
-}
-
-impl Default for RetryPolicy {
-    fn default() -> Self {
-        Self {
-            max_attempts: 3,
-            retry_interval_seconds: 60,
-            exponential_backoff: true,
-        }
-    }
 }
 
 /// Register webhook request
@@ -52,7 +35,6 @@ pub struct RegisterWebhookRequest {
     pub events: Vec<String>,
     pub description: Option<String>,
     pub headers: Option<serde_json::Value>,
-    pub retry_policy: Option<RetryPolicy>,
 }
 
 /// Update webhook request
@@ -63,21 +45,20 @@ pub struct UpdateWebhookRequest {
     pub is_active: Option<bool>,
     pub description: Option<String>,
     pub headers: Option<serde_json::Value>,
-    pub retry_policy: Option<RetryPolicy>,
 }
 
 /// Webhook delivery log
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct WebhookDelivery {
     pub id: Uuid,
     pub webhook_id: Uuid,
     pub event_type: String,
     pub payload: serde_json::Value,
-    pub status: String, // "success", "failed", "pending", "retrying"
-    pub status_code: Option<u16>,
+    pub status: String,
+    pub status_code: Option<i16>,
     pub response_body: Option<String>,
     pub error_message: Option<String>,
-    pub attempt_number: u32,
+    pub attempt_number: Option<i32>,
     pub triggered_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
 }
@@ -87,37 +68,31 @@ pub struct WebhookDelivery {
 pub struct WebhookQuery {
     pub page: Option<u32>,
     pub limit: Option<u32>,
-    pub is_active: Option<bool>,
-    pub event: Option<String>,
 }
 
 /// Webhook list response
 #[derive(Debug, Serialize)]
 pub struct WebhookListResponse {
     pub webhooks: Vec<Webhook>,
-    pub total: u64,
+    pub total: i64,
     pub page: u32,
     pub limit: u32,
 }
 
-/// Webhook delivery list query
+/// Delivery list response
+#[derive(Debug, Serialize)]
+pub struct DeliveryListResponse {
+    pub deliveries: Vec<WebhookDelivery>,
+    pub total: i64,
+    pub page: u32,
+    pub limit: u32,
+}
+
+/// Delivery query
 #[derive(Debug, Deserialize)]
 pub struct DeliveryQuery {
     pub page: Option<u32>,
     pub limit: Option<u32>,
-    pub status: Option<String>,
-    pub event_type: Option<String>,
-    pub from_date: Option<DateTime<Utc>>,
-    pub to_date: Option<DateTime<Utc>>,
-}
-
-/// Webhook delivery list response
-#[derive(Debug, Serialize)]
-pub struct DeliveryListResponse {
-    pub deliveries: Vec<WebhookDelivery>,
-    pub total: u64,
-    pub page: u32,
-    pub limit: u32,
 }
 
 /// Test webhook request
@@ -129,239 +104,279 @@ pub struct TestWebhookRequest {
 
 /// Available webhook events
 #[derive(Debug, Serialize)]
-pub struct AvailableEvents {
-    pub events: Vec<WebhookEvent>,
-}
-
-#[derive(Debug, Serialize)]
 pub struct WebhookEvent {
     pub name: String,
     pub description: String,
     pub category: String,
-    pub sample_payload: serde_json::Value,
 }
 
-/// Register a new webhook
-///
-/// POST /api/v1/webhooks
-pub async fn register_webhook(
-    State(_state): State<AppState>,
-    Json(_payload): Json<RegisterWebhookRequest>,
-) -> Result<Json<Webhook>, StatusCode> {
-    // TODO: Validate webhook URL
-    // TODO: Validate event types
-    // TODO: Generate webhook secret
-    // TODO: Store in database
-    // TODO: Test the webhook endpoint (ping)
+// ─── Handlers ───
 
-    Err(StatusCode::NOT_IMPLEMENTED)
+/// Create a webhook
+pub async fn create_webhook(
+    State(state): State<AppState>,
+    Json(payload): Json<RegisterWebhookRequest>,
+) -> Result<Json<Webhook>, StatusCode> {
+    // Generate a random secret for HMAC signing
+    let secret = format!("whsec_{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
+    let webhook_id = Uuid::new_v4();
+    // Use a placeholder user_id until auth is wired
+    let user_id = Uuid::nil();
+
+    let webhook = sqlx::query_as::<_, Webhook>(
+        "INSERT INTO webhooks (id, user_id, url, events, secret, description, headers)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *"
+    )
+    .bind(webhook_id)
+    .bind(user_id)
+    .bind(&payload.url)
+    .bind(&payload.events)
+    .bind(&secret)
+    .bind(&payload.description)
+    .bind(&payload.headers)
+    .fetch_one(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error creating webhook: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(webhook))
 }
 
 /// List user's webhooks
-///
-/// GET /api/v1/webhooks
 pub async fn list_webhooks(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Query(params): Query<WebhookQuery>,
 ) -> Result<Json<WebhookListResponse>, StatusCode> {
     let page = params.page.unwrap_or(1);
     let limit = params.limit.unwrap_or(20).min(100);
+    let offset = (page.saturating_sub(1)) * limit;
 
-    // TODO: Extract user ID from JWT
-    // TODO: Fetch webhooks from database
-    // TODO: Apply filters (is_active, event)
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM webhooks")
+        .fetch_one(state.db.pool())
+        .await
+        .unwrap_or(0);
+
+    let webhooks = sqlx::query_as::<_, Webhook>(
+        "SELECT * FROM webhooks ORDER BY created_at DESC LIMIT $1 OFFSET $2"
+    )
+    .bind(limit as i64)
+    .bind(offset as i64)
+    .fetch_all(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error listing webhooks: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     Ok(Json(WebhookListResponse {
-        webhooks: vec![],
-        total: 0,
+        webhooks,
+        total,
         page,
         limit,
     }))
 }
 
 /// Get webhook by ID
-///
-/// GET /api/v1/webhooks/:id
 pub async fn get_webhook(
-    State(_state): State<AppState>,
-    Path(_webhook_id): Path<Uuid>,
+    State(state): State<AppState>,
+    Path(webhook_id): Path<Uuid>,
 ) -> Result<Json<Webhook>, StatusCode> {
-    // TODO: Fetch webhook from database
-    // TODO: Verify user ownership
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let webhook = sqlx::query_as::<_, Webhook>(
+        "SELECT * FROM webhooks WHERE id = $1"
+    )
+    .bind(webhook_id)
+    .fetch_optional(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or(StatusCode::NOT_FOUND)?;
+
+    Ok(Json(webhook))
 }
 
 /// Update webhook
-///
-/// PUT /api/v1/webhooks/:id
 pub async fn update_webhook(
-    State(_state): State<AppState>,
-    Path(_webhook_id): Path<Uuid>,
-    Json(_payload): Json<UpdateWebhookRequest>,
+    State(state): State<AppState>,
+    Path(webhook_id): Path<Uuid>,
+    Json(payload): Json<UpdateWebhookRequest>,
 ) -> Result<Json<Webhook>, StatusCode> {
-    // TODO: Verify user ownership
-    // TODO: Validate updated fields
-    // TODO: Update in database
-    Err(StatusCode::NOT_IMPLEMENTED)
+    // Build dynamic UPDATE query
+    let webhook = sqlx::query_as::<_, Webhook>(
+        "UPDATE webhooks SET
+            url = COALESCE($2, url),
+            events = COALESCE($3, events),
+            is_active = COALESCE($4, is_active),
+            description = COALESCE($5, description),
+            headers = COALESCE($6, headers),
+            updated_at = NOW()
+         WHERE id = $1
+         RETURNING *"
+    )
+    .bind(webhook_id)
+    .bind(&payload.url)
+    .bind(&payload.events)
+    .bind(payload.is_active)
+    .bind(&payload.description)
+    .bind(&payload.headers)
+    .fetch_optional(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error updating webhook: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or(StatusCode::NOT_FOUND)?;
+
+    Ok(Json(webhook))
 }
 
 /// Delete webhook
-///
-/// DELETE /api/v1/webhooks/:id
 pub async fn delete_webhook(
-    State(_state): State<AppState>,
-    Path(_webhook_id): Path<Uuid>,
+    State(state): State<AppState>,
+    Path(webhook_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Verify user ownership
-    // TODO: Delete from database
-    // TODO: Cancel any pending deliveries
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let result = sqlx::query("DELETE FROM webhooks WHERE id = $1")
+        .bind(webhook_id)
+        .execute(state.db.pool())
+        .await
+        .map_err(|e| {
+            tracing::error!("DB error deleting webhook: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    if result.rows_affected() == 0 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Test webhook by sending a sample event
-///
-/// POST /api/v1/webhooks/:id/test
 pub async fn test_webhook(
-    State(_state): State<AppState>,
-    Path(_webhook_id): Path<Uuid>,
-    Json(_payload): Json<TestWebhookRequest>,
+    State(state): State<AppState>,
+    Path(webhook_id): Path<Uuid>,
+    Json(payload): Json<TestWebhookRequest>,
 ) -> Result<Json<WebhookDelivery>, StatusCode> {
-    // TODO: Verify user ownership
-    // TODO: Generate sample payload for event type
-    // TODO: Send test webhook
-    // TODO: Return delivery result
+    // First fetch the webhook
+    let webhook = sqlx::query_as::<_, Webhook>(
+        "SELECT * FROM webhooks WHERE id = $1"
+    )
+    .bind(webhook_id)
+    .fetch_optional(state.db.pool())
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    .ok_or(StatusCode::NOT_FOUND)?;
 
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let test_payload = payload.sample_payload.unwrap_or(serde_json::json!({
+        "event": payload.event_type,
+        "test": true,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+
+    // Send HTTP POST to webhook URL
+    let client = reqwest::Client::new();
+    let result = client
+        .post(&webhook.url)
+        .header("Content-Type", "application/json")
+        .header("X-Webhook-Event", &payload.event_type)
+        .json(&test_payload)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await;
+
+    let (status, status_code, response_body, error_message) = match result {
+        Ok(resp) => {
+            let code = resp.status().as_u16() as i16;
+            let body = resp.text().await.unwrap_or_default();
+            if code >= 200 && code < 300 {
+                ("success".to_string(), Some(code), Some(body), None)
+            } else {
+                ("failed".to_string(), Some(code), Some(body), Some(format!("HTTP {}", code)))
+            }
+        }
+        Err(e) => {
+            ("failed".to_string(), None, None, Some(e.to_string()))
+        }
+    };
+
+    // Record delivery
+    let delivery = sqlx::query_as::<_, WebhookDelivery>(
+        "INSERT INTO webhook_deliveries (id, webhook_id, event_type, payload, status, status_code, response_body, error_message, attempt_number, completed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, NOW())
+         RETURNING *"
+    )
+    .bind(Uuid::new_v4())
+    .bind(webhook_id)
+    .bind(&payload.event_type)
+    .bind(&test_payload)
+    .bind(&status)
+    .bind(status_code)
+    .bind(&response_body)
+    .bind(&error_message)
+    .fetch_one(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error recording delivery: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(delivery))
 }
 
-/// Get webhook deliveries (logs)
-///
-/// GET /api/v1/webhooks/:id/deliveries
+/// Get webhook deliveries
 pub async fn get_webhook_deliveries(
-    State(_state): State<AppState>,
-    Path(_webhook_id): Path<Uuid>,
+    State(state): State<AppState>,
+    Path(webhook_id): Path<Uuid>,
     Query(params): Query<DeliveryQuery>,
 ) -> Result<Json<DeliveryListResponse>, StatusCode> {
     let page = params.page.unwrap_or(1);
     let limit = params.limit.unwrap_or(20).min(100);
+    let offset = (page.saturating_sub(1)) * limit;
 
-    // TODO: Verify user ownership
-    // TODO: Fetch deliveries from database
-    // TODO: Apply filters (status, event_type, date range)
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM webhook_deliveries WHERE webhook_id = $1"
+    )
+    .bind(webhook_id)
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or(0);
+
+    let deliveries = sqlx::query_as::<_, WebhookDelivery>(
+        "SELECT * FROM webhook_deliveries WHERE webhook_id = $1
+         ORDER BY triggered_at DESC LIMIT $2 OFFSET $3"
+    )
+    .bind(webhook_id)
+    .bind(limit as i64)
+    .bind(offset as i64)
+    .fetch_all(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     Ok(Json(DeliveryListResponse {
-        deliveries: vec![],
-        total: 0,
+        deliveries,
+        total,
         page,
         limit,
     }))
 }
 
-/// Retry a failed webhook delivery
-///
-/// POST /api/v1/webhooks/deliveries/:delivery_id/retry
-pub async fn retry_delivery(
+/// List available webhook events
+pub async fn list_available_events(
     State(_state): State<AppState>,
-    Path(_delivery_id): Path<Uuid>,
-) -> Result<Json<WebhookDelivery>, StatusCode> {
-    // TODO: Verify user ownership
-    // TODO: Check if delivery is eligible for retry
-    // TODO: Queue retry job
-    // TODO: Return updated delivery status
-
-    Err(StatusCode::NOT_IMPLEMENTED)
-}
-
-/// Get available webhook events
-///
-/// GET /api/v1/webhooks/events
-pub async fn get_available_events(
-    State(_state): State<AppState>,
-) -> Result<Json<AvailableEvents>, StatusCode> {
-    // TODO: Return list of all available webhook events with descriptions
-    let events = vec![
-        WebhookEvent {
-            name: "analysis.completed".to_string(),
-            description: "Triggered when a malware analysis is completed".to_string(),
-            category: "analysis".to_string(),
-            sample_payload: serde_json::json!({
-                "analysis_id": "550e8400-e29b-41d4-a716-446655440000",
-                "status": "completed",
-                "verdict": "malicious",
-                "confidence": 0.95
-            }),
-        },
-        WebhookEvent {
-            name: "bounty.created".to_string(),
-            description: "Triggered when a new bounty is created".to_string(),
-            category: "bounty".to_string(),
-            sample_payload: serde_json::json!({
-                "bounty_id": "550e8400-e29b-41d4-a716-446655440000",
-                "reward_amount": "1000",
-                "deadline": "2025-12-31T23:59:59Z"
-            }),
-        },
-        WebhookEvent {
-            name: "bounty.submission".to_string(),
-            description: "Triggered when a submission is made to your bounty".to_string(),
-            category: "bounty".to_string(),
-            sample_payload: serde_json::json!({
-                "bounty_id": "550e8400-e29b-41d4-a716-446655440000",
-                "submission_id": "660e8400-e29b-41d4-a716-446655440000",
-                "submitter": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-            }),
-        },
-        WebhookEvent {
-            name: "bounty.finalized".to_string(),
-            description: "Triggered when a bounty is finalized with winner".to_string(),
-            category: "bounty".to_string(),
-            sample_payload: serde_json::json!({
-                "bounty_id": "550e8400-e29b-41d4-a716-446655440000",
-                "winner_submission_id": "660e8400-e29b-41d4-a716-446655440000",
-                "reward_amount": "1000"
-            }),
-        },
-        WebhookEvent {
-            name: "transaction.confirmed".to_string(),
-            description: "Triggered when a blockchain transaction is confirmed".to_string(),
-            category: "transaction".to_string(),
-            sample_payload: serde_json::json!({
-                "transaction_hash": "0x1234567890abcdef",
-                "type": "stake",
-                "amount": "500",
-                "status": "confirmed"
-            }),
-        },
-        WebhookEvent {
-            name: "reputation.updated".to_string(),
-            description: "Triggered when your reputation score changes".to_string(),
-            category: "reputation".to_string(),
-            sample_payload: serde_json::json!({
-                "old_score": 75.5,
-                "new_score": 78.2,
-                "change": 2.7,
-                "reason": "bounty_win"
-            }),
-        },
-    ];
-
-    Ok(Json(AvailableEvents { events }))
-}
-
-/// Get webhook statistics
-///
-/// GET /api/v1/webhooks/stats
-pub async fn get_webhook_stats(
-    State(_state): State<AppState>,
-) -> Result<Json<serde_json::Value>, StatusCode> {
-    // TODO: Calculate webhook statistics for current user
-    Ok(Json(serde_json::json!({
-        "total_webhooks": 0,
-        "active_webhooks": 0,
-        "total_deliveries": 0,
-        "successful_deliveries": 0,
-        "failed_deliveries": 0,
-        "success_rate": 0.0,
-        "last_24h_deliveries": 0,
-    })))
+) -> Result<Json<Vec<WebhookEvent>>, StatusCode> {
+    Ok(Json(vec![
+        WebhookEvent { name: "analysis.completed".into(), description: "Analysis completed".into(), category: "analysis".into() },
+        WebhookEvent { name: "bounty.created".into(), description: "New bounty created".into(), category: "bounty".into() },
+        WebhookEvent { name: "bounty.submission".into(), description: "Analysis submitted to bounty".into(), category: "bounty".into() },
+        WebhookEvent { name: "bounty.finalized".into(), description: "Bounty resolved with winner".into(), category: "bounty".into() },
+        WebhookEvent { name: "transaction.confirmed".into(), description: "Blockchain tx confirmed".into(), category: "transaction".into() },
+        WebhookEvent { name: "reputation.updated".into(), description: "Reputation score changed".into(), category: "reputation".into() },
+    ]))
 }

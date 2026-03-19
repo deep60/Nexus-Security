@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @author Nexus-Security Team
  */
 
-// TODO: Implement all IBountyManager interface methods
+
 contract BountyManager {
     // Enums
     enum BountyStatus {

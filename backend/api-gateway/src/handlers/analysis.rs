@@ -5,10 +5,8 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::models::analysis::{AnalysisResult, AnalysisStatus, ThreatVerdict};
 use crate::AppState;
 
 /// Query parameters for listing analyses
@@ -26,161 +24,199 @@ pub struct ListAnalysesQuery {
 #[derive(Debug, Serialize)]
 pub struct AnalysisListResponse {
     pub analyses: Vec<AnalysisSummary>,
-    pub total: u64,
+    pub total: i64,
     pub page: u32,
     pub limit: u32,
 }
 
 /// Summary of an analysis
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct AnalysisSummary {
     pub id: Uuid,
-    pub file_hash: String,
-    pub status: String,
+    pub file_hash: Option<String>,
+    pub status: Option<String>,
     pub verdict: Option<String>,
     pub confidence: Option<f64>,
     pub created_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
 }
 
-/// Detailed analysis response
+/// Analysis stats
 #[derive(Debug, Serialize)]
-pub struct DetailedAnalysisResponse {
-    pub id: Uuid,
-    pub file_hash: String,
-    pub file_name: String,
-    pub file_size: i64,
-    pub file_type: String,
-    pub status: String,
-    pub verdict: Option<String>,
-    pub confidence: Option<f64>,
-    pub threat_types: Vec<String>,
-    pub risk_score: Option<i32>,
-    pub engine_results: Vec<EngineResult>,
-    pub indicators: Vec<ThreatIndicator>,
-    pub created_at: DateTime<Utc>,
-    pub started_at: Option<DateTime<Utc>>,
-    pub completed_at: Option<DateTime<Utc>>,
-    pub metadata: serde_json::Value,
-}
-
-#[derive(Debug, Serialize)]
-pub struct EngineResult {
-    pub engine_name: String,
-    pub verdict: String,
-    pub confidence: f64,
-    pub threat_types: Vec<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ThreatIndicator {
-    pub indicator_type: String,
-    pub value: String,
-    pub severity: String,
+pub struct AnalysisStats {
+    pub total_analyses: i64,
+    pub pending: i64,
+    pub completed: i64,
+    pub malicious_count: i64,
+    pub benign_count: i64,
+    pub suspicious_count: i64,
 }
 
 /// Get analysis by ID
-///
-/// GET /api/v1/analysis/:id
 pub async fn get_analysis(
     State(state): State<AppState>,
     Path(analysis_id): Path<Uuid>,
-) -> Result<Json<DetailedAnalysisResponse>, StatusCode> {
-    // TODO: Fetch from database
-    // For now, return placeholder
-    Err(StatusCode::NOT_IMPLEMENTED)
+) -> Result<Json<AnalysisSummary>, StatusCode> {
+    let row = sqlx::query_as::<_, AnalysisSummary>(
+        "SELECT id, file_hash, status, verdict, confidence::float8 as confidence, created_at, completed_at FROM analyses WHERE id = $1"
+    )
+    .bind(analysis_id)
+    .fetch_optional(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error fetching analysis: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    match row {
+        Some(analysis) => Ok(Json(analysis)),
+        None => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+/// Get analysis details (same as get_analysis for now)
+pub async fn get_analysis_details(
+    state: State<AppState>,
+    path: Path<Uuid>,
+) -> Result<Json<AnalysisSummary>, StatusCode> {
+    get_analysis(state, path).await
 }
 
 /// List all analyses with filters
-///
-/// GET /api/v1/analysis
 pub async fn list_analyses(
     State(state): State<AppState>,
     Query(params): Query<ListAnalysesQuery>,
 ) -> Result<Json<AnalysisListResponse>, StatusCode> {
     let page = params.page.unwrap_or(1);
     let limit = params.limit.unwrap_or(20).min(100);
+    let offset = (page.saturating_sub(1)) * limit;
 
-    // TODO: Fetch from database with filters
-    // For now, return empty list
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analyses")
+        .fetch_one(state.db.pool())
+        .await
+        .map_err(|e| {
+            tracing::error!("DB error counting analyses: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let analyses = sqlx::query_as::<_, AnalysisSummary>(
+        "SELECT id, file_hash, status, verdict, confidence::float8 as confidence, created_at, completed_at
+         FROM analyses ORDER BY created_at DESC LIMIT $1 OFFSET $2"
+    )
+    .bind(limit as i64)
+    .bind(offset as i64)
+    .fetch_all(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error listing analyses: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     Ok(Json(AnalysisListResponse {
-        analyses: vec![],
-        total: 0,
+        analyses,
+        total,
         page,
         limit,
     }))
 }
 
 /// Get analysis statistics
-///
-/// GET /api/v1/analysis/stats
 pub async fn get_analysis_stats(
     State(state): State<AppState>,
 ) -> Result<Json<AnalysisStats>, StatusCode> {
-    // TODO: Calculate real stats from database
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analyses")
+        .fetch_one(state.db.pool())
+        .await
+        .unwrap_or(0);
+
+    let pending: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE status = 'pending'")
+        .fetch_one(state.db.pool())
+        .await
+        .unwrap_or(0);
+
+    let completed: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE status = 'completed'")
+        .fetch_one(state.db.pool())
+        .await
+        .unwrap_or(0);
+
+    let malicious: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE verdict = 'malicious'")
+        .fetch_one(state.db.pool())
+        .await
+        .unwrap_or(0);
+
+    let benign: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE verdict = 'benign'")
+        .fetch_one(state.db.pool())
+        .await
+        .unwrap_or(0);
+
+    let suspicious: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE verdict = 'suspicious'")
+        .fetch_one(state.db.pool())
+        .await
+        .unwrap_or(0);
+
     Ok(Json(AnalysisStats {
-        total_analyses: 0,
-        pending: 0,
-        in_progress: 0,
-        completed: 0,
-        failed: 0,
-        malicious_count: 0,
-        benign_count: 0,
-        suspicious_count: 0,
-        average_processing_time_seconds: 0.0,
+        total_analyses: total,
+        pending,
+        completed,
+        malicious_count: malicious,
+        benign_count: benign,
+        suspicious_count: suspicious,
     }))
 }
 
-#[derive(Debug, Serialize)]
-pub struct AnalysisStats {
-    pub total_analyses: u64,
-    pub pending: u64,
-    pub in_progress: u64,
-    pub completed: u64,
-    pub failed: u64,
-    pub malicious_count: u64,
-    pub benign_count: u64,
-    pub suspicious_count: u64,
-    pub average_processing_time_seconds: f64,
+/// Get analyses by bounty
+pub async fn get_analyses_by_bounty(
+    State(state): State<AppState>,
+    Path(bounty_id): Path<Uuid>,
+) -> Result<Json<Vec<AnalysisSummary>>, StatusCode> {
+    let analyses = sqlx::query_as::<_, AnalysisSummary>(
+        "SELECT id, file_hash, status, verdict, confidence::float8 as confidence, created_at, completed_at
+         FROM analyses WHERE bounty_id = $1 ORDER BY created_at DESC"
+    )
+    .bind(bounty_id)
+    .fetch_all(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(analyses))
 }
 
-/// Cancel an analysis
-///
-/// POST /api/v1/analysis/:id/cancel
-pub async fn cancel_analysis(
+/// Get analyses by file hash
+pub async fn get_analyses_by_hash(
     State(state): State<AppState>,
-    Path(analysis_id): Path<Uuid>,
+    Path(file_hash): Path<String>,
+) -> Result<Json<Vec<AnalysisSummary>>, StatusCode> {
+    let analyses = sqlx::query_as::<_, AnalysisSummary>(
+        "SELECT id, file_hash, status, verdict, confidence::float8 as confidence, created_at, completed_at
+         FROM analyses WHERE file_hash = $1 ORDER BY created_at DESC"
+    )
+    .bind(&file_hash)
+    .fetch_all(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(analyses))
+}
+
+/// Submit analysis
+pub async fn submit_analysis(
+    State(_state): State<AppState>,
+    Json(_payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    // TODO: Implement analysis cancellation
     Err(StatusCode::NOT_IMPLEMENTED)
 }
 
-/// Resubmit an analysis
-///
-/// POST /api/v1/analysis/:id/resubmit
-pub async fn resubmit_analysis(
-    State(state): State<AppState>,
-    Path(analysis_id): Path<Uuid>,
+/// Dispute analysis
+pub async fn dispute_analysis(
+    State(_state): State<AppState>,
+    Path(_analysis_id): Path<Uuid>,
+    Json(_payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    // TODO: Implement analysis resubmission
     Err(StatusCode::NOT_IMPLEMENTED)
-}
-
-/// Download analysis report
-///
-/// GET /api/v1/analysis/:id/report
-pub async fn download_report(
-    State(state): State<AppState>,
-    Path(analysis_id): Path<Uuid>,
-) -> Result<Json<AnalysisReport>, StatusCode> {
-    // TODO: Generate and return report
-    Err(StatusCode::NOT_IMPLEMENTED)
-}
-
-#[derive(Debug, Serialize)]
-pub struct AnalysisReport {
-    pub id: Uuid,
-    pub generated_at: DateTime<Utc>,
-    pub summary: String,
-    pub details: serde_json::Value,
 }
