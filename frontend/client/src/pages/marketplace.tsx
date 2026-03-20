@@ -13,6 +13,7 @@ import { ErrorState } from "@/components/error-state";
 import { EmptyState } from "@/components/empty-state";
 import { useQuery } from "@tanstack/react-query";
 import { PlusCircle, Info, Search, FileX, Shield } from "lucide-react";
+import { SEO } from "@/components/seo";
 
 type SortOption = "newest" | "oldest" | "highest" | "lowest";
 type EngineFilter = "all" | "ml" | "signature" | "human" | "hybrid";
@@ -112,10 +113,11 @@ export default function Marketplace() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SEO title="Bounty Marketplace" description="Analyze intelligence reports and claim rewards by staking confidence." />
       <ParticleBackground />
       <Navigation />
 
-      <div className="relative z-10 py-8">
+      <main className="relative z-10 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Security Engines Section */}
           <section className="mb-16">
@@ -327,7 +329,7 @@ export default function Marketplace() {
             </div>
           </section>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

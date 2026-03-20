@@ -27,7 +27,7 @@ import {
   Zap,
   Target,
 } from "lucide-react";
-import { LoadingStatCard } from "@/components/loading-skeleton";
+import { StatCardSkeleton } from "@/components/loading-skeleton";
 import { InlineErrorState } from "@/components/error-state";
 
 export function PlatformAnalytics() {
@@ -107,7 +107,7 @@ export function PlatformAnalytics() {
     return (
       <div className="grid gap-6 md:grid-cols-2">
         {[...Array(4)].map((_, i) => (
-          <LoadingStatCard key={i} />
+          <StatCardSkeleton key={i} />
         ))}
       </div>
     );

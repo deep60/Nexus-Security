@@ -18,6 +18,10 @@ export function Navigation() {
   const { user, isAuthenticated, logout, connectWallet } = useAuth();
 
   const navItems = [
+    { href: "/how-it-works", label: "How It Works" },
+    { href: "/features", label: "Features" },
+    { href: "/use-cases", label: "Use Cases" },
+    { href: "/pricing", label: "Pricing" },
     { href: "/dashboard", label: "Dashboard" },
     { href: "/marketplace", label: "Marketplace" },
     { href: "/api", label: "API" },

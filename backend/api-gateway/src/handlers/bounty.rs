@@ -320,49 +320,180 @@ pub async fn finalize_bounty(
     Ok(StatusCode::OK)
 }
 
-/// Update a bounty
+/// Update a bounty (owner only)
 pub async fn update_bounty(
-    State(_state): State<crate::AppState>,
-    Path(_bounty_id): Path<Uuid>,
-    Json(_payload): Json<serde_json::Value>,
+    State(state): State<crate::AppState>,
+    claims: crate::middleware::auth::Claims,
+    Path(bounty_id): Path<Uuid>,
+    Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    // Verify ownership
+    let bounty = state.db.get_bounty_by_id(bounty_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if bounty.creator != claims.sub {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    // Only allow updates on draft/active bounties
+    if !matches!(bounty.status, BountyStatus::Draft | BountyStatus::Active) {
+        return Err(StatusCode::CONFLICT);
+    }
+
+    let title = payload.get("title").and_then(|v| v.as_str());
+    let description = payload.get("description").and_then(|v| v.as_str());
+
+    sqlx::query(
+        "UPDATE bounties SET title = COALESCE($1, title), description = COALESCE($2, description), updated_at = NOW() WHERE id = $3"
+    )
+    .bind(title)
+    .bind(description)
+    .bind(bounty_id)
+    .execute(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to update bounty: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(serde_json::json!({
+        "id": bounty_id,
+        "message": "Bounty updated successfully"
+    })))
 }
 
-/// Cancel a bounty
+/// Cancel a bounty (owner only, must be draft/active)
 pub async fn cancel_bounty(
-    State(_state): State<crate::AppState>,
-    Path(_bounty_id): Path<Uuid>,
+    State(state): State<crate::AppState>,
+    claims: crate::middleware::auth::Claims,
+    Path(bounty_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let bounty = state.db.get_bounty_by_id(bounty_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if bounty.creator != claims.sub {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    if !matches!(bounty.status, BountyStatus::Draft | BountyStatus::Active) {
+        return Err(StatusCode::CONFLICT);
+    }
+
+    state.db.update_bounty_status(bounty_id, BountyStatus::Cancelled).await
+        .map_err(|e| {
+            tracing::error!("Failed to cancel bounty: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(StatusCode::OK)
 }
 
-/// Extend bounty deadline
+/// Extend bounty deadline (owner only)
 pub async fn extend_bounty(
-    State(_state): State<crate::AppState>,
-    Path(_bounty_id): Path<Uuid>,
-    Json(_payload): Json<serde_json::Value>,
+    State(state): State<crate::AppState>,
+    claims: crate::middleware::auth::Claims,
+    Path(bounty_id): Path<Uuid>,
+    Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let bounty = state.db.get_bounty_by_id(bounty_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if bounty.creator != claims.sub {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let new_deadline = payload.get("deadline")
+        .and_then(|v| v.as_str())
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|d| d.with_timezone(&chrono::Utc))
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    // Deadline must be in the future
+    if new_deadline <= chrono::Utc::now() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    sqlx::query("UPDATE bounties SET deadline = $1, updated_at = NOW() WHERE id = $2")
+        .bind(new_deadline)
+        .bind(bounty_id)
+        .execute(state.db.pool())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to extend bounty deadline: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(serde_json::json!({
+        "id": bounty_id,
+        "new_deadline": new_deadline,
+        "message": "Bounty deadline extended"
+    })))
 }
 
-/// Claim bounty reward
+/// Claim bounty reward (participant only, bounty must be completed)
 pub async fn claim_reward(
-    State(_state): State<crate::AppState>,
-    Path(_bounty_id): Path<Uuid>,
+    State(state): State<crate::AppState>,
+    claims: crate::middleware::auth::Claims,
+    Path(bounty_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let bounty = state.db.get_bounty_by_id(bounty_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if !matches!(bounty.status, BountyStatus::Completed) {
+        return Err(StatusCode::CONFLICT);
+    }
+
+    // Check on-chain ID exists
+    let chain_id = state.db.get_bounty_on_chain_id(bounty_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::PRECONDITION_FAILED)?;
+
+    // Rewards are distributed during resolveBounty on-chain.
+    // This records the user's claim intent and returns status.
+    Ok(Json(serde_json::json!({
+        "bounty_id": bounty_id,
+        "on_chain_id": chain_id,
+        "user_id": claims.sub,
+        "message": "Rewards are distributed automatically during bounty resolution. Check your wallet for received rewards.",
+        "status": "resolved"
+    })))
 }
 
 /// Get bounty statistics
 pub async fn get_bounty_stats(
-    State(_state): State<crate::AppState>,
-    Path(_bounty_id): Path<Uuid>,
+    State(state): State<crate::AppState>,
+    Path(bounty_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
+    // Verify bounty exists
+    let _bounty = state.db.get_bounty_by_id(bounty_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let submissions: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM analyses WHERE bounty_id = $1"
+    )
+    .bind(bounty_id)
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or(0);
+
+    let participants: i64 = sqlx::query_scalar(
+        "SELECT COUNT(DISTINCT analyst_id) FROM analyses WHERE bounty_id = $1"
+    )
+    .bind(bounty_id)
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or(0);
+
     Ok(Json(serde_json::json!({
-        "submissions": 0,
-        "total_staked": "0",
-        "participants": 0
+        "bounty_id": bounty_id,
+        "submissions": submissions,
+        "participants": participants,
+        "total_staked": "0"
     })))
 }
 
@@ -370,13 +501,46 @@ pub async fn get_bounty_stats(
 pub async fn list_active_bounties(
     State(state): State<crate::AppState>,
 ) -> Result<Json<Vec<Bounty>>, StatusCode> {
-    // Delegate to list_bounties with active filter
-    Ok(Json(vec![]))
+    let bounties = state.db.get_active_bounties(50, 0).await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch active bounties: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok(Json(bounties))
 }
 
 /// List completed bounties
 pub async fn list_completed_bounties(
     State(state): State<crate::AppState>,
 ) -> Result<Json<Vec<Bounty>>, StatusCode> {
-    Ok(Json(vec![]))
+    let bounties = sqlx::query_as::<_, Bounty>(
+        r#"
+        SELECT
+            id, creator, creator_address, title, description,
+            bounty_type as "bounty_type: BountyType",
+            priority as "priority: BountyPriority",
+            status as "status: BountyStatus",
+            total_reward, minimum_stake,
+            distribution_method as "distribution_method: DistributionMethod",
+            max_participants, current_participants,
+            required_consensus, minimum_reputation,
+            deadline, auto_finalize, requires_human_analysis,
+            file_types_allowed, max_file_size, tags, metadata,
+            blockchain_tx_hash, on_chain_id, escrow_address,
+            created_at, updated_at, started_at, completed_at
+        FROM bounties
+        WHERE status = 'completed'
+        ORDER BY completed_at DESC NULLS LAST
+        LIMIT 50
+        "#
+    )
+    .fetch_all(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fetch completed bounties: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(bounties))
 }
+

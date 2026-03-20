@@ -187,7 +187,7 @@ impl FileHandler {
     }
 
     fn calculate_md5(&self, data: &[u8]) -> String {
-        let digest = md5::compute(data);
+        let digest = md5::Md5::digest(data);
         format!("{:x}", digest)
     }
 

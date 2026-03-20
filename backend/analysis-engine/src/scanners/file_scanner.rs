@@ -103,6 +103,7 @@ pub struct FileScanner {
     suspicious_strings: Vec<String>,
 }
 
+#[async_trait::async_trait]
 impl Scanner for FileScanner {
     type Config = FileScannerConfig;
     type Result = FileScanResult;

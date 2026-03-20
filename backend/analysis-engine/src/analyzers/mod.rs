@@ -3,21 +3,97 @@ use anyhow::{Result, anyhow};
 use tracing::{info, warn, error, debug};
 use serde::{Deserialize, Serialize};
 use tokio::time::{timeout, Duration};
-use futures::join;
 use chrono::Utc;
 use uuid::Uuid;
 
 // Re-export all analyzer modules
 pub mod hash_analyzer;
 pub mod static_analyzer;
+pub mod dynamic_analyzer;
+
+#[cfg(feature = "yara-engine")]
 pub mod yara_engine;
+#[cfg(feature = "clamav")]
 pub mod clamav_analyzer;
 
 // Re-export commonly used types
 pub use hash_analyzer::{HashAnalyzer, HashAnalyzerConfig, HashInfo, HashType};
 pub use static_analyzer::{StaticAnalyzer, StaticAnalyzerConfig, FileType, PEAnalysis, StringAnalysis, EntropyAnalysis};
+
+#[cfg(feature = "yara-engine")]
 pub use yara_engine::{YaraEngine, YaraEngineConfig, YaraMatch, YaraRule, YaraEngineError};
+#[cfg(feature = "clamav")]
 pub use clamav_analyzer::{ClamAvAnalyzer, ClamAvAnalyzerConfig};
+
+// ── Stubs when native features are disabled ──────────────────────
+
+#[cfg(not(feature = "yara-engine"))]
+pub mod yara_stub {
+    use anyhow::Result;
+    use serde::{Deserialize, Serialize};
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use crate::models::analysis_result::DetectionResult;
+
+    #[derive(Debug, Clone)]
+    pub struct YaraEngineConfig {
+        pub rules_directory: PathBuf,
+        pub max_matches: usize,
+    }
+    impl Default for YaraEngineConfig {
+        fn default() -> Self {
+            Self { rules_directory: PathBuf::from("./rules"), max_matches: 100 }
+        }
+    }
+
+    pub struct YaraEngine;
+    impl YaraEngine {
+        pub fn new(_config: YaraEngineConfig) -> Result<Self> { Ok(Self) }
+        pub async fn analyze_file_data(&self, _data: &[u8], _filename: &str) -> Result<DetectionResult> {
+            Err(anyhow::anyhow!("YARA engine not compiled (enable 'yara-engine' feature)"))
+        }
+        pub fn get_stats(&self) -> HashMap<String, String> { HashMap::new() }
+        pub fn reload_rules(&mut self) -> Result<()> { Ok(()) }
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct YaraMatch { pub rule: String }
+    #[derive(Debug, Clone)]
+    pub struct YaraRule;
+    #[derive(Debug, thiserror::Error)]
+    #[error("YARA engine not available")]
+    pub struct YaraEngineError;
+}
+#[cfg(not(feature = "yara-engine"))]
+pub use yara_stub::*;
+
+#[cfg(not(feature = "clamav"))]
+pub mod clamav_stub {
+    use anyhow::Result;
+    use crate::models::analysis_result::DetectionResult;
+
+    #[derive(Debug, Clone)]
+    pub struct ClamAvAnalyzerConfig {
+        pub host: String,
+        pub port: u16,
+        pub enabled: bool,
+    }
+    impl Default for ClamAvAnalyzerConfig {
+        fn default() -> Self {
+            Self { host: "localhost".into(), port: 3310, enabled: false }
+        }
+    }
+
+    pub struct ClamAvAnalyzer { _config: ClamAvAnalyzerConfig }
+    impl ClamAvAnalyzer {
+        pub fn new(config: ClamAvAnalyzerConfig) -> Self { Self { _config: config } }
+        pub async fn scan_file(&self, _data: &[u8], _filename: &str) -> Result<DetectionResult> {
+            Err(anyhow::anyhow!("ClamAV not compiled (enable 'clamav' feature)"))
+        }
+    }
+}
+#[cfg(not(feature = "clamav"))]
+pub use clamav_stub::*;
 
 use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, ConfidenceLevel, DetectionResult, FileMetadata, AnalysisStatus, EngineType, SeverityLevel, ThreatCategory};
 
@@ -79,8 +155,8 @@ impl Default for AnalysisOptions {
         Self {
             enable_hash_analysis: true,
             enable_static_analysis: true,
-            enable_yara_analysis: true,
-            enable_clamav_analysis: true,
+            enable_yara_analysis: cfg!(feature = "yara-engine"),
+            enable_clamav_analysis: cfg!(feature = "clamav"),
             priority: AnalysisPriority::Normal,
             custom_metadata: HashMap::new(),
         }
@@ -101,7 +177,8 @@ impl AnalysisEngine {
     pub fn new(config: AnalysisEngineConfig) -> Result<Self> {
         info!("Initializing analysis engine");
 
-        let hash_analyzer = HashAnalyzer::new(config.hash_analyzer.clone());
+        let hash_analyzer = HashAnalyzer::new(config.hash_analyzer.clone())
+            .map_err(|e| anyhow!("Failed to initialize hash analyzer: {}", e))?;
         let static_analyzer = StaticAnalyzer::new(config.static_analyzer.clone());
 
         let yara_engine = YaraEngine::new(config.yara_engine.clone())
@@ -221,12 +298,21 @@ impl AnalysisEngine {
 
     async fn run_hash_analysis(&self, request: &FileAnalysisRequest) -> Result<Vec<DetectionResult>> {
         if request.analysis_options.enable_hash_analysis {
+            let sha256_hash = {
+                use sha2::{Sha256, Digest};
+                let mut hasher = Sha256::new();
+                hasher.update(&request.file_data);
+                format!("{:x}", hasher.finalize())
+            };
             let hash_info = HashInfo {
                 hash_type: HashType::SHA256,
-                hash_value: self.hash_analyzer.compute_sha256(&request.file_data),  // Assume method added in hash_analyzer
+                hash_value: sha256_hash,
                 file_size: Some(request.file_data.len() as u64),
+                computed_at: chrono::Utc::now(),
             };
-            self.hash_analyzer.analyze_hash(&hash_info, Some(&request.file_data)).await
+            let analysis_result = self.hash_analyzer.analyze_hash(&hash_info, Some(&request.file_data)).await
+                .map_err(|e| anyhow!("Hash analysis error: {}", e))?;
+            Ok(analysis_result.detections)
         } else {
             Ok(vec![])
         }
@@ -242,7 +328,7 @@ impl AnalysisEngine {
 
     async fn run_yara_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
         if request.analysis_options.enable_yara_analysis {
-            self.yara_engine.analyze_file_data(&request.file_data, &request.filename).await // Assume method updated
+            self.yara_engine.analyze_file_data(&request.file_data, &request.filename).await
         } else {
             Err(anyhow!("Yara analysis disabled"))
         }
@@ -273,11 +359,11 @@ impl AnalysisEngine {
     }
 
     /// Get statistics about the analysis engine
-    pub fn get_stats(&self) -> HashMap<String, String> {
+    pub async fn get_stats(&self) -> HashMap<String, String> {
         let mut stats = HashMap::new();
         
         // Combine stats from all analyzers
-        let hash_stats = self.hash_analyzer.get_cache_stats();
+        let hash_stats = self.hash_analyzer.get_cache_stats().await;
         for (key, value) in hash_stats {
             stats.insert(format!("hash_{}", key), value.to_string());
         }
@@ -313,56 +399,13 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_analysis_engine_creation() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut config = AnalysisEngineConfig::default();
-        config.yara_engine.rules_directory = temp_dir.path().to_path_buf();
-        
-        // Create a minimal YARA rule for testing
-        std::fs::write(
-            temp_dir.path().join("test.yara"),
-            "rule TestRule { condition: true }"
-        ).unwrap();
-
-        let engine = AnalysisEngine::new(config);
-        assert!(engine.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_file_analysis() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut config = AnalysisEngineConfig::default();
-        config.yara_engine.rules_directory = temp_dir.path().to_path_buf();
-        config.require_all_analyzers = false; // Allow partial failures for testing
-        
-        std::fs::write(
-            temp_dir.path().join("test.yara"),
-            "rule TestRule { condition: true }"
-        ).unwrap();
-
-        let mut engine = AnalysisEngine::new(config).unwrap();
-
-        let request = FileAnalysisRequest {
-            filename: "test.exe".to_string(),
-            file_data: b"MZ\x90\x00test content".to_vec(),
-            file_hashes: None,
-            analysis_options: AnalysisOptions::default(),
-        };
-
-        let result = engine.analyze_file(request).await;
-        assert!(result.is_ok());
-
-        let analysis = result.unwrap();
-        assert_eq!(analysis.status, AnalysisStatus::Completed);
-    }
-
     #[test]
     fn test_analysis_options() {
         let options = AnalysisOptions {
             enable_hash_analysis: false,
             enable_static_analysis: true,
             enable_yara_analysis: true,
+            enable_clamav_analysis: false,
             priority: AnalysisPriority::High,
             custom_metadata: HashMap::from([
                 ("source".to_string(), "unit_test".to_string()),

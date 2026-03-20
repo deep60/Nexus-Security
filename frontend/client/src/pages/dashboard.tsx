@@ -6,11 +6,13 @@ import { PlatformAnalytics } from "@/components/platform-analytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, BarChart3 } from "lucide-react";
+import { SEO } from "@/components/seo";
 
 export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <ParticleBackground />
+      <SEO title="Dashboard" description="Submit files for analysis and view recent intelligence reports." />
       <Navigation />
 
       <div className="relative z-10 py-8">

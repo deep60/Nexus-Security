@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Key, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { SEO } from "@/components/seo";
 
 export default function ApiDocs() {
   const { toast } = useToast();
@@ -81,6 +82,7 @@ print(f"Threat score: {results.json()['confidence']}")`;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SEO title="API Documentation" description="Integrate Nexus-Security distributed scanning into your CI/CD pipelines via REST and gRPC." />
       <ParticleBackground />
       <Navigation />
 

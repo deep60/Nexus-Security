@@ -152,6 +152,7 @@ pub struct UrlScanner {
     phishing_keywords: Vec<String>,
 }
 
+#[async_trait::async_trait]
 impl Scanner for UrlScanner {
     type Config = UrlScannerConfig;
     type Result = UrlScanResult;

@@ -132,6 +132,7 @@ pub struct EmailScanner {
     urgent_keywords: Vec<String>,
 }
 
+#[async_trait::async_trait]
 impl Scanner for EmailScanner {
     type Config = EmailScannerConfig;
     type Result = EmailScanResult;
@@ -540,8 +541,8 @@ impl EmailScanner {
     fn extract_urls(&self, body: &str) -> Vec<String> {
         let mut urls = Vec::new();
         let url_patterns = [
-            regex::Regex::new(r"https?://[^\s<>\"]+").unwrap(),
-            regex::Regex::new(r"www\.[^\s<>\"]+").unwrap(),
+            regex::Regex::new(r#"https?://[^\s<>""]+"#).unwrap(),
+            regex::Regex::new(r#"www\.[^\s<>""]+"#).unwrap(),
         ];
 
         for pattern in &url_patterns {

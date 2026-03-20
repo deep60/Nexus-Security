@@ -6,7 +6,7 @@ pub mod analysis_result;
 // Re-export commonly used types
 pub use analysis_result::{
     AnalysisResult, AnalysisStatus, DetectionResult, ThreatVerdict, ConfidenceLevel, EngineType, 
-    SeverityLevel, ThreatCategory, FileMetadata, ExecutableInfo, AnalysisError,
+    SeverityLevel, ThreatCategory, FileMetadata, ExecutableInfo,
 };
 
 /// Base configuration for all analysis engines

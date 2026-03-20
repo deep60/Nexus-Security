@@ -250,10 +250,77 @@ pub async fn list_available_badges(
     ]))
 }
 
-/// Claim badge
+/// Claim badge — check eligibility and award
 pub async fn claim_badge(
-    State(_state): State<AppState>,
-    Json(_payload): Json<serde_json::Value>,
+    State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
+    Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let badge_id = payload.get("badge_id")
+        .and_then(|v| v.as_str())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    // Validate badge exists in known set
+    let (badge_name, required_count) = match badge_id {
+        "first_analysis" => ("First Analysis", 1i64),
+        "ten_analyses" => ("Veteran Analyst", 10),
+        "high_accuracy" => ("Sharp Eye", 20),
+        "bounty_hunter" => ("Bounty Hunter", 5),
+        "top_ten" => ("Elite", 0), // Checked via leaderboard position
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
+
+    // Check eligibility based on badge type
+    let eligible = if badge_id == "top_ten" {
+        // Check if user is in top 10 by reputation
+        let rank: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) + 1 FROM users WHERE reputation_score > (SELECT COALESCE(reputation_score, 0) FROM users WHERE id = $1)"
+        )
+        .bind(claims.sub)
+        .fetch_one(state.db.pool())
+        .await
+        .unwrap_or(999);
+
+        rank <= 10
+    } else {
+        // Count completed analyses for this user
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM analyses WHERE analyst_id = $1 AND status = 'completed'"
+        )
+        .bind(claims.sub)
+        .fetch_one(state.db.pool())
+        .await
+        .unwrap_or(0);
+
+        count >= required_count
+    };
+
+    if !eligible {
+        return Ok(Json(serde_json::json!({
+            "badge_id": badge_id,
+            "eligible": false,
+            "message": format!("You have not yet met the requirements for the '{}' badge", badge_name)
+        })));
+    }
+
+    // Record the badge claim in reputation_history
+    let _ = sqlx::query(
+        r#"INSERT INTO reputation_history (id, user_id, event_type, score_change, new_score, reason, created_at)
+           VALUES ($1, $2, 'badge_claimed', 0, COALESCE((SELECT reputation_score FROM users WHERE id = $2), 0), $3, NOW())"#
+    )
+    .bind(Uuid::new_v4())
+    .bind(claims.sub)
+    .bind(format!("Claimed badge: {}", badge_name))
+    .execute(state.db.pool())
+    .await;
+
+    Ok(Json(serde_json::json!({
+        "badge_id": badge_id,
+        "badge_name": badge_name,
+        "eligible": true,
+        "claimed": true,
+        "user_id": claims.sub,
+        "message": format!("Badge '{}' claimed successfully!", badge_name)
+    })))
 }
+

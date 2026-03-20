@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
 use sha3::{Sha3_256, Digest as Sha3Digest};
-use md5::{Md5, Digest as Md5Digest};
+use md5::Md5;
 use sha1::{Sha1, Digest as Sha1Digest};
 use blake2::{Blake2b512, Digest as BlakeDigest};
 use tokio::time::{timeout, sleep, interval};
@@ -14,7 +14,7 @@ use anyhow::{Result, anyhow};
 use tracing::{info, warn, error, debug, instrument};
 use thiserror::Error;
 
-use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, SeverityLevel, FileMetadata, AnalysisStatus, DetectionResult, EngineType};
+use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, SeverityLevel, ThreatCategory, FileMetadata, AnalysisStatus, DetectionResult, EngineType};
 
 /// Custom error types for hash analysis
 #[derive(Error, Debug)]
@@ -22,11 +22,11 @@ pub enum HashAnalysisError {
     #[error("Invalid hash format for {hash_type}: {hash}")]
     InvalidHash { hash_type: String, hash: String },
     
-    #[error("API timeout for source: {source}")]
-    ApiTimeout { source: String },
+    #[error("API timeout for source: {api_source}")]
+    ApiTimeout { api_source: String },
     
-    #[error("Rate limit exceeded for source: {source}")]
-    RateLimitExceeded { source: String },
+    #[error("Rate limit exceeded for source: {api_source}")]
+    RateLimitExceeded { api_source: String },
     
     #[error("Database error: {message}")]
     DatabaseError { message: String },
@@ -34,8 +34,8 @@ pub enum HashAnalysisError {
     #[error("Network error: {message}")]
     NetworkError { message: String },
     
-    #[error("API error from {source}: {status_code}")]
-    ApiError { source: String, status_code: u16 },
+    #[error("API error from {api_source}: {status_code}")]
+    ApiError { api_source: String, status_code: u16 },
     
     #[error("Configuration error: {message}")]
     ConfigError { message: String },
@@ -187,7 +187,7 @@ impl RateLimiter {
         
         self.semaphore.acquire().await
             .map_err(|_| HashAnalysisError::RateLimitExceeded { 
-                source: "Rate Limiter".to_string() 
+                api_source: "Rate Limiter".to_string() 
             })?;
         Ok(())
     }
@@ -512,14 +512,14 @@ impl HashAnalyzer {
         if hash.len() != expected_len {
             return Err(HashAnalysisError::InvalidHash {
                 hash_type: hash_type.to_string(),
-                hash: hash.clone(),
+                hash: hash.to_string(),
             });
         }
         
         if !hash.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err(HashAnalysisError::InvalidHash {
                 hash_type: hash_type.to_string(),
-                hash: hash.clone(),
+                hash: hash.to_string(),
             });
         }
         
@@ -595,7 +595,7 @@ impl HashAnalyzer {
 
         if !circuit_breaker.is_available().await {
             return Err(HashAnalysisError::ApiError {
-                source: source.to_string(),
+                api_source: source.to_string(),
                 status_code: 503, // Service Unavailable
             });
         }
@@ -645,7 +645,7 @@ impl HashAnalyzer {
                 .send()
         ).await
         .map_err(|_| HashAnalysisError::ApiTimeout { 
-            source: "VirusTotal".to_string() 
+            api_source: "VirusTotal".to_string() 
         })?
         .map_err(|e| HashAnalysisError::NetworkError { 
             message: format!("VirusTotal request failed: {}", e) 
@@ -674,10 +674,10 @@ impl HashAnalyzer {
                 query_time_ms: query_time,
             }),
             429 => Err(HashAnalysisError::RateLimitExceeded { 
-                source: "VirusTotal".to_string() 
+                api_source: "VirusTotal".to_string() 
             }),
             status => Err(HashAnalysisError::ApiError { 
-                source: "VirusTotal".to_string(), 
+                api_source: "VirusTotal".to_string(), 
                 status_code: status 
             }),
         }
@@ -780,7 +780,7 @@ impl HashAnalyzer {
                 .send()
         ).await
         .map_err(|_| HashAnalysisError::ApiTimeout { 
-            source: "MalwareBazaar".to_string() 
+            api_source: "MalwareBazaar".to_string() 
         })?
         .map_err(|e| HashAnalysisError::NetworkError { 
             message: format!("MalwareBazaar request failed: {}", e) 
@@ -851,7 +851,7 @@ impl HashAnalyzer {
             }
         } else {
             Err(HashAnalysisError::ApiError { 
-                source: "MalwareBazaar".to_string(), 
+                api_source: "MalwareBazaar".to_string(), 
                 status_code: response.status().as_u16() 
             })
         }
@@ -874,7 +874,7 @@ impl HashAnalyzer {
                 .send()
         ).await
         .map_err(|_| HashAnalysisError::ApiTimeout { 
-            source: "Hybrid Analysis".to_string() 
+            api_source: "Hybrid Analysis".to_string() 
         })?
         .map_err(|e| HashAnalysisError::NetworkError { 
             message: format!("Hybrid Analysis request failed: {}", e) 
@@ -940,10 +940,10 @@ impl HashAnalyzer {
             }
             404 => Ok(self.create_unknown_reputation("Hybrid Analysis", query_time)),
             429 => Err(HashAnalysisError::RateLimitExceeded { 
-                source: "Hybrid Analysis".to_string() 
+                api_source: "Hybrid Analysis".to_string() 
             }),
             status => Err(HashAnalysisError::ApiError { 
-                source: "Hybrid Analysis".to_string(), 
+                api_source: "Hybrid Analysis".to_string(), 
                 status_code: status 
             }),
         }
@@ -1184,7 +1184,16 @@ impl HashAnalyzer {
                 verdict: reputation.verdict,
                 confidence: weighted_confidence,
                 severity,
-                categories: reputation.threat_types.clone(),
+                categories: reputation.threat_types.iter().map(|s| {
+                    match s.as_str() {
+                        "trojan" => ThreatCategory::Trojan,
+                        "ransomware" => ThreatCategory::Ransomware,
+                        "worm" => ThreatCategory::Worm,
+                        "adware" => ThreatCategory::Adware,
+                        "spyware" => ThreatCategory::Spyware,
+                        _ => ThreatCategory::Unknown,
+                    }
+                }).collect(),
                 metadata,
                 detected_at: Utc::now(),
                 processing_time_ms: reputation.query_time_ms,
@@ -1272,7 +1281,7 @@ impl HashAnalyzer {
         }
         
         // Performance metrics
-        if let Ok(metrics) = self.metrics.lock().await {
+        if let Ok(metrics) = self.metrics.lock() {
             stats.insert("total_queries".to_string(), serde_json::Value::Number(metrics.total_queries.into()));
             stats.insert("cache_hit_rate".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(metrics.cache_hit_rate()).unwrap()));
             stats.insert("success_rate".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(metrics.success_rate()).unwrap()));
@@ -1324,11 +1333,12 @@ impl HashAnalyzer {
         info!("Starting bulk analysis for {} hashes", hash_infos.len());
         
         // Process hashes concurrently with semaphore limiting
-        let tasks = hash_infos.into_iter().map(|hash_info| {
-            self.analyze_hash(&hash_info, None)
-        });
+        let mut results = Vec::new();
+        for hash_info in &hash_infos {
+            results.push(self.analyze_hash(hash_info, None));
+        }
         
-        join_all(tasks).await
+        join_all(results).await
     }
 
     /// Get cache statistics (legacy method for compatibility)
@@ -1587,7 +1597,7 @@ mod tests {
         assert!(error.to_string().contains("Invalid hash format"));
         
         let error = HashAnalysisError::ApiTimeout {
-            source: "VirusTotal".to_string(),
+            api_source: "VirusTotal".to_string(),
         };
         assert!(error.to_string().contains("API timeout"));
     }

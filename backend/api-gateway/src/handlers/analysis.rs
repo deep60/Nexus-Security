@@ -204,19 +204,111 @@ pub async fn get_analyses_by_hash(
     Ok(Json(analyses))
 }
 
-/// Submit analysis
+/// Submit analysis (standalone, not via bounty route)
 pub async fn submit_analysis(
-    State(_state): State<AppState>,
-    Json(_payload): Json<serde_json::Value>,
+    State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
+    Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let bounty_id = payload.get("bounty_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    let file_hash = payload.get("file_hash")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let verdict = payload.get("verdict")
+        .and_then(|v| v.as_str())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    // Validate verdict value
+    if !["benign", "malicious", "suspicious"].contains(&verdict) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let confidence = payload.get("confidence")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
+
+    let analysis_id = Uuid::new_v4();
+    let now = chrono::Utc::now();
+
+    sqlx::query(
+        r#"INSERT INTO analyses (id, bounty_id, analyst_id, file_hash, verdict, confidence, status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $7)"#
+    )
+    .bind(analysis_id)
+    .bind(bounty_id)
+    .bind(claims.sub)
+    .bind(file_hash)
+    .bind(verdict)
+    .bind(confidence)
+    .bind(now)
+    .execute(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to insert analysis: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(serde_json::json!({
+        "id": analysis_id,
+        "bounty_id": bounty_id,
+        "analyst_id": claims.sub,
+        "verdict": verdict,
+        "confidence": confidence,
+        "status": "pending",
+        "created_at": now
+    })))
 }
 
-/// Dispute analysis
+/// Dispute an analysis result
 pub async fn dispute_analysis(
-    State(_state): State<AppState>,
-    Path(_analysis_id): Path<Uuid>,
-    Json(_payload): Json<serde_json::Value>,
+    State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
+    Path(analysis_id): Path<Uuid>,
+    Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    // Verify analysis exists
+    let analysis = sqlx::query_as::<_, AnalysisSummary>(
+        "SELECT id, file_hash, status, verdict, confidence::float8 as confidence, created_at, completed_at FROM analyses WHERE id = $1"
+    )
+    .bind(analysis_id)
+    .fetch_optional(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Can only dispute completed analyses
+    if analysis.status.as_deref() != Some("completed") {
+        return Err(StatusCode::CONFLICT);
+    }
+
+    let reason = payload.get("reason")
+        .and_then(|v| v.as_str())
+        .unwrap_or("No reason provided");
+
+    // Update analysis status to disputed
+    sqlx::query("UPDATE analyses SET status = 'disputed', updated_at = NOW() WHERE id = $1")
+        .bind(analysis_id)
+        .execute(state.db.pool())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to dispute analysis: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(serde_json::json!({
+        "analysis_id": analysis_id,
+        "status": "disputed",
+        "disputed_by": claims.sub,
+        "reason": reason,
+        "message": "Analysis has been disputed and flagged for review"
+    })))
 }
+

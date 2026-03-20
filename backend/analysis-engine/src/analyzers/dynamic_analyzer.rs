@@ -1,16 +1,52 @@
-use crate::models::{AnalysisResult, ThreatIndicator, ScanJob};
 use crate::sandbox::{Container, Monitor, ReportGenerator};
 use anyhow::{Context, Result};
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use tokio::fs;
-use tokio::process::Command;
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+/// Verdict for dynamic analysis (local to this module)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum Verdict {
+    Benign,
+    Suspicious,
+    Malicious,
+    Error,
+}
+
+/// Threat indicator produced by dynamic analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThreatIndicator {
+    pub indicator_type: String,
+    pub value: String,
+    pub severity: String,
+    pub description: String,
+    pub source: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+/// Scan job description for dynamic analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScanJob {
+    pub id: Uuid,
+    pub file_path: PathBuf,
+    pub priority: u8,
+}
+
+/// Result of a dynamic analysis run
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DynamicAnalysisResult {
+    pub analysis_id: Uuid,
+    pub engine_name: String,
+    pub verdict: Verdict,
+    pub confidence_score: f32,
+    pub threat_indicators: Vec<ThreatIndicator>,
+    pub metadata: HashMap<String, serde_json::Value>,
+    pub error_message: Option<String>,
+}
 
 /// Configuration for dynamic analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -238,7 +274,7 @@ impl DynamicAnalyzer {
     }
 
     /// Analyze a file dynamically in a sandbox environment
-    pub async fn analyze_file(&self, file_path: &Path, job: &ScanJob) -> Result<AnalysisResult> {
+    pub async fn analyze_file(&self, file_path: &Path, job: &ScanJob) -> Result<DynamicAnalysisResult> {
         let analysis_id = Uuid::new_v4();
         let start_time = Instant::now();
 
@@ -248,7 +284,15 @@ impl DynamicAnalyzer {
         let sandbox_id = self.create_sandbox(analysis_id).await
             .context("Failed to create sandbox environment")?;
 
-        let mut analysis_result = AnalysisResult::new(job.id.clone(), "dynamic_analyzer".to_string());
+        let mut analysis_result = DynamicAnalysisResult {
+            analysis_id,
+            engine_name: "dynamic_analyzer".to_string(),
+            verdict: Verdict::Benign,
+            confidence_score: 0.0,
+            threat_indicators: Vec::new(),
+            metadata: HashMap::new(),
+            error_message: None,
+        };
 
         match self.execute_dynamic_analysis(&sandbox_id, file_path, &analysis_id).await {
             Ok(behavior) => {
@@ -267,7 +311,7 @@ impl DynamicAnalyzer {
             }
             Err(e) => {
                 error!("Dynamic analysis failed for job {}: {}", job.id, e);
-                analysis_result.verdict = crate::models::Verdict::Error;
+                analysis_result.verdict = Verdict::Error;
                 analysis_result.error_message = Some(format!("Dynamic analysis failed: {}", e));
             }
         }
@@ -608,7 +652,7 @@ impl DynamicAnalyzer {
     }
 
     /// Determine the final verdict based on threat indicators
-    fn determine_verdict(&self, indicators: &DynamicThreatIndicators) -> crate::models::Verdict {
+    fn determine_verdict(&self, indicators: &DynamicThreatIndicators) -> Verdict {
         let total_indicators = indicators.malicious_network_connections.len()
             + indicators.suspicious_file_operations.len()
             + indicators.malicious_processes.len()
@@ -618,9 +662,9 @@ impl DynamicAnalyzer {
             + indicators.data_exfiltration_attempts.len();
 
         match total_indicators {
-            0 => crate::models::Verdict::Benign,
-            1..=3 => crate::models::Verdict::Suspicious,
-            _ => crate::models::Verdict::Malicious,
+            0 => Verdict::Benign,
+            1..=3 => Verdict::Suspicious,
+            _ => Verdict::Malicious,
         }
     }
 

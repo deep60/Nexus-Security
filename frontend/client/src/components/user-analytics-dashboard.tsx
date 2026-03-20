@@ -32,7 +32,7 @@ import {
   Trophy,
   Calendar,
 } from "lucide-react";
-import { LoadingStatCard } from "@/components/loading-skeleton";
+import { StatCardSkeleton } from "@/components/loading-skeleton";
 import { InlineErrorState } from "@/components/error-state";
 
 interface UserAnalyticsDashboardProps {
@@ -132,7 +132,7 @@ export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) 
       <div className="space-y-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
-            <LoadingStatCard key={i} />
+            <StatCardSkeleton key={i} />
           ))}
         </div>
       </div>

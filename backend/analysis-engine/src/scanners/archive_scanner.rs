@@ -125,6 +125,7 @@ pub struct ArchiveScanner {
     archive_extensions: Vec<String>,
 }
 
+#[async_trait::async_trait]
 impl Scanner for ArchiveScanner {
     type Config = ArchiveScannerConfig;
     type Result = ArchiveScanResult;

@@ -15,11 +15,19 @@ import Register from "@/pages/register";
 import Profile from "@/pages/profile";
 import AnalysisDetails from "@/pages/analysis-details";
 import NotFound from "@/pages/not-found";
+import HowItWorks from "@/pages/how-it-works";
+import Features from "@/pages/features";
+import UseCases from "@/pages/use-cases";
+import Pricing from "@/pages/pricing";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/how-it-works" component={HowItWorks} />
+      <Route path="/features" component={Features} />
+      <Route path="/use-cases" component={UseCases} />
+      <Route path="/pricing" component={Pricing} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/dashboard" component={Dashboard} />

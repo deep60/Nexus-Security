@@ -143,24 +143,67 @@ pub async fn get_transactions(
     }))
 }
 
-/// Connect wallet — handled by auth::collect_wallet with signature verification
+/// Connect wallet — verify signature and link address to user
 ///
 /// POST /api/v1/wallet/connect
 pub async fn connect_wallet(
-    State(_state): State<AppState>,
-    Json(_payload): Json<ConnectWalletRequest>,
+    State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
+    Json(payload): Json<ConnectWalletRequest>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    // Wallet connection with signature is handled by auth::collect_wallet
-    // This endpoint delegates to that implementation
-    Err(StatusCode::NOT_IMPLEMENTED)
+    // Verify signature: recover address from message + signature
+    let signature = payload.signature.parse::<ethers::types::Signature>()
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let recovered = signature.recover(payload.message.as_str())
+        .map_err(|e| {
+            tracing::warn!("Signature recovery failed: {}", e);
+            StatusCode::BAD_REQUEST
+        })?;
+
+    let recovered_addr = format!("{:?}", recovered);
+
+    // Check recovered address matches claimed address (case-insensitive)
+    if recovered_addr.to_lowercase() != payload.address.to_lowercase() {
+        tracing::warn!("Signature mismatch: recovered={}, claimed={}", recovered_addr, payload.address);
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    // Save wallet address to user record
+    sqlx::query("UPDATE users SET wallet_address = $1, updated_at = NOW() WHERE id = $2")
+        .bind(&payload.address)
+        .bind(claims.sub)
+        .execute(state.db.pool())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to update wallet address: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(serde_json::json!({
+        "address": payload.address,
+        "message": "Wallet connected successfully",
+        "user_id": claims.sub
+    })))
 }
 
-/// Disconnect wallet
+/// Disconnect wallet — remove address from user record
 ///
 /// POST /api/v1/wallet/disconnect
-pub async fn disconnect_wallet(State(_state): State<AppState>) -> Result<StatusCode, StatusCode> {
-    // Wallet disconnect is handled by auth::disconnect_wallet
-    Err(StatusCode::NOT_IMPLEMENTED)
+pub async fn disconnect_wallet(
+    State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
+) -> Result<StatusCode, StatusCode> {
+    sqlx::query("UPDATE users SET wallet_address = NULL, updated_at = NOW() WHERE id = $1")
+        .bind(claims.sub)
+        .execute(state.db.pool())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to disconnect wallet: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(StatusCode::OK)
 }
 
 /// Withdraw funds

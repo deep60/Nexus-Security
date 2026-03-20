@@ -168,3 +168,4 @@ fn webhook_routes() -> Router<AppState> {
         .route("/:webhook_id/deliveries", get(webhook::get_webhook_deliveries))
         .route("/events", get(webhook::list_available_events))
 }
+
