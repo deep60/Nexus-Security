@@ -1,4 +1,5 @@
 use axum::{
+    middleware,
     routing::{get, post, put, delete},
     Router,
 };
@@ -7,44 +8,55 @@ use crate::{
     handlers::{
         analysis, auth, bounty, health, reputation, submission, user, wallet, webhook,
     },
+    middleware::auth as auth_mw,
     AppState,
 };
 
 /// Create all routes for API v1
-/// Note: Global middleware (CORS, metrics, logging, auth) is applied in main.rs
+///
+/// Auth strategy:
+///   - Public groups (health, auth): no auth layer
+///   - Mixed groups (bounties, analysis, reputation): optional_auth — GETs work
+///     anonymously, POSTs that extract `Claims` still return 401 if no token
+///   - Protected groups (users, wallet, submissions, webhooks): strict auth —
+///     all requests without a valid JWT are rejected with 401
 pub fn create_routes(state: AppState) -> Router {
-    Router::new()
-        // Health check routes (public, no auth required)
+    // ── Public routes (no auth) ──────────────────────────
+    let public_routes = Router::new()
         .nest("/health", health_routes())
+        .nest("/auth", auth_routes());
 
-        // Authentication routes (public)
-        .nest("/auth", auth_routes())
-
-        // User routes (requires authentication)
-        .nest("/users", user_routes())
-
-        // Bounty routes (mixed auth)
+    // ── Mixed routes (optional auth) ─────────────────────
+    let mixed_routes = Router::new()
         .nest("/bounties", bounty_routes())
-
-        // Analysis routes (mixed auth)
         .nest("/analysis", analysis_routes())
-
-        // Submission routes (requires authentication)
-        .nest("/submissions", submission_routes())
-
-        // Wallet routes (requires authentication)
-        .nest("/wallet", wallet_routes())
-
-        // Reputation routes (public read, authenticated write)
         .nest("/reputation", reputation_routes())
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_mw::optional_auth_middleware,
+        ));
 
-        // Webhook routes (requires authentication)
+    // ── Protected routes (strict auth) ───────────────────
+    let protected_routes = Router::new()
+        .nest("/users", user_routes())
+        .nest("/wallet", wallet_routes())
+        .nest("/submissions", submission_routes())
         .nest("/webhooks", webhook_routes())
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_mw::auth_middleware,
+        ));
 
+    // Merge all route groups and attach state
+    Router::new()
+        .merge(public_routes)
+        .merge(mixed_routes)
+        .merge(protected_routes)
         .with_state(state)
 }
 
-/// Health check routes
+// ─── Public route groups ────────────────────────────────────────
+
 fn health_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(health::health_check))
@@ -53,7 +65,6 @@ fn health_routes() -> Router<AppState> {
         .route("/metrics", get(health::metrics))
 }
 
-/// Authentication routes
 fn auth_routes() -> Router<AppState> {
     Router::new()
         .route("/register", post(auth::register))
@@ -69,28 +80,17 @@ fn auth_routes() -> Router<AppState> {
         .route("/wallet/disconnect", post(auth::disconnect_wallet))
 }
 
-/// User routes
-fn user_routes() -> Router<AppState> {
-    Router::new()
-        .route("/me", get(user::get_current_user))
-        .route("/me", put(user::update_profile))
-        .route("/me/stats", get(user::get_user_stats))
-        .route("/:user_id", get(user::get_user_by_id))
-        .route("/:user_id/stats", get(user::get_user_stats_by_id))
-        .route("/me/api-keys", get(user::list_api_keys))
-        .route("/me/api-keys/:key_id", delete(user::revoke_api_key))
-}
+// ─── Mixed route groups (optional auth) ─────────────────────────
 
-/// Bounty routes
 fn bounty_routes() -> Router<AppState> {
     Router::new()
-        // Public routes (read-only)
+        // Public reads
         .route("/", get(bounty::list_bounties))
         .route("/:bounty_id", get(bounty::get_bounty))
         .route("/:bounty_id/stats", get(bounty::get_bounty_stats))
         .route("/active", get(bounty::list_active_bounties))
         .route("/completed", get(bounty::list_completed_bounties))
-        // Protected routes
+        // Writes — Claims extractor returns 401 if missing from extensions
         .route("/", post(bounty::create_bounty))
         .route("/:bounty_id", put(bounty::update_bounty))
         .route("/:bounty_id/cancel", post(bounty::cancel_bounty))
@@ -100,7 +100,6 @@ fn bounty_routes() -> Router<AppState> {
         .route("/:bounty_id/finalize", put(bounty::finalize_bounty))
 }
 
-/// Analysis routes
 fn analysis_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(analysis::list_analyses))
@@ -113,18 +112,29 @@ fn analysis_routes() -> Router<AppState> {
         .route("/:analysis_id/dispute", post(analysis::dispute_analysis))
 }
 
-/// Submission routes
-fn submission_routes() -> Router<AppState> {
+fn reputation_routes() -> Router<AppState> {
     Router::new()
-        .route("/", get(submission::list_submissions))
-        .route("/:submission_id", get(submission::get_submission))
-        .route("/", post(submission::create_submission))
-        .route("/:submission_id/vote", post(submission::vote_on_submission))
-        .route("/:submission_id/verify", post(submission::verify_submission))
-        .route("/my-submissions", get(submission::get_my_submissions))
+        .route("/leaderboard", get(reputation::get_leaderboard))
+        .route("/leaderboard/top", get(reputation::get_top_analysts))
+        .route("/user/:user_id", get(reputation::get_user_reputation))
+        .route("/badges", get(reputation::list_available_badges))
+        .route("/history/:user_id", get(reputation::get_reputation_history))
+        .route("/claim-badge", post(reputation::claim_badge))
 }
 
-/// Wallet routes
+// ─── Protected route groups (strict auth) ───────────────────────
+
+fn user_routes() -> Router<AppState> {
+    Router::new()
+        .route("/me", get(user::get_current_user))
+        .route("/me", put(user::update_profile))
+        .route("/me/stats", get(user::get_user_stats))
+        .route("/:user_id", get(user::get_user_by_id))
+        .route("/:user_id/stats", get(user::get_user_stats_by_id))
+        .route("/me/api-keys", get(user::list_api_keys))
+        .route("/me/api-keys/:key_id", delete(user::revoke_api_key))
+}
+
 fn wallet_routes() -> Router<AppState> {
     Router::new()
         .route("/connect", post(wallet::connect_wallet))
@@ -137,20 +147,16 @@ fn wallet_routes() -> Router<AppState> {
         .route("/claim-rewards", post(wallet::claim_rewards))
 }
 
-/// Reputation routes
-fn reputation_routes() -> Router<AppState> {
+fn submission_routes() -> Router<AppState> {
     Router::new()
-        // Public routes
-        .route("/leaderboard", get(reputation::get_leaderboard))
-        .route("/leaderboard/top", get(reputation::get_top_analysts))
-        .route("/user/:user_id", get(reputation::get_user_reputation))
-        .route("/badges", get(reputation::list_available_badges))
-        .route("/history/:user_id", get(reputation::get_reputation_history))
-        // Protected routes
-        .route("/claim-badge", post(reputation::claim_badge))
+        .route("/", get(submission::list_submissions))
+        .route("/:submission_id", get(submission::get_submission))
+        .route("/", post(submission::create_submission))
+        .route("/:submission_id/vote", post(submission::vote_on_submission))
+        .route("/:submission_id/verify", post(submission::verify_submission))
+        .route("/my-submissions", get(submission::get_my_submissions))
 }
 
-/// Webhook routes
 fn webhook_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(webhook::list_webhooks))

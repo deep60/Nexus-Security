@@ -15,7 +15,7 @@ pub async fn start(service: Arc<PaymentService>) -> Result<()> {
 
         // Query pending transactions from DB
         let pending = sqlx::query_as::<_, PendingTx>(
-            "SELECT id, tx_hash FROM transactions WHERE status = 'pending' AND tx_hash IS NOT NULL LIMIT 50"
+            "SELECT id, transaction_hash as tx_hash FROM payment_transactions WHERE status = 'pending' AND transaction_hash IS NOT NULL LIMIT 50"
         )
         .fetch_all(service.db_pool())
         .await;
@@ -31,7 +31,7 @@ pub async fn start(service: Arc<PaymentService>) -> Result<()> {
                                 "failed"
                             };
                             let _ = sqlx::query(
-                                "UPDATE transactions SET status = $1, block_number = $2, updated_at = NOW() WHERE id = $3"
+                                "UPDATE payment_transactions SET status = $1, block_number = $2, confirmed_at = NOW() WHERE id = $3"
                             )
                             .bind(status)
                             .bind(receipt.block_number.map(|n| n.as_u64() as i64))

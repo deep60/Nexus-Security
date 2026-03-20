@@ -183,11 +183,13 @@ pub async fn create_bounty(
     };
 
     match state.blockchain.create_bounty(bc_params).await {
-        Ok(tx_hash) => {
+        Ok((tx_hash, on_chain_id)) => {
             let hash_str = format!("{:?}", tx_hash);
-            if let Err(e) = state.db.update_bounty_on_chain_id(bounty.id, &hash_str).await {
-                tracing::warn!("Bounty created on-chain but failed to store tx hash: {}", e);
+            let chain_id = on_chain_id.as_u64() as i64;
+            if let Err(e) = state.db.update_bounty_on_chain_id(bounty.id, &hash_str, chain_id).await {
+                tracing::warn!("Bounty created on-chain but failed to store on_chain_id: {}", e);
             }
+            tracing::info!("Bounty {} mapped to on-chain ID {}", bounty.id, chain_id);
         }
         Err(e) => {
             tracing::warn!("On-chain bounty creation failed (DB record exists): {}", e);
@@ -236,14 +238,25 @@ pub async fn get_bounty(
     Ok(Json(bounty))
 }
 
-// TODO: Rewrite to match actual Bounty model
 pub async fn submit_analysis(
     State(state): State<crate::AppState>,
     Path(bounty_id): Path<Uuid>,
     Json(request): Json<SubmitAnalysisRequest>,
 ) -> Result<Json<SubmissionResponse>, StatusCode> {
-    use crate::services::blockchain::{SubmitAnalysisParams};
+    use crate::services::blockchain::SubmitAnalysisParams;
     use ethers::types::U256;
+
+    // Look up the real on-chain bounty ID from DB (contract uses incremental IDs, not UUIDs)
+    let on_chain_id = state.db.get_bounty_on_chain_id(bounty_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("DB error looking up on_chain_id: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or_else(|| {
+            tracing::error!("Bounty {} has no on_chain_id — not yet confirmed on-chain", bounty_id);
+            StatusCode::PRECONDITION_FAILED
+        })?;
 
     // Map verdict string to uint8 enum value
     let verdict: u8 = match request.verdict.as_str() {
@@ -254,7 +267,7 @@ pub async fn submit_analysis(
     };
 
     let params = SubmitAnalysisParams {
-        bounty_id: U256::from(bounty_id.as_u128()),
+        bounty_id: U256::from(on_chain_id as u64),
         verdict,
         confidence: U256::from((request.confidence * 100.0) as u64),
         stake_amount: U256::from(request.stake_amount),
@@ -279,14 +292,25 @@ pub async fn submit_analysis(
     }))
 }
 
-// TODO: Rewrite to match actual Bounty model
 pub async fn finalize_bounty(
     State(state): State<crate::AppState>,
     Path(bounty_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
     use ethers::types::U256;
 
-    let on_chain_id = U256::from(bounty_id.as_u128());
+    // Look up the real on-chain bounty ID from DB (contract uses incremental IDs, not UUIDs)
+    let chain_id = state.db.get_bounty_on_chain_id(bounty_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("DB error looking up on_chain_id: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or_else(|| {
+            tracing::error!("Bounty {} has no on_chain_id — not yet confirmed on-chain", bounty_id);
+            StatusCode::PRECONDITION_FAILED
+        })?;
+
+    let on_chain_id = U256::from(chain_id as u64);
 
     state.blockchain.resolve_bounty(on_chain_id).await.map_err(|e| {
         tracing::error!("Failed to finalize bounty on-chain: {}", e);

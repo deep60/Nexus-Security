@@ -147,9 +147,8 @@ impl BlockchainSyncService {
 
     /// Get events from a specific block
     async fn get_block_events(&self, block_number: u64) -> Result<Vec<BlockchainEvent>, SyncError> {
-        // Use the blockchain service client to fetch event logs
-        // This implementation fetches BountyManager contract logs for the block
-        use ethers::types::{Filter, BlockNumber, H256};
+        use ethers::types::{Filter, BlockNumber, H256, U256, Address};
+        use ethers::abi::{ParamType, decode as abi_decode};
 
         let client = self.blockchain.get_client();
         let filter = Filter::new()
@@ -164,18 +163,147 @@ impl BlockchainSyncService {
         let events: Vec<BlockchainEvent> = logs
             .iter()
             .filter_map(|log| {
-                let event_type = classify_event_topic(log.topics.first()?);
+                let event_type = classify_event_topic(log.topics.first()?)?;
                 let tx_hash = log.transaction_hash.map(|h| format!("{:?}", h)).unwrap_or_default();
 
+                // ── Decode indexed topics ──
+                // topic[0] = event signature hash
+                // topic[1..] = indexed params (uint256 → U256, address → Address)
+                let bounty_id = log.topics.get(1)
+                    .map(|t| U256::from(t.as_bytes()))
+                    .map(|id| id.to_string());
+
+                // For events with 2 indexed params: topic[2] is address (creator/analyst)
+                let indexed_address = log.topics.get(2)
+                    .map(|t| {
+                        // Address is stored right-padded in 32 bytes; take last 20 bytes
+                        let bytes = t.as_bytes();
+                        let addr = Address::from_slice(&bytes[12..]);
+                        format!("{:?}", addr)
+                    });
+
+                // ── Decode non-indexed data from log.data ──
+                let data = match event_type {
+                    // BountyCreated: data = (string artifactHash, uint256 reward, uint256 deadline)
+                    BlockchainEventType::BountyCreated => {
+                        let decoded = abi_decode(
+                            &[ParamType::String, ParamType::Uint(256), ParamType::Uint(256)],
+                            &log.data,
+                        ).ok();
+
+                        let artifact_hash = decoded.as_ref()
+                            .and_then(|d| d.get(0))
+                            .and_then(|t| t.clone().into_string());
+                        let reward = decoded.as_ref()
+                            .and_then(|d| d.get(1))
+                            .and_then(|t| t.clone().into_uint())
+                            .map(|u| u.to_string());
+                        let deadline = decoded.as_ref()
+                            .and_then(|d| d.get(2))
+                            .and_then(|t| t.clone().into_uint())
+                            .map(|u| u.to_string());
+
+                        serde_json::json!({
+                            "bounty_id": bounty_id,
+                            "creator": indexed_address,
+                            "artifact_hash": artifact_hash,
+                            "reward": reward,
+                            "deadline": deadline,
+                            "log_index": log.log_index,
+                            "address": format!("{:?}", log.address),
+                        })
+                    },
+
+                    // AnalysisSubmitted: data = (uint8 verdict, uint256 stake, uint256 confidence)
+                    BlockchainEventType::SubmissionStaked => {
+                        let decoded = abi_decode(
+                            &[ParamType::Uint(8), ParamType::Uint(256), ParamType::Uint(256)],
+                            &log.data,
+                        ).ok();
+
+                        let verdict = decoded.as_ref()
+                            .and_then(|d| d.get(0))
+                            .and_then(|t| t.clone().into_uint())
+                            .map(|u| u.as_u64());
+                        let stake = decoded.as_ref()
+                            .and_then(|d| d.get(1))
+                            .and_then(|t| t.clone().into_uint())
+                            .map(|u| u.to_string());
+                        let confidence = decoded.as_ref()
+                            .and_then(|d| d.get(2))
+                            .and_then(|t| t.clone().into_uint())
+                            .map(|u| u.to_string());
+
+                        serde_json::json!({
+                            "bounty_id": bounty_id,
+                            "analyst": indexed_address,
+                            "verdict": verdict,
+                            "stake_amount": stake,
+                            "confidence": confidence,
+                            "log_index": log.log_index,
+                            "address": format!("{:?}", log.address),
+                        })
+                    },
+
+                    // ConsensusReached: data = (uint8 consensus, uint256 confidenceScore, uint256 totalAnalyses)
+                    BlockchainEventType::ConsensusReached => {
+                        let decoded = abi_decode(
+                            &[ParamType::Uint(8), ParamType::Uint(256), ParamType::Uint(256)],
+                            &log.data,
+                        ).ok();
+
+                        let consensus = decoded.as_ref()
+                            .and_then(|d| d.get(0))
+                            .and_then(|t| t.clone().into_uint())
+                            .map(|u| u.as_u64());
+                        let confidence_score = decoded.as_ref()
+                            .and_then(|d| d.get(1))
+                            .and_then(|t| t.clone().into_uint())
+                            .map(|u| u.to_string());
+                        let total_analyses = decoded.as_ref()
+                            .and_then(|d| d.get(2))
+                            .and_then(|t| t.clone().into_uint())
+                            .map(|u| u.to_string());
+
+                        serde_json::json!({
+                            "bounty_id": bounty_id,
+                            "consensus_verdict": consensus,
+                            "confidence_score": confidence_score,
+                            "total_analyses": total_analyses,
+                            "log_index": log.log_index,
+                            "address": format!("{:?}", log.address),
+                        })
+                    },
+
+                    // RewardsDistributed: data = (address[] winners, uint256[] rewards, uint256[] stakes)
+                    // Dynamic arrays — complex ABI decoding
+                    BlockchainEventType::PayoutDistributed => {
+                        // For dynamic arrays, just store raw hex and decode later
+                        let raw_hex: String = log.data.iter().map(|b| format!("{:02x}", b)).collect();
+                        serde_json::json!({
+                            "bounty_id": bounty_id,
+                            "raw_data": format!("0x{}", raw_hex),
+                            "log_index": log.log_index,
+                            "address": format!("{:?}", log.address),
+                        })
+                    },
+
+                    // Other events — store what we can
+                    _ => {
+                        serde_json::json!({
+                            "bounty_id": bounty_id,
+                            "log_index": log.log_index,
+                            "address": format!("{:?}", log.address),
+                        })
+                    },
+                };
+
                 Some(BlockchainEvent {
-                    event_type: event_type?,
+                    event_type,
                     block_number,
                     transaction_hash: tx_hash,
                     timestamp: chrono::Utc::now().timestamp(),
-                    data: serde_json::json!({
-                        "log_index": log.log_index,
-                        "address": format!("{:?}", log.address),
-                    }),
+                    data,
                 })
             })
             .collect();
@@ -216,62 +344,76 @@ impl BlockchainSyncService {
     }
 
     /// Handle BountyCreated event
-    /// Event: BountyCreated(uint256 indexed bountyId, address indexed creator, string artifactHash, uint256 rewardAmount, uint256 deadline)
+    /// Decoded: bounty_id, creator, artifact_hash, reward, deadline
     async fn handle_bounty_created(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
-        info!("Processing BountyCreated event in block {}", event.block_number);
-        
-        // Topic[1] = bountyId (indexed), Topic[2] = creator (indexed)
-        // Non-indexed data: artifactHash, rewardAmount, deadline
-        if let Some(on_chain_id) = event.data.get("bounty_id").and_then(|v| v.as_str()) {
-            info!("On-chain bounty {} created, tx: {}", on_chain_id, event.transaction_hash);
-            // In production: look up DB bounty by blockchain_tx_hash and update status to Active
-        }
+        let bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let creator = event.data.get("creator").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let artifact_hash = event.data.get("artifact_hash").and_then(|v| v.as_str()).unwrap_or("");
+        let reward = event.data.get("reward").and_then(|v| v.as_str()).unwrap_or("0");
 
+        info!(
+            "BountyCreated: id={}, creator={}, artifact={}, reward={}, tx={}",
+            bounty_id, creator, artifact_hash, reward, event.transaction_hash
+        );
+
+        // TODO: look up DB bounty by blockchain_tx_hash and update on_chain_id + status to Active
         Ok(())
     }
 
     /// Handle BountyFunded event
     async fn handle_bounty_funded(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
-        info!("Processing BountyFunded event in block {}, tx: {}", event.block_number, event.transaction_hash);
-        // BountyFunded is implicit in createBounty (transferFrom happens in createBounty)
-        // No additional DB update needed beyond what handle_bounty_created does
+        let bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+        info!("BountyFunded: id={}, tx={}", bounty_id, event.transaction_hash);
+        // Funding is implicit in createBounty (transferFrom) — no additional DB update needed
         Ok(())
     }
 
-    /// Handle SubmissionStaked event
-    /// Event: AnalysisSubmitted(uint256 indexed bountyId, address indexed analyst, uint8 verdict, uint256 stakeAmount, uint256 confidence)
+    /// Handle SubmissionStaked (AnalysisSubmitted) event
+    /// Decoded: bounty_id, analyst, verdict, stake_amount, confidence
     async fn handle_submission_staked(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
-        info!("Processing AnalysisSubmitted event in block {}", event.block_number);
-        
         let bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
         let analyst = event.data.get("analyst").and_then(|v| v.as_str()).unwrap_or("unknown");
-        info!("Analysis submitted for bounty {} by {}, tx: {}", bounty_id, analyst, event.transaction_hash);
-        // In production: create or update submission record in DB with on-chain confirmation
+        let verdict = event.data.get("verdict").and_then(|v| v.as_u64()).unwrap_or(0);
+        let stake = event.data.get("stake_amount").and_then(|v| v.as_str()).unwrap_or("0");
+        let confidence = event.data.get("confidence").and_then(|v| v.as_str()).unwrap_or("0");
 
+        info!(
+            "AnalysisSubmitted: bounty={}, analyst={}, verdict={}, stake={}, confidence={}, tx={}",
+            bounty_id, analyst, verdict, stake, confidence, event.transaction_hash
+        );
+
+        // TODO: create or update submission record in DB with on-chain confirmation
         Ok(())
     }
 
     /// Handle ConsensusReached event
-    /// Event: ConsensusReached(uint256 indexed bountyId, uint8 verdict, uint256 confidenceScore, uint256 totalAnalyses)
+    /// Decoded: bounty_id, consensus_verdict, confidence_score, total_analyses
     async fn handle_consensus_reached(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
-        info!("Processing ConsensusReached event in block {}", event.block_number);
-        
         let bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
-        info!("Consensus reached for bounty {}, tx: {}", bounty_id, event.transaction_hash);
-        // In production: update bounty status to Completed, store consensus verdict
+        let verdict = event.data.get("consensus_verdict").and_then(|v| v.as_u64()).unwrap_or(0);
+        let confidence = event.data.get("confidence_score").and_then(|v| v.as_str()).unwrap_or("0");
+        let total = event.data.get("total_analyses").and_then(|v| v.as_str()).unwrap_or("0");
 
+        info!(
+            "ConsensusReached: bounty={}, verdict={}, confidence={}, analyses={}, tx={}",
+            bounty_id, verdict, confidence, total, event.transaction_hash
+        );
+
+        // TODO: update bounty status to Completed, store consensus verdict
         Ok(())
     }
 
-    /// Handle PayoutDistributed event
-    /// Event: RewardsDistributed(uint256 indexed bountyId, address[] winners, uint256[] rewards, uint256[] stakes)
+    /// Handle PayoutDistributed (RewardsDistributed) event
+    /// Decoded: bounty_id (from topic), raw_data (dynamic arrays not yet decoded)
     async fn handle_payout_distributed(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
-        info!("Processing RewardsDistributed event in block {}", event.block_number);
-        
         let bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
-        info!("Rewards distributed for bounty {}, tx: {}", bounty_id, event.transaction_hash);
-        // In production: create payout records for each winner
 
+        info!(
+            "RewardsDistributed: bounty={}, tx={}",
+            bounty_id, event.transaction_hash
+        );
+
+        // TODO: decode raw_data dynamic arrays and create payout records for each winner
         Ok(())
     }
 

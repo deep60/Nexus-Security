@@ -25,8 +25,14 @@ ALTER TABLE bounties ADD COLUMN IF NOT EXISTS escrow_address VARCHAR(42);
 ALTER TABLE bounties ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
 ALTER TABLE bounties ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 
--- Rename creator_id to creator if needed (keep both for compatibility)
--- ALTER TABLE bounties RENAME COLUMN creator_id TO creator;
+-- Rename creator_id to creator (model uses 'creator')
+ALTER TABLE bounties RENAME COLUMN creator_id TO creator;
+-- Copy reward_amount data into total_reward, then drop old column
+UPDATE bounties SET total_reward = COALESCE(reward_amount::text, '0') WHERE total_reward = '0' OR total_reward IS NULL;
+ALTER TABLE bounties DROP COLUMN IF EXISTS reward_amount;
+-- Rename file_hash to something that doesn't conflict (model doesn't use it directly)
+-- The model stores hash info in metadata; keep file_hash for backward compat but don't require it
+-- Rename expires_at references: initial schema used 'deadline' so no rename needed
 
 -- ============================================
 -- Extend analyses table

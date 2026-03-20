@@ -227,7 +227,22 @@ async fn main() -> Result<()> {
     };
 
     // Create router with all routes and middleware
-    let app = routes::create_router(state);
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PUT,
+            axum::http::Method::DELETE,
+            axum::http::Method::PATCH,
+            axum::http::Method::OPTIONS,
+        ])
+        .allow_headers(Any);
+
+    let app = routes::create_router(state)
+        .layer(TraceLayer::new_for_http())
+        .layer(cors)
+        .layer(DefaultBodyLimit::max(10 * 1024 * 1024)); // 10MB
 
     // Create server address
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));

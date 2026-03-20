@@ -1255,8 +1255,8 @@
       ]
     },
     "/Users/arjun/Developer/Nexus-Security/blockchain/contracts/core/BountyManager.sol": {
-      "lastModificationDate": 1764213571779,
-      "contentHash": "e18f416b944bea7c5f035e4208588338",
+      "lastModificationDate": 1773819435823,
+      "contentHash": "e6a917afbeb13eb510841fa827f53def",
       "sourceName": "contracts/core/BountyManager.sol",
       "solcConfig": {
         "version": "0.8.28",

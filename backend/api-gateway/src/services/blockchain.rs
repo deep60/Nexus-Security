@@ -196,7 +196,8 @@ impl BlockchainService {
 
     /// Create a new bounty on the blockchain
     /// ABI: createBounty(string artifactHash, string artifactType, uint256 rewardAmount, uint256 deadline, string description) returns (uint256)
-    pub async fn create_bounty(&self, params: CreateBountyParams) -> Result<H256> {
+    /// Returns (tx_hash, on_chain_bounty_id) — the on-chain ID is the contract's incremental bountyCounter
+    pub async fn create_bounty(&self, params: CreateBountyParams) -> Result<(H256, U256)> {
         let tx = self.contracts.bounty_manager
             .method::<_, U256>("createBounty", (
                 params.artifact_hash,
@@ -220,8 +221,30 @@ impl BlockchainService {
             None,
         ).await;
 
-        tracing::info!("Created bounty transaction: {:?}", tx_hash);
-        Ok(tx_hash)
+        // Wait for receipt and parse BountyCreated event to get the on-chain bounty ID.
+        // BountyCreated(uint256 indexed bountyId, address indexed creator, string artifactHash, uint256 reward, uint256 deadline)
+        // The bountyId is topic[1] (first indexed param after the event signature in topic[0]).
+        let receipt = pending_tx
+            .await
+            .context("Failed waiting for create bounty receipt")?
+            .ok_or_else(|| anyhow::anyhow!("No receipt for create bounty tx"))?;
+
+        let on_chain_id = receipt.logs.iter()
+            .find_map(|log| {
+                // BountyCreated event: topic[0] = event sig, topic[1] = bountyId (indexed uint256)
+                if log.topics.len() >= 2 {
+                    Some(U256::from(log.topics[1].as_bytes()))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| {
+                tracing::warn!("Could not parse BountyCreated event, defaulting on_chain_id to 0");
+                U256::zero()
+            });
+
+        tracing::info!("Created bounty tx: {:?}, on_chain_id: {}", tx_hash, on_chain_id);
+        Ok((tx_hash, on_chain_id))
     }
 
     /// Submit analysis for a bounty

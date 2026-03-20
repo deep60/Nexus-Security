@@ -149,7 +149,7 @@ impl DatabaseService {
                 required_consensus, minimum_reputation,
                 deadline, auto_finalize, requires_human_analysis,
                 file_types_allowed, max_file_size, tags, metadata,
-                blockchain_tx_hash, escrow_address,
+                blockchain_tx_hash, on_chain_id, escrow_address,
                 created_at, updated_at, started_at, completed_at
             "#,
         )
@@ -181,16 +181,18 @@ impl DatabaseService {
         Ok(bounty)
     }
 
-    /// Store the on-chain bounty ID (incremental counter from BountyManager)
+    /// Store the on-chain bounty ID (incremental counter from BountyManager) and tx hash
     pub async fn update_bounty_on_chain_id(
         &self,
         bounty_id: Uuid,
         tx_hash: &str,
+        on_chain_id: i64,
     ) -> Result<()> {
         sqlx::query(
-            "UPDATE bounties SET blockchain_tx_hash = $1, updated_at = $2 WHERE id = $3"
+            "UPDATE bounties SET blockchain_tx_hash = $1, on_chain_id = $2, updated_at = $3 WHERE id = $4"
         )
         .bind(tx_hash)
+        .bind(on_chain_id)
         .bind(Utc::now())
         .bind(bounty_id)
         .execute(&self.pool)
@@ -200,13 +202,36 @@ impl DatabaseService {
         Ok(())
     }
 
+    /// Look up the on-chain bounty ID for a given DB bounty UUID.
+    /// Returns None if the bounty hasn't been submitted on-chain yet.
+    pub async fn get_bounty_on_chain_id(&self, bounty_id: Uuid) -> Result<Option<i64>> {
+        let row: Option<(Option<i64>,)> = sqlx::query_as(
+            "SELECT on_chain_id FROM bounties WHERE id = $1"
+        )
+        .bind(bounty_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to fetch bounty on_chain_id")?;
+
+        Ok(row.and_then(|r| r.0))
+    }
+
     pub async fn get_bounty_by_id(&self, bounty_id: Uuid) -> Result<Option<Bounty>> {
         let bounty = sqlx::query_as::<_, Bounty>(
             r#"
             SELECT
-                id, title, description, reward_amount, creator_id,
-                status as "status: BountyStatus", target_hash, target_url,
-                target_type, expires_at, created_at, updated_at
+                id, creator, creator_address, title, description,
+                bounty_type as "bounty_type: BountyType",
+                priority as "priority: BountyPriority",
+                status as "status: BountyStatus",
+                total_reward, minimum_stake,
+                distribution_method as "distribution_method: DistributionMethod",
+                max_participants, current_participants,
+                required_consensus, minimum_reputation,
+                deadline, auto_finalize, requires_human_analysis,
+                file_types_allowed, max_file_size, tags, metadata,
+                blockchain_tx_hash, on_chain_id, escrow_address,
+                created_at, updated_at, started_at, completed_at
             FROM bounties
             WHERE id = $1
             "#,
@@ -223,11 +248,20 @@ impl DatabaseService {
         let bounties = sqlx::query_as::<_, Bounty>(
             r#"
             SELECT
-                id, title, description, reward_amount, creator_id,
-                status as "status: BountyStatus", target_hash, target_url,
-                target_type, expires_at, created_at, updated_at
+                id, creator, creator_address, title, description,
+                bounty_type as "bounty_type: BountyType",
+                priority as "priority: BountyPriority",
+                status as "status: BountyStatus",
+                total_reward, minimum_stake,
+                distribution_method as "distribution_method: DistributionMethod",
+                max_participants, current_participants,
+                required_consensus, minimum_reputation,
+                deadline, auto_finalize, requires_human_analysis,
+                file_types_allowed, max_file_size, tags, metadata,
+                blockchain_tx_hash, on_chain_id, escrow_address,
+                created_at, updated_at, started_at, completed_at
             FROM bounties
-            WHERE status = $1 AND expires_at > $2
+            WHERE status = $1 AND (deadline IS NULL OR deadline > $2)
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
             "#,
@@ -247,11 +281,20 @@ impl DatabaseService {
         let bounties = sqlx::query_as::<_, Bounty>(
             r#"
             SELECT
-                id, title, description, reward_amount, creator_id,
-                status as "status: BountyStatus", target_hash, target_url,
-                target_type, expires_at, created_at, updated_at
+                id, creator, creator_address, title, description,
+                bounty_type as "bounty_type: BountyType",
+                priority as "priority: BountyPriority",
+                status as "status: BountyStatus",
+                total_reward, minimum_stake,
+                distribution_method as "distribution_method: DistributionMethod",
+                max_participants, current_participants,
+                required_consensus, minimum_reputation,
+                deadline, auto_finalize, requires_human_analysis,
+                file_types_allowed, max_file_size, tags, metadata,
+                blockchain_tx_hash, on_chain_id, escrow_address,
+                created_at, updated_at, started_at, completed_at
             FROM bounties
-            WHERE creator_id = $1
+            WHERE creator = $1
             ORDER BY created_at DESC
             "#,
         )
