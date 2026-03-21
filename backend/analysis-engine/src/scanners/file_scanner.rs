@@ -276,9 +276,9 @@ impl FileScanner {
 
         // Check magic bytes
         match &data[0..2] {
-            b"MZ" => FileType::Executable, // PE/DOS executable
-            b"PK" => FileType::Archive,    // ZIP
-            [0x7f, 0x45] if data.len() > 4 && &data[1..4] == b"ELF" => FileType::Executable, // ELF
+            b"MZ" => return FileType::Executable, // PE/DOS executable
+            b"PK" => return FileType::Archive,    // ZIP
+            [0x7f, 0x45] if data.len() > 4 && &data[1..4] == b"ELF" => return FileType::Executable, // ELF
             _ => {}
         }
 
@@ -353,8 +353,8 @@ impl FileScanner {
         }
 
         match &data[0..2] {
-            b"MZ" => "application/x-msdownload".to_string(),
-            b"PK" => "application/zip".to_string(),
+            b"MZ" => return "application/x-msdownload".to_string(),
+            b"PK" => return "application/zip".to_string(),
             _ => {}
         }
 

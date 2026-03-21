@@ -221,7 +221,8 @@ impl FileHandler {
         let mut entries = async_fs::read_dir(&self.storage_path).await?;
         
         while let Some(entry) = entries.next_entry().await? {
-            let file_name = entry.file_name().to_str().unwrap_or("");
+            let os_file_name = entry.file_name();
+            let file_name = os_file_name.to_str().unwrap_or("");
             if file_name.ends_with(".meta") {
                 let file_id = file_name.trim_end_matches(".meta");
                 if let Ok(metadata) = self.get_metadata(file_id).await {

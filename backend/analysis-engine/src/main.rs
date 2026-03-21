@@ -24,6 +24,7 @@ mod scanners;
 mod sandbox;
 mod queue;
 
+use crate::scanners::Scanner;
 use crate::analyzers::{AnalysisEngine, AnalysisEngineConfig, FileAnalysisRequest, AnalysisOptions, AnalysisPriority};
 use crate::analyzers::hash_analyzer::{HashInfo, HashType};
 use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, FileMetadata};
@@ -384,7 +385,7 @@ async fn perform_url_analysis(
     // Use URL scanner to analyze the URL
     let scan_result = state.url_scanner.scan(url.as_bytes(), None).await?;
 
-    info!("URL analysis completed for: {} - Risk Level: {:?}", analysis_id, scan_result.risk_level);
+    info!("URL analysis completed for: {} - Verdict: {:?}", analysis_id, scan_result.base.verdict);
 
     // TODO: Store URL scan results in database with proper AnalysisResult structure
 

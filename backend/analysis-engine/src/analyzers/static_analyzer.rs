@@ -632,13 +632,13 @@ impl StaticAnalyzer {
         Ok(PEAnalysis {
             machine_type: format!("{:?}", pe.header.coff_header.machine),
             timestamp: Some(pe.header.coff_header.time_date_stamp),
-            entry_point: pe.entry,
+            entry_point: pe.entry as u32,
             sections,
             imports,
             exports,
             resources,
             is_packed,
-            is_signed: pe.is_signed,
+            is_signed: false, // goblin doesn't expose is_signed directly
             entropy: overall_entropy,
             suspicious_imports,
             packer_signatures,

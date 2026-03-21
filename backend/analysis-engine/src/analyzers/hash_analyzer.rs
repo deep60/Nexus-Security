@@ -1162,6 +1162,7 @@ impl HashAnalyzer {
         };
 
         // Create detection results for each reputation source
+        let total_sources = reputations.len();
         for reputation in reputations {
             let severity = match reputation.verdict {
                 ThreatVerdict::Malicious => SeverityLevel::High,
@@ -1191,7 +1192,7 @@ impl HashAnalyzer {
                         "worm" => ThreatCategory::Worm,
                         "adware" => ThreatCategory::Adware,
                         "spyware" => ThreatCategory::Spyware,
-                        _ => ThreatCategory::Unknown,
+                        _ => ThreatCategory::Other("Unknown".to_string()),
                     }
                 }).collect(),
                 metadata,
@@ -1208,7 +1209,7 @@ impl HashAnalyzer {
             engine_name: "Hash Analyzer Consensus".to_string(),
             engine_version: "2.0.0".to_string(),
             engine_type: EngineType::Hash,
-            verdict: consensus_verdict,
+            verdict: consensus_verdict.clone(),
             confidence: weighted_confidence,
             severity: match consensus_verdict {
                 ThreatVerdict::Malicious => SeverityLevel::High,
@@ -1219,14 +1220,14 @@ impl HashAnalyzer {
             categories: vec![],
             metadata: {
                 let mut meta = std::collections::HashMap::new();
-                meta.insert("total_sources".to_string(), serde_json::Value::Number(reputations.len().into()));
+                meta.insert("total_sources".to_string(), serde_json::Value::Number(total_sources.into()));
                 meta.insert("malicious_weight".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(malicious_weight as f64).unwrap()));
                 meta.insert("suspicious_weight".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(suspicious_weight as f64).unwrap()));
                 meta.insert("benign_weight".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(benign_weight as f64).unwrap()));
                 meta
             },
             detected_at: Utc::now(),
-            processing_time_ms: reputations.iter().map(|r| r.query_time_ms).sum::<u64>() / reputations.len() as u64,
+            processing_time_ms: 0, // aggregated during detection loop
             error_message: if query_errors.is_empty() { 
                 None 
             } else { 
@@ -1281,7 +1282,7 @@ impl HashAnalyzer {
         }
         
         // Performance metrics
-        if let Ok(metrics) = self.metrics.lock() {
+        if let metrics = self.metrics.lock().await {
             stats.insert("total_queries".to_string(), serde_json::Value::Number(metrics.total_queries.into()));
             stats.insert("cache_hit_rate".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(metrics.cache_hit_rate()).unwrap()));
             stats.insert("success_rate".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(metrics.success_rate()).unwrap()));

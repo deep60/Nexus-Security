@@ -7,5 +7,6 @@ use crate::AppState;
 /// Create the main router with API v1
 pub fn create_router(state: AppState) -> Router {
     Router::new()
-        .nest("/api/v1", v1::create_routes(state))
+        .nest("/api/v1", v1::create_routes(state.clone()))
+        .nest("/api", v1::create_routes(state))
 }

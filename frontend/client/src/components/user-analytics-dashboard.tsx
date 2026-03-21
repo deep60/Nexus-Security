@@ -76,7 +76,7 @@ export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) 
     { date: "Thu", reputation: 91, submissions: 4 },
     { date: "Fri", reputation: 93, submissions: 2 },
     { date: "Sat", reputation: 95, submissions: 3 },
-    { date: "Sun", reputation: parseFloat(user?.reputation || "95"), submissions: 1 },
+    { date: "Sun", reputation: parseFloat(String(user?.reputation || "95")), submissions: 1 },
   ];
 
   // Submission outcomes pie chart data

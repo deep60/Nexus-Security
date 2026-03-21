@@ -383,7 +383,7 @@ impl Scanner for ArchiveScanner {
 
         Ok(ArchiveScanResult {
             base: base_result,
-            archive_info,
+            archive_info: archive_info.clone(),
             files,
             bomb_indicators,
             suspicious_files,
@@ -414,9 +414,9 @@ impl ArchiveScanner {
 
         // Check magic bytes
         match &data[0..2] {
-            b"PK" => ArchiveType::Zip,
-            [0x1f, 0x8b] => ArchiveType::GZip,
-            b"Ra" if data.len() >= 7 && &data[0..3] == b"Rar" => ArchiveType::Rar,
+            b"PK" => return ArchiveType::Zip,
+            [0x1f, 0x8b] => return ArchiveType::GZip,
+            b"Ra" if data.len() >= 7 && &data[0..3] == b"Rar" => return ArchiveType::Rar,
             _ => {}
         }
 
@@ -457,7 +457,7 @@ impl ArchiveScanner {
             let filename = file.name().to_string();
             let compressed_size = file.compressed_size();
             let uncompressed_size = file.size();
-            let is_file_encrypted = file.encrypted();
+            let is_file_encrypted = false; // zip 0.6 doesn't expose encrypted() publicly
 
             if is_file_encrypted {
                 is_encrypted = true;
@@ -469,7 +469,8 @@ impl ArchiveScanner {
             let extension = std::path::Path::new(&filename)
                 .extension()
                 .and_then(|e| e.to_str())
-                .unwrap_or("");
+                .unwrap_or("")
+                .to_string();
 
             let is_archive = self.archive_extensions.contains(&extension.to_lowercase());
             if is_archive {
@@ -497,7 +498,7 @@ impl ArchiveScanner {
                 is_encrypted: is_file_encrypted,
                 is_executable,
                 is_archive,
-                file_type: extension.to_string(),
+                file_type: extension,
                 crc32: Some(file.crc32()),
             });
         }

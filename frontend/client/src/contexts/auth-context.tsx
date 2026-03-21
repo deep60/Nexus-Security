@@ -23,6 +23,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Helper – returns the stored JWT (if any) */
+export function getAuthToken(): string | null {
+  return localStorage.getItem("token");
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,30 +39,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuthStatus = async () => {
     try {
-      const sessionId = localStorage.getItem("sessionId");
-      if (!sessionId) {
+      const token = getAuthToken();
+      if (!token) {
         setIsLoading(false);
         return;
       }
 
-      // Validate session with backend
+      // Validate token with backend
       const response = await fetch("/api/auth/me", {
         headers: {
-          Authorization: `Bearer ${sessionId}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
       if (response.ok) {
         const userData = await response.json();
-        setUser(userData);
+        // Handle both { user: ... } and direct user object
+        setUser(userData.user || userData);
       } else {
-        // Session expired or invalid
-        localStorage.removeItem("sessionId");
+        // Token expired or invalid
+        localStorage.removeItem("token");
         localStorage.removeItem("user");
       }
     } catch (error) {
       console.error("Auth check failed:", error);
-      localStorage.removeItem("sessionId");
+      localStorage.removeItem("token");
       localStorage.removeItem("user");
     } finally {
       setIsLoading(false);
@@ -74,17 +80,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Login failed");
+        throw new Error(error.error || error.message || "Login failed");
       }
 
       const data = await response.json();
-      setUser(data.user);
-      localStorage.setItem("sessionId", data.sessionId);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      const userData = data.user || data;
+      const token = data.token || data.sessionId; // accept both JWT and legacy sessionId
+
+      setUser(userData);
+      if (token) localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(userData));
 
       toast({
         title: "Welcome back!",
-        description: `Logged in as ${data.user.username}`,
+        description: `Logged in as ${userData.username}`,
       });
     } catch (error: any) {
       toast({
@@ -106,13 +115,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Registration failed");
+        throw new Error(error.error || error.message || "Registration failed");
       }
 
       const data = await response.json();
-      setUser(data.user);
-      localStorage.setItem("sessionId", data.sessionId);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      const userData = data.user || data;
+      const token = data.token || data.sessionId;
+
+      setUser(userData);
+      if (token) localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(userData));
 
       toast({
         title: "Account created!",
@@ -130,12 +142,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      const sessionId = localStorage.getItem("sessionId");
-      if (sessionId) {
+      const token = getAuthToken();
+      if (token) {
         await fetch("/api/auth/logout", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${sessionId}`,
+            Authorization: `Bearer ${token}`,
           },
         });
       }
@@ -143,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Logout error:", error);
     } finally {
       setUser(null);
-      localStorage.removeItem("sessionId");
+      localStorage.removeItem("token");
       localStorage.removeItem("user");
       toast({
         title: "Logged out",
@@ -170,21 +182,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const walletAddress = accounts[0];
 
       // Update wallet address via API
-      const sessionId = localStorage.getItem("sessionId");
-      if (sessionId) {
-        const response = await fetch("/api/auth/wallet", {
-          method: "PATCH",
+      const token = getAuthToken();
+      if (token) {
+        const response = await fetch("/api/auth/wallet/connect", {
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${sessionId}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ walletAddress }),
         });
 
         if (response.ok) {
           const updatedUser = await response.json();
-          setUser(updatedUser);
-          localStorage.setItem("user", JSON.stringify(updatedUser));
+          const userData = updatedUser.user || updatedUser;
+          setUser(userData);
+          localStorage.setItem("user", JSON.stringify(userData));
         }
       }
 
@@ -203,21 +216,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const disconnectWallet = async () => {
     try {
-      const sessionId = localStorage.getItem("sessionId");
-      if (sessionId) {
-        const response = await fetch("/api/auth/wallet", {
-          method: "PATCH",
+      const token = getAuthToken();
+      if (token) {
+        const response = await fetch("/api/auth/wallet/disconnect", {
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${sessionId}`,
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ walletAddress: null }),
         });
 
         if (response.ok) {
           const updatedUser = await response.json();
-          setUser(updatedUser);
-          localStorage.setItem("user", JSON.stringify(updatedUser));
+          const userData = updatedUser.user || updatedUser;
+          setUser(userData);
+          localStorage.setItem("user", JSON.stringify(userData));
 
           toast({
             title: "Wallet disconnected",

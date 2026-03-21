@@ -7,6 +7,7 @@ interface WebSocketMessage {
 
 export function useWebSocket(onMessage?: (message: WebSocketMessage) => void) {
   const [isConnected, setIsConnected] = useState(false);
+  const [lastMessage, setLastMessage] = useState<MessageEvent | null>(null);
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export function useWebSocket(onMessage?: (message: WebSocketMessage) => void) {
     };
 
     ws.current.onmessage = (event) => {
+      setLastMessage(event);
       try {
         const message = JSON.parse(event.data);
         onMessage?.(message);
@@ -45,5 +47,5 @@ export function useWebSocket(onMessage?: (message: WebSocketMessage) => void) {
     }
   };
 
-  return { isConnected, sendMessage };
+  return { isConnected, sendMessage, lastMessage };
 }

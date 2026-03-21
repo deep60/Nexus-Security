@@ -8,6 +8,7 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '5000', 10),
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  apiGatewayUrl: process.env.API_GATEWAY_URL || 'http://localhost:8080',
 
   // Database
   databaseUrl: process.env.DATABASE_URL || '',

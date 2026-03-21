@@ -84,7 +84,7 @@ impl Container {
         config: &DynamicAnalyzerConfig,
     ) -> Result<SandboxContainerConfig> {
         let memory_limit = format!("{}m", config.resource_limits.max_memory_mb);
-        let cpu_quota = format!("{}", config.resource_limits.max_cpu_percent * 1000);
+        let cpu_quota = format!("{}", config.resource_limits.max_cpu_percent as u32 * 1000);
 
         let network_mode = if config.network_config.internet_access {
             "bridge".to_string()

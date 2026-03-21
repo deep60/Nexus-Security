@@ -283,10 +283,10 @@ fn calculate_verdict(
         }
     }
 
-    let avg_confidence = confidence_sum / total_detections;
+    let avg_confidence = confidence_sum / total_detections as f32;
     let is_malicious = malicious_count > benign_count;
 
-    (is_malicious, avg_confidence)
+    (is_malicious, avg_confidence as f64)
 }
 
 /// Store analysis results in database

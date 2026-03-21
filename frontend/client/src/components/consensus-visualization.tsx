@@ -176,7 +176,6 @@ export function ConsensusVisualization({ consensus }: ConsensusVisualizationProp
               <Progress
                 value={(maliciousVotes / totalEngines) * 100}
                 className="h-3"
-                indicatorClassName="bg-destructive"
               />
               <div className="text-xs text-muted-foreground mt-1">
                 {((maliciousVotes / totalEngines) * 100).toFixed(1)}%
@@ -195,7 +194,6 @@ export function ConsensusVisualization({ consensus }: ConsensusVisualizationProp
               <Progress
                 value={(suspiciousVotes / totalEngines) * 100}
                 className="h-3"
-                indicatorClassName="bg-yellow-500"
               />
               <div className="text-xs text-muted-foreground mt-1">
                 {((suspiciousVotes / totalEngines) * 100).toFixed(1)}%
@@ -214,7 +212,6 @@ export function ConsensusVisualization({ consensus }: ConsensusVisualizationProp
               <Progress
                 value={(cleanVotes / totalEngines) * 100}
                 className="h-3"
-                indicatorClassName="bg-green-500"
               />
               <div className="text-xs text-muted-foreground mt-1">
                 {((cleanVotes / totalEngines) * 100).toFixed(1)}%

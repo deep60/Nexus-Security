@@ -274,7 +274,7 @@ impl DynamicAnalyzer {
     }
 
     /// Analyze a file dynamically in a sandbox environment
-    pub async fn analyze_file(&self, file_path: &Path, job: &ScanJob) -> Result<DynamicAnalysisResult> {
+    pub async fn analyze_file(&mut self, file_path: &Path, job: &ScanJob) -> Result<DynamicAnalysisResult> {
         let analysis_id = Uuid::new_v4();
         let start_time = Instant::now();
 
@@ -325,7 +325,7 @@ impl DynamicAnalyzer {
     }
 
     /// Create an isolated sandbox environment
-    async fn create_sandbox(&self, analysis_id: Uuid) -> Result<String> {
+    async fn create_sandbox(&mut self, analysis_id: Uuid) -> Result<String> {
         debug!("Creating sandbox for analysis {}", analysis_id);
         
         let sandbox_config = self.container_manager.create_sandbox_config(&self.config)?;
@@ -689,7 +689,7 @@ impl DynamicAnalyzer {
     }
 
     /// Cleanup sandbox environment
-    async fn cleanup_sandbox(&self, sandbox_id: &str) -> Result<()> {
+    async fn cleanup_sandbox(&mut self, sandbox_id: &str) -> Result<()> {
         debug!("Cleaning up sandbox {}", sandbox_id);
         self.container_manager.remove_container(sandbox_id).await
     }

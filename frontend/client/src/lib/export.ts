@@ -44,7 +44,7 @@ export function exportToCSV<T extends Record<string, any>>(
         formatted[col.label] = col.format ? col.format(value) : value;
       });
       return formatted;
-    });
+    }) as T[];
   }
 
   // Convert to CSV
@@ -79,7 +79,7 @@ export function exportToJSON<T extends Record<string, any>>(
         formatted[col.key] = col.format ? col.format(value) : value;
       });
       return formatted;
-    });
+    }) as T[];
   }
 
   // Convert to JSON (pretty print)
@@ -177,7 +177,7 @@ export function exportToExcel<T extends Record<string, any>>(
         formatted[col.label] = col.format ? col.format(value) : value;
       });
       return formatted;
-    });
+    }) as T[];
   }
 
   // Create worksheet

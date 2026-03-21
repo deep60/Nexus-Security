@@ -31,15 +31,15 @@ import { StatCardSkeleton } from "@/components/loading-skeleton";
 import { InlineErrorState } from "@/components/error-state";
 
 export function PlatformAnalytics() {
-  const { data: stats, isLoading, isError } = useQuery({
+  const { data: stats, isLoading, isError } = useQuery<any>({
     queryKey: ['/api/stats'],
   });
 
-  const { data: submissions = [] } = useQuery({
+  const { data: submissions = [] } = useQuery<any[]>({
     queryKey: ['/api/submissions'],
   });
 
-  const { data: engines = [] } = useQuery({
+  const { data: engines = [] } = useQuery<any[]>({
     queryKey: ['/api/engines'],
   });
 
