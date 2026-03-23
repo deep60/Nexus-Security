@@ -5,7 +5,7 @@ use sqlx::{FromRow, PgPool, Row};
 use uuid::Uuid;
 
 use crate::models::{
-    analysis::{AnalysisResult, AnalysisStatus, ThreatVerdict},
+    analysis::AnalysisResult,
     bounty::{Bounty, BountyStatus, CreateBountyRequest},
     user::{User, UserRole},
 };
@@ -30,7 +30,10 @@ impl DatabaseService {
         &self.pool
     }
 
+    // ═══════════════════════════════════════════════
     // User operations
+    // ═══════════════════════════════════════════════
+
     pub async fn create_user(
         &self,
         wallet_address: &str,
@@ -108,7 +111,10 @@ impl DatabaseService {
         Ok(())
     }
 
-    // Bounty operations
+    // ═══════════════════════════════════════════════
+    // Bounty operations — matches `bounties` table
+    // ═══════════════════════════════════════════════
+
     pub async fn create_bounty(
         &self,
         request: CreateBountyRequest,
@@ -117,61 +123,42 @@ impl DatabaseService {
         let now = Utc::now();
         let bounty_id = Uuid::new_v4();
         let deadline = request.deadline_hours.map(|h| now + chrono::Duration::hours(h as i64));
+        let min_stake = request.min_stake_amount.unwrap_or_else(|| "0".to_string());
+        let consensus = request.consensus_threshold.unwrap_or(0.60);
+        let priority = request.priority_level.unwrap_or(1);
+        let requires_verification = request.requires_verification.unwrap_or(false);
 
         let bounty = sqlx::query_as::<_, Bounty>(
             r#"
             INSERT INTO bounties (
-                id, creator, creator_address, title, description, bounty_type, priority,
-                status, total_reward, minimum_stake, distribution_method,
-                max_participants, current_participants, required_consensus,
-                minimum_reputation, deadline, auto_finalize, requires_human_analysis,
-                file_types_allowed, max_file_size, tags, metadata,
-                blockchain_tx_hash, escrow_address, created_at, updated_at,
-                started_at, completed_at
+                id, creator_id, submission_id, title, description,
+                reward_amount, min_stake_amount, max_participants,
+                deadline, bounty_status, requires_verification,
+                priority_level, consensus_threshold,
+                created_at, updated_at
             )
             VALUES (
-                $1, $2, '', $3, $4, $5, $6,
-                'active', $7, $8, $9,
-                $10, 0, $11,
-                $12, $13, $14, $15,
-                $16, $17, $18, $19,
-                NULL, NULL, $20, $21,
-                NULL, NULL
+                $1, $2, $3, $4, $5,
+                $6, $7, $8,
+                $9, 'active', $10,
+                $11, $12,
+                $13, $14
             )
-            RETURNING
-                id, creator, creator_address, title, description,
-                bounty_type as "bounty_type: BountyType",
-                priority as "priority: BountyPriority",
-                status as "status: BountyStatus",
-                total_reward, minimum_stake,
-                distribution_method as "distribution_method: DistributionMethod",
-                max_participants, current_participants,
-                required_consensus, minimum_reputation,
-                deadline, auto_finalize, requires_human_analysis,
-                file_types_allowed, max_file_size, tags, metadata,
-                blockchain_tx_hash, on_chain_id, escrow_address,
-                created_at, updated_at, started_at, completed_at
+            RETURNING *
             "#,
         )
         .bind(bounty_id)
         .bind(creator_id)
+        .bind(request.submission_id)
         .bind(&request.title)
         .bind(&request.description)
-        .bind(&request.bounty_type)
-        .bind(&request.priority)
-        .bind(&request.total_reward)
-        .bind(&request.minimum_stake)
-        .bind(&request.distribution_method)
+        .bind(&request.reward_amount)
+        .bind(&min_stake)
         .bind(request.max_participants)
-        .bind(request.required_consensus.unwrap_or(70.0))
-        .bind(request.minimum_reputation.unwrap_or(0.0))
         .bind(deadline)
-        .bind(request.auto_finalize.unwrap_or(true))
-        .bind(request.requires_human_analysis.unwrap_or(false))
-        .bind(request.file_types_allowed.as_deref().unwrap_or(&[]))
-        .bind(request.max_file_size)
-        .bind(request.tags.as_deref().unwrap_or(&[]))
-        .bind(request.metadata.unwrap_or(serde_json::Value::Object(serde_json::Map::new())))
+        .bind(requires_verification)
+        .bind(priority)
+        .bind(consensus)
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -203,7 +190,6 @@ impl DatabaseService {
     }
 
     /// Look up the on-chain bounty ID for a given DB bounty UUID.
-    /// Returns None if the bounty hasn't been submitted on-chain yet.
     pub async fn get_bounty_on_chain_id(&self, bounty_id: Uuid) -> Result<Option<i64>> {
         let row: Option<(Option<i64>,)> = sqlx::query_as(
             "SELECT on_chain_id FROM bounties WHERE id = $1"
@@ -219,20 +205,7 @@ impl DatabaseService {
     pub async fn get_bounty_by_id(&self, bounty_id: Uuid) -> Result<Option<Bounty>> {
         let bounty = sqlx::query_as::<_, Bounty>(
             r#"
-            SELECT
-                id, creator, creator_address, title, description,
-                bounty_type as "bounty_type: BountyType",
-                priority as "priority: BountyPriority",
-                status as "status: BountyStatus",
-                total_reward, minimum_stake,
-                distribution_method as "distribution_method: DistributionMethod",
-                max_participants, current_participants,
-                required_consensus, minimum_reputation,
-                deadline, auto_finalize, requires_human_analysis,
-                file_types_allowed, max_file_size, tags, metadata,
-                blockchain_tx_hash, on_chain_id, escrow_address,
-                created_at, updated_at, started_at, completed_at
-            FROM bounties
+            SELECT * FROM bounties
             WHERE id = $1
             "#,
         )
@@ -247,26 +220,12 @@ impl DatabaseService {
     pub async fn get_active_bounties(&self, limit: i64, offset: i64) -> Result<Vec<Bounty>> {
         let bounties = sqlx::query_as::<_, Bounty>(
             r#"
-            SELECT
-                id, creator, creator_address, title, description,
-                bounty_type as "bounty_type: BountyType",
-                priority as "priority: BountyPriority",
-                status as "status: BountyStatus",
-                total_reward, minimum_stake,
-                distribution_method as "distribution_method: DistributionMethod",
-                max_participants, current_participants,
-                required_consensus, minimum_reputation,
-                deadline, auto_finalize, requires_human_analysis,
-                file_types_allowed, max_file_size, tags, metadata,
-                blockchain_tx_hash, on_chain_id, escrow_address,
-                created_at, updated_at, started_at, completed_at
-            FROM bounties
-            WHERE status = $1 AND (deadline IS NULL OR deadline > $2)
+            SELECT * FROM bounties
+            WHERE bounty_status = 'active' AND (deadline IS NULL OR deadline > $1)
             ORDER BY created_at DESC
-            LIMIT $3 OFFSET $4
+            LIMIT $2 OFFSET $3
             "#,
         )
-        .bind(BountyStatus::Active as BountyStatus)
         .bind(Utc::now())
         .bind(limit)
         .bind(offset)
@@ -280,21 +239,8 @@ impl DatabaseService {
     pub async fn get_bounties_by_creator(&self, creator_id: Uuid) -> Result<Vec<Bounty>> {
         let bounties = sqlx::query_as::<_, Bounty>(
             r#"
-            SELECT
-                id, creator, creator_address, title, description,
-                bounty_type as "bounty_type: BountyType",
-                priority as "priority: BountyPriority",
-                status as "status: BountyStatus",
-                total_reward, minimum_stake,
-                distribution_method as "distribution_method: DistributionMethod",
-                max_participants, current_participants,
-                required_consensus, minimum_reputation,
-                deadline, auto_finalize, requires_human_analysis,
-                file_types_allowed, max_file_size, tags, metadata,
-                blockchain_tx_hash, on_chain_id, escrow_address,
-                created_at, updated_at, started_at, completed_at
-            FROM bounties
-            WHERE creator = $1
+            SELECT * FROM bounties
+            WHERE creator_id = $1
             ORDER BY created_at DESC
             "#,
         )
@@ -306,15 +252,15 @@ impl DatabaseService {
         Ok(bounties)
     }
 
-    pub async fn update_bounty_status(&self, bounty_id: Uuid, status: BountyStatus) -> Result<()> {
+    pub async fn update_bounty_status(&self, bounty_id: Uuid, status: &str) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE bounties
-            SET status = $1, updated_at = $2
+            SET bounty_status = $1, updated_at = $2
             WHERE id = $3
             "#,
         )
-        .bind(status as BountyStatus)
+        .bind(status)
         .bind(Utc::now())
         .bind(bounty_id)
         .execute(&self.pool)
@@ -324,39 +270,37 @@ impl DatabaseService {
         Ok(())
     }
 
-    // Analysis operations
+    // ═══════════════════════════════════════════════
+    // Analysis operations — matches `analysis_results` table
+    // ═══════════════════════════════════════════════
+
     pub async fn create_analysis_result(
         &self,
-        bounty_id: Uuid,
-        analyzer_id: Option<Uuid>,
-        engine_name: &str,
-        verdict: ThreatVerdict,
-        confidence_score: f32,
-        metadata: serde_json::Value,
+        engine_id: Uuid,
+        submission_id: Uuid,
+        bounty_id: Option<Uuid>,
+        verdict: &str,
+        confidence_score: f64,
+        detailed_report: serde_json::Value,
     ) -> Result<AnalysisResult> {
         let analysis = sqlx::query_as::<_, AnalysisResult>(
             r#"
             INSERT INTO analysis_results (
-                id, bounty_id, analyzer_id, engine_name, verdict,
-                confidence_score, metadata, status, created_at, updated_at
+                id, engine_id, submission_id, bounty_id,
+                verdict, confidence_score, detailed_report,
+                analysis_status, created_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING
-                id, bounty_id, analyzer_id, engine_name,
-                verdict as "verdict: ThreatVerdict", confidence_score,
-                metadata, status as "status: AnalysisStatus",
-                created_at, updated_at
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', $8)
+            RETURNING *
             "#,
         )
         .bind(Uuid::new_v4())
+        .bind(engine_id)
+        .bind(submission_id)
         .bind(bounty_id)
-        .bind(analyzer_id)
-        .bind(engine_name)
-        .bind(verdict as ThreatVerdict)
+        .bind(verdict)
         .bind(confidence_score)
-        .bind(metadata)
-        .bind(AnalysisStatus::Completed as AnalysisStatus)
-        .bind(Utc::now())
+        .bind(detailed_report)
         .bind(Utc::now())
         .fetch_one(&self.pool)
         .await
@@ -371,12 +315,7 @@ impl DatabaseService {
     ) -> Result<Vec<AnalysisResult>> {
         let results = sqlx::query_as::<_, AnalysisResult>(
             r#"
-            SELECT
-                id, bounty_id, analyzer_id, engine_name,
-                verdict as "verdict: ThreatVerdict", confidence_score,
-                metadata, status as "status: AnalysisStatus",
-                created_at, updated_at
-            FROM analysis_results
+            SELECT * FROM analysis_results
             WHERE bounty_id = $1
             ORDER BY created_at DESC
             "#,
@@ -389,31 +328,29 @@ impl DatabaseService {
         Ok(results)
     }
 
-    pub async fn get_analysis_results_by_analyzer(
+    pub async fn get_analysis_results_by_engine(
         &self,
-        analyzer_id: Uuid,
+        engine_id: Uuid,
     ) -> Result<Vec<AnalysisResult>> {
         let results = sqlx::query_as::<_, AnalysisResult>(
             r#"
-            SELECT
-                id, bounty_id, analyzer_id, engine_name,
-                verdict as "verdict: ThreatVerdict", confidence_score,
-                metadata, status as "status: AnalysisStatus",
-                created_at, updated_at
-            FROM analysis_results
-            WHERE analyzer_id = $1
+            SELECT * FROM analysis_results
+            WHERE engine_id = $1
             ORDER BY created_at DESC
             "#,
         )
-        .bind(analyzer_id)
+        .bind(engine_id)
         .fetch_all(&self.pool)
         .await
-        .context("Failed to fetch analysis results by analyzer")?;
+        .context("Failed to fetch analysis results by engine")?;
 
         Ok(results)
     }
 
+    // ═══════════════════════════════════════════════
     // Consensus and reputation operations
+    // ═══════════════════════════════════════════════
+
     pub async fn calculate_consensus_for_bounty(
         &self,
         bounty_id: Uuid,
@@ -422,12 +359,12 @@ impl DatabaseService {
             r#"
             SELECT
                 COUNT(*) as total_analyses,
-                AVG(confidence_score) as avg_confidence,
+                AVG(confidence_score::float) as avg_confidence,
                 COUNT(CASE WHEN verdict = 'malicious' THEN 1 END) as malicious_count,
                 COUNT(CASE WHEN verdict = 'benign' THEN 1 END) as benign_count,
                 COUNT(CASE WHEN verdict = 'suspicious' THEN 1 END) as suspicious_count
             FROM analysis_results
-            WHERE bounty_id = $1 AND status = 'completed'
+            WHERE bounty_id = $1 AND analysis_status = 'completed'
             "#,
         )
         .bind(bounty_id)
@@ -446,11 +383,11 @@ impl DatabaseService {
             r#"
             SELECT
                 COUNT(*) as total_analyses,
-                AVG(confidence_score) as avg_confidence,
+                AVG(confidence_score::float) as avg_confidence,
                 COUNT(CASE WHEN verdict = 'malicious' THEN 1 END) as malicious_detections,
                 COUNT(CASE WHEN verdict = 'benign' THEN 1 END) as benign_detections
             FROM analysis_results
-            WHERE analyzer_id = $1 AND status = 'completed'
+            WHERE analyzer_id = $1 AND analysis_status = 'completed'
             "#,
         )
         .bind(user_id)
@@ -461,7 +398,10 @@ impl DatabaseService {
         Ok(stats)
     }
 
+    // ═══════════════════════════════════════════════
     // Transaction management
+    // ═══════════════════════════════════════════════
+
     pub async fn begin_transaction(&self) -> Result<sqlx::Transaction<'_, sqlx::Postgres>> {
         self.pool
             .begin()
@@ -482,13 +422,11 @@ impl DatabaseService {
     // === Submission-related methods (stubs for compilation) ===
 
     /// Get analysis result by ID
-    /// TODO: Implement actual database query
     pub async fn get_analysis_result(&self, _analysis_id: Uuid) -> Result<AnalysisResult> {
         anyhow::bail!("get_analysis_result not yet implemented")
     }
 
     /// Store file metadata
-    /// TODO: Implement actual database insert
     pub async fn store_file_metadata(
         &self,
         _file_id: Uuid,
@@ -498,7 +436,6 @@ impl DatabaseService {
     }
 
     /// Get file info by hash
-    /// TODO: Implement actual database query
     pub async fn get_file_info(
         &self,
         _file_hash: &str,
@@ -507,7 +444,6 @@ impl DatabaseService {
     }
 
     /// Create extended submission
-    /// TODO: Implement actual database insert
     pub async fn create_extended_submission(
         &self,
         _submission: &crate::models::bounty::BountySubmission,
@@ -516,7 +452,6 @@ impl DatabaseService {
     }
 
     /// Get submissions with filters
-    /// TODO: Implement actual database query with filtering
     pub async fn get_submissions_with_filters(
         &self,
         _filters: &crate::handlers::submission::SubmissionFilters,
@@ -527,7 +462,6 @@ impl DatabaseService {
     }
 
     /// Get extended submission by ID
-    /// TODO: Implement actual database query
     pub async fn get_extended_submission_by_id(
         &self,
         _submission_id: Uuid,
@@ -536,7 +470,6 @@ impl DatabaseService {
     }
 
     /// Update submission
-    /// TODO: Implement actual database update
     pub async fn update_submission(
         &self,
         _submission_id: Uuid,
@@ -546,7 +479,6 @@ impl DatabaseService {
     }
 
     /// Delete submission
-    /// TODO: Implement actual database delete
     pub async fn delete_submission(&self, _submission_id: Uuid) -> Result<()> {
         anyhow::bail!("delete_submission not yet implemented")
     }
@@ -563,7 +495,7 @@ pub struct ConsensusResult {
 }
 
 impl ConsensusResult {
-    pub fn get_consensus_verdict(&self) -> Option<ThreatVerdict> {
+    pub fn get_consensus_verdict(&self) -> Option<String> {
         let malicious = self.malicious_count.unwrap_or(0);
         let benign = self.benign_count.unwrap_or(0);
         let suspicious = self.suspicious_count.unwrap_or(0);
@@ -574,11 +506,11 @@ impl ConsensusResult {
         }
 
         if malicious > benign && malicious > suspicious {
-            Some(ThreatVerdict::Malicious)
+            Some("malicious".to_string())
         } else if benign > malicious && benign > suspicious {
-            Some(ThreatVerdict::Benign)
+            Some("benign".to_string())
         } else {
-            Some(ThreatVerdict::Suspicious)
+            Some("suspicious".to_string())
         }
     }
 

@@ -1,6 +1,6 @@
 /**
  * Unit Tests for Storage Layer
- * Tests the MemStorage implementation
+ * Tests the MemStorage implementation against the canonical Drizzle schema.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -18,7 +18,7 @@ describe('MemStorage - User Operations', () => {
     const userData: InsertUser = {
       username: 'testuser',
       email: 'test@example.com',
-      password: 'hashedpassword123',
+      passwordHash: 'hashedpassword123',
     };
 
     const user = await storage.createUser(userData);
@@ -27,16 +27,15 @@ describe('MemStorage - User Operations', () => {
     expect(user.id).toBeDefined();
     expect(user.username).toBe('testuser');
     expect(user.email).toBe('test@example.com');
-    expect(user.reputation).toBe('0');
-    expect(user.totalStaked).toBe('0');
-    expect(user.totalEarned).toBe('0');
+    expect(user.reputationScore).toBe(0);
+    expect(user.totalSubmissions).toBe(0);
   });
 
   it('should get user by email', async () => {
     const userData: InsertUser = {
       username: 'testuser',
       email: 'test@example.com',
-      password: 'hashedpassword123',
+      passwordHash: 'hashedpassword123',
     };
 
     const createdUser = await storage.createUser(userData);
@@ -51,7 +50,7 @@ describe('MemStorage - User Operations', () => {
     const userData: InsertUser = {
       username: 'testuser',
       email: 'test@example.com',
-      password: 'hashedpassword123',
+      passwordHash: 'hashedpassword123',
     };
 
     const createdUser = await storage.createUser(userData);
@@ -66,7 +65,7 @@ describe('MemStorage - User Operations', () => {
     const userData: InsertUser = {
       username: 'testuser',
       email: 'test@example.com',
-      password: 'hashedpassword123',
+      passwordHash: 'hashedpassword123',
     };
 
     const createdUser = await storage.createUser(userData);
@@ -80,18 +79,18 @@ describe('MemStorage - User Operations', () => {
     const userData: InsertUser = {
       username: 'testuser',
       email: 'test@example.com',
-      password: 'hashedpassword123',
+      passwordHash: 'hashedpassword123',
     };
 
     const createdUser = await storage.createUser(userData);
     const updated = await storage.updateUser(createdUser.id, {
       walletAddress: '0x1234567890abcdef',
-      reputation: '100',
+      reputationScore: 100,
     });
 
     expect(updated).toBeDefined();
     expect(updated?.walletAddress).toBe('0x1234567890abcdef');
-    expect(updated?.reputation).toBe('100');
+    expect(updated?.reputationScore).toBe(100);
   });
 
   it('should return undefined for non-existent user', async () => {
@@ -112,16 +111,16 @@ describe('MemStorage - Security Engine Operations', () => {
 
     expect(engines.length).toBeGreaterThan(0);
     expect(engines[0]).toHaveProperty('name');
-    expect(engines[0]).toHaveProperty('type');
-    expect(engines[0]).toHaveProperty('accuracy');
+    expect(engines[0]).toHaveProperty('engineType');
+    expect(engines[0]).toHaveProperty('accuracyRate');
   });
 
   it('should create a security engine', async () => {
     const engineData: InsertSecurityEngine = {
       name: 'Test Engine',
-      type: 'automated',
+      engineType: 'automated',
       description: 'Test description',
-      status: 'online',
+      isActive: true,
       ownerId: null,
     };
 
@@ -130,8 +129,8 @@ describe('MemStorage - Security Engine Operations', () => {
     expect(engine).toBeDefined();
     expect(engine.id).toBeDefined();
     expect(engine.name).toBe('Test Engine');
-    expect(engine.type).toBe('automated');
-    expect(engine.accuracy).toBe('0');
+    expect(engine.engineType).toBe('automated');
+    expect(engine.accuracyRate).toBe('0.0000');
     expect(engine.totalAnalyses).toBe(0);
   });
 
@@ -150,12 +149,12 @@ describe('MemStorage - Security Engine Operations', () => {
     const firstEngine = engines[0];
 
     const updated = await storage.updateSecurityEngine(firstEngine.id, {
-      accuracy: '95.5',
+      accuracyRate: '0.9550',
       totalAnalyses: 1000,
     });
 
     expect(updated).toBeDefined();
-    expect(updated?.accuracy).toBe('95.5');
+    expect(updated?.accuracyRate).toBe('0.9550');
     expect(updated?.totalAnalyses).toBe(1000);
   });
 });
@@ -169,29 +168,26 @@ describe('MemStorage - Submission Operations', () => {
 
   it('should create a submission', async () => {
     const submissionData: InsertSubmission = {
-      filename: 'test.exe',
+      submitterId: '00000000-0000-0000-0000-000000000001',
+      originalFilename: 'test.exe',
       fileHash: 'sha256_abc123',
       submissionType: 'file',
-      analysisType: 'full',
-      bountyAmount: '1.5',
     };
 
     const submission = await storage.createSubmission(submissionData);
 
     expect(submission).toBeDefined();
     expect(submission.id).toBeDefined();
-    expect(submission.filename).toBe('test.exe');
-    expect(submission.status).toBe('pending');
-    expect(submission.bountyAmount).toBe('1.5');
+    expect(submission.originalFilename).toBe('test.exe');
+    expect(submission.analysisStatus).toBe('pending');
   });
 
   it('should get submission by id', async () => {
     const submissionData: InsertSubmission = {
-      filename: 'test.exe',
+      submitterId: '00000000-0000-0000-0000-000000000001',
+      originalFilename: 'test.exe',
       fileHash: 'sha256_abc123',
       submissionType: 'file',
-      analysisType: 'full',
-      bountyAmount: '1.5',
     };
 
     const created = await storage.createSubmission(submissionData);
@@ -202,16 +198,15 @@ describe('MemStorage - Submission Operations', () => {
   });
 
   it('should get all submissions', async () => {
-    const submissionData: InsertSubmission = {
-      filename: 'test.exe',
+    const base: InsertSubmission = {
+      submitterId: '00000000-0000-0000-0000-000000000001',
+      originalFilename: 'test.exe',
       fileHash: 'sha256_abc123',
       submissionType: 'file',
-      analysisType: 'full',
-      bountyAmount: '1.5',
     };
 
-    await storage.createSubmission(submissionData);
-    await storage.createSubmission({ ...submissionData, filename: 'test2.exe' });
+    await storage.createSubmission(base);
+    await storage.createSubmission({ ...base, originalFilename: 'test2.exe', fileHash: 'sha256_def456' });
 
     const submissions = await storage.getSubmissions();
 
@@ -220,20 +215,19 @@ describe('MemStorage - Submission Operations', () => {
 
   it('should update submission status', async () => {
     const submissionData: InsertSubmission = {
-      filename: 'test.exe',
+      submitterId: '00000000-0000-0000-0000-000000000001',
+      originalFilename: 'test.exe',
       fileHash: 'sha256_abc123',
       submissionType: 'file',
-      analysisType: 'full',
-      bountyAmount: '1.5',
     };
 
     const created = await storage.createSubmission(submissionData);
     const updated = await storage.updateSubmission(created.id, {
-      status: 'analyzing',
+      analysisStatus: 'analyzing',
     });
 
     expect(updated).toBeDefined();
-    expect(updated?.status).toBe('analyzing');
+    expect(updated?.analysisStatus).toBe('analyzing');
   });
 });
 
@@ -247,11 +241,10 @@ describe('MemStorage - Analysis Operations', () => {
 
     // Create a submission for testing
     const submissionData: InsertSubmission = {
-      filename: 'test.exe',
+      submitterId: '00000000-0000-0000-0000-000000000001',
+      originalFilename: 'test.exe',
       fileHash: 'sha256_abc123',
       submissionType: 'file',
-      analysisType: 'full',
-      bountyAmount: '1.5',
     };
     const submission = await storage.createSubmission(submissionData);
     submissionId = submission.id;
@@ -265,10 +258,8 @@ describe('MemStorage - Analysis Operations', () => {
     const analysisData: InsertAnalysis = {
       submissionId,
       engineId,
-      stakeAmount: '0.1',
-      verdict: null,
-      confidence: null,
-      details: null,
+      verdict: 'malicious',
+      confidenceScore: '0.9500',
     };
 
     const analysis = await storage.createAnalysis(analysisData);
@@ -277,17 +268,15 @@ describe('MemStorage - Analysis Operations', () => {
     expect(analysis.id).toBeDefined();
     expect(analysis.submissionId).toBe(submissionId);
     expect(analysis.engineId).toBe(engineId);
-    expect(analysis.status).toBe('pending');
+    expect(analysis.analysisStatus).toBe('completed');
   });
 
   it('should get analyses by submission', async () => {
     const analysisData: InsertAnalysis = {
       submissionId,
       engineId,
-      stakeAmount: '0.1',
-      verdict: null,
-      confidence: null,
-      details: null,
+      verdict: 'malicious',
+      confidenceScore: '0.9500',
     };
 
     await storage.createAnalysis(analysisData);
@@ -303,23 +292,21 @@ describe('MemStorage - Analysis Operations', () => {
     const analysisData: InsertAnalysis = {
       submissionId,
       engineId,
-      stakeAmount: '0.1',
-      verdict: null,
-      confidence: null,
-      details: null,
+      verdict: 'benign',
+      confidenceScore: '0.5000',
     };
 
     const created = await storage.createAnalysis(analysisData);
     const updated = await storage.updateAnalysis(created.id, {
       verdict: 'malicious',
-      confidence: '95.5',
-      status: 'completed',
+      confidenceScore: '0.9550',
+      analysisStatus: 'completed',
     });
 
     expect(updated).toBeDefined();
     expect(updated?.verdict).toBe('malicious');
-    expect(updated?.confidence).toBe('95.5');
-    expect(updated?.status).toBe('completed');
+    expect(updated?.confidenceScore).toBe('0.9550');
+    expect(updated?.analysisStatus).toBe('completed');
   });
 });
 
@@ -332,11 +319,10 @@ describe('MemStorage - Consensus Operations', () => {
 
     // Create a submission
     const submissionData: InsertSubmission = {
-      filename: 'test.exe',
+      submitterId: '00000000-0000-0000-0000-000000000001',
+      originalFilename: 'test.exe',
       fileHash: 'sha256_abc123',
       submissionType: 'file',
-      analysisType: 'full',
-      bountyAmount: '1.5',
     };
     const submission = await storage.createSubmission(submissionData);
     submissionId = submission.id;
@@ -394,11 +380,10 @@ describe('MemStorage - Bounty Operations', () => {
 
     // Create a submission
     const submissionData: InsertSubmission = {
-      filename: 'test.exe',
+      submitterId: '00000000-0000-0000-0000-000000000001',
+      originalFilename: 'test.exe',
       fileHash: 'sha256_abc123',
       submissionType: 'file',
-      analysisType: 'full',
-      bountyAmount: '1.5',
     };
     const submission = await storage.createSubmission(submissionData);
     submissionId = submission.id;
@@ -407,8 +392,10 @@ describe('MemStorage - Bounty Operations', () => {
   it('should create a bounty', async () => {
     const bountyData = {
       submissionId,
-      amount: '1.5',
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      creatorId: '00000000-0000-0000-0000-000000000001',
+      title: 'Test Bounty',
+      rewardAmount: '1.50000000',
+      deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     };
 
     const bounty = await storage.createBounty(bountyData);
@@ -416,15 +403,17 @@ describe('MemStorage - Bounty Operations', () => {
     expect(bounty).toBeDefined();
     expect(bounty.id).toBeDefined();
     expect(bounty.submissionId).toBe(submissionId);
-    expect(bounty.amount).toBe('1.5');
-    expect(bounty.status).toBe('active');
+    expect(bounty.rewardAmount).toBe('1.50000000');
+    expect(bounty.bountyStatus).toBe('active');
   });
 
   it('should get active bounties', async () => {
     const bountyData = {
       submissionId,
-      amount: '1.5',
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      creatorId: '00000000-0000-0000-0000-000000000001',
+      title: 'Test Bounty',
+      rewardAmount: '1.50000000',
+      deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     };
 
     await storage.createBounty(bountyData);
@@ -432,22 +421,24 @@ describe('MemStorage - Bounty Operations', () => {
     const activeBounties = await storage.getActiveBounties();
 
     expect(activeBounties.length).toBeGreaterThan(0);
-    expect(activeBounties[0].status).toBe('active');
+    expect(activeBounties[0].bountyStatus).toBe('active');
   });
 
   it('should update bounty status', async () => {
     const bountyData = {
       submissionId,
-      amount: '1.5',
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      creatorId: '00000000-0000-0000-0000-000000000001',
+      title: 'Test Bounty',
+      rewardAmount: '1.50000000',
+      deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     };
 
     const created = await storage.createBounty(bountyData);
     const updated = await storage.updateBounty(created.id, {
-      status: 'completed',
+      bountyStatus: 'completed',
     });
 
     expect(updated).toBeDefined();
-    expect(updated?.status).toBe('completed');
+    expect(updated?.bountyStatus).toBe('completed');
   });
 });

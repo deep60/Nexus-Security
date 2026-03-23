@@ -38,17 +38,17 @@ export function SubmissionsTableExample() {
   // Define table columns
   const columns: ColumnDef<Submission>[] = [
     {
-      accessorKey: 'filename',
+      accessorKey: 'originalFilename',
       header: 'Filename',
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue('filename')}</div>
+        <div className="font-medium">{row.getValue('originalFilename')}</div>
       ),
     },
     {
-      accessorKey: 'status',
+      accessorKey: 'analysisStatus',
       header: 'Status',
       cell: ({ row }) => {
-        const status = row.getValue('status') as string;
+        const status = row.getValue('analysisStatus') as string;
         return (
           <Badge
             variant={
@@ -69,20 +69,8 @@ export function SubmissionsTableExample() {
       header: 'Type',
     },
     {
-      accessorKey: 'analysisType',
-      header: 'Analysis',
-    },
-    {
-      accessorKey: 'bountyAmount',
-      header: 'Bounty',
-      cell: ({ row }) => {
-        const amount = parseFloat(row.getValue('bountyAmount'));
-        return (
-          <div className="font-medium">
-            {amount.toFixed(2)} ETH
-          </div>
-        );
-      },
+      accessorKey: 'mimeType',
+      header: 'File Type',
     },
     {
       accessorKey: 'createdAt',
@@ -100,22 +88,16 @@ export function SubmissionsTableExample() {
 
   // Export columns configuration
   const exportColumns = [
-    { key: 'filename', label: 'Filename' },
-    { key: 'status', label: 'Status' },
+    { key: 'originalFilename', label: 'Filename' },
+    { key: 'analysisStatus', label: 'Status' },
     { key: 'submissionType', label: 'Type' },
-    { key: 'analysisType', label: 'Analysis' },
-    {
-      key: 'bountyAmount',
-      label: 'Bounty (ETH)',
-      format: (value: string) => parseFloat(value).toFixed(2),
-    },
+    { key: 'mimeType', label: 'File Type' },
     {
       key: 'createdAt',
       label: 'Created',
       format: (value: Date) => format(new Date(value), 'yyyy-MM-dd HH:mm:ss'),
     },
     { key: 'fileHash', label: 'File Hash' },
-    { key: 'description', label: 'Description' },
   ];
 
   // Handle bulk actions
@@ -128,11 +110,10 @@ export function SubmissionsTableExample() {
     } else if (action === 'export') {
       // Export selected rows
       const data = selectedRows.map((row) => ({
-        filename: row.filename,
-        status: row.status,
+        filename: row.originalFilename,
+        status: row.analysisStatus,
         type: row.submissionType,
-        analysis: row.analysisType,
-        bounty: row.bountyAmount,
+        fileType: row.mimeType,
         created: format(new Date(row.createdAt!), 'yyyy-MM-dd HH:mm:ss'),
       }));
 

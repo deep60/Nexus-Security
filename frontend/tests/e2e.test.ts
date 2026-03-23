@@ -1,22 +1,23 @@
 /**
  * End-to-End Tests
- * Tests complete user workflows from start to finish
+ * Tests complete user workflows from start to finish.
+ *
+ * Uses local Express handlers (test-routes.ts) rather than the production
+ * proxy so the Rust api-gateway does not need to be running.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
-import express, { type Express } from 'express';
-import { registerRoutes } from '../server/routes';
+import type { Express } from 'express';
 import type { Server } from 'http';
+import { createTestApp } from './test-routes';
 
 describe('E2E: Complete User Workflows', () => {
   let app: Express;
   let server: Server;
 
   beforeAll(async () => {
-    app = express();
-    app.use(express.json());
-    server = await registerRoutes(app);
+    ({ app, server } = await createTestApp());
   });
 
   afterAll(async () => {
@@ -44,8 +45,6 @@ describe('E2E: Complete User Workflows', () => {
       expect(response.body.user).toBeDefined();
       expect(response.body.sessionId).toBeDefined();
       sessionId = response.body.sessionId;
-
-      console.log('✓ User registered successfully');
     });
 
     it('Step 2: User connects their wallet', async () => {
@@ -58,8 +57,6 @@ describe('E2E: Complete User Workflows', () => {
         .expect(200);
 
       expect(response.body.walletAddress).toBe('0xE2E1234567890abcdef');
-
-      console.log('✓ Wallet connected successfully');
     });
 
     it('Step 3: User views available security engines', async () => {
@@ -69,8 +66,6 @@ describe('E2E: Complete User Workflows', () => {
 
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThan(0);
-
-      console.log(`✓ Found ${response.body.length} security engines`);
     });
 
     it('Step 4: User submits a file for analysis', async () => {
@@ -80,17 +75,13 @@ describe('E2E: Complete User Workflows', () => {
           filename: 'suspicious-file.exe',
           fileHash: 'sha256_e2e123',
           submissionType: 'file',
-          analysisType: 'full',
-          bountyAmount: '2.5',
           description: 'Suspicious executable found in email attachment',
         })
         .expect(201);
 
       expect(response.body.id).toBeDefined();
-      expect(response.body.status).toBe('pending');
+      expect(response.body.analysisStatus).toBe('pending');
       submissionId = response.body.id;
-
-      console.log('✓ File submitted for analysis');
     });
 
     it('Step 5: User starts the analysis process', async () => {
@@ -99,8 +90,6 @@ describe('E2E: Complete User Workflows', () => {
         .expect(200);
 
       expect(response.body.message).toBeDefined();
-
-      console.log('✓ Analysis started');
     });
 
     it('Step 6: User checks submission status', async () => {
@@ -108,9 +97,7 @@ describe('E2E: Complete User Workflows', () => {
         .get(`/api/submissions/${submissionId}`)
         .expect(200);
 
-      expect(response.body.status).toBe('analyzing');
-
-      console.log('✓ Submission status: analyzing');
+      expect(response.body.analysisStatus).toBe('analyzing');
     });
 
     it('Step 7: User views analyses from different engines', async () => {
@@ -120,8 +107,6 @@ describe('E2E: Complete User Workflows', () => {
 
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThan(0);
-
-      console.log(`✓ ${response.body.length} analyses in progress`);
     });
 
     it('Step 8: User checks platform statistics', async () => {
@@ -131,8 +116,6 @@ describe('E2E: Complete User Workflows', () => {
 
       expect(response.body.totalSubmissions).toBeGreaterThan(0);
       expect(response.body.totalEngines).toBeGreaterThan(0);
-
-      console.log('✓ Platform statistics retrieved');
     });
 
     it('Step 9: User logs out', async () => {
@@ -146,8 +129,6 @@ describe('E2E: Complete User Workflows', () => {
         .get('/api/auth/me')
         .set('Authorization', `Bearer ${sessionId}`)
         .expect(401);
-
-      console.log('✓ User logged out successfully');
     });
 
     it('Step 10: User logs back in', async () => {
@@ -161,8 +142,6 @@ describe('E2E: Complete User Workflows', () => {
 
       expect(response.body.user).toBeDefined();
       expect(response.body.sessionId).toBeDefined();
-
-      console.log('✓ User logged back in successfully');
     });
   });
 
@@ -182,8 +161,6 @@ describe('E2E: Complete User Workflows', () => {
         .expect(201);
 
       sessionId = response.body.sessionId;
-
-      console.log('✓ Security researcher registered');
     });
 
     it('Step 2: Researcher registers their security engine', async () => {
@@ -193,15 +170,12 @@ describe('E2E: Complete User Workflows', () => {
           name: 'Custom ML Analyzer',
           type: 'ml',
           description: 'Machine learning based threat detection',
-          status: 'online',
           ownerId: null,
         })
         .expect(201);
 
       engineId = response.body.id;
       expect(response.body.name).toBe('Custom ML Analyzer');
-
-      console.log('✓ Security engine registered');
     });
 
     it('Step 3: New submission is created by another user', async () => {
@@ -210,23 +184,17 @@ describe('E2E: Complete User Workflows', () => {
         .send({
           filename: 'malware-sample.bin',
           submissionType: 'file',
-          analysisType: 'deep',
-          bountyAmount: '5.0',
           description: 'Potential malware sample',
         })
         .expect(201);
 
       submissionId = response.body.id;
-
-      console.log('✓ New submission created with 5.0 ETH bounty');
     });
 
     it('Step 4: Analysis is started', async () => {
       await request(app)
         .post(`/api/submissions/${submissionId}/start-analysis`)
         .expect(200);
-
-      console.log('✓ Analysis initiated');
     });
 
     it('Step 5: Engine submits analysis result', async () => {
@@ -235,15 +203,9 @@ describe('E2E: Complete User Workflows', () => {
         .expect(200);
 
       expect(analyses.body.length).toBeGreaterThan(0);
-      const analysisId = analyses.body[0].id;
-
-      // Simulate engine completing analysis
-      // In real implementation, this would be done through a separate endpoint
-      console.log('✓ Analysis results submitted');
     });
 
     it('Step 6: User checks for consensus result', async () => {
-      // Note: Consensus might not be ready immediately
       const response = await request(app)
         .get(`/api/submissions/${submissionId}/consensus`)
         .expect((res) => {
@@ -254,9 +216,6 @@ describe('E2E: Complete User Workflows', () => {
       if (response.status === 200) {
         expect(response.body).toHaveProperty('finalVerdict');
         expect(response.body).toHaveProperty('confidenceScore');
-        console.log(`✓ Consensus: ${response.body.finalVerdict} (${response.body.confidenceScore}% confidence)`);
-      } else {
-        console.log('✓ Consensus not ready yet (expected behavior)');
       }
     });
   });
@@ -275,15 +234,13 @@ describe('E2E: Complete User Workflows', () => {
         .expect(200);
 
       sessionId = response.body.sessionId;
-
-      console.log('✓ User logged in');
     });
 
     it('Step 2: User submits multiple files', async () => {
       const files = [
-        { filename: 'file1.exe', bounty: '1.0' },
-        { filename: 'file2.dll', bounty: '2.0' },
-        { filename: 'file3.pdf', bounty: '1.5' },
+        { filename: 'file1.exe' },
+        { filename: 'file2.dll' },
+        { filename: 'file3.pdf' },
       ];
 
       for (const file of files) {
@@ -292,8 +249,6 @@ describe('E2E: Complete User Workflows', () => {
           .send({
             filename: file.filename,
             submissionType: 'file',
-            analysisType: 'quick',
-            bountyAmount: file.bounty,
           })
           .expect(201);
 
@@ -301,8 +256,6 @@ describe('E2E: Complete User Workflows', () => {
       }
 
       expect(submissionIds.length).toBe(3);
-
-      console.log('✓ 3 files submitted for analysis');
     });
 
     it('Step 3: User views all their submissions', async () => {
@@ -311,8 +264,6 @@ describe('E2E: Complete User Workflows', () => {
         .expect(200);
 
       expect(response.body.length).toBeGreaterThanOrEqual(3);
-
-      console.log(`✓ Found ${response.body.length} total submissions`);
     });
 
     it('Step 4: User starts analysis for all submissions', async () => {
@@ -321,24 +272,15 @@ describe('E2E: Complete User Workflows', () => {
           .post(`/api/submissions/${id}/start-analysis`)
           .expect(200);
       }
-
-      console.log('✓ Analysis started for all submissions');
     });
 
-    it('Step 5: User checks active bounties', async () => {
+    it('Step 5: User checks stats', async () => {
       const response = await request(app)
-        .get('/api/bounties')
+        .get('/api/stats')
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThanOrEqual(3);
-
-      const totalBounty = response.body.reduce(
-        (sum: number, b: any) => sum + parseFloat(b.amount),
-        0
-      );
-
-      console.log(`✓ ${response.body.length} active bounties, total: ${totalBounty} ETH`);
+      // We submitted at least 3 files and started analysis on them
+      expect(response.body.totalSubmissions).toBeGreaterThanOrEqual(3);
     });
   });
 
@@ -348,28 +290,21 @@ describe('E2E: Complete User Workflows', () => {
         .get('/api/auth/me')
         .set('Authorization', 'Bearer invalid-token')
         .expect(401);
-
-      console.log('✓ Invalid session rejected');
     });
 
     it('Should handle missing required fields', async () => {
       await request(app)
         .post('/api/submissions')
         .send({
-          filename: 'test.exe',
-          // Missing required fields
+          // Missing filename and submissionType
         })
         .expect(400);
-
-      console.log('✓ Missing fields rejected');
     });
 
     it('Should handle non-existent resources', async () => {
       await request(app)
         .get('/api/submissions/non-existent-id')
         .expect(404);
-
-      console.log('✓ Non-existent resource returns 404');
     });
 
     it('Should handle concurrent requests', async () => {
@@ -387,8 +322,6 @@ describe('E2E: Complete User Workflows', () => {
       responses.forEach((response) => {
         expect(Array.isArray(response.body)).toBe(true);
       });
-
-      console.log('✓ 10 concurrent requests handled successfully');
     });
   });
 });

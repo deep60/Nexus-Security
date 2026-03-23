@@ -13,8 +13,8 @@ use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
 use crate::models::{
-    analysis::{AnalysisResult, FileMetadata, ThreatIndicator},
-    bounty::{BountySubmission, EngineVerdict, ExtendedSubmission, ProcessingMetrics},
+    analysis::{AnalysisResult, FileMetadata},
+    bounty::{BountySubmission, ExtendedSubmission, ProcessingMetrics},
 };
 
 use crate::utils::{crypto::calculate_file_hash, validation::FileValidator};

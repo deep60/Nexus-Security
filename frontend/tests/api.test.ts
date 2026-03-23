@@ -1,13 +1,13 @@
 /**
  * API Integration Tests
- * Tests all API endpoints using supertest
+ * Tests API endpoints using supertest against local MemStorage-backed handlers.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
-import express, { type Express } from 'express';
-import { registerRoutes } from '../server/routes';
+import type { Express } from 'express';
 import type { Server } from 'http';
+import { createTestApp } from './test-routes';
 
 describe('API Integration Tests', () => {
   let app: Express;
@@ -15,9 +15,7 @@ describe('API Integration Tests', () => {
   let sessionId: string;
 
   beforeAll(async () => {
-    app = express();
-    app.use(express.json());
-    server = await registerRoutes(app);
+    ({ app, server } = await createTestApp());
   });
 
   afterAll(async () => {
@@ -42,7 +40,7 @@ describe('API Integration Tests', () => {
       expect(response.body.user).toBeDefined();
       expect(response.body.user.username).toBe('testuser');
       expect(response.body.user.email).toBe('test@example.com');
-      expect(response.body.user.password).toBeUndefined(); // Password should not be returned
+      expect(response.body.user.passwordHash).toBeUndefined(); // Should not be returned
       expect(response.body.sessionId).toBeDefined();
 
       // Save session ID for subsequent tests
@@ -124,7 +122,7 @@ describe('API Integration Tests', () => {
 
       expect(response.body.username).toBe('testuser');
       expect(response.body.email).toBe('test@example.com');
-      expect(response.body.password).toBeUndefined();
+      expect(response.body.passwordHash).toBeUndefined();
     });
 
     it('GET /api/auth/me - should reject without session', async () => {
@@ -175,8 +173,8 @@ describe('API Integration Tests', () => {
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThan(0);
       expect(response.body[0]).toHaveProperty('name');
-      expect(response.body[0]).toHaveProperty('type');
-      expect(response.body[0]).toHaveProperty('accuracy');
+      expect(response.body[0]).toHaveProperty('engineType');
+      expect(response.body[0]).toHaveProperty('accuracyRate');
     });
 
     it('POST /api/engines - should create a new engine', async () => {
@@ -186,13 +184,12 @@ describe('API Integration Tests', () => {
           name: 'Test Engine',
           type: 'automated',
           description: 'Test engine description',
-          status: 'online',
           ownerId: null,
         })
         .expect(201);
 
       expect(response.body.name).toBe('Test Engine');
-      expect(response.body.type).toBe('automated');
+      expect(response.body.engineType).toBe('automated');
     });
   });
 
@@ -205,15 +202,12 @@ describe('API Integration Tests', () => {
         .send({
           filename: 'test.exe',
           submissionType: 'file',
-          analysisType: 'full',
-          bountyAmount: '1.5',
           description: 'Test file for analysis',
         })
         .expect(201);
 
-      expect(response.body.filename).toBe('test.exe');
-      expect(response.body.status).toBe('pending');
-      expect(response.body.bountyAmount).toBe('1.5');
+      expect(response.body.originalFilename).toBe('test.exe');
+      expect(response.body.analysisStatus).toBe('pending');
 
       submissionId = response.body.id;
     });
@@ -233,7 +227,7 @@ describe('API Integration Tests', () => {
         .expect(200);
 
       expect(response.body.id).toBe(submissionId);
-      expect(response.body.filename).toBe('test.exe');
+      expect(response.body.originalFilename).toBe('test.exe');
     });
 
     it('GET /api/submissions/:id - should return 404 for non-existent submission', async () => {
@@ -252,7 +246,7 @@ describe('API Integration Tests', () => {
         .get(`/api/submissions/${submissionId}`)
         .expect(200);
 
-      expect(response.body.status).toBe('analyzing');
+      expect(response.body.analysisStatus).toBe('analyzing');
     });
 
     it('GET /api/submissions/:id/analyses - should get analyses for submission', async () => {
@@ -290,25 +284,32 @@ describe('API Integration Tests', () => {
 
   describe('Rate Limiting', () => {
     it('should rate limit authentication endpoints', async () => {
-      // Make 6 registration attempts (limit is 5)
-      for (let i = 0; i < 6; i++) {
-        const response = await request(app)
-          .post('/api/auth/register')
-          .send({
-            username: `ratetest${i}`,
-            email: `ratetest${i}@example.com`,
-            password: 'password123',
-          });
+      // Use a fresh app so previous auth tests don't pollute the counter
+      const { app: freshApp, server: freshServer } = await createTestApp();
 
-        if (i < 5) {
-          // First 5 should succeed or fail normally
-          expect([201, 400]).toContain(response.status);
-        } else {
-          // 6th request should be rate limited
-          expect(response.status).toBe(429);
+      try {
+        // Make 6 registration attempts (limit is 5)
+        for (let i = 0; i < 6; i++) {
+          const response = await request(freshApp)
+            .post('/api/auth/register')
+            .send({
+              username: `ratetest${i}`,
+              email: `ratetest${i}@example.com`,
+              password: 'password123',
+            });
+
+          if (i < 5) {
+            // First 5 should succeed or fail normally
+            expect([201, 400]).toContain(response.status);
+          } else {
+            // 6th request should be rate limited
+            expect(response.status).toBe(429);
+          }
         }
+      } finally {
+        await new Promise<void>((resolve) => freshServer.close(() => resolve()));
       }
-    }, { timeout: 10000 });
+    }, 10000);
   });
 
   describe('Security Headers', () => {
@@ -317,7 +318,7 @@ describe('API Integration Tests', () => {
         .get('/api/engines')
         .expect(200);
 
-      // Check for helmet security headers
+      // Check for security headers
       expect(response.headers).toHaveProperty('x-content-type-options');
       expect(response.headers).toHaveProperty('x-frame-options');
       expect(response.headers).toHaveProperty('x-xss-protection');

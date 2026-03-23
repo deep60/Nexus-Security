@@ -23,32 +23,21 @@ export function EngineCard({ engine }: EngineCardProps) {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "online":
-        return "text-accent";
-      case "offline":
-        return "text-muted-foreground";
-      case "busy":
-        return "text-secondary";
-      default:
-        return "text-muted-foreground";
-    }
-  };
+
 
   return (
     <Card className="glassmorphism border-primary/20 hover:border-primary/40 transition-colors group hover:transform hover:-translate-y-1 duration-300">
       <CardContent className="p-6">
         <div className="flex items-center space-x-3 mb-4">
           <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center">
-            {getEngineIcon(engine.type)}
+            {getEngineIcon(engine.engineType)}
           </div>
           <div>
             <div className="font-semibold" data-testid={`engine-name-${engine.id}`}>
               {engine.name}
             </div>
             <div className="text-sm text-muted-foreground capitalize">
-              {engine.type}
+              {engine.engineType}
             </div>
           </div>
         </div>
@@ -57,7 +46,7 @@ export function EngineCard({ engine }: EngineCardProps) {
           <div className="flex justify-between text-sm">
             <span>Accuracy</span>
             <span className="text-accent font-medium" data-testid={`accuracy-${engine.id}`}>
-              {engine.accuracy}%
+              {parseFloat(engine.accuracyRate || "0").toFixed(2)}%
             </span>
           </div>
           <div className="flex justify-between text-sm">
@@ -69,13 +58,13 @@ export function EngineCard({ engine }: EngineCardProps) {
           <div className="flex justify-between text-sm">
             <span>Stake</span>
             <span className="text-secondary font-medium" data-testid={`stake-${engine.id}`}>
-              {engine.totalStaked} ETH
+              {engine.stakeAmount} ETH
             </span>
           </div>
         </div>
         
-        <div className={`text-xs matrix-text ${getStatusColor(engine.status || "offline")}`} data-testid={`status-${engine.id}`}>
-          {(engine.status || "offline").toUpperCase()} • {engine.type === "human" ? "ACTIVE" : "READY"}
+        <div className={`text-xs matrix-text ${engine.isActive ? "text-accent" : "text-muted-foreground"}`} data-testid={`status-${engine.id}`}>
+          {engine.isActive ? "ONLINE" : "OFFLINE"} • {engine.engineType === "human" ? "ACTIVE" : "READY"}
         </div>
       </CardContent>
     </Card>

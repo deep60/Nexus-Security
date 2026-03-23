@@ -184,22 +184,23 @@ pub struct SslInfo {
     pub key_size: Option<i32>,
 }
 
-// Analysis result for consensus and database storage
+// Analysis result — matches `analysis_results` table (001+002+005 migrations)
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct AnalysisResult {
     pub id: Uuid,
-    pub bounty_id: Uuid,
-    pub analysis_id: Uuid,
+    pub participation_id: Option<Uuid>,
     pub engine_id: Uuid,
-    pub engine_name: String,
-    pub verdict: ThreatVerdict,
-    pub confidence: f64,
-    pub stake_amount: String,
-    pub details: serde_json::Value,
-    #[sqlx(json)]
-    pub threat_indicators: Vec<ThreatIndicator>,
-    pub submitted_at: DateTime<Utc>,
-    pub verified_at: Option<DateTime<Utc>>,
+    pub submission_id: Uuid,
+    pub bounty_id: Option<Uuid>,        // added by migration 005
+    pub analyzer_id: Option<Uuid>,       // added by migration 005
+    pub verdict: String,                 // 'malicious','benign','suspicious','unknown'
+    pub confidence_score: String,        // DECIMAL(5,4)
+    pub threat_types: Option<Vec<String>>, // TEXT[]
+    pub analysis_duration: Option<i32>,  // seconds
+    pub detailed_report: Option<serde_json::Value>, // JSONB
+    pub analysis_status: Option<String>, // 'pending','running','completed','failed','timeout'
+    pub created_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
 }
 
 // Threat indicators found in analysis

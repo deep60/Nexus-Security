@@ -416,11 +416,13 @@ impl BlockchainSyncService {
             chain_bounty_id, analyst, verdict_num, stake, confidence, event.transaction_hash
         );
 
-        // Map numeric verdict to string: 0=Benign, 1=Malicious, 2=Suspicious
+        // Map numeric verdict to string: Solidity ThreatVerdict enum
+        // Pending=0, Benign=1, Malicious=2, Suspicious=3
         let verdict_str = match verdict_num {
-            0 => "Benign",
-            1 => "Malicious",
-            2 => "Suspicious",
+            0 => "Pending",
+            1 => "Benign",
+            2 => "Malicious",
+            3 => "Suspicious",
             _ => "Unknown",
         };
 
@@ -500,10 +502,12 @@ impl BlockchainSyncService {
             chain_bounty_id, verdict, confidence, total, event.transaction_hash
         );
 
+        // Solidity ThreatVerdict enum: Pending=0, Benign=1, Malicious=2, Suspicious=3
         let verdict_str = match verdict {
-            0 => "Benign",
-            1 => "Malicious",
-            2 => "Suspicious",
+            0 => "Pending",
+            1 => "Benign",
+            2 => "Malicious",
+            3 => "Suspicious",
             _ => "Unknown",
         };
 

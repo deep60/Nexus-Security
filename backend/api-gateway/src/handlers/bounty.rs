@@ -11,12 +11,10 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::models::{
-    bounty::{Bounty, BountyStatus},
+    bounty::Bounty,
     user::User,
 };
 use crate::AppState;
-// Import CreateBountyRequest from models if available, otherwise define here matching the service
-// Re-using existing structs if they match, or updating them.
 
 // Request/Response DTOs
 #[derive(Deserialize)]
@@ -26,7 +24,8 @@ pub struct CreateBountyRequest {
     pub target_url: Option<String>,
     pub target_hash: Option<String>,
     pub target_type: String, // "url", "file", "binary"
-    pub reward_amount: i64, // Amount in Wei (using i64 to match Diesel/SQLx usually, but u64 is better for amounts)
+    pub reward_amount: i64,
+    pub submission_id: Uuid,
     pub deadline: DateTime<Utc>,
 }
 
@@ -51,14 +50,13 @@ pub struct BountyFilters {
 pub struct BountyResponse {
     pub id: Uuid,
     pub title: String,
-    pub description: String,
-    pub creator: String,
-    pub reward_amount: u64,
-    pub current_pool: u64,
-    pub status: BountyStatus,
+    pub description: Option<String>,
+    pub creator_id: Uuid,
+    pub reward_amount: String,
+    pub bounty_status: String,
     pub created_at: DateTime<Utc>,
-    pub deadline: DateTime<Utc>,
-    pub submission_count: u32,
+    pub deadline: Option<DateTime<Utc>>,
+    pub participant_count: i32,
     pub consensus_reached: bool,
     pub final_verdict: Option<String>,
     pub confidence_score: Option<f32>,
@@ -99,61 +97,26 @@ pub struct FileInfo {
 }
 
 // handler Implementation
-// TODO: Rewrite to match actual Bounty model structure from models/bounty.rs
-// handler Implementation
 pub async fn create_bounty(
     State(state): State<AppState>,
     claims: crate::middleware::auth::Claims,
     Json(request): Json<CreateBountyRequest>,
 ) -> Result<Json<Bounty>, StatusCode> {
-    // Map handler DTO to model DTO
-    let mut metadata = serde_json::Map::new();
-    if let Some(url) = &request.target_url {
-        metadata.insert(
-            "target_url".to_string(),
-            serde_json::Value::String(url.clone()),
-        );
-    }
-    if let Some(hash) = &request.target_hash {
-        metadata.insert(
-            "target_hash".to_string(),
-            serde_json::Value::String(hash.clone()),
-        );
-    }
-    metadata.insert(
-        "target_type".to_string(),
-        serde_json::Value::String(request.target_type.clone()),
-    );
-
-    // Extract values from metadata before moving it
-    let artifact_hash = metadata.get("target_hash")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let artifact_type = metadata.get("target_type")
-        .and_then(|v| v.as_str())
-        .unwrap_or("file")
-        .to_string();
+    // Compute deadline_hours from the provided deadline
+    let now = Utc::now();
+    let deadline_hours = ((request.deadline - now).num_hours()).max(1) as i32;
 
     let model_request = crate::models::bounty::CreateBountyRequest {
+        submission_id: request.submission_id,
         title: request.title,
-        description: request.description,
-        bounty_type: crate::models::bounty::BountyType::Custom, // TODO: Map from request.target_type
-        priority: crate::models::bounty::BountyPriority::Medium,
-        total_reward: request.reward_amount.to_string(),
-        minimum_stake: "0".to_string(),
-        distribution_method: crate::models::bounty::DistributionMethod::ProportionalStake,
+        description: Some(request.description),
+        reward_amount: request.reward_amount.to_string(),
+        min_stake_amount: Some("0".to_string()),
         max_participants: None,
-        required_consensus: None,
-        minimum_reputation: None,
-        deadline_hours: Some(24), // derived from deadline difference ideally
-        auto_finalize: Some(true),
-        requires_human_analysis: Some(false),
-        file_types_allowed: None,
-        max_file_size: None,
-        tags: None,
-        template_id: None,
-        metadata: Some(serde_json::Value::Object(metadata)),
+        deadline_hours: Some(deadline_hours),
+        requires_verification: Some(false),
+        priority_level: Some(1),
+        consensus_threshold: None,
     };
 
     let bounty = state
@@ -165,21 +128,23 @@ pub async fn create_bounty(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    // Submit on-chain createBounty (artifact_hash and artifact_type extracted above)
-    let reward_str = &bounty.total_reward;
-    let reward_amount = ethers::types::U256::from_dec_str(reward_str).unwrap_or_default();
+    // Submit on-chain createBounty
+    let reward_amount = ethers::types::U256::from_dec_str(&bounty.reward_amount).unwrap_or_default();
     let deadline_ts = bounty.deadline
         .map(|d| ethers::types::U256::from(d.timestamp() as u64))
         .unwrap_or(ethers::types::U256::from(
             (chrono::Utc::now() + chrono::Duration::hours(24)).timestamp() as u64
         ));
 
+    let artifact_hash = String::new(); // TODO: derive from submission
+    let artifact_type = "file".to_string();
+
     let bc_params = crate::services::blockchain::CreateBountyParams {
         artifact_hash,
         artifact_type,
         reward_amount,
         deadline: deadline_ts,
-        description: bounty.description.clone(),
+        description: bounty.description.clone().unwrap_or_default(),
     };
 
     match state.blockchain.create_bounty(bc_params).await {
@@ -193,14 +158,12 @@ pub async fn create_bounty(
         }
         Err(e) => {
             tracing::warn!("On-chain bounty creation failed (DB record exists): {}", e);
-            // Continue — DB record exists, on-chain can be retried
         }
     }
 
     Ok(Json(bounty))
 }
 
-// TODO: Rewrite to match actual Bounty model
 pub async fn list_bounties(
     State(state): State<AppState>,
     Query(filters): Query<BountyFilters>,
@@ -220,7 +183,6 @@ pub async fn list_bounties(
     Ok(Json(bounties))
 }
 
-// TODO: Rewrite to match actual Bounty model
 pub async fn get_bounty(
     State(state): State<AppState>,
     Path(bounty_id): Path<Uuid>,
@@ -246,7 +208,7 @@ pub async fn submit_analysis(
     use crate::services::blockchain::SubmitAnalysisParams;
     use ethers::types::U256;
 
-    // Look up the real on-chain bounty ID from DB (contract uses incremental IDs, not UUIDs)
+    // Look up the real on-chain bounty ID from DB
     let on_chain_id = state.db.get_bounty_on_chain_id(bounty_id)
         .await
         .map_err(|e| {
@@ -298,7 +260,6 @@ pub async fn finalize_bounty(
 ) -> Result<StatusCode, StatusCode> {
     use ethers::types::U256;
 
-    // Look up the real on-chain bounty ID from DB (contract uses incremental IDs, not UUIDs)
     let chain_id = state.db.get_bounty_on_chain_id(bounty_id)
         .await
         .map_err(|e| {
@@ -327,17 +288,16 @@ pub async fn update_bounty(
     Path(bounty_id): Path<Uuid>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    // Verify ownership
     let bounty = state.db.get_bounty_by_id(bounty_id).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    if bounty.creator != claims.sub {
+    if bounty.creator_id != claims.sub {
         return Err(StatusCode::FORBIDDEN);
     }
 
-    // Only allow updates on draft/active bounties
-    if !matches!(bounty.status, BountyStatus::Draft | BountyStatus::Active) {
+    // Only allow updates on active bounties
+    if bounty.bounty_status != "active" {
         return Err(StatusCode::CONFLICT);
     }
 
@@ -363,7 +323,7 @@ pub async fn update_bounty(
     })))
 }
 
-/// Cancel a bounty (owner only, must be draft/active)
+/// Cancel a bounty (owner only, must be active)
 pub async fn cancel_bounty(
     State(state): State<crate::AppState>,
     claims: crate::middleware::auth::Claims,
@@ -373,15 +333,15 @@ pub async fn cancel_bounty(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    if bounty.creator != claims.sub {
+    if bounty.creator_id != claims.sub {
         return Err(StatusCode::FORBIDDEN);
     }
 
-    if !matches!(bounty.status, BountyStatus::Draft | BountyStatus::Active) {
+    if bounty.bounty_status != "active" {
         return Err(StatusCode::CONFLICT);
     }
 
-    state.db.update_bounty_status(bounty_id, BountyStatus::Cancelled).await
+    state.db.update_bounty_status(bounty_id, "cancelled").await
         .map_err(|e| {
             tracing::error!("Failed to cancel bounty: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
@@ -401,7 +361,7 @@ pub async fn extend_bounty(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    if bounty.creator != claims.sub {
+    if bounty.creator_id != claims.sub {
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -411,7 +371,6 @@ pub async fn extend_bounty(
         .map(|d| d.with_timezone(&chrono::Utc))
         .ok_or(StatusCode::BAD_REQUEST)?;
 
-    // Deadline must be in the future
     if new_deadline <= chrono::Utc::now() {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -443,17 +402,14 @@ pub async fn claim_reward(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    if !matches!(bounty.status, BountyStatus::Completed) {
+    if bounty.bounty_status != "completed" {
         return Err(StatusCode::CONFLICT);
     }
 
-    // Check on-chain ID exists
     let chain_id = state.db.get_bounty_on_chain_id(bounty_id).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::PRECONDITION_FAILED)?;
 
-    // Rewards are distributed during resolveBounty on-chain.
-    // This records the user's claim intent and returns status.
     Ok(Json(serde_json::json!({
         "bounty_id": bounty_id,
         "on_chain_id": chain_id,
@@ -468,13 +424,12 @@ pub async fn get_bounty_stats(
     State(state): State<crate::AppState>,
     Path(bounty_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    // Verify bounty exists
     let _bounty = state.db.get_bounty_by_id(bounty_id).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
     let submissions: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM analyses WHERE bounty_id = $1"
+        "SELECT COUNT(*) FROM analysis_results WHERE bounty_id = $1"
     )
     .bind(bounty_id)
     .fetch_one(state.db.pool())
@@ -482,7 +437,7 @@ pub async fn get_bounty_stats(
     .unwrap_or(0);
 
     let participants: i64 = sqlx::query_scalar(
-        "SELECT COUNT(DISTINCT analyst_id) FROM analyses WHERE bounty_id = $1"
+        "SELECT COUNT(DISTINCT engine_id) FROM analysis_results WHERE bounty_id = $1"
     )
     .bind(bounty_id)
     .fetch_one(state.db.pool())
@@ -515,21 +470,8 @@ pub async fn list_completed_bounties(
 ) -> Result<Json<Vec<Bounty>>, StatusCode> {
     let bounties = sqlx::query_as::<_, Bounty>(
         r#"
-        SELECT
-            id, creator, creator_address, title, description,
-            bounty_type as "bounty_type: BountyType",
-            priority as "priority: BountyPriority",
-            status as "status: BountyStatus",
-            total_reward, minimum_stake,
-            distribution_method as "distribution_method: DistributionMethod",
-            max_participants, current_participants,
-            required_consensus, minimum_reputation,
-            deadline, auto_finalize, requires_human_analysis,
-            file_types_allowed, max_file_size, tags, metadata,
-            blockchain_tx_hash, on_chain_id, escrow_address,
-            created_at, updated_at, started_at, completed_at
-        FROM bounties
-        WHERE status = 'completed'
+        SELECT * FROM bounties
+        WHERE bounty_status = 'completed'
         ORDER BY completed_at DESC NULLS LAST
         LIMIT 50
         "#
@@ -543,4 +485,3 @@ pub async fn list_completed_bounties(
 
     Ok(Json(bounties))
 }
-
