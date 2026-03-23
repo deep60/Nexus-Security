@@ -403,31 +403,160 @@ fn verify_wallet_signature(address: &str, signature: &str, message: &str) -> boo
 
 /// Verify email address
 pub async fn verify_email(
-    State(_state): State<AppState>,
-    Json(_payload): Json<serde_json::Value>,
+    State(state): State<AppState>,
+    Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let token = payload
+        .get("token")
+        .and_then(|t| t.as_str())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    // Look up verification token in Redis
+    let user_id_str = state
+        .redis
+        .get_raw(format!("email_verify:{}", token))
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    let user_id = Uuid::parse_str(&user_id_str).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    // Mark user as verified
+    sqlx::query("UPDATE users SET is_verified = true WHERE id = $1")
+        .bind(user_id)
+        .execute(state.db.pool())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Clean up token
+    let _ = state.redis.delete_raw(format!("email_verify:{}", token)).await;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "message": "Email verified successfully"
+    })))
 }
 
 /// Forgot password — send reset link
 pub async fn forgot_password(
-    State(_state): State<AppState>,
-    Json(_payload): Json<serde_json::Value>,
+    State(state): State<AppState>,
+    Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let email = payload
+        .get("email")
+        .and_then(|e| e.as_str())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    // Find user by email (always return success to prevent user enumeration)
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
+        .bind(email)
+        .fetch_optional(state.db.pool())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if let Some(user) = user {
+        // Generate reset token and store in Redis with 1-hour expiry
+        let reset_token = Uuid::new_v4().to_string();
+        let _ = state
+            .redis
+            .set_raw_with_ttl(
+                format!("password_reset:{}", reset_token),
+                user.id.to_string(),
+                3600,
+            )
+            .await;
+
+        // TODO: Send email with reset link containing the token
+        tracing::info!("Password reset token generated for user {}", user.id);
+    }
+
+    // Always return success to prevent email enumeration
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "message": "If an account with that email exists, a password reset link has been sent"
+    })))
 }
 
 /// Reset password
 pub async fn reset_password(
-    State(_state): State<AppState>,
-    Json(_payload): Json<serde_json::Value>,
+    State(state): State<AppState>,
+    Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let token = payload
+        .get("token")
+        .and_then(|t| t.as_str())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+    let new_password = payload
+        .get("password")
+        .and_then(|p| p.as_str())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    if new_password.len() < 8 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Validate reset token
+    let user_id_str = state
+        .redis
+        .get_raw(format!("password_reset:{}", token))
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    let user_id = Uuid::parse_str(&user_id_str).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    // Hash the new password
+    let password_hash = hash_password(new_password)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Update password
+    sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
+        .bind(&password_hash)
+        .execute(state.db.pool())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Invalidate the reset token
+    let _ = state.redis.delete_raw(format!("password_reset:{}", token)).await;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "message": "Password reset successfully"
+    })))
 }
 
 /// Generate API key
 pub async fn generate_api_key(
-    State(_state): State<AppState>,
+    headers: HeaderMap,
+    State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let user = authenticate_user(&headers, &state)
+        .await
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    // Generate a random API key
+    let raw_key = format!("nxs_{}", Uuid::new_v4().to_string().replace("-", ""));
+    let key_hash = hash_password(&raw_key).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let key_id = Uuid::new_v4();
+
+    // Store hashed key in database
+    sqlx::query(
+        "INSERT INTO api_keys (id, user_id, key_hash, name, created_at) VALUES ($1, $2, $3, $4, $5)"
+    )
+    .bind(key_id)
+    .bind(user.id)
+    .bind(&key_hash)
+    .bind("Default API Key")
+    .bind(Utc::now())
+    .execute(state.db.pool())
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Return the raw key (only shown once)
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "api_key": raw_key,
+        "key_id": key_id,
+        "message": "Store this key securely — it will not be shown again"
+    })))
 }

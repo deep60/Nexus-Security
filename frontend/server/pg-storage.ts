@@ -46,22 +46,22 @@ export class PostgresStorage implements IStorage {
       const mockEngines: InsertSecurityEngine[] = [
         {
           name: "DeepScan AI",
-          type: "automated",
+          engineType: "automated",
           description: "Advanced AI-powered malware detection",
         },
         {
           name: "CyberExpert_007",
-          type: "human",
+          engineType: "human",
           description: "Senior cybersecurity researcher",
         },
         {
           name: "NeuralGuard",
-          type: "ml",
+          engineType: "hybrid",
           description: "Machine learning threat classifier",
         },
         {
           name: "SigHunter",
-          type: "signature",
+          engineType: "automated",
           description: "Signature-based detection engine",
         },
       ];
@@ -271,7 +271,7 @@ export class PostgresStorage implements IStorage {
     return await this.db
       .select()
       .from(schema.bounties)
-      .where(eq(schema.bounties.status, "active"))
+      .where(eq(schema.bounties.bountyStatus, "active"))
       .orderBy(desc(schema.bounties.createdAt));
   }
 

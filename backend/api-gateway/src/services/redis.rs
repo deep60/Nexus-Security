@@ -656,4 +656,33 @@ impl RedisService {
         info!("Invalidated caches for submission: {}", submission_id);
         Ok(())
     }
+    /// Get a raw string value by key
+    pub async fn get_raw(&self, key: String) -> Result<Option<String>> {
+        let mut conn = self.connection_pool.clone();
+        let value: Option<String> = conn
+            .get(&key)
+            .await
+            .context("Failed to get raw value from Redis")?;
+        Ok(value)
+    }
+
+    /// Set a raw string value with TTL (in seconds)
+    pub async fn set_raw_with_ttl(&self, key: String, value: String, ttl_seconds: u64) -> Result<()> {
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
+            .set_ex(&key, value, ttl_seconds)
+            .await
+            .context("Failed to set raw value in Redis")?;
+        Ok(())
+    }
+
+    /// Delete a key
+    pub async fn delete_raw(&self, key: String) -> Result<()> {
+        let mut conn = self.connection_pool.clone();
+        let _: () = conn
+            .del(&key)
+            .await
+            .context("Failed to delete key from Redis")?;
+        Ok(())
+    }
 }

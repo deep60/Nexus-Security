@@ -462,7 +462,9 @@ impl AppConfig {
         }
 
         // Blockchain configuration
-        if let Ok(rpc_url) = std::env::var("BLOCKCHAIN_RPC_URL") {
+        if let Ok(rpc_url) = std::env::var("BLOCKCHAIN_RPC_URL")
+            .or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
+        {
             config.blockchain.rpc_url = rpc_url;
         }
         if let Ok(chain_id) = std::env::var("CHAIN_ID") {
@@ -474,11 +476,13 @@ impl AppConfig {
         // Contract addresses (accept both naming conventions for compatibility)
         if let Ok(addr) = std::env::var("BOUNTY_MANAGER_ADDRESS")
             .or_else(|_| std::env::var("CONTRACT_BOUNTY_MANAGER"))
+            .or_else(|_| std::env::var("CONTRACT_ADDRESS_BOUNTY"))
         {
             config.blockchain.contracts.bounty_manager = addr;
         }
         if let Ok(addr) = std::env::var("THREAT_TOKEN_ADDRESS")
             .or_else(|_| std::env::var("CONTRACT_THREAT_TOKEN"))
+            .or_else(|_| std::env::var("CONTRACT_ADDRESS_TOKEN"))
         {
             config.blockchain.contracts.threat_token = addr;
         }
@@ -491,6 +495,7 @@ impl AppConfig {
         // Blockchain private key
         if let Ok(key) = std::env::var("BLOCKCHAIN_PRIVATE_KEY")
             .or_else(|_| std::env::var("TREASURY_PRIVATE_KEY"))
+            .or_else(|_| std::env::var("PRIVATE_KEY"))
         {
             config.blockchain.private_key = key;
         }

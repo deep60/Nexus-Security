@@ -72,58 +72,70 @@ export class MemStorage implements IStorage {
 
   private initializeMockData() {
     // Create mock security engines
-    const engines: SecurityEngine[] = [
+    const mockEngines: SecurityEngine[] = [
       {
         id: randomUUID(),
         name: "DeepScan AI",
-        type: "automated",
+        engineType: "automated",
         description: "Advanced AI-powered malware detection",
-        accuracy: "94.2",
+        accuracyRate: "0.9420",
         totalAnalyses: 15742,
-        totalStaked: "245.0",
-        status: "online",
+        correctAnalyses: 14828,
+        stakeAmount: "245.00000000",
+        isActive: true,
+        apiEndpoint: null,
         ownerId: null,
         createdAt: new Date(),
+        updatedAt: new Date(),
       },
       {
         id: randomUUID(),
         name: "CyberExpert_007",
-        type: "human",
+        engineType: "human",
         description: "Senior cybersecurity researcher",
-        accuracy: "98.7",
+        accuracyRate: "0.9870",
         totalAnalyses: 892,
-        totalStaked: "89.0",
-        status: "online",
+        correctAnalyses: 880,
+        stakeAmount: "89.00000000",
+        isActive: true,
+        apiEndpoint: null,
         ownerId: null,
         createdAt: new Date(),
+        updatedAt: new Date(),
       },
       {
         id: randomUUID(),
         name: "NeuralGuard",
-        type: "ml",
+        engineType: "hybrid",
         description: "Machine learning threat classifier",
-        accuracy: "91.8",
+        accuracyRate: "0.9180",
         totalAnalyses: 8234,
-        totalStaked: "156.0",
-        status: "online",
+        correctAnalyses: 7559,
+        stakeAmount: "156.00000000",
+        isActive: true,
+        apiEndpoint: null,
         ownerId: null,
         createdAt: new Date(),
+        updatedAt: new Date(),
       },
       {
         id: randomUUID(),
         name: "SigHunter",
-        type: "signature",
+        engineType: "automated",
         description: "Signature-based detection engine",
-        accuracy: "89.4",
+        accuracyRate: "0.8940",
         totalAnalyses: 22156,
-        totalStaked: "178.0",
-        status: "online",
+        correctAnalyses: 19807,
+        stakeAmount: "178.00000000",
+        isActive: true,
+        apiEndpoint: null,
         ownerId: null,
         createdAt: new Date(),
+        updatedAt: new Date(),
       },
     ];
 
-    engines.forEach(engine => this.securityEngines.set(engine.id, engine));
+    mockEngines.forEach(engine => this.securityEngines.set(engine.id, engine));
   }
 
   // User methods
@@ -149,12 +161,15 @@ export class MemStorage implements IStorage {
       id,
       username: insertUser.username,
       email: insertUser.email,
-      password: insertUser.password,
+      passwordHash: insertUser.passwordHash,
       walletAddress: insertUser.walletAddress || null,
-      reputation: "0",
-      totalStaked: "0",
-      totalEarned: "0",
-      createdAt: new Date()
+      reputationScore: 0,
+      totalSubmissions: 0,
+      successfulSubmissions: 0,
+      isVerified: false,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
     this.users.set(id, user);
     return user;
@@ -183,12 +198,15 @@ export class MemStorage implements IStorage {
     const newEngine: SecurityEngine = {
       ...engine,
       id,
-      accuracy: "0",
+      accuracyRate: "0.0000",
       totalAnalyses: 0,
-      totalStaked: "0",
+      correctAnalyses: 0,
+      stakeAmount: "0",
+      isActive: true,
+      apiEndpoint: engine.apiEndpoint || null,
       createdAt: new Date(),
+      updatedAt: new Date(),
       description: engine.description || null,
-      status: engine.status || "online",
       ownerId: engine.ownerId || null
     };
     this.securityEngines.set(id, newEngine);
@@ -220,13 +238,19 @@ export class MemStorage implements IStorage {
     const newSubmission: Submission = {
       ...submission,
       id,
-      status: "pending",
+      isMalicious: null,
+      confidenceScore: null,
+      analysisStatus: "pending",
+      metadata: null,
       createdAt: new Date(),
-      completedAt: null,
-      description: submission.description || null,
+      updatedAt: new Date(),
+      url: submission.url || null,
+      originalFilename: submission.originalFilename || null,
       fileSize: submission.fileSize || null,
-      priority: submission.priority || null,
-      submitterId: submission.submitterId || null
+      mimeType: submission.mimeType || null,
+      categoryId: submission.categoryId || null,
+      filePath: submission.filePath || null,
+      fileHash: submission.fileHash || null,
     };
     this.submissions.set(id, newSubmission);
     return newSubmission;
@@ -257,12 +281,13 @@ export class MemStorage implements IStorage {
     const newAnalysis: Analysis = {
       ...analysis,
       id,
-      status: "pending",
+      analysisStatus: "completed",
       createdAt: new Date(),
       completedAt: null,
-      details: analysis.details || null,
-      verdict: analysis.verdict || null,
-      confidence: analysis.confidence || null
+      participationId: analysis.participationId || null,
+      threatTypes: analysis.threatTypes || null,
+      analysisDuration: analysis.analysisDuration || null,
+      detailedReport: analysis.detailedReport || null,
     };
     this.analyses.set(id, newAnalysis);
     return newAnalysis;
@@ -302,7 +327,7 @@ export class MemStorage implements IStorage {
 
   async getActiveBounties(): Promise<Bounty[]> {
     return Array.from(this.bounties.values()).filter(
-      bounty => bounty.status === "active"
+      bounty => bounty.bountyStatus === "active"
     );
   }
 
@@ -311,9 +336,21 @@ export class MemStorage implements IStorage {
     const newBounty: Bounty = {
       ...bounty,
       id,
-      status: "active",
+      bountyStatus: "active",
+      totalStaked: "0",
+      participantCount: 0,
+      requiresVerification: bounty.requiresVerification ?? false,
+      priorityLevel: bounty.priorityLevel ?? 1,
+      minStakeAmount: bounty.minStakeAmount ?? "0",
+      consensusThreshold: bounty.consensusThreshold ?? "0.60",
       createdAt: new Date(),
-      expiresAt: bounty.expiresAt || null
+      updatedAt: new Date(),
+      completedAt: null,
+      blockchainTxHash: bounty.blockchainTxHash || null,
+      smartContractAddress: bounty.smartContractAddress || null,
+      maxParticipants: bounty.maxParticipants || null,
+      deadline: bounty.deadline || null,
+      description: bounty.description || null,
     };
     this.bounties.set(id, newBounty);
     return newBounty;

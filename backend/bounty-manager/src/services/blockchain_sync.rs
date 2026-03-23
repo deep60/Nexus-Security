@@ -346,17 +346,51 @@ impl BlockchainSyncService {
     /// Handle BountyCreated event
     /// Decoded: bounty_id, creator, artifact_hash, reward, deadline
     async fn handle_bounty_created(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
-        let bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let chain_bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
         let creator = event.data.get("creator").and_then(|v| v.as_str()).unwrap_or("unknown");
         let artifact_hash = event.data.get("artifact_hash").and_then(|v| v.as_str()).unwrap_or("");
         let reward = event.data.get("reward").and_then(|v| v.as_str()).unwrap_or("0");
 
         info!(
             "BountyCreated: id={}, creator={}, artifact={}, reward={}, tx={}",
-            bounty_id, creator, artifact_hash, reward, event.transaction_hash
+            chain_bounty_id, creator, artifact_hash, reward, event.transaction_hash
         );
 
-        // TODO: look up DB bounty by blockchain_tx_hash and update on_chain_id + status to Active
+        // Look up DB bounty by artifact_hash + creator and update it with on-chain data
+        let result = sqlx::query(
+            r#"
+            UPDATE bounties
+            SET status = 'Active',
+                metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+                    'on_chain_id', $1::text,
+                    'chain_tx_hash', $2::text,
+                    'chain_block', $3::bigint
+                ),
+                updated_at = NOW()
+            WHERE artifact_hash = $4 AND creator = $5 AND status = 'Pending'
+            "#
+        )
+        .bind(chain_bounty_id)
+        .bind(&event.transaction_hash)
+        .bind(event.block_number as i64)
+        .bind(artifact_hash)
+        .bind(creator)
+        .execute(&self.db)
+        .await;
+
+        match result {
+            Ok(r) if r.rows_affected() > 0 => {
+                info!("Updated bounty to Active for chain id {}", chain_bounty_id);
+            }
+            Ok(_) => {
+                warn!("No matching Pending bounty found for chain id {} (artifact={}, creator={})", chain_bounty_id, artifact_hash, creator);
+            }
+            Err(e) => {
+                error!("DB error updating bounty for chain event: {}", e);
+                return Err(SyncError::DatabaseError(e.to_string()));
+            }
+        }
+
         Ok(())
     }
 
@@ -371,70 +405,304 @@ impl BlockchainSyncService {
     /// Handle SubmissionStaked (AnalysisSubmitted) event
     /// Decoded: bounty_id, analyst, verdict, stake_amount, confidence
     async fn handle_submission_staked(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
-        let bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let chain_bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
         let analyst = event.data.get("analyst").and_then(|v| v.as_str()).unwrap_or("unknown");
-        let verdict = event.data.get("verdict").and_then(|v| v.as_u64()).unwrap_or(0);
+        let verdict_num = event.data.get("verdict").and_then(|v| v.as_u64()).unwrap_or(0);
         let stake = event.data.get("stake_amount").and_then(|v| v.as_str()).unwrap_or("0");
         let confidence = event.data.get("confidence").and_then(|v| v.as_str()).unwrap_or("0");
 
         info!(
             "AnalysisSubmitted: bounty={}, analyst={}, verdict={}, stake={}, confidence={}, tx={}",
-            bounty_id, analyst, verdict, stake, confidence, event.transaction_hash
+            chain_bounty_id, analyst, verdict_num, stake, confidence, event.transaction_hash
         );
 
-        // TODO: create or update submission record in DB with on-chain confirmation
+        // Map numeric verdict to string: 0=Benign, 1=Malicious, 2=Suspicious
+        let verdict_str = match verdict_num {
+            0 => "Benign",
+            1 => "Malicious",
+            2 => "Suspicious",
+            _ => "Unknown",
+        };
+
+        // Look up the internal bounty UUID by on-chain ID stored in metadata
+        let bounty_uuid: Option<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM bounties WHERE metadata->>'on_chain_id' = $1"
+        )
+        .bind(chain_bounty_id)
+        .fetch_optional(&self.db)
+        .await
+        .unwrap_or(None);
+
+        let bounty_id = match bounty_uuid {
+            Some(id) => id,
+            None => {
+                warn!("No bounty found for chain id {}; skipping submission insert", chain_bounty_id);
+                return Ok(());
+            }
+        };
+
+        // Parse stake and confidence to numeric types
+        let stake_amount: i64 = stake.parse().unwrap_or(0);
+        let confidence_f32: f32 = confidence.parse::<f64>().unwrap_or(0.0) as f32;
+
+        // Insert submission record
+        let submission_id = Uuid::new_v4();
+        let result = sqlx::query(
+            r#"
+            INSERT INTO submissions (
+                id, bounty_id, engine_id, engine_type, verdict, confidence,
+                stake_amount, analysis_details, status, transaction_hash,
+                submitted_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+            ON CONFLICT DO NOTHING
+            "#
+        )
+        .bind(submission_id)
+        .bind(bounty_id)
+        .bind(analyst)
+        .bind("blockchain_analyst")
+        .bind(verdict_str)
+        .bind(confidence_f32)
+        .bind(stake_amount)
+        .bind(serde_json::json!({ "source": "blockchain_sync", "block": event.block_number }))
+        .bind("Confirmed")
+        .bind(&event.transaction_hash)
+        .execute(&self.db)
+        .await;
+
+        match result {
+            Ok(r) if r.rows_affected() > 0 => {
+                info!("Created submission {} for bounty {}", submission_id, bounty_id);
+            }
+            Ok(_) => {
+                warn!("Submission already existed for tx {}", event.transaction_hash);
+            }
+            Err(e) => {
+                error!("DB error creating submission: {}", e);
+                return Err(SyncError::DatabaseError(e.to_string()));
+            }
+        }
+
         Ok(())
     }
 
     /// Handle ConsensusReached event
     /// Decoded: bounty_id, consensus_verdict, confidence_score, total_analyses
     async fn handle_consensus_reached(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
-        let bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let chain_bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
         let verdict = event.data.get("consensus_verdict").and_then(|v| v.as_u64()).unwrap_or(0);
         let confidence = event.data.get("confidence_score").and_then(|v| v.as_str()).unwrap_or("0");
         let total = event.data.get("total_analyses").and_then(|v| v.as_str()).unwrap_or("0");
 
         info!(
             "ConsensusReached: bounty={}, verdict={}, confidence={}, analyses={}, tx={}",
-            bounty_id, verdict, confidence, total, event.transaction_hash
+            chain_bounty_id, verdict, confidence, total, event.transaction_hash
         );
 
-        // TODO: update bounty status to Completed, store consensus verdict
+        let verdict_str = match verdict {
+            0 => "Benign",
+            1 => "Malicious",
+            2 => "Suspicious",
+            _ => "Unknown",
+        };
+
+        // Update bounty status to Completed and store consensus data
+        let result = sqlx::query(
+            r#"
+            UPDATE bounties
+            SET status = 'Completed',
+                metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+                    'consensus_verdict', $1::text,
+                    'consensus_confidence', $2::text,
+                    'total_analyses', $3::text,
+                    'consensus_tx_hash', $4::text
+                ),
+                updated_at = NOW()
+            WHERE metadata->>'on_chain_id' = $5
+            "#
+        )
+        .bind(verdict_str)
+        .bind(confidence)
+        .bind(total)
+        .bind(&event.transaction_hash)
+        .bind(chain_bounty_id)
+        .execute(&self.db)
+        .await;
+
+        match result {
+            Ok(r) if r.rows_affected() > 0 => {
+                info!("Updated bounty {} to Completed with consensus {}", chain_bounty_id, verdict_str);
+            }
+            Ok(_) => {
+                warn!("No bounty found for chain id {} to mark Completed", chain_bounty_id);
+            }
+            Err(e) => {
+                error!("DB error updating consensus: {}", e);
+                return Err(SyncError::DatabaseError(e.to_string()));
+            }
+        }
+
         Ok(())
     }
 
     /// Handle PayoutDistributed (RewardsDistributed) event
     /// Decoded: bounty_id (from topic), raw_data (dynamic arrays not yet decoded)
     async fn handle_payout_distributed(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
-        let bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let chain_bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
 
         info!(
             "RewardsDistributed: bounty={}, tx={}",
-            bounty_id, event.transaction_hash
+            chain_bounty_id, event.transaction_hash
         );
 
-        // TODO: decode raw_data dynamic arrays and create payout records for each winner
+        // Look up the internal bounty UUID
+        let bounty_uuid: Option<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM bounties WHERE metadata->>'on_chain_id' = $1"
+        )
+        .bind(chain_bounty_id)
+        .fetch_optional(&self.db)
+        .await
+        .unwrap_or(None);
+
+        let bounty_id = match bounty_uuid {
+            Some(id) => id,
+            None => {
+                warn!("No bounty found for chain id {}; skipping payout record", chain_bounty_id);
+                return Ok(());
+            }
+        };
+
+        // Create a payout record for the overall distribution event
+        // (Individual winner payouts would need raw_data decoded — stored in metadata for later)
+        let payout_id = Uuid::new_v4();
+        let result = sqlx::query(
+            r#"
+            INSERT INTO payouts (
+                id, bounty_id, recipient, amount, currency, payout_type,
+                status, transaction_hash, created_at, processed_at, metadata
+            )
+            VALUES ($1, $2, 'contract', 0, 'ETH', 'reward', 'Confirmed', $3, NOW(), NOW(), $4)
+            "#
+        )
+        .bind(payout_id)
+        .bind(bounty_id)
+        .bind(&event.transaction_hash)
+        .bind(&event.data)
+        .execute(&self.db)
+        .await;
+
+        match result {
+            Ok(_) => {
+                info!("Created payout record {} for bounty {}", payout_id, bounty_id);
+                // Also mark bounty as Paid
+                let _ = sqlx::query("UPDATE bounties SET status = 'Paid', updated_at = NOW() WHERE id = $1")
+                    .bind(bounty_id)
+                    .execute(&self.db)
+                    .await;
+            }
+            Err(e) => {
+                error!("DB error creating payout: {}", e);
+                return Err(SyncError::DatabaseError(e.to_string()));
+            }
+        }
+
         Ok(())
     }
 
     /// Handle StakeSlashed event
     async fn handle_stake_slashed(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
+        let chain_bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
         info!("Processing StakeSlashed event in block {}", event.block_number);
-        // TODO: Update submission status to Slashed
+
+        // Mark all submissions for this bounty as Slashed
+        let result = sqlx::query(
+            r#"
+            UPDATE submissions SET status = 'Slashed', processed_at = NOW()
+            WHERE bounty_id IN (SELECT id FROM bounties WHERE metadata->>'on_chain_id' = $1)
+              AND status != 'Confirmed'
+            "#
+        )
+        .bind(chain_bounty_id)
+        .execute(&self.db)
+        .await;
+
+        match result {
+            Ok(r) => info!("Slashed {} submissions for chain bounty {}", r.rows_affected(), chain_bounty_id),
+            Err(e) => {
+                error!("DB error slashing submissions: {}", e);
+                return Err(SyncError::DatabaseError(e.to_string()));
+            }
+        }
+
         Ok(())
     }
 
     /// Handle DisputeRaised event
     async fn handle_dispute_raised(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
+        let chain_bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
         info!("Processing DisputeRaised event in block {}", event.block_number);
-        // TODO: Create dispute record
+
+        let result = sqlx::query(
+            r#"
+            UPDATE bounties
+            SET status = 'Disputed',
+                metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+                    'dispute_tx_hash', $1::text,
+                    'dispute_block', $2::bigint
+                ),
+                updated_at = NOW()
+            WHERE metadata->>'on_chain_id' = $3
+            "#
+        )
+        .bind(&event.transaction_hash)
+        .bind(event.block_number as i64)
+        .bind(chain_bounty_id)
+        .execute(&self.db)
+        .await;
+
+        match result {
+            Ok(r) => info!("Marked {} bounties as Disputed for chain id {}", r.rows_affected(), chain_bounty_id),
+            Err(e) => {
+                error!("DB error creating dispute: {}", e);
+                return Err(SyncError::DatabaseError(e.to_string()));
+            }
+        }
+
         Ok(())
     }
 
     /// Handle DisputeResolved event
     async fn handle_dispute_resolved(&self, event: &BlockchainEvent) -> Result<(), SyncError> {
+        let chain_bounty_id = event.data.get("bounty_id").and_then(|v| v.as_str()).unwrap_or("unknown");
         info!("Processing DisputeResolved event in block {}", event.block_number);
-        // TODO: Update dispute status
+
+        let result = sqlx::query(
+            r#"
+            UPDATE bounties
+            SET status = 'Completed',
+                metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+                    'dispute_resolved_tx', $1::text,
+                    'dispute_resolved_block', $2::bigint
+                ),
+                updated_at = NOW()
+            WHERE metadata->>'on_chain_id' = $3 AND status = 'Disputed'
+            "#
+        )
+        .bind(&event.transaction_hash)
+        .bind(event.block_number as i64)
+        .bind(chain_bounty_id)
+        .execute(&self.db)
+        .await;
+
+        match result {
+            Ok(r) => info!("Resolved dispute for {} bounties with chain id {}", r.rows_affected(), chain_bounty_id),
+            Err(e) => {
+                error!("DB error resolving dispute: {}", e);
+                return Err(SyncError::DatabaseError(e.to_string()));
+            }
+        }
+
         Ok(())
     }
 

@@ -608,19 +608,82 @@ pub async fn get_submission(
 
 /// Vote on a submission
 pub async fn vote_on_submission(
-    State(_state): State<AppState>,
-    Path(_submission_id): Path<Uuid>,
-    Json(_payload): Json<serde_json::Value>,
+    State(state): State<AppState>,
+    Path(submission_id): Path<Uuid>,
+    Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let verdict = payload
+        .get("verdict")
+        .and_then(|v| v.as_str())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+    let confidence = payload
+        .get("confidence")
+        .and_then(|c| c.as_f64())
+        .unwrap_or(1.0);
+
+    // Validate verdict value
+    let valid_verdicts = ["malicious", "benign", "suspicious", "agree", "disagree"];
+    if !valid_verdicts.contains(&verdict) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let vote_id = Uuid::new_v4();
+
+    // Record the vote
+    sqlx::query(
+        "INSERT INTO submission_votes (id, submission_id, verdict, confidence, created_at) VALUES ($1, $2, $3, $4, $5)"
+    )
+    .bind(vote_id)
+    .bind(submission_id)
+    .bind(verdict)
+    .bind(confidence)
+    .bind(Utc::now())
+    .execute(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to record vote: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "vote_id": vote_id,
+        "submission_id": submission_id,
+        "verdict": verdict,
+        "confidence": confidence,
+    })))
 }
 
 /// Verify a submission
 pub async fn verify_submission(
-    State(_state): State<AppState>,
-    Path(_submission_id): Path<Uuid>,
+    State(state): State<AppState>,
+    Path(submission_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    // Update the submission status to Verified
+    let result = sqlx::query(
+        "UPDATE extended_submissions SET status = 'Verified', updated_at = NOW() WHERE submission_id = $1"
+    )
+    .bind(submission_id)
+    .execute(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to verify submission: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    if result.rows_affected() == 0 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    // Invalidate cache
+    let _ = state.redis.invalidate_submission_cache(submission_id).await;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "submission_id": submission_id,
+        "status": "Verified",
+        "message": "Submission has been verified"
+    })))
 }
 
 /// Get current user's submissions

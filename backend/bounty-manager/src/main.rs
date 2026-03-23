@@ -156,8 +156,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let redis_url = std::env::var("REDIS_URL")
         .unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
-    let port = std::env::var("PORT")
-        .unwrap_or_else(|_| "3002".to_string())
+    let port = std::env::var("SERVER_PORT")
+        .or_else(|_| std::env::var("PORT"))
+        .unwrap_or_else(|_| "8080".to_string())
         .parse::<u16>()?;
 
     // Initialize database connection
@@ -183,11 +184,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sync_db = db.clone();
     tokio::spawn(async move {
         // Initialize blockchain service for sync
-        let rpc_url = std::env::var("BLOCKCHAIN_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string());
-        let private_key = std::env::var("BLOCKCHAIN_PRIVATE_KEY").unwrap_or_default();
+        let rpc_url = std::env::var("BLOCKCHAIN_RPC_URL")
+            .or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
+            .unwrap_or_else(|_| "http://localhost:8545".to_string());
+        let private_key = std::env::var("BLOCKCHAIN_PRIVATE_KEY")
+            .or_else(|_| std::env::var("PRIVATE_KEY"))
+            .unwrap_or_default();
         let chain_id: u64 = std::env::var("CHAIN_ID").unwrap_or_else(|_| "31337".to_string()).parse().unwrap_or(31337);
-        let bounty_manager_addr = std::env::var("BOUNTY_MANAGER_ADDRESS").unwrap_or_default();
-        let threat_token_addr = std::env::var("THREAT_TOKEN_ADDRESS").unwrap_or_default();
+        let bounty_manager_addr = std::env::var("BOUNTY_MANAGER_ADDRESS")
+            .or_else(|_| std::env::var("CONTRACT_ADDRESS_BOUNTY"))
+            .unwrap_or_default();
+        let threat_token_addr = std::env::var("THREAT_TOKEN_ADDRESS")
+            .or_else(|_| std::env::var("CONTRACT_ADDRESS_TOKEN"))
+            .unwrap_or_default();
 
         if private_key.is_empty() || bounty_manager_addr.is_empty() {
             warn!("Blockchain sync not started: BLOCKCHAIN_PRIVATE_KEY or BOUNTY_MANAGER_ADDRESS not set");

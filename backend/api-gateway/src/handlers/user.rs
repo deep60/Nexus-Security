@@ -212,12 +212,35 @@ pub struct Activity {
     pub timestamp: DateTime<Utc>,
 }
 
-/// Delete user account
+/// Delete user account (soft-delete)
 ///
 /// DELETE /api/v1/users/me
-pub async fn delete_account(State(state): State<AppState>) -> Result<StatusCode, StatusCode> {
-    // TODO: Implement account deletion
-    Err(StatusCode::NOT_IMPLEMENTED)
+pub async fn delete_account(
+    State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
+) -> Result<StatusCode, StatusCode> {
+    // Soft-delete: anonymise personal data but keep the record for audit
+    sqlx::query(
+        r#"
+        UPDATE users
+        SET email = CONCAT('deleted_', id::text, '@removed'),
+            username = CONCAT('deleted_', id::text),
+            password_hash = '',
+            wallet_address = NULL,
+            is_verified = false,
+            updated_at = NOW()
+        WHERE id = $1
+        "#,
+    )
+    .bind(claims.sub)
+    .execute(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to delete account: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Get another user's stats by ID
@@ -260,8 +283,23 @@ pub async fn list_api_keys(
 
 /// Revoke an API key
 pub async fn revoke_api_key(
-    State(_state): State<AppState>,
-    Path(_key_id): Path<Uuid>,
+    State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
+    Path(key_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+    let result = sqlx::query("DELETE FROM api_keys WHERE id = $1 AND user_id = $2")
+        .bind(key_id)
+        .bind(claims.sub)
+        .execute(state.db.pool())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to revoke API key: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    if result.rows_affected() == 0 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }

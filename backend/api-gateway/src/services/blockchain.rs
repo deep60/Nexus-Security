@@ -229,14 +229,26 @@ impl BlockchainService {
             .context("Failed waiting for create bounty receipt")?
             .ok_or_else(|| anyhow::anyhow!("No receipt for create bounty tx"))?;
 
+        // Verify event signature + contract address before extracting the bounty ID.
+        // BountyCreated(uint256 indexed bountyId, address indexed creator, string artifactHash, uint256 reward, uint256 deadline)
+        let bounty_created_sig = H256::from(ethers::utils::keccak256(
+            "BountyCreated(uint256,address,string,uint256,uint256)",
+        ));
+        let bounty_manager_addr: Address = self.config.contracts.bounty_manager.parse()
+            .unwrap_or_default();
+
         let on_chain_id = receipt.logs.iter()
             .find_map(|log| {
-                // BountyCreated event: topic[0] = event sig, topic[1] = bountyId (indexed uint256)
-                if log.topics.len() >= 2 {
-                    Some(U256::from(log.topics[1].as_bytes()))
-                } else {
-                    None
+                // Must originate from the bounty manager contract
+                if log.address != bounty_manager_addr {
+                    return None;
                 }
+                // topic[0] must be the BountyCreated event signature
+                if log.topics.first() != Some(&bounty_created_sig) {
+                    return None;
+                }
+                // topic[1] = bountyId (indexed uint256)
+                log.topics.get(1).map(|t| U256::from(t.as_bytes()))
             })
             .unwrap_or_else(|| {
                 tracing::warn!("Could not parse BountyCreated event, defaulting on_chain_id to 0");

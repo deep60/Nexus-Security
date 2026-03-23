@@ -88,10 +88,11 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .expect("DATABASE_URL must be set");
     let redis_url = env::var("REDIS_URL")
         .unwrap_or_else(|_| "redis://localhost:6379".to_string());
-    let port = env::var("PORT")
-        .unwrap_or_else(|_| "8002".to_string())
+    let port = env::var("SERVER_PORT")
+        .or_else(|_| env::var("PORT"))
+        .unwrap_or_else(|_| "8080".to_string())
         .parse::<u16>()
-        .unwrap_or(8002);
+        .unwrap_or(8080);
     let yara_rule_path = env::var("YARA_RULE_PATH")
         .unwrap_or_else(|_| "./rules".to_string());
     let upload_dir = env::var("UPLOAD_DIR")

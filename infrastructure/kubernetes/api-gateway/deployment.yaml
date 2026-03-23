@@ -28,8 +28,8 @@ spec:
         app.kubernetes.io/version: "1.0.0"
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "9090"
-        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/api/health/metrics"
     spec:
       serviceAccountName: nexus-security-sa
       restartPolicy: Always
@@ -74,10 +74,7 @@ spec:
         
         ports:
         - name: http
-          containerPort: 8000
-          protocol: TCP
-        - name: metrics
-          containerPort: 9090
+          containerPort: 8080
           protocol: TCP
         
         env:
@@ -183,7 +180,7 @@ spec:
         # Health checks
         livenessProbe:
           httpGet:
-            path: /health
+            path: /api/health
             port: http
             scheme: HTTP
           initialDelaySeconds: 30
@@ -194,7 +191,7 @@ spec:
         
         readinessProbe:
           httpGet:
-            path: /ready
+            path: /api/health/ready
             port: http
             scheme: HTTP
           initialDelaySeconds: 10
@@ -206,7 +203,7 @@ spec:
         # Startup probe for slow initialization
         startupProbe:
           httpGet:
-            path: /health
+            path: /api/health
             port: http
             scheme: HTTP
           initialDelaySeconds: 10

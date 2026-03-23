@@ -1,131 +1,191 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, integer, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, integer, timestamp, boolean, jsonb, uuid, bigint, real, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// ─── Users (matches database/postgres/migrations/001_user_engine.sql) ───
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  email: text("email").notNull().unique(),
-  password: text("password").notNull(),
-  walletAddress: text("wallet_address"),
-  reputation: decimal("reputation", { precision: 10, scale: 2 }).default("0"),
-  totalStaked: decimal("total_staked", { precision: 18, scale: 8 }).default("0"),
-  totalEarned: decimal("total_earned", { precision: 18, scale: 8 }).default("0"),
-  createdAt: timestamp("created_at").defaultNow(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  username: varchar("username", { length: 50 }).notNull().unique(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  walletAddress: varchar("wallet_address", { length: 42 }).unique(),
+  reputationScore: integer("reputation_score").default(0),
+  totalSubmissions: integer("total_submissions").default(0),
+  successfulSubmissions: integer("successful_submissions").default(0),
+  isVerified: boolean("is_verified").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const securityEngines = pgTable("security_engines", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  type: text("type").notNull(), // 'automated', 'human', 'ml', 'signature'
+// ─── Engines (matches database/postgres/migrations/001_user_engine.sql) ───
+export const engines = pgTable("engines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull(),
+  engineType: varchar("engine_type", { length: 20 }).notNull(), // 'automated', 'human', 'hybrid'
   description: text("description"),
-  accuracy: decimal("accuracy", { precision: 5, scale: 2 }).default("0"),
+  ownerId: uuid("owner_id").references(() => users.id),
+  apiEndpoint: varchar("api_endpoint", { length: 255 }),
+  isActive: boolean("is_active").default(true),
+  accuracyRate: decimal("accuracy_rate", { precision: 5, scale: 4 }).default("0.0000"),
   totalAnalyses: integer("total_analyses").default(0),
-  totalStaked: decimal("total_staked", { precision: 18, scale: 8 }).default("0"),
-  status: text("status").default("online"), // 'online', 'offline', 'busy'
-  ownerId: varchar("owner_id").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  correctAnalyses: integer("correct_analyses").default(0),
+  stakeAmount: decimal("stake_amount", { precision: 20, scale: 8 }).default("0"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+// Keep legacy alias for backward compat in frontend code
+export const securityEngines = engines;
+
+// ─── Submissions (matches database/postgres/migrations/001_user_engine.sql) ───
 export const submissions = pgTable("submissions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  filename: text("filename").notNull(),
-  fileHash: text("file_hash").notNull(),
-  fileSize: integer("file_size"),
-  submissionType: text("submission_type").notNull(), // 'file', 'url'
-  analysisType: text("analysis_type").notNull(), // 'quick', 'full', 'deep', 'behavioral'
-  bountyAmount: decimal("bounty_amount", { precision: 18, scale: 8 }).notNull(),
-  priority: boolean("priority").default(false),
-  description: text("description"),
-  status: text("status").default("pending"), // 'pending', 'analyzing', 'completed', 'failed'
-  submitterId: varchar("submitter_id").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  completedAt: timestamp("completed_at"),
+  id: uuid("id").primaryKey().defaultRandom(),
+  submitterId: uuid("submitter_id").notNull().references(() => users.id),
+  fileHash: varchar("file_hash", { length: 64 }).unique(),
+  url: text("url"),
+  originalFilename: varchar("original_filename", { length: 255 }),
+  fileSize: bigint("file_size", { mode: "number" }),
+  mimeType: varchar("mime_type", { length: 100 }),
+  categoryId: integer("category_id"),
+  filePath: text("file_path"),
+  submissionType: varchar("submission_type", { length: 10 }).notNull(), // 'file', 'url'
+  isMalicious: boolean("is_malicious"),
+  confidenceScore: decimal("confidence_score", { precision: 5, scale: 4 }),
+  analysisStatus: varchar("analysis_status", { length: 20 }).default("pending"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const analyses = pgTable("analyses", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  submissionId: varchar("submission_id").references(() => submissions.id).notNull(),
-  engineId: varchar("engine_id").references(() => securityEngines.id).notNull(),
-  verdict: text("verdict"), // 'malicious', 'clean', 'suspicious', 'unknown'
-  confidence: decimal("confidence", { precision: 5, scale: 2 }),
-  stakeAmount: decimal("stake_amount", { precision: 18, scale: 8 }).notNull(),
-  details: jsonb("details"), // Additional analysis details
-  status: text("status").default("pending"), // 'pending', 'analyzing', 'completed'
-  createdAt: timestamp("created_at").defaultNow(),
-  completedAt: timestamp("completed_at"),
-});
-
-export const consensusResults = pgTable("consensus_results", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  submissionId: varchar("submission_id").references(() => submissions.id).notNull(),
-  finalVerdict: text("final_verdict").notNull(),
-  confidenceScore: decimal("confidence_score", { precision: 5, scale: 2 }).notNull(),
-  totalEngines: integer("total_engines").notNull(),
-  maliciousVotes: integer("malicious_votes").default(0),
-  cleanVotes: integer("clean_votes").default(0),
-  suspiciousVotes: integer("suspicious_votes").default(0),
-  rewardsDistributed: boolean("rewards_distributed").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
+// ─── Bounties (matches database/postgres/migrations/002_bounty_system.sql) ───
 export const bounties = pgTable("bounties", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  submissionId: varchar("submission_id").references(() => submissions.id).notNull(),
-  amount: decimal("amount", { precision: 18, scale: 8 }).notNull(),
-  status: text("status").default("active"), // 'active', 'completed', 'expired'
-  expiresAt: timestamp("expires_at"),
-  createdAt: timestamp("created_at").defaultNow(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  creatorId: uuid("creator_id").notNull().references(() => users.id),
+  submissionId: uuid("submission_id").notNull().references(() => submissions.id),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  rewardAmount: decimal("reward_amount", { precision: 20, scale: 8 }).notNull(),
+  minStakeAmount: decimal("min_stake_amount", { precision: 20, scale: 8 }).default("0"),
+  maxParticipants: integer("max_participants"),
+  deadline: timestamp("deadline", { withTimezone: true }),
+  bountyStatus: varchar("bounty_status", { length: 20 }).default("active"),
+  requiresVerification: boolean("requires_verification").default(false),
+  priorityLevel: integer("priority_level").default(1),
+  blockchainTxHash: varchar("blockchain_tx_hash", { length: 66 }),
+  smartContractAddress: varchar("smart_contract_address", { length: 42 }),
+  totalStaked: decimal("total_staked", { precision: 20, scale: 8 }).default("0"),
+  participantCount: integer("participant_count").default(0),
+  consensusThreshold: decimal("consensus_threshold", { precision: 3, scale: 2 }).default("0.60"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
 });
 
-// Insert schemas
+// ─── Analysis Results (matches database/postgres/migrations/002_bounty_system.sql) ───
+export const analysisResults = pgTable("analysis_results", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  participationId: uuid("participation_id"),
+  engineId: uuid("engine_id").notNull().references(() => engines.id),
+  submissionId: uuid("submission_id").notNull().references(() => submissions.id),
+  verdict: varchar("verdict", { length: 20 }).notNull(),
+  confidenceScore: decimal("confidence_score", { precision: 5, scale: 4 }).notNull(),
+  threatTypes: text("threat_types").array(),
+  analysisDuration: integer("analysis_duration"),
+  detailedReport: jsonb("detailed_report"),
+  analysisStatus: varchar("analysis_status", { length: 20 }).default("completed"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
+// Keep legacy alias
+export const analyses = analysisResults;
+
+// ─── Consensus Results (matches database/postgres/migrations/002_bounty_system.sql) ───
+export const consensusResults = pgTable("consensus_results", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  bountyId: uuid("bounty_id").notNull().references(() => bounties.id),
+  submissionId: uuid("submission_id").notNull().references(() => submissions.id),
+  finalVerdict: varchar("final_verdict", { length: 20 }).notNull(),
+  confidenceScore: decimal("confidence_score", { precision: 5, scale: 4 }).notNull(),
+  maliciousVotes: integer("malicious_votes").default(0),
+  benignVotes: integer("benign_votes").default(0),
+  suspiciousVotes: integer("suspicious_votes").default(0),
+  unknownVotes: integer("unknown_votes").default(0),
+  totalParticipants: integer("total_participants").notNull(),
+  weightedScore: decimal("weighted_score", { precision: 10, scale: 8 }),
+  consensusAlgorithm: varchar("consensus_algorithm", { length: 50 }).default("majority_vote"),
+  calculationMetadata: jsonb("calculation_metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+// ─── Insert Schemas ───
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
-  reputation: true,
-  totalStaked: true,
-  totalEarned: true,
+  reputationScore: true,
+  totalSubmissions: true,
+  successfulSubmissions: true,
+  isVerified: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
-export const insertSecurityEngineSchema = createInsertSchema(securityEngines).omit({
+export const insertEngineSchema = createInsertSchema(engines).omit({
   id: true,
-  accuracy: true,
+  accuracyRate: true,
   totalAnalyses: true,
-  totalStaked: true,
+  correctAnalyses: true,
+  stakeAmount: true,
   createdAt: true,
+  updatedAt: true,
 });
+
+// Legacy alias
+export const insertSecurityEngineSchema = insertEngineSchema;
 
 export const insertSubmissionSchema = createInsertSchema(submissions).omit({
   id: true,
-  status: true,
+  isMalicious: true,
+  confidenceScore: true,
+  analysisStatus: true,
   createdAt: true,
-  completedAt: true,
+  updatedAt: true,
 });
 
-export const insertAnalysisSchema = createInsertSchema(analyses).omit({
+export const insertAnalysisSchema = createInsertSchema(analysisResults).omit({
   id: true,
-  status: true,
+  analysisStatus: true,
   createdAt: true,
   completedAt: true,
 });
 
 export const insertBountySchema = createInsertSchema(bounties).omit({
   id: true,
-  status: true,
+  bountyStatus: true,
+  totalStaked: true,
+  participantCount: true,
   createdAt: true,
+  updatedAt: true,
+  completedAt: true,
 });
 
-// Types
+// ─── Types ───
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
-export type SecurityEngine = typeof securityEngines.$inferSelect;
-export type InsertSecurityEngine = z.infer<typeof insertSecurityEngineSchema>;
+export type Engine = typeof engines.$inferSelect;
+export type InsertEngine = z.infer<typeof insertEngineSchema>;
+
+// Legacy aliases
+export type SecurityEngine = Engine;
+export type InsertSecurityEngine = InsertEngine;
 
 export type Submission = typeof submissions.$inferSelect;
 export type InsertSubmission = z.infer<typeof insertSubmissionSchema>;
 
-export type Analysis = typeof analyses.$inferSelect;
+export type Analysis = typeof analysisResults.$inferSelect;
 export type InsertAnalysis = z.infer<typeof insertAnalysisSchema>;
 
 export type ConsensusResult = typeof consensusResults.$inferSelect;

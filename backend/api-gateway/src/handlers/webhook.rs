@@ -115,13 +115,13 @@ pub struct WebhookEvent {
 /// Create a webhook
 pub async fn create_webhook(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Json(payload): Json<RegisterWebhookRequest>,
 ) -> Result<Json<Webhook>, StatusCode> {
     // Generate a random secret for HMAC signing
     let secret = format!("whsec_{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
     let webhook_id = Uuid::new_v4();
-    // Use a placeholder user_id until auth is wired
-    let user_id = Uuid::nil();
+    let user_id = claims.sub;
 
     let webhook = sqlx::query_as::<_, Webhook>(
         "INSERT INTO webhooks (id, user_id, url, events, secret, description, headers)
@@ -148,20 +148,23 @@ pub async fn create_webhook(
 /// List user's webhooks
 pub async fn list_webhooks(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Query(params): Query<WebhookQuery>,
 ) -> Result<Json<WebhookListResponse>, StatusCode> {
     let page = params.page.unwrap_or(1);
     let limit = params.limit.unwrap_or(20).min(100);
     let offset = (page.saturating_sub(1)) * limit;
 
-    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM webhooks")
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM webhooks WHERE user_id = $1")
+        .bind(claims.sub)
         .fetch_one(state.db.pool())
         .await
         .unwrap_or(0);
 
     let webhooks = sqlx::query_as::<_, Webhook>(
-        "SELECT * FROM webhooks ORDER BY created_at DESC LIMIT $1 OFFSET $2"
+        "SELECT * FROM webhooks WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3"
     )
+    .bind(claims.sub)
     .bind(limit as i64)
     .bind(offset as i64)
     .fetch_all(state.db.pool())
@@ -182,12 +185,14 @@ pub async fn list_webhooks(
 /// Get webhook by ID
 pub async fn get_webhook(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Path(webhook_id): Path<Uuid>,
 ) -> Result<Json<Webhook>, StatusCode> {
     let webhook = sqlx::query_as::<_, Webhook>(
-        "SELECT * FROM webhooks WHERE id = $1"
+        "SELECT * FROM webhooks WHERE id = $1 AND user_id = $2"
     )
     .bind(webhook_id)
+    .bind(claims.sub)
     .fetch_optional(state.db.pool())
     .await
     .map_err(|e| {
@@ -202,6 +207,7 @@ pub async fn get_webhook(
 /// Update webhook
 pub async fn update_webhook(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Path(webhook_id): Path<Uuid>,
     Json(payload): Json<UpdateWebhookRequest>,
 ) -> Result<Json<Webhook>, StatusCode> {
@@ -214,7 +220,7 @@ pub async fn update_webhook(
             description = COALESCE($5, description),
             headers = COALESCE($6, headers),
             updated_at = NOW()
-         WHERE id = $1
+         WHERE id = $1 AND user_id = $7
          RETURNING *"
     )
     .bind(webhook_id)
@@ -223,6 +229,7 @@ pub async fn update_webhook(
     .bind(payload.is_active)
     .bind(&payload.description)
     .bind(&payload.headers)
+    .bind(claims.sub)
     .fetch_optional(state.db.pool())
     .await
     .map_err(|e| {
@@ -237,10 +244,12 @@ pub async fn update_webhook(
 /// Delete webhook
 pub async fn delete_webhook(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Path(webhook_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    let result = sqlx::query("DELETE FROM webhooks WHERE id = $1")
+    let result = sqlx::query("DELETE FROM webhooks WHERE id = $1 AND user_id = $2")
         .bind(webhook_id)
+        .bind(claims.sub)
         .execute(state.db.pool())
         .await
         .map_err(|e| {

@@ -50,7 +50,7 @@ spec:
         env:
         - name: RUST_LOG
           value: "info"
-        - name: PORT
+        - name: SERVER_PORT
           value: "8083"
         - name: ENVIRONMENT
           value: "production"
@@ -91,9 +91,12 @@ spec:
               name: bounty-manager-config
               key: token_contract_address
 
+        - name: CHAIN_ID
+          value: "1"
+
         # Service discovery
         - name: API_GATEWAY_URL
-          value: "http://nexus-api-gateway-service:8000"
+          value: "http://nexus-api-gateway-service:8080"
         - name: ANALYSIS_ENGINE_URL
           value: "http://analysis-engine-service:8081"
 

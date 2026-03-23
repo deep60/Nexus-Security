@@ -28,8 +28,16 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 \i postgres/migrations/004_reputation_system.sql
 
 \echo ''
-\echo 'Step 5/5: Applying schema fixes and updates...'
+\echo 'Step 5/7: Applying schema fixes and updates...'
 \i postgres/migrations/005_fix_user_schema.sql
+
+\echo ''
+\echo 'Step 6/7: Creating API gateway service tables...'
+\i postgres/migrations/006_api_gateway_tables.sql
+
+\echo ''
+\echo 'Step 7/7: Creating payout tables...'
+\i postgres/migrations/007_payout_tables.sql
 
 \echo ''
 \echo '================================'
@@ -38,9 +46,9 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 \echo ''
 \echo 'Summary:'
 \echo '  - Extensions enabled: uuid-ossp, pgcrypto'
-\echo '  - Migrations applied: 5'
-\echo '  - Tables created: 40+'
-\echo '  - Indexes created: 100+'
+\echo '  - Migrations applied: 7'
+\echo '  - Tables created: 45+'
+\echo '  - Indexes created: 120+'
 \echo '  - Functions created: 5+'
 \echo '  - Views created: 3'
 \echo ''
