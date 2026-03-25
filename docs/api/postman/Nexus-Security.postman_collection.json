@@ -1,0 +1,75 @@
+{
+  "info": {
+    "name": "Nexus Security API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api/v1" },
+    { "key": "jwt", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          }
+        },
+        {
+          "name": "Readiness",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health/ready"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"analyst@example.com\",\n  \"password\": \"StrongPassword123!\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bounties",
+      "item": [
+        {
+          "name": "List Bounties",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bounties"
+          }
+        },
+        {
+          "name": "Create Bounty",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Investigate suspicious executable\",\n  \"description\": \"Potential payload observed in phishing chain\",\n  \"reward_amount\": 100,\n  \"expires_at\": \"2026-04-30T23:59:59Z\"\n}"
+            },
+            "url": "{{baseUrl}}/bounties"
+          }
+        }
+      ]
+    }
+  ]
+}

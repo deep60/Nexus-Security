@@ -1,0 +1,6 @@
+{
+  "title": "Investigate suspicious executable",
+  "description": "Potential payload observed in phishing chain",
+  "reward_amount": 100,
+  "expires_at": "2026-04-30T23:59:59Z"
+}

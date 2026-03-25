@@ -1,0 +1,110 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+workers = 4
+max_connections = 1000
+keep_alive = 75
+request_timeout_seconds = 30
+graceful_shutdown_timeout_seconds = 30
+environment = "development"
+
+[database]
+url = "postgresql://nexus_user:nexus_password@localhost:5432/nexus_security"
+max_connections = 25
+min_connections = 5
+connection_timeout_seconds = 30
+idle_timeout_seconds = 600
+max_lifetime_seconds = 1800
+enable_logging = false
+run_migrations = true
+
+[redis]
+url = "redis://localhost:6379"
+max_connections = 50
+connection_timeout_seconds = 5
+pool_timeout_seconds = 10
+enable_cluster = false
+key_prefix = "nexus:dev:"
+default_ttl_seconds = 3600
+
+[blockchain]
+rpc_url = "http://localhost:8545"
+chain_id = 31337
+private_key = "0x0000000000000000000000000000000000000000000000000000000000000000"
+gas_limit = 500000
+gas_price_gwei = 20
+gas_price_multiplier = 1.2
+max_gas_price_gwei = 500
+confirmation_blocks = 2
+transaction_timeout_seconds = 300
+retry_attempts = 3
+retry_delay_ms = 1000
+
+[blockchain.contracts]
+bounty_manager = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+threat_token = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+reputation_system = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+governance = "0x0000000000000000000000000000000000000000"
+
+[security]
+jwt_secret = "change-me-in-development"
+jwt_expiry_hours = 24
+refresh_token_expiry_days = 30
+api_key_length = 32
+password_min_length = 10
+password_require_special_char = true
+password_require_number = true
+password_require_uppercase = true
+max_login_attempts = 5
+lockout_duration_minutes = 15
+session_timeout_minutes = 60
+
+[security.cors]
+allowed_origins = ["http://localhost:5173", "http://localhost:3000"]
+allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+allowed_headers = ["*"]
+expose_headers = []
+allow_credentials = true
+max_age_seconds = 3600
+
+[security.rate_limiting]
+enabled = true
+requests_per_minute = 120
+burst_size = 200
+auth_requests_per_15min = 15
+api_requests_per_hour = 5000
+whitelist_ips = []
+
+[services]
+analysis_engine_url = "http://localhost:8082"
+bounty_manager_url = "http://localhost:8083"
+notification_service_url = "http://localhost:8088"
+storage_service_url = "http://localhost:8084"
+ml_service_url = ""
+max_file_size_mb = 100
+supported_file_types = ["exe", "dll", "pdf", "apk", "zip"]
+analysis_timeout_seconds = 300
+upload_path = "./uploads"
+
+[features]
+enable_file_uploads = true
+enable_url_analysis = true
+enable_blockchain_integration = true
+enable_webhooks = true
+enable_api_keys = true
+enable_mfa = false
+enable_oauth2 = false
+enable_analytics = true
+enable_ml_insights = false
+enable_reputation_system = true
+enable_gamification = true
+
+[monitoring]
+enable_metrics = true
+enable_tracing = true
+metrics_port = 9090
+log_level = "info"
+log_format = "pretty"
+sentry_dsn = ""
+prometheus_enabled = true
+jaeger_endpoint = ""

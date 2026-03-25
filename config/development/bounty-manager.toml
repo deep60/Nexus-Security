@@ -1,0 +1,35 @@
+[server]
+host = "0.0.0.0"
+port = 8083
+workers = 4
+
+[database]
+url = "postgresql://nexus_user:nexus_password@localhost:5432/nexus_security"
+max_connections = 20
+min_connections = 5
+connect_timeout = 30
+idle_timeout = 600
+
+[blockchain]
+rpc_url = "http://localhost:8545"
+chain_id = 31337
+contract_address = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+private_key = ""
+gas_price_gwei = 20
+confirmation_blocks = 3
+
+[redis]
+url = "redis://localhost:6379"
+max_connections = 10
+
+[bounty]
+min_stake_amount = 1000
+max_participants = 100
+default_deadline_hours = 24
+min_quality_score = 0.7
+
+[consensus]
+min_submissions = 3
+consensus_threshold = 0.75
+voting_window_hours = 48
+enable_weighted_voting = true

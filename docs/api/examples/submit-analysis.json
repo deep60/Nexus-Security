@@ -1,0 +1,6 @@
+{
+  "bounty_id": "b6e35cb3-71a6-4b89-8d76-8d3c58f1c7ac",
+  "verdict": "malicious",
+  "confidence": 0.93,
+  "report": "Detected suspicious process injection and C2 indicators."
+}

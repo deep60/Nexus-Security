@@ -1,0 +1,18 @@
+graph TD
+  User[User or Analyst]
+  Frontend[Frontend App]
+  Gateway[API Gateway]
+  Services[Domain Services]
+  Postgres[(PostgreSQL)]
+  Redis[(Redis)]
+  Storage[(MinIO or S3)]
+  Chain[(Blockchain)]
+
+  User --> Frontend
+  User --> Gateway
+  Frontend --> Gateway
+  Gateway --> Services
+  Services --> Postgres
+  Services --> Redis
+  Services --> Storage
+  Services --> Chain

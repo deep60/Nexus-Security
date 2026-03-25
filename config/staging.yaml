@@ -1,18 +1,18 @@
-environment: production
+environment: staging
 
 server:
   host: 0.0.0.0
   port: 8080
-  frontend_url: https://app.nexus-security.com
+  frontend_url: https://staging.nexus-security.com
 
 database:
   url: ${DATABASE_URL}
-  max_connections: 100
-  min_connections: 10
+  max_connections: 50
+  min_connections: 5
 
 redis:
   url: ${REDIS_URL}
-  key_prefix: "nexus:prod:"
+  key_prefix: "nexus:staging:"
 
 blockchain:
   rpc_url: ${BLOCKCHAIN_RPC_URL}
@@ -23,7 +23,7 @@ blockchain:
     reputation_system: "${REPUTATION_SYSTEM_ADDRESS}"
 
 services:
-  api_gateway: https://api.nexus-security.com
+  api_gateway: https://api-staging.nexus-security.com
   analysis_engine: ${ANALYSIS_ENGINE_URL}
   bounty_manager: ${BOUNTY_MANAGER_URL}
   notification_service: ${NOTIFICATION_SERVICE_URL}
@@ -32,7 +32,7 @@ services:
 security:
   jwt_secret: ${JWT_SECRET}
   cors_allowed_origins:
-    - https://app.nexus-security.com
+    - https://staging.nexus-security.com
 
 features:
   enable_blockchain: true

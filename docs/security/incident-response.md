@@ -1,323 +1,58 @@
-# Incident Response Plan
+# Incident Response Playbook
 
-This document outlines procedures for handling security incidents at Nexus Security.
+## Severity Levels
 
-## Incident Classification
+- P1: Active compromise or financial risk.
+- P2: Major degradation or high-confidence breach indicator.
+- P3: Contained issue with limited blast radius.
+- P4: Low-risk or informational finding.
 
-### Severity Levels
+## 1. Detection and Triage
 
-| Level | Description | Response Time | Examples |
-|-------|-------------|---------------|----------|
-| P1 - Critical | Active breach, funds at risk | 15 minutes | Smart contract exploit, data exfiltration |
-| P2 - High | Potential breach, service down | 1 hour | Auth bypass, DoS attack |
-| P3 - Medium | Limited impact, contained | 4 hours | Single account compromise |
-| P4 - Low | Minor issue, no data loss | 24 hours | Failed attack attempts |
+1. Capture alert source and timestamp.
+2. Identify impacted service(s) and data scope.
+3. Assign severity and incident commander.
+4. Open incident channel and record timeline.
 
-## Response Team
+## 2. Immediate Containment
 
-### Roles
+Examples:
 
-- **Incident Commander**: Coordinates response, makes decisions
-- **Technical Lead**: Leads technical investigation
-- **Communications Lead**: Handles internal/external comms
-- **Legal/Compliance**: Advises on obligations
+- Disable affected route or service deployment.
+- Block abusive origins/IPs at ingress.
+- Rotate impacted secrets.
+- Pause unsafe rollout and freeze deploy pipeline.
 
-### On-Call Rotation
+## 3. Investigation
 
-- Primary: Check PagerDuty schedule
-- Secondary: Backup responder
-- Escalation: CTO ’ CEO
+- Collect logs from API gateway and affected services.
+- Validate auth events and suspicious token patterns.
+- Inspect DB/Redis activity for abuse signatures.
+- Confirm whether blockchain credentials were exposed.
 
-## Response Phases
+## 4. Recovery
 
-### 1. Detection
+- Deploy fixed build.
+- Restore data from known-good backups if needed.
+- Re-run `scripts/deployment/health-check.sh`.
+- Monitor for recurrence before closing incident.
 
-**Sources**:
+## 5. Post-Incident Actions
 
-- Monitoring alerts (Prometheus/Grafana)
-- User reports
-- Security scanning
-- External notification
+- Produce incident report with timeline and root cause.
+- Add preventive controls/tests.
+- Update docs and runbooks.
+- Share action items with owners and due dates.
 
-**Initial Actions**:
-
-```
-1. Acknowledge alert
-2. Assess severity level
-3. Page appropriate responders
-4. Create incident channel (#incident-YYYY-MM-DD)
-```
-
-### 2. Containment
-
-**Immediate Actions by Severity**:
-
-#### P1 - Critical
+## Useful Commands
 
 ```bash
-# Pause smart contracts (if applicable)
-cast send $CONTRACT "pause()" --private-key $KEY
+# Health check after remediation
+scripts/deployment/health-check.sh
 
-# Block suspicious IPs
-kubectl exec -it nginx -- nginx -s reload
+# Backup before risky hotfix work
+scripts/maintenance/backup.sh
 
-# Revoke compromised credentials
-./scripts/revoke-all-tokens.sh
-
-# Take affected services offline
-kubectl scale deployment api-gateway --replicas=0
+# Controlled rollback
+scripts/deployment/rollback.sh --to <git-ref>
 ```
-
-#### P2 - High
-
-```bash
-# Enable enhanced logging
-kubectl set env deployment/api-gateway LOG_LEVEL=debug
-
-# Increase rate limits
-kubectl apply -f emergency-rate-limits.yaml
-
-# Block specific users/IPs
-redis-cli SADD blocked_ips "x.x.x.x"
-```
-
-#### P3/P4
-
-- Document indicators
-- Monitor closely
-- Prepare containment if escalates
-
-### 3. Eradication
-
-**Objectives**:
-
-- Remove attacker access
-- Patch vulnerabilities
-- Clean compromised systems
-
-**Actions**:
-
-```bash
-# Rotate all secrets
-./scripts/rotate-secrets.sh
-
-# Deploy security patches
-kubectl set image deployment/api-gateway api-gateway=nexus/api-gateway:patched
-
-# Reset compromised accounts
-./scripts/force-password-reset.sh --users affected_users.txt
-```
-
-### 4. Recovery
-
-**Steps**:
-
-1. Verify systems are clean
-2. Restore from known-good backups
-3. Gradually restore services
-4. Monitor for re-compromise
-
-```bash
-# Restore database from backup
-aws rds restore-db-instance-from-db-snapshot \
-  --db-instance-identifier nexus-postgres-recovered \
-  --db-snapshot-identifier pre-incident-snapshot
-
-# Gradual traffic restoration
-kubectl scale deployment api-gateway --replicas=1
-# Monitor...
-kubectl scale deployment api-gateway --replicas=3
-```
-
-### 5. Post-Incident
-
-**Timeline**: Within 48 hours
-
-#### Incident Report Template
-
-```markdown
-## Incident Report: [Title]
-
-**Date**: YYYY-MM-DD
-**Severity**: P1/P2/P3/P4
-**Duration**: X hours
-**Commander**: Name
-
-### Summary
-Brief description of what happened.
-
-### Timeline
-- HH:MM - Event detected
-- HH:MM - Team assembled
-- HH:MM - Containment achieved
-- HH:MM - Eradication complete
-- HH:MM - Recovery complete
-
-### Impact
-- Users affected: X
-- Data exposed: Description
-- Financial impact: $X
-
-### Root Cause
-Technical explanation of vulnerability.
-
-### Resolution
-How the issue was fixed.
-
-### Lessons Learned
-What we'll do better.
-
-### Action Items
-- [ ] Task 1 - Owner - Due date
-- [ ] Task 2 - Owner - Due date
-```
-
-## Communication
-
-### Internal Communication
-
-**Channels**:
-
-- Slack: #incident-response (real-time)
-- Email: security-team@nexus-security.com
-
-**Updates**:
-
-- P1: Every 30 minutes
-- P2: Every hour
-- P3/P4: At resolution
-
-### External Communication
-
-#### User Notification (if required)
-
-```
-Subject: Security Notice - Action Required
-
-Dear [User],
-
-We detected unauthorized access to your Nexus Security account on [date].
-We have secured your account and recommend you:
-
-1. Reset your password immediately
-2. Review recent account activity
-3. Enable two-factor authentication
-
-No funds were affected. We apologize for any inconvenience.
-
-Questions? Contact security@nexus-security.com
-
-Nexus Security Team
-```
-
-#### Public Disclosure
-
-**Criteria for public disclosure**:
-
-- User data was exposed
-- Regulatory requirement
-- Wide-scale impact
-
-**Template**:
-
-```
-SECURITY INCIDENT NOTICE
-
-Date: [Date]
-
-Nexus Security identified and resolved a security incident on [date].
-[Brief description of what occurred and impact].
-
-What We Did:
-- [Actions taken]
-
-What You Should Do:
-- [User actions]
-
-We are committed to transparency and security. For questions,
-contact security@nexus-security.com.
-```
-
-## Playbooks
-
-### Compromised User Account
-
-1. Disable account
-2. Revoke all sessions
-3. Check for unauthorized actions
-4. Notify user via verified contact
-5. Require password reset + 2FA
-
-### Smart Contract Vulnerability
-
-1. Pause contract if possible
-2. Assess exploitability
-3. Prepare patch
-4. Deploy to testnet
-5. Emergency audit
-6. Deploy to mainnet
-7. Resume contract
-
-### DDoS Attack
-
-1. Enable CDN DDoS protection
-2. Implement aggressive rate limiting
-3. Block attacking IPs/ASNs
-4. Scale infrastructure
-5. Contact ISP if needed
-
-### Data Breach
-
-1. Contain the breach
-2. Assess data exposed
-3. Notify legal/compliance
-4. Preserve evidence
-5. Notify affected users
-6. Report to authorities (if required)
-
-## Tools
-
-### Investigation
-
-- Log analysis: Grafana Loki
-- Network: Wireshark, tcpdump
-- Forensics: Velociraptor
-
-### Communication
-
-- Incident management: PagerDuty
-- Chat: Slack
-- Video: Zoom
-
-### Recovery
-
-- Backups: AWS Backup
-- Config management: Terraform
-- Secrets: AWS Secrets Manager
-
-## Training
-
-- Tabletop exercises: Quarterly
-- Technical drills: Monthly
-- New hire training: Onboarding
-
-## Review
-
-This plan is reviewed and updated:
-
-- After every P1/P2 incident
-- Quarterly at minimum
-- When infrastructure changes significantly
-
-## Contacts
-
-**Internal**:
-
-- Security Team: security@nexus-security.com
-- On-call: See PagerDuty
-
-**External**:
-
-- Legal Counsel: [Contact]
-- Cyber Insurance: [Contact]
-- Law Enforcement: [Contact]

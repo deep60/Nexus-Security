@@ -1,0 +1,50 @@
+environment: development
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  frontend_url: http://localhost:5173
+
+database:
+  url: postgresql://nexus_user:nexus_password@localhost:5432/nexus_security
+  max_connections: 25
+  min_connections: 5
+
+redis:
+  url: redis://localhost:6379
+  key_prefix: "nexus:dev:"
+
+blockchain:
+  rpc_url: http://localhost:8545
+  chain_id: 31337
+  contracts:
+    bounty_manager: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+    threat_token: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    reputation_system: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+
+services:
+  api_gateway: http://localhost:8080
+  user_service: http://localhost:8081
+  analysis_engine: http://localhost:8082
+  bounty_manager: http://localhost:8083
+  submission_service: http://localhost:8084
+  consensus_service: http://localhost:8085
+  payment_service: http://localhost:8086
+  reputation_service: http://localhost:8087
+  notification_service: http://localhost:8088
+
+security:
+  jwt_secret: change-me-in-dev
+  cors_allowed_origins:
+    - http://localhost:3000
+    - http://localhost:5173
+
+features:
+  enable_blockchain: true
+  enable_email: true
+  enable_clamav: true
+  enable_ipfs: false
+
+logging:
+  level: info
+  format: pretty

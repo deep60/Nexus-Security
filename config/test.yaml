@@ -1,0 +1,42 @@
+environment: test
+
+server:
+  host: 127.0.0.1
+  port: 18080
+
+# Test DB is isolated from development to avoid accidental data loss.
+database:
+  url: postgresql://nexus_user:nexus_password@localhost:5432/nexus_security_test
+  max_connections: 10
+  min_connections: 2
+
+redis:
+  url: redis://localhost:6379/1
+  key_prefix: "nexus:test:"
+
+blockchain:
+  rpc_url: http://localhost:8545
+  chain_id: 31337
+  contracts:
+    bounty_manager: "0x0000000000000000000000000000000000000000"
+    threat_token: "0x0000000000000000000000000000000000000000"
+    reputation_system: "0x0000000000000000000000000000000000000000"
+
+services:
+  api_gateway: http://localhost:18080
+
+security:
+  jwt_secret: test-secret-not-for-production
+  cors_allowed_origins:
+    - http://localhost:3000
+    - http://localhost:5173
+
+features:
+  enable_blockchain: false
+  enable_email: false
+  enable_clamav: false
+  enable_ipfs: false
+
+logging:
+  level: warn
+  format: compact

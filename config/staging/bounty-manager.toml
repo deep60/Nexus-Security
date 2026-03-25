@@ -1,0 +1,35 @@
+[server]
+host = "0.0.0.0"
+port = 8083
+workers = 6
+
+[database]
+url = "${DATABASE_URL}"
+max_connections = 30
+min_connections = 10
+connect_timeout = 30
+idle_timeout = 600
+
+[blockchain]
+rpc_url = "${BLOCKCHAIN_RPC_URL}"
+chain_id = 11155111
+contract_address = "${BOUNTY_MANAGER_ADDRESS}"
+private_key = "${BLOCKCHAIN_PRIVATE_KEY}"
+gas_price_gwei = 20
+confirmation_blocks = 5
+
+[redis]
+url = "${REDIS_URL}"
+max_connections = 20
+
+[bounty]
+min_stake_amount = 1000
+max_participants = 150
+default_deadline_hours = 24
+min_quality_score = 0.75
+
+[consensus]
+min_submissions = 3
+consensus_threshold = 0.8
+voting_window_hours = 48
+enable_weighted_voting = true

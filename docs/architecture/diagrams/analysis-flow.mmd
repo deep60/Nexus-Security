@@ -1,0 +1,15 @@
+sequenceDiagram
+  participant U as User
+  participant G as API Gateway
+  participant Sub as Submission Service
+  participant Eng as Analysis Engine
+  participant DB as PostgreSQL
+
+  U->>G: Submit artifact or report
+  G->>Sub: Validate and create submission
+  Sub->>DB: Store submission metadata
+  Sub->>Eng: Trigger analysis workflow
+  Eng->>DB: Store analysis output
+  U->>G: Query result
+  G->>DB: Read aggregated status
+  G-->>U: Verdict and confidence
