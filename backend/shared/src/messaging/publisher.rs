@@ -169,7 +169,7 @@ mod tests {
         let event = NexusEvent::PaymentProcessed(PaymentProcessedEvent {
             bounty_id: Uuid::new_v4(),
             recipient_id: Uuid::new_v4(),
-            amount: 1000.0,
+            amount: 1000,
             tx_hash: "0x1234567890abcdef".to_string(),
             payment_type: PaymentType::BountyReward,
             processed_at: Utc::now(),

@@ -106,6 +106,7 @@ services:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus_security
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       RUST_LOG: info
+      SERVER_PORT: 8082
       YARA_RULES_PATH: /app/rules
       UPLOAD_DIR: /app/uploads
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-104857600}

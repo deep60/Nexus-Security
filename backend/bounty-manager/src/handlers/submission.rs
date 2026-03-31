@@ -13,6 +13,7 @@ use chrono::{DateTime, Utc};
 use shared::types::ApiResponse;
 use super::bounty_crud::PaginationParams;
 use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
+use crate::models::SubmissionModel;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Submission {
@@ -197,73 +198,122 @@ pub async fn submit_analysis(
     let submission_id = Uuid::new_v4();
     let now = Utc::now();
 
-    let submission = Submission {
+    let analysis_json = serde_json::to_value(&req.analysis_details).unwrap_or_default();
+
+    let db_sub = SubmissionModel {
         id: submission_id,
         bounty_id,
         engine_id: engine_id.clone(),
-        engine_type: req.engine_type,
-        verdict: req.verdict,
+        engine_type: format!("{:?}", req.engine_type),
+        verdict: format!("{:?}", req.verdict),
         confidence: req.confidence,
-        stake_amount: req.stake_amount,
-        analysis_details: req.analysis_details,
-        status: SubmissionStatus::Pending,
-        transaction_hash: None, // Will be updated after blockchain confirmation
+        stake_amount: req.stake_amount as i64,
+        analysis_details: analysis_json,
+        status: "Pending".to_string(),
+        transaction_hash: None,
         submitted_at: now,
         processed_at: None,
         accuracy_score: None,
     };
 
-    // TODO: Create blockchain transaction for stake
-    // TODO: Save submission to database
-    // TODO: Emit real-time event
-    // TODO: Check if consensus threshold is reached
+    let saved = SubmissionModel::create(&state.db, &db_sub)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to create submission: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let submission = db_submission_to_handler_submission(saved, req.analysis_details);
 
     Ok(Json(ApiResponse::success(submission)))
 }
 
 pub async fn get_submission(
-    State(_state): State<BountyManagerState>,
+    State(state): State<BountyManagerState>,
     Path(submission_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<Submission>>, StatusCode> {
-    // TODO: Fetch from database
-    let mock_submission = create_mock_submission(submission_id);
+    let db_sub = SubmissionModel::find_by_id(&state.db, submission_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch submission: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
-    Ok(Json(ApiResponse::success(mock_submission)))
+    let details: AnalysisDetails = serde_json::from_value(db_sub.analysis_details.clone())
+        .unwrap_or_else(|_| default_analysis_details());
+    let submission = db_submission_to_handler_submission(db_sub, details);
+
+    Ok(Json(ApiResponse::success(submission)))
 }
 
 pub async fn list_submissions_for_bounty(
-    State(_state): State<BountyManagerState>,
+    State(state): State<BountyManagerState>,
     Path(bounty_id): Path<Uuid>,
     Query(pagination): Query<PaginationParams>,
-    Query(filters): Query<SubmissionFilters>,
+    Query(_filters): Query<SubmissionFilters>,
 ) -> Result<Json<ApiResponse<SubmissionListResponse>>, StatusCode> {
     let page = pagination.page.unwrap_or(1);
     let per_page = pagination.per_page.unwrap_or(20).min(100);
 
-    // TODO: Implement database query with filters
-    let submissions = vec![
-        create_mock_submission(Uuid::new_v4()),
-        create_mock_submission(Uuid::new_v4()),
-    ];
+    let db_submissions = SubmissionModel::find_by_bounty(&state.db, bounty_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to list submissions: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
-    // TODO: Calculate real consensus data
-    let consensus_data = ConsensusData {
-        current_consensus: Some(ThreatVerdict::Malicious),
-        confidence_level: 0.85,
-        total_submissions: 2,
-        verdict_breakdown: {
-            let mut breakdown = HashMap::new();
-            breakdown.insert("Malicious".to_string(), 2);
-            breakdown.insert("Benign".to_string(), 0);
-            breakdown
-        },
-        weighted_score: 0.87,
+    let total_count = db_submissions.len();
+
+    // Build real consensus data from submissions
+    let mut verdict_breakdown: HashMap<String, u32> = HashMap::new();
+    let mut total_confidence: f32 = 0.0;
+    let mut total_stake: i64 = 0;
+
+    for s in &db_submissions {
+        *verdict_breakdown.entry(s.verdict.clone()).or_insert(0) += 1;
+        total_confidence += s.confidence;
+        total_stake += s.stake_amount;
+    }
+
+    let avg_confidence = if total_count > 0 {
+        total_confidence / total_count as f32
+    } else {
+        0.0
     };
+
+    // Determine current consensus verdict (most common)
+    let current_consensus = verdict_breakdown
+        .iter()
+        .max_by_key(|(_, count)| *count)
+        .map(|(verdict, _)| match verdict.as_str() {
+            "Malicious" => ThreatVerdict::Malicious,
+            "Benign" => ThreatVerdict::Benign,
+            "Suspicious" => ThreatVerdict::Suspicious,
+            _ => ThreatVerdict::Unknown,
+        });
+
+    let consensus_data = ConsensusData {
+        current_consensus,
+        confidence_level: avg_confidence,
+        total_submissions: total_count as u32,
+        verdict_breakdown,
+        weighted_score: avg_confidence, // Simplified; could weight by stake/reputation
+    };
+
+    let submissions: Vec<Submission> = db_submissions
+        .into_iter()
+        .map(|s| {
+            let details: AnalysisDetails = serde_json::from_value(s.analysis_details.clone())
+                .unwrap_or_else(|_| default_analysis_details());
+            db_submission_to_handler_submission(s, details)
+        })
+        .collect();
 
     let response_data = SubmissionListResponse {
         submissions,
         consensus_data: Some(consensus_data),
-        total_count: 2,
+        total_count,
         page,
         per_page,
     };
@@ -272,56 +322,82 @@ pub async fn list_submissions_for_bounty(
 }
 
 pub async fn update_submission_status(
-    State(_state): State<BountyManagerState>,
+    State(state): State<BountyManagerState>,
     Path(submission_id): Path<Uuid>,
     Json(status): Json<SubmissionStatus>,
 ) -> Result<Json<ApiResponse<Submission>>, StatusCode> {
-    // TODO: This would typically be called by internal services
-    // TODO: Update submission status in database
-    // TODO: Handle reward/slashing logic
+    let status_str = format!("{:?}", status);
 
-    let mut submission = create_mock_submission(submission_id);
-    submission.status = status;
-    submission.processed_at = Some(Utc::now());
+    SubmissionModel::update_status(&state.db, submission_id, &status_str)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to update submission status: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let db_sub = SubmissionModel::find_by_id(&state.db, submission_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to re-fetch submission: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let details: AnalysisDetails = serde_json::from_value(db_sub.analysis_details.clone())
+        .unwrap_or_else(|_| default_analysis_details());
+    let submission = db_submission_to_handler_submission(db_sub, details);
 
     Ok(Json(ApiResponse::success(submission)))
 }
 
-// Helper function for mock data
-fn create_mock_submission(id: Uuid) -> Submission {
+// Conversion helper: SubmissionModel (DB) -> Submission (handler DTO)
+fn db_submission_to_handler_submission(db: SubmissionModel, details: AnalysisDetails) -> Submission {
+    let engine_type = match db.engine_type.as_str() {
+        "Human" => EngineType::Human,
+        "Hybrid" => EngineType::Hybrid,
+        _ => EngineType::Automated,
+    };
+
+    let verdict = match db.verdict.as_str() {
+        "Malicious" => ThreatVerdict::Malicious,
+        "Benign" => ThreatVerdict::Benign,
+        "Suspicious" => ThreatVerdict::Suspicious,
+        _ => ThreatVerdict::Unknown,
+    };
+
+    let status = match db.status.as_str() {
+        "Active" => SubmissionStatus::Active,
+        "Correct" => SubmissionStatus::Correct,
+        "Incorrect" => SubmissionStatus::Incorrect,
+        "Slashed" => SubmissionStatus::Slashed,
+        "Rewarded" => SubmissionStatus::Rewarded,
+        _ => SubmissionStatus::Pending,
+    };
+
     Submission {
-        id,
-        bounty_id: Uuid::new_v4(),
-        engine_id: "engine_123".to_string(),
-        engine_type: EngineType::Automated,
-        verdict: ThreatVerdict::Malicious,
-        confidence: 0.92,
-        stake_amount: 50000,
-        analysis_details: AnalysisDetails {
-            malware_families: vec!["Trojan.Generic".to_string()],
-            threat_indicators: vec![
-                ThreatIndicator {
-                    indicator_type: "hash".to_string(),
-                    value: "abc123def456".to_string(),
-                    severity: ThreatSeverity::High,
-                    description: Some("Known malicious hash".to_string()),
-                }
-            ],
-            behavioral_analysis: Some(BehavioralAnalysis {
-                network_connections: vec!["192.168.1.100:8080".to_string()],
-                file_operations: vec!["CreateFile: C:\\temp\\malware.exe".to_string()],
-                registry_modifications: vec!["HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run".to_string()],
-                process_creation: vec!["cmd.exe".to_string()],
-                api_calls: vec!["CreateProcessA".to_string()],
-            }),
-            static_analysis: None,
-            network_analysis: None,
-            metadata: HashMap::new(),
-        },
-        status: SubmissionStatus::Active,
-        transaction_hash: Some("0xabc123def456...".to_string()),
-        submitted_at: Utc::now() - chrono::Duration::minutes(30),
-        processed_at: None,
-        accuracy_score: None,
+        id: db.id,
+        bounty_id: db.bounty_id,
+        engine_id: db.engine_id,
+        engine_type,
+        verdict,
+        confidence: db.confidence,
+        stake_amount: db.stake_amount as u64,
+        analysis_details: details,
+        status,
+        transaction_hash: db.transaction_hash,
+        submitted_at: db.submitted_at,
+        processed_at: db.processed_at,
+        accuracy_score: db.accuracy_score,
+    }
+}
+
+fn default_analysis_details() -> AnalysisDetails {
+    AnalysisDetails {
+        malware_families: Vec::new(),
+        threat_indicators: Vec::new(),
+        behavioral_analysis: None,
+        static_analysis: None,
+        network_analysis: None,
+        metadata: HashMap::new(),
     }
 }

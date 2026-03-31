@@ -5,11 +5,13 @@ use axum::{
     Extension,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use shared::types::ApiResponse;
+use crate::models::{BountyModel, SubmissionModel};
 use crate::services::reputation::ReputationService;
 
 // Common types
@@ -151,10 +153,10 @@ pub struct CurrencyStats {
     pub bounty_count: u32,
 }
 
-// Application state (would typically come from dependency injection)
+// Application state
 #[derive(Clone)]
 pub struct BountyManagerState {
-    // Database connection pool, blockchain client, etc.
+    pub db: PgPool,
     pub reputation_service: Arc<ReputationService>,
 }
 
@@ -173,10 +175,43 @@ pub async fn create_bounty(
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    // Create bounty
     let bounty_id = Uuid::new_v4();
     let now = Utc::now();
     let deadline = now + chrono::Duration::hours(req.deadline_hours as i64);
+    let consensus = req.consensus_threshold.unwrap_or(0.75);
+    let metadata_clone = req.metadata.clone();
+
+    // Build DB model and persist
+    let db_bounty = BountyModel {
+        id: bounty_id,
+        creator: user_address.clone(),
+        title: req.title.clone(),
+        description: req.description.clone(),
+        artifact_type: format!("{:?}", req.artifact_type),
+        artifact_hash: req.artifact_data.hash.clone(),
+        artifact_url: req.artifact_data.url.clone(),
+        file_name: req.artifact_data.file_name.clone(),
+        file_size: req.artifact_data.file_size.map(|s| s as i64),
+        mime_type: req.artifact_data.mime_type.clone(),
+        upload_path: req.artifact_data.upload_path.clone(),
+        reward_amount: req.reward_amount as i64,
+        currency: req.currency.clone(),
+        min_stake: req.min_stake as i64,
+        max_participants: req.max_participants.map(|m| m as i32),
+        deadline,
+        status: "Active".to_string(),
+        consensus_threshold: consensus,
+        created_at: now,
+        updated_at: now,
+        metadata: metadata_clone.map(|m| serde_json::to_value(m).unwrap_or_default()),
+    };
+
+    BountyModel::create(&state.db, &db_bounty)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to create bounty: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let bounty = Bounty {
         id: bounty_id,
@@ -191,130 +226,258 @@ pub async fn create_bounty(
         max_participants: req.max_participants,
         deadline,
         status: BountyStatus::Active,
-        consensus_threshold: req.consensus_threshold.unwrap_or(0.75),
+        consensus_threshold: consensus,
         created_at: now,
         updated_at: now,
         submissions: Vec::new(),
         metadata: req.metadata.unwrap_or_default(),
     };
 
-    // TODO: Save to database
-    // TODO: Create blockchain transaction for bounty creation
-    // TODO: Emit event for real-time updates
-
     Ok(Json(ApiResponse::success(bounty)))
 }
 
 pub async fn get_bounty(
-    State(_state): State<BountyManagerState>,
+    State(state): State<BountyManagerState>,
     Path(bounty_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<Bounty>>, StatusCode> {
-    // TODO: Fetch from database
-    // For now, return a mock bounty
-    let mock_bounty = create_mock_bounty(bounty_id);
+    let db_bounty = BountyModel::find_by_id(&state.db, bounty_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch bounty: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
-    Ok(Json(ApiResponse::success(mock_bounty)))
+    let bounty = db_bounty_to_handler_bounty(db_bounty);
+    Ok(Json(ApiResponse::success(bounty)))
 }
 
 pub async fn list_bounties(
-    State(_state): State<BountyManagerState>,
+    State(state): State<BountyManagerState>,
     Query(pagination): Query<PaginationParams>,
     Query(filters): Query<BountyFilters>,
 ) -> Result<Json<ApiResponse<BountyListResponse>>, StatusCode> {
     let page = pagination.page.unwrap_or(1);
     let per_page = pagination.per_page.unwrap_or(20).min(100);
+    let offset = ((page.saturating_sub(1)) * per_page) as i64;
 
-    // TODO: Implement database query with filters and pagination
-    let bounties = create_mock_bounty_list();
-    let total_count = bounties.len();
+    let status_str = filters.status.as_ref().map(|s| format!("{:?}", s));
+    let creator_str = filters.creator.as_deref();
+
+    let db_bounties = BountyModel::list(
+        &state.db,
+        status_str.as_deref(),
+        creator_str,
+        per_page as i64,
+        offset,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to list bounties: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let total_count = BountyModel::count(&state.db, status_str.as_deref())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to count bounties: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })? as usize;
+
+    let bounties: Vec<Bounty> = db_bounties.into_iter().map(db_bounty_to_handler_bounty).collect();
+    let has_more = (page as usize * per_page as usize) < total_count;
 
     let response_data = BountyListResponse {
         bounties,
         total_count,
         page,
         per_page,
-        has_more: false, // TODO: Calculate based on actual data
+        has_more,
     };
 
     Ok(Json(ApiResponse::success(response_data)))
 }
 
 pub async fn update_bounty(
-    State(_state): State<BountyManagerState>,
+    State(state): State<BountyManagerState>,
     Extension(user_address): Extension<String>,
     Path(bounty_id): Path<Uuid>,
     Json(req): Json<UpdateBountyRequest>,
 ) -> Result<Json<ApiResponse<Bounty>>, StatusCode> {
-    // TODO: Fetch existing bounty from database
-    // TODO: Check if user is the creator
-    // TODO: Validate that bounty can be updated (not completed, etc.)
-    
-    let mut bounty = create_mock_bounty(bounty_id);
-    
+    // Fetch existing bounty
+    let db_bounty = BountyModel::find_by_id(&state.db, bounty_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch bounty: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
     // Verify ownership
-    if bounty.creator != user_address {
+    if db_bounty.creator != user_address {
         return Err(StatusCode::FORBIDDEN);
     }
 
-    // Apply updates
-    if let Some(title) = req.title {
-        bounty.title = title;
-    }
-    if let Some(description) = req.description {
-        bounty.description = description;
-    }
-    if let Some(deadline) = req.deadline {
-        bounty.deadline = deadline;
-    }
-    if let Some(status) = req.status {
-        bounty.status = status;
-    }
-    if let Some(metadata) = req.metadata {
-        bounty.metadata = metadata;
+    // Check bounty can be updated (not completed/cancelled)
+    if db_bounty.status == "Completed" || db_bounty.status == "Cancelled" {
+        return Err(StatusCode::CONFLICT);
     }
 
-    bounty.updated_at = Utc::now();
+    // Apply updates via direct SQL for flexibility
+    if let Some(ref title) = req.title {
+        sqlx::query("UPDATE bounties SET title = $1, updated_at = $2 WHERE id = $3")
+            .bind(title)
+            .bind(Utc::now())
+            .bind(bounty_id)
+            .execute(&state.db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to update bounty title: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    }
+    if let Some(ref description) = req.description {
+        sqlx::query("UPDATE bounties SET description = $1, updated_at = $2 WHERE id = $3")
+            .bind(description)
+            .bind(Utc::now())
+            .bind(bounty_id)
+            .execute(&state.db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to update bounty description: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    }
+    if let Some(ref deadline) = req.deadline {
+        sqlx::query("UPDATE bounties SET deadline = $1, updated_at = $2 WHERE id = $3")
+            .bind(deadline)
+            .bind(Utc::now())
+            .bind(bounty_id)
+            .execute(&state.db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to update bounty deadline: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    }
+    if let Some(ref status) = req.status {
+        let status_str = format!("{:?}", status);
+        BountyModel::update_status(&state.db, bounty_id, &status_str)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to update bounty status: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    }
+    if let Some(ref metadata) = req.metadata {
+        let json_val = serde_json::to_value(metadata).unwrap_or_default();
+        sqlx::query("UPDATE bounties SET metadata = $1, updated_at = $2 WHERE id = $3")
+            .bind(json_val)
+            .bind(Utc::now())
+            .bind(bounty_id)
+            .execute(&state.db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to update bounty metadata: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    }
 
-    // TODO: Save to database
-    // TODO: Emit update event
+    // Re-fetch to return updated state
+    let updated = BountyModel::find_by_id(&state.db, bounty_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to re-fetch bounty: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
-    Ok(Json(ApiResponse::success(bounty)))
+    Ok(Json(ApiResponse::success(db_bounty_to_handler_bounty(updated))))
 }
 
 pub async fn cancel_bounty(
-    State(_state): State<BountyManagerState>,
+    State(state): State<BountyManagerState>,
     Extension(user_address): Extension<String>,
     Path(bounty_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
-    // TODO: Fetch bounty and verify ownership
-    // TODO: Check if bounty can be cancelled
-    // TODO: Handle refunds and blockchain transactions
+    // Fetch bounty and verify ownership
+    let db_bounty = BountyModel::find_by_id(&state.db, bounty_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch bounty: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if db_bounty.creator != user_address {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    if db_bounty.status == "Completed" || db_bounty.status == "Cancelled" {
+        return Err(StatusCode::CONFLICT);
+    }
+
+    BountyModel::update_status(&state.db, bounty_id, "Cancelled")
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to cancel bounty: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(Json(ApiResponse::success(())))
 }
 
 pub async fn get_bounty_stats(
-    State(_state): State<BountyManagerState>,
+    State(state): State<BountyManagerState>,
 ) -> Result<Json<ApiResponse<BountyStatsResponse>>, StatusCode> {
-    // TODO: Implement real statistics from database
+    let total_bounties = BountyModel::count(&state.db, None).await.unwrap_or(0) as u64;
+    let active_bounties = BountyModel::count(&state.db, Some("Active")).await.unwrap_or(0) as u64;
+    let completed_bounties = BountyModel::count(&state.db, Some("Completed")).await.unwrap_or(0) as u64;
+
+    // Aggregate reward stats
+    let reward_row: (Option<i64>,) = sqlx::query_as(
+        "SELECT COALESCE(SUM(reward_amount), 0) FROM bounties WHERE status = 'Completed'"
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or((Some(0),));
+
+    let total_rewards_paid = reward_row.0.unwrap_or(0) as u64;
+
+    // Average resolution time
+    let avg_row: (Option<f64>,) = sqlx::query_as(
+        "SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600.0) FROM bounties WHERE status = 'Completed'"
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or((Some(0.0),));
+
+    let avg_resolution_time_hours = avg_row.0.unwrap_or(0.0) as f32;
+
+    // Top currencies
+    let currency_rows: Vec<(String, Option<i64>, Option<i64>)> = sqlx::query_as(
+        "SELECT currency, SUM(reward_amount) as total, COUNT(*) as cnt FROM bounties GROUP BY currency ORDER BY total DESC LIMIT 5"
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let top_currencies: Vec<CurrencyStats> = currency_rows
+        .into_iter()
+        .map(|(currency, total, cnt)| CurrencyStats {
+            currency,
+            total_amount: total.unwrap_or(0) as u64,
+            bounty_count: cnt.unwrap_or(0) as u32,
+        })
+        .collect();
+
     let stats = BountyStatsResponse {
-        total_bounties: 156,
-        active_bounties: 23,
-        completed_bounties: 128,
-        total_rewards_paid: 2500000, // wei
-        avg_resolution_time_hours: 4.2,
-        top_currencies: vec![
-            CurrencyStats {
-                currency: "0x...".to_string(), // ETH address
-                total_amount: 1500000,
-                bounty_count: 89,
-            },
-            CurrencyStats {
-                currency: "0x...".to_string(), // USDC address
-                total_amount: 1000000,
-                bounty_count: 67,
-            },
-        ],
+        total_bounties,
+        active_bounties,
+        completed_bounties,
+        total_rewards_paid,
+        avg_resolution_time_hours,
+        top_currencies,
     };
 
     Ok(Json(ApiResponse::success(stats)))
@@ -326,19 +489,66 @@ pub async fn submit_to_bounty(
     Path(bounty_id): Path<Uuid>,
     Json(submission): Json<SubmissionRequest>,
 ) -> Result<Json<ApiResponse<SubmissionResponse>>, StatusCode> {
-    // TODO: Validate bounty exists and is active
-    // TODO: Check if engine can participate (reputation, stake requirements)
-    // TODO: Process stake transaction
-    // TODO: Store submission
-    
+    // Validate bounty exists and is active
+    let db_bounty = BountyModel::find_by_id(&state.db, bounty_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch bounty: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if db_bounty.status != "Active" {
+        return Err(StatusCode::CONFLICT);
+    }
+
+    // Check max participants
+    if let Some(max) = db_bounty.max_participants {
+        let current = SubmissionModel::count_by_bounty(&state.db, bounty_id)
+            .await
+            .unwrap_or(0);
+        if current >= max as i64 {
+            return Err(StatusCode::CONFLICT);
+        }
+    }
+
     let submission_id = Uuid::new_v4();
-    
+    let now = Utc::now();
+
+    let analysis_json = submission.analysis_data
+        .as_ref()
+        .map(|a| serde_json::to_value(a).unwrap_or_default())
+        .unwrap_or(serde_json::json!({}));
+
+    let db_sub = SubmissionModel {
+        id: submission_id,
+        bounty_id,
+        engine_id: engine_id.clone(),
+        engine_type: "Automated".to_string(),
+        verdict: format!("{:?}", submission.verdict),
+        confidence: submission.confidence,
+        stake_amount: submission.stake_amount as i64,
+        analysis_details: analysis_json,
+        status: "Pending".to_string(),
+        transaction_hash: None,
+        submitted_at: now,
+        processed_at: None,
+        accuracy_score: None,
+    };
+
+    SubmissionModel::create(&state.db, &db_sub)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to create submission: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
     let response_data = SubmissionResponse {
         submission_id,
         bounty_id,
-        engine_id: engine_id.clone(),
+        engine_id,
         status: "submitted".to_string(),
-        stake_transaction_hash: "0x...".to_string(), // Mock transaction hash
+        stake_transaction_hash: String::new(),
     };
 
     Ok(Json(ApiResponse::success(response_data)))
@@ -353,7 +563,7 @@ pub struct SubmissionRequest {
     pub analysis_data: Option<AnalysisData>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct AnalysisData {
     pub detected_families: Vec<String>,
     pub behavioral_indicators: Vec<String>,
@@ -369,39 +579,54 @@ pub struct SubmissionResponse {
     pub stake_transaction_hash: String,
 }
 
-// Mock data functions (to be replaced with real database queries)
-fn create_mock_bounty(id: Uuid) -> Bounty {
-    Bounty {
-        id,
-        creator: "0x742d35Cc6634C0532925a3b8D404C8f89f6562b6".to_string(),
-        title: "Analyze suspicious executable".to_string(),
-        description: "Please analyze this PE file for malware indicators".to_string(),
-        artifact_type: ArtifactType::File,
-        artifact_data: ArtifactData {
-            hash: Some("sha256:abc123...".to_string()),
-            url: None,
-            file_name: Some("suspicious.exe".to_string()),
-            file_size: Some(1024000),
-            mime_type: Some("application/x-msdownload".to_string()),
-            upload_path: Some("/uploads/abc123...".to_string()),
-        },
-        reward_amount: 100000, // wei
-        currency: "0x...".to_string(),
-        min_stake: 10000,
-        max_participants: Some(10),
-        deadline: Utc::now() + chrono::Duration::hours(24),
-        status: BountyStatus::Active,
-        consensus_threshold: 0.75,
-        created_at: Utc::now() - chrono::Duration::hours(2),
-        updated_at: Utc::now() - chrono::Duration::hours(2),
-        submissions: vec![],
-        metadata: HashMap::new(),
-    }
-}
+// Conversion helper: BountyModel (DB) -> Bounty (handler DTO)
+fn db_bounty_to_handler_bounty(db: BountyModel) -> Bounty {
+    let artifact_type = match db.artifact_type.as_str() {
+        "Url" => ArtifactType::Url,
+        "Hash" => ArtifactType::Hash,
+        "IpAddress" => ArtifactType::IpAddress,
+        "Domain" => ArtifactType::Domain,
+        "Email" => ArtifactType::Email,
+        _ => ArtifactType::File,
+    };
 
-fn create_mock_bounty_list() -> Vec<Bounty> {
-    vec![
-        create_mock_bounty(Uuid::new_v4()),
-        create_mock_bounty(Uuid::new_v4()),
-    ]
+    let status = match db.status.as_str() {
+        "InProgress" => BountyStatus::InProgress,
+        "Completed" => BountyStatus::Completed,
+        "Expired" => BountyStatus::Expired,
+        "Cancelled" => BountyStatus::Cancelled,
+        "UnderReview" => BountyStatus::UnderReview,
+        _ => BountyStatus::Active,
+    };
+
+    let metadata: HashMap<String, String> = db.metadata
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default();
+
+    Bounty {
+        id: db.id,
+        creator: db.creator,
+        title: db.title,
+        description: db.description,
+        artifact_type,
+        artifact_data: ArtifactData {
+            hash: db.artifact_hash,
+            url: db.artifact_url,
+            file_name: db.file_name,
+            file_size: db.file_size.map(|s| s as u64),
+            mime_type: db.mime_type,
+            upload_path: db.upload_path,
+        },
+        reward_amount: db.reward_amount as u64,
+        currency: db.currency,
+        min_stake: db.min_stake as u64,
+        max_participants: db.max_participants.map(|m| m as u32),
+        deadline: db.deadline,
+        status,
+        consensus_threshold: db.consensus_threshold,
+        created_at: db.created_at,
+        updated_at: db.updated_at,
+        submissions: Vec::new(), // Loaded separately if needed
+        metadata,
+    }
 }

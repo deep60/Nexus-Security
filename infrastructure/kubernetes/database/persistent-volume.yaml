@@ -1,30 +1,7 @@
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: postgres-pv
-  labels:
-    app: postgresql
-    component: database
-spec:
-  capacity:
-    storage: 50Gi
-  volumeMode: Filesystem
-  accessModes:
-  - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: fast-ssd
-  hostPath:
-    path: /mnt/data/postgres
-  nodeAffinity:
-    required:
-      nodeSelectorTerms:
-      - matchExpressions:
-        - key: kubernetes.io/os
-          operator: In
-          values:
-          - linux
-
----
+# ============================================================
+# Production-ready PVCs using dynamic provisioning via StorageClass.
+# Do NOT use hostPath in production — data is lost on node failure.
+# ============================================================
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -40,34 +17,6 @@ spec:
     requests:
       storage: 50Gi
   storageClassName: fast-ssd
-  volumeName: postgres-pv
-
----
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: redis-pv
-  labels:
-    app: redis
-    component: cache
-spec:
-  capacity:
-    storage: 10Gi
-  volumeMode: Filesystem
-  accessModes:
-  - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: fast-ssd
-  hostPath:
-    path: /mnt/data/redis
-  nodeAffinity:
-    required:
-      nodeSelectorTerms:
-      - matchExpressions:
-        - key: kubernetes.io/os
-          operator: In
-          values:
-          - linux
 
 ---
 apiVersion: v1
@@ -85,7 +34,6 @@ spec:
     requests:
       storage: 10Gi
   storageClassName: fast-ssd
-  volumeName: redis-pv
 
 ---
 apiVersion: storage.k8s.io/v1
@@ -94,7 +42,7 @@ metadata:
   name: fast-ssd
   labels:
     component: storage
-provisioner: kubernetes.io/no-provisioner
+provisioner: pd.csi.storage.gke.io
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 parameters:

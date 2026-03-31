@@ -173,7 +173,10 @@ impl RateLimiter {
         }
     }
     
-    pub async fn acquire(&self) -> Result<(), HashAnalysisError> {
+    /// Acquire a rate-limit permit. The returned `OwnedSemaphorePermit` MUST be
+    /// held by the caller for the duration of the API request so the semaphore
+    /// slot stays occupied.
+    pub async fn acquire(&self) -> Result<tokio::sync::OwnedSemaphorePermit, HashAnalysisError> {
         // Reset semaphore every minute
         let mut last_reset = self.last_reset.lock().await;
         if last_reset.elapsed() >= self.interval_duration {
@@ -185,11 +188,11 @@ impl RateLimiter {
         }
         drop(last_reset);
         
-        self.semaphore.acquire().await
+        let permit = Arc::clone(&self.semaphore).acquire_owned().await
             .map_err(|_| HashAnalysisError::RateLimitExceeded { 
                 api_source: "Rate Limiter".to_string() 
             })?;
-        Ok(())
+        Ok(permit)
     }
 }
 
@@ -601,8 +604,8 @@ impl HashAnalyzer {
         }
 
         for attempt in 1..=self.config.retry_attempts {
-            // Rate limiting
-            rate_limiter.acquire().await?;
+            // Rate limiting — hold the permit for the duration of the request
+            let _permit = rate_limiter.acquire().await?;
 
             match query_fn().await {
                 Ok(result) => {

@@ -419,7 +419,7 @@ impl DatabaseService {
         Ok(())
     }
 
-    // === Submission-related methods (stubs for compilation) ===
+    // === Submission-related methods ===
 
     /// Get analysis result by ID
     pub async fn get_analysis_result(&self, _analysis_id: Uuid) -> Result<AnalysisResult> {
@@ -443,44 +443,241 @@ impl DatabaseService {
         Ok(None)
     }
 
-    /// Create extended submission
+    /// Create a bounty submission and its extended data
     pub async fn create_extended_submission(
         &self,
-        _submission: &crate::models::bounty::BountySubmission,
+        submission: &crate::models::bounty::BountySubmission,
     ) -> Result<()> {
-        anyhow::bail!("create_extended_submission not yet implemented")
+        let mut tx = self.pool.begin().await.context("Failed to begin transaction")?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO bounty_submissions (
+                id, bounty_id, engine_id, engine_name, engine_address,
+                verdict, confidence, stake_amount, details, submitted_at, is_verified
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            "#,
+        )
+        .bind(submission.id)
+        .bind(submission.bounty_id)
+        .bind(submission.engine_id)
+        .bind(&submission.engine_name)
+        .bind(&submission.engine_address)
+        .bind(&submission.verdict)
+        .bind(submission.confidence)
+        .bind(&submission.stake_amount)
+        .bind(&submission.details)
+        .bind(submission.submitted_at)
+        .bind(submission.is_verified)
+        .execute(&mut *tx)
+        .await
+        .context("Failed to insert bounty_submission")?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO extended_submissions (submission_id, status, created_at, updated_at)
+            VALUES ($1, 'Pending', NOW(), NOW())
+            "#,
+        )
+        .bind(submission.id)
+        .execute(&mut *tx)
+        .await
+        .context("Failed to insert extended_submission")?;
+
+        tx.commit().await.context("Failed to commit submission transaction")?;
+        Ok(())
     }
 
-    /// Get submissions with filters
+    /// Get submissions with filters (paginated)
     pub async fn get_submissions_with_filters(
         &self,
-        _filters: &crate::handlers::submission::SubmissionFilters,
-        _page: u32,
-        _limit: u32,
+        filters: &crate::handlers::submission::SubmissionFilters,
+        page: u32,
+        limit: u32,
     ) -> Result<(Vec<crate::models::bounty::BountySubmission>, u32)> {
-        Ok((Vec::new(), 0))
+        let offset = (page.saturating_sub(1)) * limit;
+
+        // Build dynamic WHERE clause
+        let mut conditions: Vec<String> = Vec::new();
+        if filters.bounty_id.is_some() {
+            conditions.push("bs.bounty_id = $1".to_string());
+        }
+        if filters.verdict.is_some() {
+            conditions.push(format!("bs.verdict = ${}", conditions.len() + 1));
+        }
+
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", conditions.join(" AND "))
+        };
+
+        // Count query
+        let count_sql = format!("SELECT COUNT(*) as cnt FROM bounty_submissions bs {}", where_clause);
+        let total: (i64,) = {
+            let mut q = sqlx::query_as(&count_sql);
+            if let Some(ref bounty_id) = filters.bounty_id {
+                q = q.bind(bounty_id);
+            }
+            if let Some(ref verdict) = filters.verdict {
+                q = q.bind(verdict);
+            }
+            q.fetch_one(&self.pool).await.context("Failed to count submissions")?
+        };
+
+        // Data query
+        let data_sql = format!(
+            "SELECT bs.* FROM bounty_submissions bs {} ORDER BY bs.submitted_at DESC LIMIT {} OFFSET {}",
+            where_clause, limit, offset
+        );
+        let submissions: Vec<crate::models::bounty::BountySubmission> = {
+            let mut q = sqlx::query_as(&data_sql);
+            if let Some(ref bounty_id) = filters.bounty_id {
+                q = q.bind(bounty_id);
+            }
+            if let Some(ref verdict) = filters.verdict {
+                q = q.bind(verdict);
+            }
+            q.fetch_all(&self.pool).await.context("Failed to fetch submissions")?
+        };
+
+        Ok((submissions, total.0 as u32))
     }
 
-    /// Get extended submission by ID
+    /// Get extended submission by ID (joins bounty_submissions + extended_submissions)
     pub async fn get_extended_submission_by_id(
         &self,
-        _submission_id: Uuid,
+        submission_id: Uuid,
     ) -> Result<Option<crate::models::bounty::ExtendedSubmission>> {
-        Ok(None)
+        use crate::handlers::submission::SubmissionStatus;
+
+        let row = sqlx::query(
+            r#"
+            SELECT
+                bs.id, bs.bounty_id, bs.engine_id, bs.engine_name, bs.engine_address,
+                bs.verdict, bs.confidence, bs.stake_amount, bs.details, bs.submitted_at, bs.is_verified,
+                es.engine_version, es.threat_types, es.risk_score, es.analysis_summary,
+                es.signatures, es.status, es.processing_metrics
+            FROM bounty_submissions bs
+            JOIN extended_submissions es ON es.submission_id = bs.id
+            WHERE bs.id = $1
+            "#,
+        )
+        .bind(submission_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to fetch extended submission")?;
+
+        match row {
+            Some(r) => {
+                let submission = crate::models::bounty::BountySubmission {
+                    id: r.get("id"),
+                    bounty_id: r.get("bounty_id"),
+                    engine_id: r.get("engine_id"),
+                    engine_name: r.get("engine_name"),
+                    engine_address: r.get("engine_address"),
+                    verdict: r.get("verdict"),
+                    confidence: r.get("confidence"),
+                    stake_amount: r.get("stake_amount"),
+                    details: r.get("details"),
+                    submitted_at: r.get("submitted_at"),
+                    is_verified: r.get("is_verified"),
+                };
+
+                let status_str: String = r.get("status");
+                let status = match status_str.as_str() {
+                    "Processing" => SubmissionStatus::Processing,
+                    "Completed" => SubmissionStatus::Completed,
+                    "Failed" => SubmissionStatus::Failed,
+                    "Disputed" => SubmissionStatus::Disputed,
+                    "Verified" => SubmissionStatus::Verified,
+                    _ => SubmissionStatus::Pending,
+                };
+
+                let metrics_json: Option<serde_json::Value> = r.get("processing_metrics");
+                let processing_metrics = metrics_json.and_then(|v| {
+                    serde_json::from_value::<crate::models::bounty::ProcessingMetrics>(v).ok()
+                });
+
+                Ok(Some(crate::models::bounty::ExtendedSubmission {
+                    engine_name: submission.engine_name.clone(),
+                    engine_version: r.get("engine_version"),
+                    threat_types: r.get("threat_types"),
+                    risk_score: {
+                        let v: i16 = r.get("risk_score");
+                        v as u8
+                    },
+                    analysis_summary: r.get("analysis_summary"),
+                    signatures: r.get("signatures"),
+                    status,
+                    processing_metrics,
+                    submission,
+                }))
+            }
+            None => Ok(None),
+        }
     }
 
-    /// Update submission
+    /// Update submission extended fields
     pub async fn update_submission(
         &self,
-        _submission_id: Uuid,
-        _updates: &crate::handlers::submission::UpdateSubmissionRequest,
+        submission_id: Uuid,
+        updates: &crate::handlers::submission::UpdateSubmissionRequest,
     ) -> Result<crate::models::bounty::ExtendedSubmission> {
-        anyhow::bail!("update_submission not yet implemented")
+        // Update extended_submissions fields if provided
+        if let Some(ref summary) = updates.analysis_summary {
+            sqlx::query(
+                "UPDATE extended_submissions SET analysis_summary = $1, updated_at = NOW() WHERE submission_id = $2"
+            )
+            .bind(summary)
+            .bind(submission_id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to update analysis_summary")?;
+        }
+
+        if let Some(ref details) = updates.technical_details {
+            sqlx::query(
+                "UPDATE bounty_submissions SET details = $1 WHERE id = $2"
+            )
+            .bind(details)
+            .bind(submission_id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to update technical_details")?;
+        }
+
+        if let Some(ref sigs) = updates.additional_signatures {
+            sqlx::query(
+                "UPDATE extended_submissions SET signatures = signatures || $1, updated_at = NOW() WHERE submission_id = $2"
+            )
+            .bind(sigs)
+            .bind(submission_id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to update signatures")?;
+        }
+
+        // Re-fetch the full extended submission
+        self.get_extended_submission_by_id(submission_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Submission {} not found after update", submission_id))
     }
 
-    /// Delete submission
-    pub async fn delete_submission(&self, _submission_id: Uuid) -> Result<()> {
-        anyhow::bail!("delete_submission not yet implemented")
+    /// Delete a submission (cascade removes extended_submissions row)
+    pub async fn delete_submission(&self, submission_id: Uuid) -> Result<()> {
+        let result = sqlx::query("DELETE FROM bounty_submissions WHERE id = $1")
+            .bind(submission_id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to delete submission")?;
+
+        if result.rows_affected() == 0 {
+            anyhow::bail!("Submission {} not found", submission_id);
+        }
+
+        Ok(())
     }
 }
 

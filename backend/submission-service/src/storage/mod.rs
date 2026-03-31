@@ -2,7 +2,5 @@
 
 pub mod s3_client;
 
-// TODO: Implement S3/MinIO storage layer
-// - Upload files to object storage
-// - Generate pre-signed URLs for download
-// - Manage file lifecycle
+// Re-export the S3Client for convenience
+pub use s3_client::{S3Client, FileMetadata};

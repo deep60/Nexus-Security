@@ -78,6 +78,7 @@ EXPOSE 8082
 # Set environment variables
 ENV RUST_LOG=info
 ENV RUST_BACKTRACE=1
+ENV SERVER_PORT=8082
 ENV YARA_RULES_PATH=/app/rules
 ENV UPLOAD_DIR=/app/uploads
 

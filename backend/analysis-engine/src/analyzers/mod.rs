@@ -382,8 +382,8 @@ impl AnalysisEngine {
     }
 
     /// Clear all caches
-    pub fn clear_caches(&mut self) {
-        self.hash_analyzer.clear_cache();
+    pub async fn clear_caches(&mut self) {
+        self.hash_analyzer.clear_cache().await;
         info!("All analyzer caches cleared");
     }
 

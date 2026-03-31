@@ -66,6 +66,7 @@ pub struct CreateSubmissionRequest {
     pub file_size: i64,
     pub mime_type: Option<String>,
     pub file_path: String,
+    pub url: Option<String>,
     pub submission_type: String,
     pub metadata: Option<serde_json::Value>,
 }

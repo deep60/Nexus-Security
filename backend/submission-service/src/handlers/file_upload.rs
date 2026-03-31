@@ -48,6 +48,7 @@ const ALLOWED_MIME_TYPES: &[&str] = &[
 /// Handle file upload submission
 pub async fn submit_file(
     State(state): State<AppState>,
+    submitter_id: Option<crate::handlers::SubmitterId>,
     mut multipart: Multipart,
 ) -> Result<Json<FileSubmissionResponse>, (StatusCode, String)> {
     tracing::info!("Received file submission request");
@@ -143,12 +144,13 @@ pub async fn submit_file(
 
     // Create submission record in database
     let create_request = CreateSubmissionRequest {
-        submitter_id: None, // TODO: Get from authenticated user context
+        submitter_id: submitter_id.map(|s| s.0),
         file_hash: file_hash.clone(),
         original_filename: filename.clone(),
         file_size: file_size as i64,
         mime_type: content_type.clone(),
         file_path: s3_key.clone(),
+        url: None,
         submission_type: SubmissionType::File.as_str().to_string(),
         metadata: None,
     };

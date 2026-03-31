@@ -120,7 +120,10 @@ spec:
     app.kubernetes.io/name: nexus-security
     app.kubernetes.io/component: api-gateway
   loadBalancerSourceRanges:
-  - "0.0.0.0/0"  # Adjust based on your security requirements
+  # Restrict to private/VPN ranges — replace with your actual CIDR blocks
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"
 
 ---
 # Backend configuration for GKE (if using Google Cloud)

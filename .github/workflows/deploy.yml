@@ -5,19 +5,79 @@ on:
     branches: [main]
     paths:
       - 'frontend/**'
+      - 'backend/**'
+      - 'infrastructure/**'
       - 'docker-compose.yml'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:  # Allow manual trigger
 
-jobs:
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
+# Prevent concurrent deploys
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
 
+jobs:
+  # ── Detect which components changed ─────────────────────────
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      api-gateway: ${{ steps.filter.outputs.api-gateway }}
+      analysis-engine: ${{ steps.filter.outputs.analysis-engine }}
+      bounty-manager: ${{ steps.filter.outputs.bounty-manager }}
+      infrastructure: ${{ steps.filter.outputs.infrastructure }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            api-gateway:
+              - 'backend/api-gateway/**'
+              - 'backend/shared/**'
+            analysis-engine:
+              - 'backend/analysis-engine/**'
+              - 'backend/shared/**'
+            bounty-manager:
+              - 'backend/bounty-manager/**'
+              - 'backend/shared/**'
+            infrastructure:
+              - 'infrastructure/**'
+              - 'docker-compose.yml'
+
+  # ── Frontend tests ──────────────────────────────────────────
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     defaults:
       run:
         working-directory: ./frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run test:run
+        env:
+          NODE_ENV: test
 
+  # ── Backend tests ───────────────────────────────────────────
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    needs: changes
+    if: >-
+      needs.changes.outputs.api-gateway == 'true' ||
+      needs.changes.outputs.analysis-engine == 'true' ||
+      needs.changes.outputs.bounty-manager == 'true'
     services:
       postgres:
         image: postgres:16-alpine
@@ -32,7 +92,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
       redis:
         image: redis:7-alpine
         ports:
@@ -42,78 +101,117 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm run test:run
+          workspaces: backend
+      - name: Run backend tests
+        working-directory: ./backend
+        run: cargo test --workspace
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/nexus_security_test
           REDIS_URL: redis://localhost:6379
-          NODE_ENV: test
 
+  # ── Build & push Docker images ──────────────────────────────
   build-and-push:
-    name: Build and Push Docker Image
+    name: Build ${{ matrix.service }}
     runs-on: ubuntu-latest
-    needs: test
-
+    needs: [changes, test-frontend, test-backend]
+    # Run if the relevant service changed; always run after both test jobs
+    # (the test jobs are skipped gracefully when not needed)
+    if: |
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled') &&
+      (
+        needs.changes.outputs.frontend == 'true' ||
+        needs.changes.outputs.api-gateway == 'true' ||
+        needs.changes.outputs.analysis-engine == 'true' ||
+        needs.changes.outputs.bounty-manager == 'true'
+      )
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
+            image_suffix: frontend
+            changed: frontend
+          - service: api-gateway
+            context: ./backend
+            dockerfile: ./infrastructure/docker/production/api-gateway/api-gateway.Dockerfile
+            image_suffix: api-gateway
+            changed: api-gateway
+          - service: analysis-engine
+            context: ./backend
+            dockerfile: ./infrastructure/docker/production/analysis-engine/analysis-engine.Dockerfile
+            image_suffix: analysis-engine
+            changed: analysis-engine
+          - service: bounty-manager
+            context: ./backend
+            dockerfile: ./infrastructure/docker/production/bounty-manager/bounty-manager.Dockerfile
+            image_suffix: bounty-manager
+            changed: bounty-manager
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Skip unchanged service
+        if: needs.changes.outputs[matrix.changed] != 'true'
+        run: echo "Skipping ${{ matrix.service }} — no changes detected" && exit 0
+
+      - uses: actions/checkout@v4
+        if: needs.changes.outputs[matrix.changed] == 'true'
 
       - name: Set up Docker Buildx
+        if: needs.changes.outputs[matrix.changed] == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
+        if: needs.changes.outputs[matrix.changed] == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Extract metadata
+        if: needs.changes.outputs[matrix.changed] == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/nexus-security-frontend
+          images: ${{ secrets.DOCKER_USERNAME }}/nexus-security-${{ matrix.image_suffix }}
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
+      - name: Build and push
+        if: needs.changes.outputs[matrix.changed] == 'true'
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
+  # ── Deploy all changed services ─────────────────────────────
   deploy:
     name: Deploy to Server
     runs-on: ubuntu-latest
-    needs: build-and-push
+    needs: [changes, build-and-push]
+    if: |
+      always() &&
+      !contains(needs.build-and-push.result, 'failure') &&
+      !contains(needs.build-and-push.result, 'cancelled')
     environment:
       name: production
       url: https://nexus-security.io
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -121,24 +219,44 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Deploy to server
+        env:
+          CHANGED_FRONTEND: ${{ needs.changes.outputs.frontend }}
+          CHANGED_API_GATEWAY: ${{ needs.changes.outputs.api-gateway }}
+          CHANGED_ANALYSIS_ENGINE: ${{ needs.changes.outputs.analysis-engine }}
+          CHANGED_BOUNTY_MANAGER: ${{ needs.changes.outputs.bounty-manager }}
+          CHANGED_INFRA: ${{ needs.changes.outputs.infrastructure }}
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          # Build the list of services to update
+          SERVICES=""
+          [[ "$CHANGED_FRONTEND" == "true" ]]       && SERVICES="$SERVICES frontend"
+          [[ "$CHANGED_API_GATEWAY" == "true" ]]     && SERVICES="$SERVICES api-gateway"
+          [[ "$CHANGED_ANALYSIS_ENGINE" == "true" ]] && SERVICES="$SERVICES analysis-engine"
+          [[ "$CHANGED_BOUNTY_MANAGER" == "true" ]]  && SERVICES="$SERVICES bounty-manager"
+
+          # If only infra changed (compose/k8s), pull everything
+          if [[ -z "$SERVICES" && "$CHANGED_INFRA" == "true" ]]; then
+            SERVICES="frontend api-gateway analysis-engine bounty-manager"
+          fi
+
+          echo "Deploying services: $SERVICES"
+
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOFSCRIPT
             cd /opt/nexus-security
             git pull origin main
-            docker-compose pull frontend
-            docker-compose up -d frontend
-            docker system prune -af
-          EOF
+            docker-compose pull $SERVICES
+            docker-compose up -d $SERVICES
+            docker system prune -af --filter "until=24h"
+          EOFSCRIPT
 
       - name: Health check
         run: |
           sleep 30
-          curl --fail https://nexus-security.io/api/engines || exit 1
+          curl --fail --retry 3 --retry-delay 10 https://nexus-security.io/api/v1/health || exit 1
 
       - name: Notify deployment status
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
-          text: 'Frontend deployment to production: ${{ job.status }}'
+          text: 'Deployment to production: ${{ job.status }}'
           webhook_url: ${{ secrets.SLACK_WEBHOOK }}
         if: always()

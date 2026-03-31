@@ -28,7 +28,7 @@ spec:
       - name: analysis-engine
         image: nexus-security/analysis-engine:latest
         ports:
-        - containerPort: 8081
+        - containerPort: 8082
           name: http
           protocol: TCP
         - containerPort: 9090
@@ -37,6 +37,8 @@ spec:
         env:
         - name: RUST_LOG
           value: "info"
+        - name: SERVER_PORT
+          value: "8082"
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
@@ -79,7 +81,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: 8081
+            port: 8082
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
@@ -87,7 +89,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /ready
-            port: 8081
+            port: 8082
           initialDelaySeconds: 5
           periodSeconds: 5
           timeoutSeconds: 3

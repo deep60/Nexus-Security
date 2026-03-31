@@ -5,6 +5,10 @@ backend/target/
 .env
 .env.local
 .env.*.local
+.env.blockchain
+.env.*
+!.env.example
+!.env.*.example
 blockchain/.env
 backend/.env
 

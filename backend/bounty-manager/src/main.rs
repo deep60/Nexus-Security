@@ -174,6 +174,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create application state using BountyManagerState
     let state = bounty_crud::BountyManagerState {
+        db: db.clone(),
         reputation_service: reputation_service.clone(),
     };
 

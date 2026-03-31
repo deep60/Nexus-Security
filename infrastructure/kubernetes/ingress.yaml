@@ -89,18 +89,18 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: nexus-analysis-service
+            name: analysis-engine-service
             port:
-              number: 8080
+              number: 8082
       
       # Bounty management API
       - path: /v1/bounties
         pathType: Prefix
         backend:
           service:
-            name: nexus-bounty-service
+            name: bounty-manager-service
             port:
-              number: 8081
+              number: 8083
       
       # Engine management API
       - path: /v1/engines
@@ -143,7 +143,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: nexus-api-gateway
+            name: nexus-api-gateway-service
             port:
               number: 8000
   

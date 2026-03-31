@@ -187,17 +187,42 @@ pub async fn api_key_middleware(
         .and_then(|h| h.to_str().ok())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    // TODO: Validate API key against database
-    // For now, just check if it starts with "nxs_"
     if !api_key.starts_with("nxs_") {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    // TODO: Add user context from API key lookup
+    // Hash the API key and look it up in the database
+    use sha2::{Sha256, Digest};
+    let key_hash = format!("{:x}", Sha256::digest(api_key.as_bytes()));
+
+    let row: Option<(Uuid, String, String)> = sqlx::query_as(
+        r#"SELECT u.id, u.email, u.role
+           FROM api_keys ak
+           JOIN users u ON u.id = ak.user_id
+           WHERE ak.key_hash = $1
+             AND ak.is_active = TRUE
+             AND (ak.expires_at IS NULL OR ak.expires_at > NOW())"#,
+    )
+    .bind(&key_hash)
+    .fetch_optional(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("API key lookup failed: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let (user_id, email, role) = row.ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Update last_used_at
+    let _ = sqlx::query("UPDATE api_keys SET last_used_at = NOW() WHERE key_hash = $1")
+        .bind(&key_hash)
+        .execute(state.db.pool())
+        .await;
+
     let claims = Claims {
-        sub: Uuid::new_v4(),
-        email: "api@example.com".to_string(),
-        role: "user".to_string(),
+        sub: user_id,
+        email,
+        role,
         exp: (Utc::now() + Duration::hours(24)).timestamp(),
         iat: Utc::now().timestamp(),
         nbf: Utc::now().timestamp(),

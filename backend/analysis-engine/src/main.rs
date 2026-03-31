@@ -43,8 +43,7 @@ pub struct AppState {
     s3_client: Arc<S3Client>,
     file_scanner: Arc<FileScanner>,
     url_scanner: Arc<UrlScanner>,
-    database_url: String,
-    redis_url: String,
+    db: sqlx::PgPool,
 }
 #[derive(Deserialize)]
 struct AnalysisRequest {
@@ -90,9 +89,9 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let port = env::var("SERVER_PORT")
         .or_else(|_| env::var("PORT"))
-        .unwrap_or_else(|_| "8080".to_string())
+        .unwrap_or_else(|_| "8082".to_string())
         .parse::<u16>()
-        .unwrap_or(8080);
+        .unwrap_or(8082);
     let yara_rule_path = env::var("YARA_RULE_PATH")
         .unwrap_or_else(|_| "./rules".to_string());
     let upload_dir = env::var("UPLOAD_DIR")
@@ -104,6 +103,14 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .await
         .expect("Failed to connect to database");
     info!("Database connection established");
+
+    // Run migrations
+    info!("Running database migrations...");
+    sqlx::migrate!("./migrations")
+        .run(&db_pool)
+        .await
+        .expect("Failed to run database migrations");
+    info!("Database migrations complete");
 
     // Initialize Redis client
     info!("Connecting to Redis...");
@@ -139,8 +146,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         s3_client: s3_client.clone(),
         file_scanner,
         url_scanner,
-        database_url,
-        redis_url,
+        db: db_pool.clone(),
     };
 
     info!("Analysis engines initialized successfully");
@@ -176,7 +182,25 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .route("/analysis/:id/detailed", get(get_detailed_analysis))
         .route("/engines/status", get(engines_status))
         .with_state(app_state)
-        .layer(CorsLayer::permissive())
+        .layer({
+            let allowed_origins: Vec<_> = std::env::var("CORS_ALLOWED_ORIGINS")
+                .unwrap_or_else(|_| "http://localhost:8080".to_string())
+                .split(',')
+                .filter_map(|o| o.trim().parse::<axum::http::HeaderValue>().ok())
+                .collect();
+
+            CorsLayer::new()
+                .allow_origin(allowed_origins)
+                .allow_methods([
+                    axum::http::Method::GET,
+                    axum::http::Method::POST,
+                    axum::http::Method::OPTIONS,
+                ])
+                .allow_headers([
+                    axum::http::header::AUTHORIZATION,
+                    axum::http::header::CONTENT_TYPE,
+                ])
+        })
         .layer(TraceLayer::new_for_http());
 
     // Start the server
@@ -251,7 +275,27 @@ async fn analyze_file(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // TODO: Store analysis result in database via proper persistence layer
+    // Store analysis result in database
+    let verdict_str = format!("{:?}", analysis_result.consensus_verdict);
+    let status_str = format!("{:?}", analysis_result.status);
+    let result_json = serde_json::to_value(&analysis_result).unwrap_or_default();
+
+    if let Err(e) = sqlx::query(
+        r#"INSERT INTO engine_analysis_results (analysis_id, status, verdict, confidence, created_at, completed_at, result_data)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (analysis_id) DO UPDATE SET status = $2, verdict = $3, confidence = $4, completed_at = $6, result_data = $7"#
+    )
+    .bind(analysis_result.analysis_id)
+    .bind(&status_str)
+    .bind(&verdict_str)
+    .bind(analysis_result.consensus_confidence)
+    .bind(analysis_result.started_at)
+    .bind(analysis_result.completed_at)
+    .bind(&result_json)
+    .execute(&state.db)
+    .await {
+        error!("Failed to persist analysis result: {}", e);
+    }
 
     info!("Analysis completed: {:?}", analysis_result.analysis_id);
 
@@ -319,31 +363,61 @@ async fn analyze_hash(
 
 async fn get_analysis_result(
     Path(id): Path<String>,
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     info!("Fetching analysis result for: {}", id);
 
-    let _analysis_id = Uuid::parse_str(&id).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let analysis_id = Uuid::parse_str(&id).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    // TODO: Retrieve from database via proper persistence layer
-    Ok(Json(serde_json::json!({
-        "analysis_id": id,
-        "status": "pending",
-        "message": "Result retrieval not yet implemented"
-    })))
+    let row: Option<(String, Option<String>, Option<f32>, chrono::DateTime<Utc>, Option<chrono::DateTime<Utc>>)> = sqlx::query_as(
+        "SELECT status, verdict, confidence, created_at, completed_at FROM engine_analysis_results WHERE analysis_id = $1"
+    )
+    .bind(analysis_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| {
+        error!("Failed to query analysis result: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    match row {
+        Some((status, verdict, confidence, created_at, completed_at)) => {
+            Ok(Json(serde_json::json!({
+                "analysis_id": id,
+                "status": status,
+                "verdict": verdict,
+                "confidence": confidence,
+                "created_at": created_at,
+                "completed_at": completed_at
+            })))
+        }
+        None => Err(StatusCode::NOT_FOUND),
+    }
 }
 
 async fn get_detailed_analysis(
     Path(id): Path<String>,
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     info!("Fetching detailed analysis for: {}", id);
 
-    // TODO: Implement detailed analysis retrieval
-    Ok(Json(serde_json::json!({
-        "analysis_id": id,
-        "detailed_result": "Detailed analysis data here"
-    })))
+    let analysis_id = Uuid::parse_str(&id).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let row: Option<(serde_json::Value,)> = sqlx::query_as(
+        "SELECT result_data FROM engine_analysis_results WHERE analysis_id = $1"
+    )
+    .bind(analysis_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| {
+        error!("Failed to query detailed analysis: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    match row {
+        Some((result_data,)) => Ok(Json(result_data)),
+        None => Err(StatusCode::NOT_FOUND),
+    }
 }
 
 async fn engines_status(
@@ -383,12 +457,36 @@ async fn perform_url_analysis(
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting URL analysis for: {} ({})", analysis_id, url);
 
+    let aid = Uuid::parse_str(analysis_id)?;
+
+    // Insert pending record
+    let _ = sqlx::query(
+        "INSERT INTO engine_analysis_results (analysis_id, status, created_at, result_data) VALUES ($1, 'InProgress', NOW(), $2)"
+    )
+    .bind(aid)
+    .bind(serde_json::json!({"type": "url", "url": url}))
+    .execute(&state.db)
+    .await;
+
     // Use URL scanner to analyze the URL
     let scan_result = state.url_scanner.scan(url.as_bytes(), None).await?;
 
-    info!("URL analysis completed for: {} - Verdict: {:?}", analysis_id, scan_result.base.verdict);
+    let verdict = format!("{:?}", scan_result.base.verdict);
+    let confidence = scan_result.base.confidence_score;
+    let result_json = serde_json::to_value(&scan_result).unwrap_or_default();
 
-    // TODO: Store URL scan results in database with proper AnalysisResult structure
+    info!("URL analysis completed for: {} - Verdict: {}", analysis_id, verdict);
+
+    // Update with results
+    sqlx::query(
+        "UPDATE engine_analysis_results SET status = 'Completed', verdict = $1, confidence = $2, completed_at = NOW(), result_data = $3 WHERE analysis_id = $4"
+    )
+    .bind(&verdict)
+    .bind(confidence)
+    .bind(&result_json)
+    .bind(aid)
+    .execute(&state.db)
+    .await?;
 
     Ok(())
 }
@@ -400,16 +498,33 @@ async fn perform_hash_analysis(
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting hash analysis for: {} ({})", analysis_id, hash);
 
-    // Use hash analyzer
+    let aid = Uuid::parse_str(analysis_id)?;
+
     let hash_info = HashInfo {
         hash_type: HashType::SHA256,
         hash_value: hash.to_string(),
         file_size: None,
         computed_at: chrono::Utc::now(),
     };
-    // Use the AnalysisEngine's analyze_file method instead of accessing private field
-    // For now, just log the hash analysis request
+
     info!("Hash analysis requested for hash: {} (type: {:?})", hash_info.hash_value, hash_info.hash_type);
+
+    // Persist hash analysis result
+    let result_json = serde_json::json!({
+        "type": "hash",
+        "hash": hash,
+        "hash_type": format!("{:?}", hash_info.hash_type),
+        "status": "completed"
+    });
+
+    sqlx::query(
+        r#"INSERT INTO engine_analysis_results (analysis_id, status, verdict, created_at, completed_at, result_data)
+           VALUES ($1, 'Completed', 'Unknown', NOW(), NOW(), $2)"#
+    )
+    .bind(aid)
+    .bind(&result_json)
+    .execute(&state.db)
+    .await?;
 
     info!("Hash analysis completed for: {}", analysis_id);
     Ok(())

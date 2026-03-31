@@ -18,6 +18,7 @@ pub async fn create_submission(
             id,
             submitter_id,
             file_hash,
+            url,
             original_filename,
             file_size,
             mime_type,
@@ -28,13 +29,14 @@ pub async fn create_submission(
             created_at,
             updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING *
         "#,
     )
     .bind(id)
     .bind(request.submitter_id)
     .bind(Some(&request.file_hash))
+    .bind(request.url.as_deref())
     .bind(Some(&request.original_filename))
     .bind(Some(request.file_size))
     .bind(request.mime_type)
@@ -181,4 +183,24 @@ pub async fn file_hash_exists(
     .await?;
 
     Ok(count > 0)
+}
+
+/// Find a recent URL submission by its hash (within last 24 hours)
+pub async fn find_recent_url_submission(
+    pool: &PgPool,
+    url_hash: &str,
+) -> Result<Option<Submission>, sqlx::Error> {
+    sqlx::query_as::<_, Submission>(
+        r#"
+        SELECT * FROM submissions
+        WHERE file_hash = $1
+          AND submission_type = 'url'
+          AND created_at > NOW() - INTERVAL '24 hours'
+        ORDER BY created_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(url_hash)
+    .fetch_optional(pool)
+    .await
 }

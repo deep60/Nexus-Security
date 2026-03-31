@@ -17,7 +17,7 @@ use std::{
 use tokio::{net::TcpListener, sync::RwLock};
 use tower::ServiceBuilder;
 use tower_http::{
-    cors::{Any, CorsLayer},
+    cors::CorsLayer,
     limit::RequestBodyLimitLayer,
     trace::TraceLayer,
 };
@@ -226,9 +226,13 @@ async fn main() -> Result<()> {
         metrics: metrics_collector.clone(),
     };
 
-    // Create router with all routes and middleware
+    // Create CORS layer from config
+    let allowed_origins: Vec<_> = state.config.security.cors.allowed_origins.iter()
+        .filter_map(|origin| origin.parse::<axum::http::HeaderValue>().ok())
+        .collect();
+
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin(allowed_origins)
         .allow_methods([
             axum::http::Method::GET,
             axum::http::Method::POST,
@@ -237,7 +241,13 @@ async fn main() -> Result<()> {
             axum::http::Method::PATCH,
             axum::http::Method::OPTIONS,
         ])
-        .allow_headers(Any);
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            header::ACCEPT,
+            "X-API-Key".parse().unwrap(),
+        ])
+        .allow_credentials(true);
 
     let app = routes::create_router(state)
         .layer(TraceLayer::new_for_http())
