@@ -8,8 +8,7 @@ import {
   Area,
   BarChart,
   Bar,
-  LineChart,
-  Line,
+
   PieChart,
   Pie,
   Cell,
@@ -22,7 +21,7 @@ import {
 } from "recharts";
 import {
   TrendingUp,
-  TrendingDown,
+
   Activity,
   Award,
   FileCheck,
@@ -39,29 +38,45 @@ interface UserAnalyticsDashboardProps {
   userId?: string;
 }
 
+interface Submission {
+  id: string;
+  fileName: string;
+  status: string;
+  createdAt: string;
+  userId?: string;
+}
+
+interface ActivityItem {
+  id: string;
+  fileName: string;
+  status: string;
+  createdAt: Date;
+  verdict: string | null;
+}
+
 export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) {
   const { user } = useAuth();
-  const targetUserId = userId || user?.id;
+  const _targetUserId = userId || user?.id;
 
   // Fetch user submissions
-  const { data: submissions = [], isLoading: submissionsLoading, isError: submissionsError } = useQuery({
+  const { data: submissions = [], isLoading: submissionsLoading, isError: submissionsError } = useQuery<Submission[]>({
     queryKey: ['/api/submissions'],
-    select: (data: any[]) => {
+    select: (data: Submission[]) => {
       // Filter submissions by user if needed
       return data;
     }
   });
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { isLoading: statsLoading } = useQuery({
     queryKey: ['/api/stats'],
   });
 
   // Calculate user statistics
   const userStats = {
     totalSubmissions: submissions.length,
-    completedSubmissions: submissions.filter((s: any) => s.status === 'completed').length,
-    pendingSubmissions: submissions.filter((s: any) => s.status === 'analyzing').length,
-    threatsDetected: submissions.filter((s: any) => s.status === 'completed').length * 0.18,
+    completedSubmissions: submissions.filter((s) => s.status === 'completed').length,
+    pendingSubmissions: submissions.filter((s) => s.status === 'analyzing').length,
+    threatsDetected: submissions.filter((s) => s.status === 'completed').length * 0.18,
   };
 
   const successRate = userStats.totalSubmissions > 0
@@ -76,7 +91,7 @@ export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) 
     { date: "Thu", reputation: 91, submissions: 4 },
     { date: "Fri", reputation: 93, submissions: 2 },
     { date: "Sat", reputation: 95, submissions: 3 },
-    { date: "Sun", reputation: parseFloat(String(user?.reputation || "95")), submissions: 1 },
+    { date: "Sun", reputation: parseFloat(String(user?.reputationScore || "95")), submissions: 1 },
   ];
 
   // Submission outcomes pie chart data
@@ -95,7 +110,7 @@ export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) 
   ];
 
   // Recent activity timeline
-  const recentActivity = submissions.slice(0, 5).map((sub: any) => ({
+  const recentActivity: ActivityItem[] = submissions.slice(0, 5).map((sub) => ({
     id: sub.id,
     fileName: sub.fileName,
     status: sub.status,
@@ -180,7 +195,7 @@ export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) 
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{user?.reputation || "0"}</div>
+            <div className="text-2xl font-bold">{user?.reputationScore || "0"}</div>
             <div className="flex items-center gap-1 text-xs text-green-500 mt-1">
               <TrendingUp className="h-3 w-3" />
               <span>+5.2% this week</span>
@@ -402,7 +417,7 @@ export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) 
         <CardContent>
           {recentActivity.length > 0 ? (
             <div className="space-y-4">
-              {recentActivity.map((activity: any) => (
+              {recentActivity.map((activity) => (
                 <div
                   key={activity.id}
                   className="flex items-center gap-4 p-4 rounded-lg border border-border/50 hover:border-primary/50 transition-colors"
@@ -418,7 +433,7 @@ export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) 
                   </div>
                   <div className="flex-shrink-0">
                     {activity.verdict ? (
-                      <Badge variant={getVerdictColor(activity.verdict) as any}>
+                      <Badge variant={getVerdictColor(activity.verdict as string | null) as "default" | "secondary" | "destructive" | "outline"}>
                         {activity.verdict}
                       </Badge>
                     ) : (

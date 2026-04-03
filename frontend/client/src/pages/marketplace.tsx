@@ -59,7 +59,7 @@ export default function Marketplace() {
 
   // Filter and sort engines
   const filteredEngines = useMemo(() => {
-    let filtered = engines.filter((engine: any) => {
+    const filtered = engines.filter((engine: any) => {
       const matchesSearch = engine.name.toLowerCase().includes(engineSearch.toLowerCase());
       const matchesFilter = engineFilter === "all" || engine.type === engineFilter;
       return matchesSearch && matchesFilter;
@@ -86,7 +86,7 @@ export default function Marketplace() {
 
   // Filter and sort bounties
   const filteredBounties = useMemo(() => {
-    let filtered = activeBountySubmissions.filter(({ submission }: any) => {
+    const filtered = activeBountySubmissions.filter(({ submission }: any) => {
       const matchesSearch = submission.fileName.toLowerCase().includes(bountySearch.toLowerCase());
       const matchesFilter = bountyFilter === "all" || submission.analysisType === bountyFilter;
       return matchesSearch && matchesFilter;

@@ -71,7 +71,7 @@ export default function Profile() {
                       <Award className="w-4 h-4 mr-2" />
                       Reputation
                     </span>
-                    <span className="font-semibold text-accent">{user.reputation}</span>
+                    <span className="font-semibold text-accent">{user.reputationScore}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground flex items-center">
@@ -165,7 +165,7 @@ export default function Profile() {
                       </div>
                       <div className="text-center p-4 bg-secondary/10 rounded-lg border border-secondary/20">
                         <div className="text-3xl font-bold text-secondary mb-2">
-                          {user.reputation}
+                          {user.reputationScore}
                         </div>
                         <div className="text-sm text-muted-foreground">Reputation Score</div>
                       </div>

@@ -1400,7 +1400,7 @@ mod tests {
         
         // Verify known hash values
         let md5_hash = hashes.iter().find(|h| h.hash_type == HashType::MD5).unwrap();
-        assert_eq!(md5_hash.hash_value, "5d41402abc4b2a76b9719d911017c592");
+        assert_eq!(md5_hash.hash_value, "5eb63bbbe01eeed093cb22bb8f5acdc3");
         
         let sha256_hash = hashes.iter().find(|h| h.hash_type == HashType::SHA256).unwrap();
         assert_eq!(sha256_hash.hash_value, "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");

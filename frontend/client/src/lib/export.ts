@@ -3,7 +3,7 @@
  * Support for CSV, JSON, and PDF exports
  */
 
-import { parse, unparse } from 'papaparse';
+import { unparse } from 'papaparse';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 export interface ExportColumn {
   key: string;
   label: string;
-  format?: (value: any) => string;
+  format?: (value: unknown) => string;
 }
 
 export interface ExportOptions {
@@ -24,7 +24,7 @@ export interface ExportOptions {
 /**
  * Export data to CSV format
  */
-export function exportToCSV<T extends Record<string, any>>(
+export function exportToCSV<T extends Record<string, unknown>>(
   data: T[],
   options: ExportOptions = {}
 ): void {
@@ -38,7 +38,7 @@ export function exportToCSV<T extends Record<string, any>>(
   let formattedData = data;
   if (columns) {
     formattedData = data.map((row) => {
-      const formatted: Record<string, any> = {};
+      const formatted: Record<string, unknown> = {};
       columns.forEach((col) => {
         const value = row[col.key];
         formatted[col.label] = col.format ? col.format(value) : value;
@@ -59,7 +59,7 @@ export function exportToCSV<T extends Record<string, any>>(
 /**
  * Export data to JSON format
  */
-export function exportToJSON<T extends Record<string, any>>(
+export function exportToJSON<T extends Record<string, unknown>>(
   data: T[],
   options: ExportOptions = {}
 ): void {
@@ -94,7 +94,7 @@ export function exportToJSON<T extends Record<string, any>>(
 /**
  * Export data to PDF format
  */
-export function exportToPDF<T extends Record<string, any>>(
+export function exportToPDF<T extends Record<string, unknown>>(
   data: T[],
   options: ExportOptions = {}
 ): void {
@@ -156,7 +156,7 @@ export function exportToPDF<T extends Record<string, any>>(
 /**
  * Export data to Excel format
  */
-export function exportToExcel<T extends Record<string, any>>(
+export function exportToExcel<T extends Record<string, unknown>>(
   data: T[],
   options: ExportOptions = {}
 ): void {
@@ -211,7 +211,7 @@ function downloadFile(content: string, filename: string, type: string): void {
 /**
  * Export data in multiple formats
  */
-export function exportData<T extends Record<string, any>>(
+export function exportData<T extends Record<string, unknown>>(
   data: T[],
   format: 'csv' | 'json' | 'pdf' | 'excel',
   options: ExportOptions = {}

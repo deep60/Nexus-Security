@@ -736,6 +736,18 @@ impl DynamicThreatIndicators {
             });
         }
 
+        // Add registry indicators
+        for reg_mod in self.registry_modifications {
+            indicators.push(ThreatIndicator {
+                indicator_type: "registry".to_string(),
+                value: reg_mod,
+                severity: "medium".to_string(),
+                description: "Suspicious registry modification detected".to_string(),
+                source: "dynamic_analyzer".to_string(),
+                timestamp: chrono::Utc::now(),
+            });
+        }
+
         // Add persistence indicators
         for persistence in self.persistence_mechanisms {
             indicators.push(ThreatIndicator {

@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export default function Login() {
   const [, setLocation] = useLocation();
   const { login, connectWallet } = useAuth();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -23,10 +23,10 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(identifier, password);
       setLocation("/dashboard");
     } catch (err) {
-      setError("Invalid email or password. Please try again.");
+      setError("Invalid credentials. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -68,15 +68,15 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="identifier">Email or Username</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="identifier"
+                  type="text"
+                  placeholder="you@example.com or username"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   className="pl-10"
                   required
                   disabled={isLoading}

@@ -2,11 +2,13 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { useToast } from "@/hooks/use-toast";
 
 interface User {
-  id: number;
+  id: string;
   username: string;
   email: string;
-  walletAddress?: string;
-  reputation: number;
+  walletAddress?: string | null;
+  reputationScore: number;
+  totalEarnings: string;
+  isVerified: boolean;
   createdAt: string;
 }
 
@@ -14,7 +16,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   connectWallet: () => Promise<void>;
@@ -26,6 +28,33 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 /** Helper – returns the stored JWT (if any) */
 export function getAuthToken(): string | null {
   return localStorage.getItem("token");
+}
+
+/**
+ * Unwrap the standard ApiResponse envelope.
+ *
+ * Backend returns:
+ *   { success: bool, data: T | null, message: string | null, timestamp }
+ *
+ * On error the response status is non-2xx and `success` is false.
+ */
+async function unwrapApiResponse<T>(response: Response): Promise<T> {
+  const body = await response.json();
+
+  if (!response.ok || !body.success) {
+    const msg = body.message || body.error || `Request failed (${response.status})`;
+    throw new Error(msg);
+  }
+
+  return body.data as T;
+}
+
+/** Shape of the auth response from /api/v1/auth/login and /register */
+interface AuthResponseData {
+  user: User;
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -45,60 +74,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Validate token with backend
-      const response = await fetch("/api/auth/me", {
+      // Validate token and fetch current user profile
+      const response = await fetch("/api/v1/auth/verify", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
       if (response.ok) {
-        const userData = await response.json();
-        // Handle both { user: ... } and direct user object
-        setUser(userData.user || userData);
+        const userData = await unwrapApiResponse<User>(response);
+        setUser(userData);
       } else {
         // Token expired or invalid
         localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
       }
     } catch (error) {
       console.error("Auth check failed:", error);
       localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (identifier: string, password: string) => {
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch("/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || error.message || "Login failed");
-      }
+      const authData = await unwrapApiResponse<AuthResponseData>(response);
 
-      const data = await response.json();
-      const userData = data.user || data;
-      const token = data.token || data.sessionId; // accept both JWT and legacy sessionId
-
-      setUser(userData);
-      if (token) localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(authData.user);
+      localStorage.setItem("token", authData.access_token);
+      localStorage.setItem("refreshToken", authData.refresh_token);
+      localStorage.setItem("user", JSON.stringify(authData.user));
 
       toast({
         title: "Welcome back!",
-        description: `Logged in as ${userData.username}`,
+        description: `Logged in as ${authData.user.username}`,
       });
     } catch (error: any) {
       toast({
         title: "Login failed",
-        description: error.message || "Invalid email or password",
+        description: error.message || "Invalid credentials",
         variant: "destructive",
       });
       throw error;
@@ -107,24 +131,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (username: string, email: string, password: string) => {
     try {
-      const response = await fetch("/api/auth/register", {
+      const response = await fetch("/api/v1/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, email, password }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || error.message || "Registration failed");
-      }
+      const authData = await unwrapApiResponse<AuthResponseData>(response);
 
-      const data = await response.json();
-      const userData = data.user || data;
-      const token = data.token || data.sessionId;
-
-      setUser(userData);
-      if (token) localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(authData.user);
+      localStorage.setItem("token", authData.access_token);
+      localStorage.setItem("refreshToken", authData.refresh_token);
+      localStorage.setItem("user", JSON.stringify(authData.user));
 
       toast({
         title: "Account created!",
@@ -144,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const token = getAuthToken();
       if (token) {
-        await fetch("/api/auth/logout", {
+        await fetch("/api/v1/auth/logout", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -156,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
       toast({
         title: "Logged out",
@@ -181,23 +200,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const walletAddress = accounts[0];
 
+      // Sign a message to prove wallet ownership
+      const message = `Connect wallet ${walletAddress} to Nexus-Security at ${Date.now()}`;
+      const signature = await window.ethereum.request({
+        method: "personal_sign",
+        params: [message, walletAddress],
+      });
+
       // Update wallet address via API
       const token = getAuthToken();
       if (token) {
-        const response = await fetch("/api/auth/wallet/connect", {
+        const response = await fetch("/api/v1/auth/wallet/connect", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ walletAddress }),
+          body: JSON.stringify({
+            wallet_address: walletAddress,
+            signature,
+            message,
+          }),
         });
 
         if (response.ok) {
-          const updatedUser = await response.json();
-          const userData = updatedUser.user || updatedUser;
-          setUser(userData);
-          localStorage.setItem("user", JSON.stringify(userData));
+          const updatedUser = await unwrapApiResponse<User>(response);
+          setUser(updatedUser);
+          localStorage.setItem("user", JSON.stringify(updatedUser));
         }
       }
 
@@ -218,7 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const token = getAuthToken();
       if (token) {
-        const response = await fetch("/api/auth/wallet/disconnect", {
+        const response = await fetch("/api/v1/auth/wallet/disconnect", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -227,10 +256,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         if (response.ok) {
-          const updatedUser = await response.json();
-          const userData = updatedUser.user || updatedUser;
-          setUser(userData);
-          localStorage.setItem("user", JSON.stringify(userData));
+          const updatedUser = await unwrapApiResponse<User>(response);
+          setUser(updatedUser);
+          localStorage.setItem("user", JSON.stringify(updatedUser));
 
           toast({
             title: "Wallet disconnected",

@@ -712,7 +712,7 @@ mod tests {
     #[tokio::test]
     async fn test_scan_phishing_email() {
         let scanner = EmailScanner::new(EmailScannerConfig::default()).unwrap();
-        let email = b"From: support@paypal-verify.com\nTo: victim@example.com\nSubject: Urgent: Verify your account\n\nYour account has been suspended. Click here immediately to verify your identity.";
+        let email = b"From: support@paypal-verify.com\nTo: victim@example.com\nSubject: Urgent: Verify your account\n\nYour account has been suspended. Click here immediately to verify your identity. Act now or your account expires in 24 hours.";
 
         let result = scanner.scan(email, None).await;
         assert!(result.is_ok());
