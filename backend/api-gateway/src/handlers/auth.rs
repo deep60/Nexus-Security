@@ -68,6 +68,7 @@ pub struct RefreshTokenRequest {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AuthResponse {
     pub user: UserResponse,
     pub access_token: String,
@@ -76,6 +77,7 @@ pub struct AuthResponse {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserResponse {
     pub id: Uuid,
     pub username: String,

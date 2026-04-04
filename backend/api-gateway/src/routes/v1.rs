@@ -6,7 +6,7 @@ use axum::{
 
 use crate::{
     handlers::{
-        analysis, auth, bounty, health, reputation, submission, user, wallet, webhook,
+        analysis, auth, bounty, engines, health, reputation, submission, user, wallet, webhook,
     },
     middleware::auth as auth_mw,
     AppState,
@@ -30,6 +30,7 @@ pub fn create_routes(state: AppState) -> Router {
     let mixed_routes = Router::new()
         .nest("/bounties", bounty_routes())
         .nest("/analysis", analysis_routes())
+        .nest("/engines", engine_routes())
         .nest("/reputation", reputation_routes())
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
@@ -71,7 +72,8 @@ fn auth_routes() -> Router<AppState> {
         .route("/login", post(auth::login))
         .route("/logout", post(auth::logout))
         .route("/refresh", post(auth::refresh_token))
-        .route("/verify", post(auth::verify_token))
+        .route("/verify", get(auth::verify_token))
+        .route("/profile", get(auth::get_profile))
         .route("/verify-email", post(auth::verify_email))
         .route("/forgot-password", post(auth::forgot_password))
         .route("/reset-password", post(auth::reset_password))
@@ -154,7 +156,16 @@ fn submission_routes() -> Router<AppState> {
         .route("/", post(submission::create_submission))
         .route("/:submission_id/vote", post(submission::vote_on_submission))
         .route("/:submission_id/verify", post(submission::verify_submission))
+        .route("/:submission_id/start-analysis", post(submission::start_analysis))
+        .route("/:submission_id/analyses", get(submission::get_submission_analyses))
+        .route("/:submission_id/consensus", get(submission::get_submission_consensus))
         .route("/my-submissions", get(submission::get_my_submissions))
+}
+
+fn engine_routes() -> Router<AppState> {
+    Router::new()
+        .route("/", get(engines::list_engines))
+        .route("/:engine_id", get(engines::get_engine))
 }
 
 fn webhook_routes() -> Router<AppState> {

@@ -10,7 +10,7 @@ import { SEO } from "@/components/seo";
 
 export default function Home() {
   const { data: stats } = useQuery<any>({
-    queryKey: ["/api/stats"],
+    queryKey: ["/api/analysis/stats"],
   });
 
   return (

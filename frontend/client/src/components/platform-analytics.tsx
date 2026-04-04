@@ -32,7 +32,7 @@ import { InlineErrorState } from "@/components/error-state";
 
 export function PlatformAnalytics() {
   const { data: stats, isLoading, isError } = useQuery<any>({
-    queryKey: ['/api/stats'],
+    queryKey: ['/api/analysis/stats'],
   });
 
   const { data: submissions = [] } = useQuery<any[]>({

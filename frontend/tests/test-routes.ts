@@ -5,12 +5,40 @@
  * During tests the gateway is not running, so we mount these local
  * handlers that exercise the same MemStorage layer that storage.test.ts
  * tests directly.
+ *
+ * NOTE: The response shapes here intentionally mirror the Rust ApiResponse
+ * envelope so tests stay aligned with the real backend contract.
  */
 
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import { createServer, type Server } from 'http';
 import { MemStorage, setStorage, getStorage } from '../server/storage';
 import { randomUUID } from 'crypto';
+
+/** Helpers to build the standard ApiResponse envelope used by the backend. */
+function apiSuccess<T>(data: T, message?: string) {
+  return {
+    success: true,
+    data,
+    message: message ?? null,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function apiError(message: string) {
+  return {
+    success: false,
+    data: null,
+    message,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/** Strip password hash from a User object before sending. */
+function safeUser(user: Record<string, any>) {
+  const { passwordHash: _, ...rest } = user;
+  return rest;
+}
 
 /**
  * Create an Express app with locally-handled API routes for testing.
@@ -22,7 +50,7 @@ export async function createTestApp(): Promise<{ app: Express; server: Server }>
   app.use(express.json());
 
   // ─── Per-app isolated state ───
-  const sessions = new Map<string, string>(); // sessionId → userId
+  const sessions = new Map<string, string>(); // token → userId
   const authAttempts = new Map<string, number>();
 
   function rateLimitMiddleware(limit: number) {
@@ -30,7 +58,7 @@ export async function createTestApp(): Promise<{ app: Express; server: Server }>
       const key = req.ip ?? req.socket.remoteAddress ?? 'test';
       const count = authAttempts.get(key) ?? 0;
       if (count >= limit) {
-        return res.status(429).json({ error: 'Too many requests' });
+        return res.status(429).json(apiError('Too many requests'));
       }
       authAttempts.set(key, count + 1);
       next();
@@ -67,19 +95,19 @@ export async function createTestApp(): Promise<{ app: Express; server: Server }>
       const { username, email, password } = req.body;
 
       if (!username || !email || !password) {
-        return res.status(400).json({ error: 'Missing required fields' });
+        return res.status(400).json(apiError('Missing required fields'));
       }
       if (password.length < 8) {
-        return res.status(400).json({ error: 'Password too short' });
+        return res.status(400).json(apiError('Password too short'));
       }
 
       const existingEmail = await getStorage().getUserByEmail(email);
       if (existingEmail) {
-        return res.status(400).json({ error: 'Email already registered' });
+        return res.status(400).json(apiError('Email already registered'));
       }
       const existingUsername = await getStorage().getUserByUsername(username);
       if (existingUsername) {
-        return res.status(400).json({ error: 'Username already taken' });
+        return res.status(400).json(apiError('Username already taken'));
       }
 
       const user = await getStorage().createUser({
@@ -88,54 +116,92 @@ export async function createTestApp(): Promise<{ app: Express; server: Server }>
         passwordHash: password, // In real app: hashed
       });
 
-      const sessionId = randomUUID();
-      sessions.set(sessionId, user.id);
+      const accessToken = randomUUID();
+      sessions.set(accessToken, user.id);
 
-      const { passwordHash: _, ...safeUser } = user;
-      return res.status(201).json({ user: safeUser, sessionId });
+      return res.status(201).json(apiSuccess({
+        user: safeUser(user),
+        accessToken,
+        refreshToken: randomUUID(),
+        expiresIn: 3600,
+      }));
     } catch (e) {
-      return res.status(500).json({ error: 'Internal error' });
+      return res.status(500).json(apiError('Internal error'));
     }
   });
 
   app.post('/api/auth/login', async (req, res) => {
-    const { email, password } = req.body;
-    const user = await getStorage().getUserByEmail(email);
-    if (!user || user.passwordHash !== password) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    // Accept both `identifier` (backend contract) and `email` (legacy tests)
+    const identifier: string | undefined = req.body.identifier ?? req.body.email;
+    const { password } = req.body;
+
+    if (!identifier) {
+      return res.status(400).json(apiError('Missing identifier'));
     }
-    const sessionId = randomUUID();
-    sessions.set(sessionId, user.id);
-    const { passwordHash: _, ...safeUser } = user;
-    return res.json({ user: safeUser, sessionId });
+
+    // Look up by email or username (mirrors the backend SQL: WHERE username = $1 OR email = $1)
+    let user = await getStorage().getUserByEmail(identifier);
+    if (!user) {
+      user = await getStorage().getUserByUsername(identifier);
+    }
+
+    if (!user || user.passwordHash !== password) {
+      return res.status(401).json(apiError('Invalid credentials'));
+    }
+
+    const accessToken = randomUUID();
+    sessions.set(accessToken, user.id);
+
+    return res.json(apiSuccess({
+      user: safeUser(user),
+      accessToken,
+      refreshToken: randomUUID(),
+      expiresIn: 3600,
+    }));
   });
 
+  // GET /api/auth/me  — mirrors backend GET /auth/verify + GET /users/me
   app.get('/api/auth/me', async (req, res) => {
     const auth = req.headers.authorization;
-    if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+    if (!auth?.startsWith('Bearer ')) return res.status(401).json(apiError('Unauthorized'));
     const userId = sessions.get(auth.slice(7));
-    if (!userId) return res.status(401).json({ error: 'Invalid session' });
+    if (!userId) return res.status(401).json(apiError('Invalid session'));
     const user = await getStorage().getUser(userId);
-    if (!user) return res.status(401).json({ error: 'User not found' });
-    const { passwordHash: _, ...safeUser } = user;
-    return res.json(safeUser);
+    if (!user) return res.status(401).json(apiError('User not found'));
+    return res.json(apiSuccess(safeUser(user)));
   });
 
-  app.patch('/api/auth/wallet', async (req, res) => {
+  // POST /api/auth/wallet/connect — mirrors backend POST /auth/wallet/connect
+  app.post('/api/auth/wallet/connect', async (req, res) => {
     const auth = req.headers.authorization;
-    if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+    if (!auth?.startsWith('Bearer ')) return res.status(401).json(apiError('Unauthorized'));
     const userId = sessions.get(auth.slice(7));
-    if (!userId) return res.status(401).json({ error: 'Invalid session' });
-    const updated = await getStorage().updateUser(userId, { walletAddress: req.body.walletAddress });
-    if (!updated) return res.status(404).json({ error: 'User not found' });
-    const { passwordHash: _, ...safeUser } = updated;
-    return res.json(safeUser);
+    if (!userId) return res.status(401).json(apiError('Invalid session'));
+
+    const walletAddress = req.body.wallet_address ?? req.body.walletAddress;
+    if (!walletAddress) return res.status(400).json(apiError('Missing wallet_address'));
+
+    const updated = await getStorage().updateUser(userId, { walletAddress });
+    if (!updated) return res.status(404).json(apiError('User not found'));
+    return res.json(apiSuccess(safeUser(updated)));
+  });
+
+  // POST /api/auth/wallet/disconnect — mirrors backend POST /auth/wallet/disconnect
+  app.post('/api/auth/wallet/disconnect', async (req, res) => {
+    const auth = req.headers.authorization;
+    if (!auth?.startsWith('Bearer ')) return res.status(401).json(apiError('Unauthorized'));
+    const userId = sessions.get(auth.slice(7));
+    if (!userId) return res.status(401).json(apiError('Invalid session'));
+
+    const updated = await getStorage().updateUser(userId, { walletAddress: null });
+    if (!updated) return res.status(404).json(apiError('User not found'));
+    return res.json(apiSuccess(safeUser(updated)));
   });
 
   app.post('/api/auth/logout', async (req, res) => {
     const auth = req.headers.authorization;
     if (auth?.startsWith('Bearer ')) sessions.delete(auth.slice(7));
-    return res.json({ message: 'Logged out' });
+    return res.json(apiSuccess(null, 'Successfully logged out'));
   });
 
   // ── ENGINE ROUTES ──
@@ -222,7 +288,7 @@ export async function createTestApp(): Promise<{ app: Express; server: Server }>
 
   // ── STATS / BOUNTIES ──
 
-  app.get('/api/stats', async (_req, res) => {
+  app.get('/api/analysis/stats', async (_req, res) => {
     const subs = await getStorage().getSubmissions();
     const engines = await getStorage().getSecurityEngines();
     return res.json({

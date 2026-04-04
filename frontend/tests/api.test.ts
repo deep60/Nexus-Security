@@ -1,6 +1,9 @@
 /**
  * API Integration Tests
  * Tests API endpoints using supertest against local MemStorage-backed handlers.
+ *
+ * Auth responses use the standard ApiResponse envelope:
+ *   { success: true, data: { user, accessToken, refreshToken, expiresIn } }
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -12,7 +15,7 @@ import { createTestApp } from './test-routes';
 describe('API Integration Tests', () => {
   let app: Express;
   let server: Server;
-  let sessionId: string;
+  let accessToken: string;
 
   beforeAll(async () => {
     ({ app, server } = await createTestApp());
@@ -37,14 +40,15 @@ describe('API Integration Tests', () => {
         })
         .expect(201);
 
-      expect(response.body.user).toBeDefined();
-      expect(response.body.user.username).toBe('testuser');
-      expect(response.body.user.email).toBe('test@example.com');
-      expect(response.body.user.passwordHash).toBeUndefined(); // Should not be returned
-      expect(response.body.sessionId).toBeDefined();
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.user).toBeDefined();
+      expect(response.body.data.user.username).toBe('testuser');
+      expect(response.body.data.user.email).toBe('test@example.com');
+      expect(response.body.data.user.passwordHash).toBeUndefined(); // Should not be returned
+      expect(response.body.data.accessToken).toBeDefined();
 
-      // Save session ID for subsequent tests
-      sessionId = response.body.sessionId;
+      // Save access token for subsequent tests
+      accessToken = response.body.data.accessToken;
     });
 
     it('POST /api/auth/register - should reject duplicate email', async () => {
@@ -80,25 +84,26 @@ describe('API Integration Tests', () => {
         .expect(400);
     });
 
-    it('POST /api/auth/login - should login with correct credentials', async () => {
+    it('POST /api/auth/login - should login with correct credentials (identifier)', async () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'test@example.com',
+          identifier: 'test@example.com',
           password: 'password123',
         })
         .expect(200);
 
-      expect(response.body.user).toBeDefined();
-      expect(response.body.user.email).toBe('test@example.com');
-      expect(response.body.sessionId).toBeDefined();
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.user).toBeDefined();
+      expect(response.body.data.user.email).toBe('test@example.com');
+      expect(response.body.data.accessToken).toBeDefined();
     });
 
     it('POST /api/auth/login - should reject invalid credentials', async () => {
       await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'test@example.com',
+          identifier: 'test@example.com',
           password: 'wrongpassword',
         })
         .expect(401);
@@ -108,58 +113,64 @@ describe('API Integration Tests', () => {
       await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'nonexistent@example.com',
+          identifier: 'nonexistent@example.com',
           password: 'password123',
         })
         .expect(401);
     });
 
-    it('GET /api/auth/me - should get current user with valid session', async () => {
+    it('GET /api/auth/me - should get current user with valid token', async () => {
       const response = await request(app)
         .get('/api/auth/me')
-        .set('Authorization', `Bearer ${sessionId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
-      expect(response.body.username).toBe('testuser');
-      expect(response.body.email).toBe('test@example.com');
-      expect(response.body.passwordHash).toBeUndefined();
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.username).toBe('testuser');
+      expect(response.body.data.email).toBe('test@example.com');
+      expect(response.body.data.passwordHash).toBeUndefined();
     });
 
-    it('GET /api/auth/me - should reject without session', async () => {
+    it('GET /api/auth/me - should reject without token', async () => {
       await request(app)
         .get('/api/auth/me')
         .expect(401);
     });
 
-    it('GET /api/auth/me - should reject with invalid session', async () => {
+    it('GET /api/auth/me - should reject with invalid token', async () => {
       await request(app)
         .get('/api/auth/me')
         .set('Authorization', 'Bearer invalid-session-id')
         .expect(401);
     });
 
-    it('PATCH /api/auth/wallet - should update wallet address', async () => {
+    it('POST /api/auth/wallet/connect - should update wallet address', async () => {
       const response = await request(app)
-        .patch('/api/auth/wallet')
-        .set('Authorization', `Bearer ${sessionId}`)
+        .post('/api/auth/wallet/connect')
+        .set('Authorization', `Bearer ${accessToken}`)
         .send({
-          walletAddress: '0x1234567890abcdef',
+          wallet_address: '0x1234567890abcdef',
+          signature: 'test-sig',
+          message: 'connect wallet',
         })
         .expect(200);
 
-      expect(response.body.walletAddress).toBe('0x1234567890abcdef');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.walletAddress).toBe('0x1234567890abcdef');
     });
 
     it('POST /api/auth/logout - should logout successfully', async () => {
-      await request(app)
+      const response = await request(app)
         .post('/api/auth/logout')
-        .set('Authorization', `Bearer ${sessionId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
+
+      expect(response.body.success).toBe(true);
 
       // Session should be invalidated
       await request(app)
         .get('/api/auth/me')
-        .set('Authorization', `Bearer ${sessionId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
         .expect(401);
     });
   });

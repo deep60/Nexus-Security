@@ -4,6 +4,9 @@
  *
  * Uses local Express handlers (test-routes.ts) rather than the production
  * proxy so the Rust api-gateway does not need to be running.
+ *
+ * Auth responses use the standard ApiResponse envelope:
+ *   { success: true, data: { user, accessToken, refreshToken, expiresIn } }
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -29,7 +32,7 @@ describe('E2E: Complete User Workflows', () => {
   });
 
   describe('E2E: New User Registration and Submission Flow', () => {
-    let sessionId: string;
+    let accessToken: string;
     let submissionId: string;
 
     it('Step 1: User registers an account', async () => {
@@ -42,21 +45,25 @@ describe('E2E: Complete User Workflows', () => {
         })
         .expect(201);
 
-      expect(response.body.user).toBeDefined();
-      expect(response.body.sessionId).toBeDefined();
-      sessionId = response.body.sessionId;
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.user).toBeDefined();
+      expect(response.body.data.accessToken).toBeDefined();
+      accessToken = response.body.data.accessToken;
     });
 
     it('Step 2: User connects their wallet', async () => {
       const response = await request(app)
-        .patch('/api/auth/wallet')
-        .set('Authorization', `Bearer ${sessionId}`)
+        .post('/api/auth/wallet/connect')
+        .set('Authorization', `Bearer ${accessToken}`)
         .send({
-          walletAddress: '0xE2E1234567890abcdef',
+          wallet_address: '0xE2E1234567890abcdef',
+          signature: 'test-sig',
+          message: 'connect wallet',
         })
         .expect(200);
 
-      expect(response.body.walletAddress).toBe('0xE2E1234567890abcdef');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.walletAddress).toBe('0xE2E1234567890abcdef');
     });
 
     it('Step 3: User views available security engines', async () => {
@@ -119,15 +126,17 @@ describe('E2E: Complete User Workflows', () => {
     });
 
     it('Step 9: User logs out', async () => {
-      await request(app)
+      const response = await request(app)
         .post('/api/auth/logout')
-        .set('Authorization', `Bearer ${sessionId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
+
+      expect(response.body.success).toBe(true);
 
       // Verify session is invalidated
       await request(app)
         .get('/api/auth/me')
-        .set('Authorization', `Bearer ${sessionId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
         .expect(401);
     });
 
@@ -135,18 +144,19 @@ describe('E2E: Complete User Workflows', () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'e2e@example.com',
+          identifier: 'e2e@example.com',
           password: 'securepassword123',
         })
         .expect(200);
 
-      expect(response.body.user).toBeDefined();
-      expect(response.body.sessionId).toBeDefined();
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.user).toBeDefined();
+      expect(response.body.data.accessToken).toBeDefined();
     });
   });
 
   describe('E2E: Security Engine Registration and Analysis Flow', () => {
-    let sessionId: string;
+    let accessToken: string;
     let engineId: string;
     let submissionId: string;
 
@@ -160,7 +170,8 @@ describe('E2E: Complete User Workflows', () => {
         })
         .expect(201);
 
-      sessionId = response.body.sessionId;
+      expect(response.body.success).toBe(true);
+      accessToken = response.body.data.accessToken;
     });
 
     it('Step 2: Researcher registers their security engine', async () => {
@@ -221,19 +232,20 @@ describe('E2E: Complete User Workflows', () => {
   });
 
   describe('E2E: Multiple Submissions Workflow', () => {
-    let sessionId: string;
+    let accessToken: string;
     const submissionIds: string[] = [];
 
     it('Step 1: User logs in', async () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'e2e@example.com',
+          identifier: 'e2e@example.com',
           password: 'securepassword123',
         })
         .expect(200);
 
-      sessionId = response.body.sessionId;
+      expect(response.body.success).toBe(true);
+      accessToken = response.body.data.accessToken;
     });
 
     it('Step 2: User submits multiple files', async () => {

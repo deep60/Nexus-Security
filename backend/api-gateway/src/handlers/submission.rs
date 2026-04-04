@@ -709,3 +709,158 @@ pub async fn get_my_submissions(
         },
     }))
 }
+
+// ─── Extra endpoints consumed by the frontend ────────────────────
+
+/// Start analysis for a submission.
+///
+/// POST /api/v1/submissions/:submission_id/start-analysis
+///
+/// Transitions the submission status to "Processing" and queues it
+/// for engine analysis.
+pub async fn start_analysis(
+    State(state): State<AppState>,
+    Path(submission_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    // Update status to Processing
+    let result = sqlx::query(
+        "UPDATE extended_submissions SET status = 'Processing', updated_at = NOW() WHERE submission_id = $1",
+    )
+    .bind(submission_id)
+    .execute(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to start analysis for {}: {}", submission_id, e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    if result.rows_affected() == 0 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    // Queue for processing
+    let _ = state.redis.queue_for_analysis(submission_id, 1).await;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "submission_id": submission_id,
+        "status": "Processing",
+        "message": "Analysis started"
+    })))
+}
+
+/// Get analyses for a specific submission / bounty.
+///
+/// GET /api/v1/submissions/:submission_id/analyses
+///
+/// Returns analysis results associated with the submission's bounty.
+pub async fn get_submission_analyses(
+    State(state): State<AppState>,
+    Path(submission_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    // Look up the bounty_id for this submission, then fetch analyses
+    let bounty_id: Option<Uuid> = sqlx::query_scalar(
+        "SELECT bounty_id FROM bounty_submissions WHERE id = $1",
+    )
+    .bind(submission_id)
+    .fetch_optional(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("DB error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let bid = bounty_id.unwrap_or(submission_id); // fallback: treat id as bounty_id
+
+    let rows: Vec<serde_json::Value> = sqlx::query_scalar(
+        r#"SELECT row_to_json(t) FROM (
+             SELECT id, file_hash, status, verdict,
+                    confidence::float8 as confidence,
+                    created_at, completed_at
+             FROM analyses
+             WHERE bounty_id = $1
+             ORDER BY created_at DESC
+           ) t"#,
+    )
+    .bind(bid)
+    .fetch_all(state.db.pool())
+    .await
+    .unwrap_or_default();
+
+    Ok(Json(serde_json::json!(rows)))
+}
+
+/// Get consensus result for a submission.
+///
+/// GET /api/v1/submissions/:submission_id/consensus
+///
+/// Returns the aggregated verdict across all analyses.
+pub async fn get_submission_consensus(
+    State(state): State<AppState>,
+    Path(submission_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    // Aggregate verdict counts for analyses related to this submission
+    let bounty_id: Option<Uuid> = sqlx::query_scalar(
+        "SELECT bounty_id FROM bounty_submissions WHERE id = $1",
+    )
+    .bind(submission_id)
+    .fetch_optional(state.db.pool())
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let bid = bounty_id.unwrap_or(submission_id);
+
+    let malicious: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM analyses WHERE bounty_id = $1 AND verdict = 'malicious'",
+    )
+    .bind(bid)
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or(0);
+
+    let suspicious: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM analyses WHERE bounty_id = $1 AND verdict = 'suspicious'",
+    )
+    .bind(bid)
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or(0);
+
+    let clean: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM analyses WHERE bounty_id = $1 AND verdict = 'benign'",
+    )
+    .bind(bid)
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or(0);
+
+    let total = malicious + suspicious + clean;
+    if total == 0 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    // Determine consensus verdict
+    let final_verdict = if malicious >= suspicious && malicious >= clean {
+        "malicious"
+    } else if suspicious >= clean {
+        "suspicious"
+    } else {
+        "clean"
+    };
+
+    let max_votes = malicious.max(suspicious).max(clean);
+    let confidence = if total > 0 {
+        (max_votes as f64 / total as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    Ok(Json(serde_json::json!({
+        "finalVerdict": final_verdict,
+        "confidenceScore": (confidence * 10.0).round() / 10.0,
+        "maliciousVotes": malicious,
+        "suspiciousVotes": suspicious,
+        "cleanVotes": clean,
+        "totalVotes": total,
+    })))
+}

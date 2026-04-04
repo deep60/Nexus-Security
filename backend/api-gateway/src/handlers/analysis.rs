@@ -43,6 +43,7 @@ pub struct AnalysisSummary {
 
 /// Analysis stats
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AnalysisStats {
     pub total_analyses: i64,
     pub pending: i64,
@@ -50,6 +51,12 @@ pub struct AnalysisStats {
     pub malicious_count: i64,
     pub benign_count: i64,
     pub suspicious_count: i64,
+    // Extra fields the frontend dashboard expects
+    pub total_submissions: i64,
+    pub active_analyses: i64,
+    pub completed_today: i64,
+    pub threats_detected: i64,
+    pub total_engines: i64,
 }
 
 /// Get analysis by ID
@@ -154,6 +161,33 @@ pub async fn get_analysis_stats(
         .await
         .unwrap_or(0);
 
+    // Extra dashboard fields
+    let total_submissions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM bounty_submissions")
+        .fetch_one(state.db.pool())
+        .await
+        .unwrap_or(total); // fallback to analyses count
+
+    let active_analyses: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM analyses WHERE status IN ('pending', 'processing')",
+    )
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or(pending);
+
+    let completed_today: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM analyses WHERE status = 'completed' AND completed_at >= CURRENT_DATE",
+    )
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or(0);
+
+    let total_engines: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM security_engines WHERE is_active = true",
+    )
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or(0);
+
     Ok(Json(AnalysisStats {
         total_analyses: total,
         pending,
@@ -161,6 +195,11 @@ pub async fn get_analysis_stats(
         malicious_count: malicious,
         benign_count: benign,
         suspicious_count: suspicious,
+        total_submissions,
+        active_analyses,
+        completed_today,
+        threats_detected: malicious + suspicious,
+        total_engines,
     }))
 }
 

@@ -68,7 +68,7 @@ export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) 
   });
 
   const { isLoading: statsLoading } = useQuery({
-    queryKey: ['/api/stats'],
+    queryKey: ['/api/analysis/stats'],
   });
 
   // Calculate user statistics

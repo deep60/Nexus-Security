@@ -52,9 +52,9 @@ async function unwrapApiResponse<T>(response: Response): Promise<T> {
 /** Shape of the auth response from /api/v1/auth/login and /register */
 interface AuthResponseData {
   user: User;
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -111,8 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const authData = await unwrapApiResponse<AuthResponseData>(response);
 
       setUser(authData.user);
-      localStorage.setItem("token", authData.access_token);
-      localStorage.setItem("refreshToken", authData.refresh_token);
+      localStorage.setItem("token", authData.accessToken);
+      localStorage.setItem("refreshToken", authData.refreshToken);
       localStorage.setItem("user", JSON.stringify(authData.user));
 
       toast({
@@ -140,8 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const authData = await unwrapApiResponse<AuthResponseData>(response);
 
       setUser(authData.user);
-      localStorage.setItem("token", authData.access_token);
-      localStorage.setItem("refreshToken", authData.refresh_token);
+      localStorage.setItem("token", authData.accessToken);
+      localStorage.setItem("refreshToken", authData.refreshToken);
       localStorage.setItem("user", JSON.stringify(authData.user));
 
       toast({

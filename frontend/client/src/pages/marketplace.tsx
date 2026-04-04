@@ -46,7 +46,7 @@ export default function Marketplace() {
   });
 
   const { data: stats } = useQuery<any>({
-    queryKey: ["/api/stats"],
+    queryKey: ["/api/analysis/stats"],
   });
 
   // Combine submissions with bounties for display

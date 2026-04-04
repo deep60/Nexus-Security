@@ -11,7 +11,7 @@ export function AnalysisDashboard() {
   });
 
   const { data: stats } = useQuery<any>({
-    queryKey: ["/api/stats"],
+    queryKey: ["/api/analysis/stats"],
   });
 
   useWebSocket((message) => {
