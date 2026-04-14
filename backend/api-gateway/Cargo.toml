@@ -10,7 +10,7 @@ repository = "https://github.com/nexus-security/deep60"
 
 [dependencies]
 # Web framework
-axum = { version = "0.7", features = ["multipart"] }
+axum = { version = "0.7", features = ["multipart", "ws"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
 
 # Async runtime
@@ -88,6 +88,8 @@ serde_urlencoded = "0.7"
 flate2 = "1.0"
 tower = "0.4"
 async-trait = "0.1"
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
 
 [dev-dependencies]
 # Testing utilities

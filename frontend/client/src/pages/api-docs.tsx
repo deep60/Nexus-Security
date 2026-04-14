@@ -17,7 +17,7 @@ export default function ApiDocs() {
         title: "Copied to clipboard",
         description: "Code snippet copied successfully",
       });
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: "Failed to copy",
         description: "Please copy manually",

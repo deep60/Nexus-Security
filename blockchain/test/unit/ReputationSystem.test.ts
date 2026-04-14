@@ -171,7 +171,7 @@ describe("ReputationSystem", function () {
             await reputation.connect(bountyManager).registerEngine(engine1.address, 0);
 
             // Record and resolve correct submission
-            let submissionId = await reputation.connect(bountyManager).recordSubmission.staticCall(
+            const submissionId = await reputation.connect(bountyManager).recordSubmission.staticCall(
                 engine1.address, 1, true, ethers.parseEther("10"), 90
             );
             await reputation.connect(bountyManager).recordSubmission(
@@ -198,7 +198,7 @@ describe("ReputationSystem", function () {
             await reputation.connect(bountyManager).registerEngine(engine1.address, 0);
             await reputation.connect(bountyManager).registerEngine(engine2.address, 0);
 
-            const [topEngines, reputations] = await reputation.getTopEngines(2);
+            const [topEngines, _reputations] = await reputation.getTopEngines(2);
             expect(topEngines.length).to.equal(2);
         });
     });

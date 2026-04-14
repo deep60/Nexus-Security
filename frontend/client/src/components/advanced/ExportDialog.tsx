@@ -31,7 +31,7 @@ interface ExportDialogProps<T> {
 
 type ExportFormat = 'csv' | 'json' | 'pdf' | 'excel';
 
-export function ExportDialog<T extends Record<string, any>>({
+export function ExportDialog<T extends Record<string, unknown>>({
   data,
   columns,
   defaultFilename = 'export',

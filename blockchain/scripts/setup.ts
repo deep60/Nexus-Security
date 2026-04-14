@@ -8,6 +8,7 @@ import { ethers } from "hardhat";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { DeploymentAddresses } from "./deploy";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 interface SetupConfig {
     // System Roles
@@ -26,12 +27,12 @@ async function loadDeploymentAddresses(networkName: string, chainId: number): Pr
     try {
         const data = readFileSync(deploymentFile, "utf8");
         return JSON.parse(data);
-    } catch (error) {
+    } catch (_error) {
         throw new Error(`❌ Could not load deployment addresses from ${deploymentFile}. Run deploy.ts first.`);
     }
 }
 
-async function setupRoles(deploymentAddresses: DeploymentAddresses, config: SetupConfig, signer: any) {
+async function setupRoles(deploymentAddresses: DeploymentAddresses, config: SetupConfig, signer: HardhatEthersSigner) {
     console.log("\n👥 Setting up roles...");
 
     const reputationSystem = await ethers.getContractAt("ReputationSystem", deploymentAddresses.reputationSystem, signer);
@@ -95,7 +96,7 @@ async function setupRoles(deploymentAddresses: DeploymentAddresses, config: Setu
 async function registerInitialEngines(
     deploymentAddresses: DeploymentAddresses,
     config: SetupConfig,
-    signer: any
+    signer: HardhatEthersSigner
 ) {
     console.log("\n🤖 Registering initial analysis engines...");
 
@@ -142,7 +143,7 @@ async function registerInitialEngines(
     }
 }
 
-async function displaySystemStatus(deploymentAddresses: DeploymentAddresses, signer: any) {
+async function displaySystemStatus(deploymentAddresses: DeploymentAddresses, signer: HardhatEthersSigner) {
     console.log("\n📊 System Status:");
     console.log("═".repeat(50));
 
@@ -201,7 +202,7 @@ async function main() {
     console.log("✅ Loaded deployment addresses");
 
     // Load configuration
-    let config: SetupConfig = { ...DEFAULT_CONFIG };
+    const config: SetupConfig = { ...DEFAULT_CONFIG };
 
     // Override with environment variables if available
     if (process.env.ADMIN_ADDRESSES) {

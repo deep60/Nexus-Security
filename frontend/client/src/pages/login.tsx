@@ -25,7 +25,7 @@ export default function Login() {
     try {
       await login(identifier, password);
       setLocation("/dashboard");
-    } catch (err) {
+    } catch (_err) {
       setError("Invalid credentials. Please try again.");
     } finally {
       setIsLoading(false);
@@ -36,7 +36,7 @@ export default function Login() {
     try {
       await connectWallet();
       setLocation("/dashboard");
-    } catch (err) {
+    } catch (_err) {
       setError("Failed to connect wallet. Please try again.");
     }
   };

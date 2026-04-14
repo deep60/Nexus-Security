@@ -54,7 +54,7 @@ export default function Register() {
     try {
       await register(formData.username, formData.email, formData.password);
       setLocation("/dashboard");
-    } catch (err) {
+    } catch (_err) {
       setError("Registration failed. Email may already be in use.");
     } finally {
       setIsLoading(false);
@@ -65,7 +65,7 @@ export default function Register() {
     try {
       await connectWallet();
       setLocation("/dashboard");
-    } catch (err) {
+    } catch (_err) {
       setError("Failed to connect wallet. Please try again.");
     }
   };

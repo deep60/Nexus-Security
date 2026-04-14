@@ -5,10 +5,11 @@ import { FileCode, Link as LinkIcon, Search } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import type { ApiSubmission } from "@/lib/api-types";
 
 interface BountyCardProps {
-  submission: any;
-  bounty: any;
+  submission: ApiSubmission;
+  bounty: Record<string, unknown>;
 }
 
 export function BountyCard({ submission, bounty }: BountyCardProps) {
@@ -50,7 +51,7 @@ export function BountyCard({ submission, bounty }: BountyCardProps) {
     return { level: "Low", color: "border-accent/20" };
   };
 
-  const bountyAmount = parseFloat(bounty.amount);
+  const bountyAmount = parseFloat(String(bounty.amount ?? "0"));
   const bountyInfo = getBountyLevel(bountyAmount);
 
   return (
@@ -61,7 +62,7 @@ export function BountyCard({ submission, bounty }: BountyCardProps) {
             <div className={`w-14 h-14 ${
               submission.submissionType === "url" ? "bg-accent/20" : "bg-destructive/20"
             } rounded-lg flex items-center justify-center`}>
-              {getFileIcon(submission.submissionType)}
+              {getFileIcon(submission.submissionType ?? "")}
             </div>
             <div>
               <div className="font-semibold text-lg" data-testid={`bounty-filename-${submission.id}`}>
@@ -74,7 +75,7 @@ export function BountyCard({ submission, bounty }: BountyCardProps) {
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold text-secondary" data-testid={`bounty-amount-${submission.id}`}>
-              {bounty.amount} ETH
+              {String(bounty.amount ?? "0")} ETH
             </div>
             <div className="text-sm text-muted-foreground">Bounty</div>
           </div>
@@ -89,7 +90,7 @@ export function BountyCard({ submission, bounty }: BountyCardProps) {
           </div>
           <div className="flex justify-between text-sm">
             <span>Submission Time</span>
-            <span>{new Date(submission.createdAt).toLocaleString()}</span>
+            <span>{new Date(submission.createdAt ?? "").toLocaleString()}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span>Priority</span>

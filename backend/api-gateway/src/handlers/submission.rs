@@ -35,6 +35,40 @@ pub struct CreateSubmissionRequest {
     pub signatures: Vec<String>, // YARA rules, hashes, etc.
 }
 
+/// Request DTO for the user-facing file submission form.
+/// This maps to the `submissions` table (not `bounty_submissions`).
+#[derive(Deserialize, Clone, Serialize)]
+pub struct CreateFileSubmissionRequest {
+    pub filename: Option<String>,
+    #[serde(rename = "originalFilename")]
+    pub original_filename: Option<String>,
+    #[serde(rename = "submissionType")]
+    pub submission_type: String,        // "file" | "url"
+    pub description: Option<String>,
+    #[serde(rename = "fileHash")]
+    pub file_hash: Option<String>,
+    #[serde(rename = "fileSize")]
+    pub file_size: Option<i64>,
+    #[serde(rename = "analysisType")]
+    pub analysis_type: Option<String>,   // "full", "quick", "deep", "behavioral"
+    #[serde(rename = "bountyAmount")]
+    pub bounty_amount: Option<String>,   // ETH amount as string
+    pub priority: Option<bool>,
+}
+
+#[derive(Serialize)]
+pub struct FileSubmissionResponse {
+    pub id: Uuid,
+    pub submitter_id: Uuid,
+    pub original_filename: Option<String>,
+    pub file_hash: Option<String>,
+    pub file_size: Option<i64>,
+    pub submission_type: String,
+    pub analysis_status: String,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
 #[derive(Deserialize)]
 pub struct UpdateSubmissionRequest {
     pub analysis_summary: Option<String>,
@@ -574,11 +608,81 @@ async fn process_single_submission(
     }
 }
 
+/// User-facing file submission handler.
+///
+/// POST /api/v1/submissions/file
+///
+/// Accepts the payload shape sent by the frontend FileSubmissionForm and
+/// inserts a row in the `submissions` table (not `bounty_submissions`).
+pub async fn create_file_submission(
+    State(state): State<AppState>,
+    Json(request): Json<CreateFileSubmissionRequest>,
+) -> Result<Json<FileSubmissionResponse>, StatusCode> {
+    let filename = request.original_filename.as_deref()
+        .or(request.filename.as_deref())
+        .unwrap_or("unknown");
+
+    if filename == "unknown" && request.filename.is_none() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let submission_id = Uuid::new_v4();
+    let now = Utc::now();
+    // Placeholder submitter; in production the auth middleware injects the real user id.
+    let submitter_id = Uuid::nil();
+
+    let metadata = serde_json::json!({
+        "analysisType": request.analysis_type,
+        "bountyAmount": request.bounty_amount,
+        "priority": request.priority.unwrap_or(false),
+        "description": request.description,
+    });
+
+    sqlx::query(
+        r#"
+        INSERT INTO submissions (
+            id, submitter_id, original_filename, file_hash,
+            file_size, submission_type, analysis_status,
+            metadata, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9)
+        "#,
+    )
+    .bind(submission_id)
+    .bind(submitter_id)
+    .bind(filename)
+    .bind(&request.file_hash)
+    .bind(request.file_size)
+    .bind(&request.submission_type)
+    .bind(&metadata)
+    .bind(now)
+    .bind(now)
+    .execute(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to insert file submission: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(FileSubmissionResponse {
+        id: submission_id,
+        submitter_id,
+        original_filename: Some(filename.to_string()),
+        file_hash: request.file_hash,
+        file_size: request.file_size,
+        submission_type: request.submission_type,
+        analysis_status: "pending".to_string(),
+        description: request.description,
+        created_at: now,
+    }))
+}
+
 // Router setup
 pub fn create_submission_router() -> Router<AppState> {
     Router::new()
         .route("/upload", post(upload_file))
         .route("/submissions", post(create_submission))
+        .route("/submissions/file", post(create_file_submission))
         .route("/submissions", get(get_submissions))
         .route("/submissions/bulk", post(bulk_create_submissions))
         .route("/submissions/:id", get(get_submission_details))

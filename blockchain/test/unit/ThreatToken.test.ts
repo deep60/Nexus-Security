@@ -47,7 +47,7 @@ describe("ThreatToken", function () {
 
     describe("Minting", function () {
         it("Should allow minter to mint tokens", async function () {
-            const { token, owner, addr1 } = await loadFixture(deployTokenFixture);
+            const { token, owner: _owner, addr1 } = await loadFixture(deployTokenFixture);
             const mintAmount = ethers.parseEther("1000");
 
             await token.mint(addr1.address, mintAmount);
@@ -75,7 +75,7 @@ describe("ThreatToken", function () {
 
     describe("Staking", function () {
         it("Should allow authorized engines to stake", async function () {
-            const { token, owner, engine1 } = await loadFixture(deployTokenFixture);
+            const { token, owner: _owner, engine1 } = await loadFixture(deployTokenFixture);
 
             // Authorize engine and fund it
             await token.setEngineAuthorization(engine1.address, true);
@@ -89,7 +89,7 @@ describe("ThreatToken", function () {
         });
 
         it("Should not allow unauthorized engines to stake", async function () {
-            const { token, owner, engine1 } = await loadFixture(deployTokenFixture);
+            const { token, owner: _owner, engine1 } = await loadFixture(deployTokenFixture);
 
             const stakeAmount = ethers.parseEther("100");
             await token.transfer(engine1.address, stakeAmount);
@@ -101,7 +101,7 @@ describe("ThreatToken", function () {
         });
 
         it("Should enforce minimum stake amount", async function () {
-            const { token, owner, engine1 } = await loadFixture(deployTokenFixture);
+            const { token, owner: _owner, engine1 } = await loadFixture(deployTokenFixture);
 
             await token.setEngineAuthorization(engine1.address, true);
             const lowStake = ethers.parseEther("50"); // Below 100 minimum
@@ -122,7 +122,7 @@ describe("ThreatToken", function () {
         });
 
         it("Should prevent transfers when paused", async function () {
-            const { token, owner, addr1 } = await loadFixture(deployTokenFixture);
+            const { token, owner: _owner, addr1 } = await loadFixture(deployTokenFixture);
             await token.pause();
 
             await expect(

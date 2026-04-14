@@ -62,7 +62,6 @@ jobs:
 
       - name: Run linter
         run: npm run lint
-        continue-on-error: true
 
       - name: Run type check
         run: npx tsc --noEmit
@@ -147,7 +146,6 @@ jobs:
 
       - name: Run npm audit
         run: npm audit --audit-level=high
-        continue-on-error: true
 
       - name: Run Snyk security scan
         uses: snyk/actions/node@master

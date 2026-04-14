@@ -37,7 +37,7 @@ export default function HowItWorks() {
                   <pre className="text-sm font-mono text-emerald-400">
                     <code>
 {`curl -X POST https://api.nexus-security.com/v1/analyze \\
-  -H "Authorization: Bearer \$NEXUS_TOKEN" \\
+  -H "Authorization: Bearer $NEXUS_TOKEN" \\
   -F "file=@payload.bin" \\
   -F "engines=yara,clamav"`}
                     </code>

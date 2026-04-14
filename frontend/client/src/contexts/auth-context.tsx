@@ -119,10 +119,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Welcome back!",
         description: `Logged in as ${authData.user.username}`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Invalid credentials";
       toast({
         title: "Login failed",
-        description: error.message || "Invalid credentials",
+        description: message,
         variant: "destructive",
       });
       throw error;
@@ -148,10 +149,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Account created!",
         description: "Welcome to Nexus-Security",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Email may already be in use";
       toast({
         title: "Registration failed",
-        description: error.message || "Email may already be in use",
+        description: message,
         variant: "destructive",
       });
       throw error;
@@ -234,7 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Wallet connected",
         description: `Connected: ${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}`,
       });
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: "Connection failed",
         description: "Could not connect to wallet",
@@ -266,7 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
         }
       }
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: "Error",
         description: "Failed to disconnect wallet",
@@ -304,6 +306,8 @@ export function useAuth() {
 // Extend Window interface for TypeScript
 declare global {
   interface Window {
-    ethereum?: any;
+    ethereum?: {
+      request: (args: { method: string; params?: unknown[] }) => Promise<string[]>;
+    };
   }
 }

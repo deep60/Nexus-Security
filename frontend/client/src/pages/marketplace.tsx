@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { EngineCardSkeleton, BountyCardSkeleton } from "@/components/loading-skeleton";
 import { ErrorState } from "@/components/error-state";
 import { EmptyState } from "@/components/empty-state";
 import { useQuery } from "@tanstack/react-query";
 import { PlusCircle, Info, Search, FileX, Shield } from "lucide-react";
 import { SEO } from "@/components/seo";
+import type { ApiEngine, ApiSubmission, ApiStats } from "@/lib/api-types";
 
 type SortOption = "newest" | "oldest" | "highest" | "lowest";
 type EngineFilter = "all" | "ml" | "signature" | "human" | "hybrid";
@@ -32,7 +33,7 @@ export default function Marketplace() {
     isLoading: enginesLoading,
     isError: enginesError,
     refetch: refetchEngines,
-  } = useQuery<any[]>({
+  } = useQuery<ApiEngine[]>({
     queryKey: ["/api/engines"],
   });
 
@@ -41,41 +42,41 @@ export default function Marketplace() {
     isLoading: submissionsLoading,
     isError: submissionsError,
     refetch: refetchSubmissions,
-  } = useQuery<any[]>({
+  } = useQuery<ApiSubmission[]>({
     queryKey: ["/api/submissions"],
   });
 
-  const { data: stats } = useQuery<any>({
+  const { data: stats } = useQuery<ApiStats>({
     queryKey: ["/api/analysis/stats"],
   });
 
   // Combine submissions with bounties for display
   const activeBountySubmissions = submissions
-    .filter((sub: any) => sub.status === "pending")
-    .map((sub: any) => ({
+    .filter((sub) => sub.status === "pending")
+    .map((sub) => ({
       submission: sub,
       bounty: { amount: sub.bountyAmount, status: "active" },
     }));
 
   // Filter and sort engines
   const filteredEngines = useMemo(() => {
-    const filtered = engines.filter((engine: any) => {
+    const filtered = engines.filter((engine) => {
       const matchesSearch = engine.name.toLowerCase().includes(engineSearch.toLowerCase());
       const matchesFilter = engineFilter === "all" || engine.type === engineFilter;
       return matchesSearch && matchesFilter;
     });
 
     // Sort engines
-    filtered.sort((a: any, b: any) => {
+    filtered.sort((a, b) => {
       switch (engineSort) {
         case "newest":
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
         case "oldest":
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          return new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
         case "highest":
-          return (b.accuracy || 0) - (a.accuracy || 0);
+          return Number(b.accuracy || 0) - Number(a.accuracy || 0);
         case "lowest":
-          return (a.accuracy || 0) - (b.accuracy || 0);
+          return Number(a.accuracy || 0) - Number(b.accuracy || 0);
         default:
           return 0;
       }
@@ -86,23 +87,23 @@ export default function Marketplace() {
 
   // Filter and sort bounties
   const filteredBounties = useMemo(() => {
-    const filtered = activeBountySubmissions.filter(({ submission }: any) => {
-      const matchesSearch = submission.fileName.toLowerCase().includes(bountySearch.toLowerCase());
+    const filtered = activeBountySubmissions.filter(({ submission }) => {
+      const matchesSearch = (submission.fileName || submission.filename || "").toLowerCase().includes(bountySearch.toLowerCase());
       const matchesFilter = bountyFilter === "all" || submission.analysisType === bountyFilter;
       return matchesSearch && matchesFilter;
     });
 
     // Sort bounties
-    filtered.sort((a: any, b: any) => {
+    filtered.sort((a, b) => {
       switch (bountySort) {
         case "newest":
-          return new Date(b.submission.createdAt).getTime() - new Date(a.submission.createdAt).getTime();
+          return new Date(b.submission.createdAt ?? 0).getTime() - new Date(a.submission.createdAt ?? 0).getTime();
         case "oldest":
-          return new Date(a.submission.createdAt).getTime() - new Date(b.submission.createdAt).getTime();
+          return new Date(a.submission.createdAt ?? 0).getTime() - new Date(b.submission.createdAt ?? 0).getTime();
         case "highest":
-          return (b.submission.bountyAmount || 0) - (a.submission.bountyAmount || 0);
+          return Number(b.submission.bountyAmount || 0) - Number(a.submission.bountyAmount || 0);
         case "lowest":
-          return (a.submission.bountyAmount || 0) - (b.submission.bountyAmount || 0);
+          return Number(a.submission.bountyAmount || 0) - Number(b.submission.bountyAmount || 0);
         default:
           return 0;
       }
@@ -188,8 +189,8 @@ export default function Marketplace() {
               />
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                {filteredEngines.map((engine: any) => (
-                  <EngineCard key={engine.id} engine={engine} />
+                {filteredEngines.map((engine) => (
+                  <EngineCard key={engine.id} engine={engine as unknown as import("@shared/schema").SecurityEngine} />
                 ))}
               </div>
             )}
@@ -286,7 +287,7 @@ export default function Marketplace() {
               />
             ) : (
               <div className="grid lg:grid-cols-2 gap-8 mb-12">
-                {filteredBounties.map(({ submission, bounty }: any) => (
+                {filteredBounties.map(({ submission, bounty }) => (
                   <BountyCard key={submission.id} submission={submission} bounty={bounty} />
                 ))}
               </div>

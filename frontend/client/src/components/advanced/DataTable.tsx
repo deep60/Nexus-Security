@@ -17,7 +17,7 @@ import {
   type RowSelectionState,
   flexRender,
 } from '@tanstack/react-table';
-import { ChevronDown, ChevronUp, ChevronsUpDown, Download, Filter, Settings } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronsUpDown, Download, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {

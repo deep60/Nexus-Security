@@ -29,17 +29,18 @@ import {
 } from "lucide-react";
 import { StatCardSkeleton } from "@/components/loading-skeleton";
 import { InlineErrorState } from "@/components/error-state";
+import type { ApiStats, ApiSubmission, ApiEngine } from "@/lib/api-types";
 
 export function PlatformAnalytics() {
-  const { data: stats, isLoading, isError } = useQuery<any>({
+  const { data: stats, isLoading, isError } = useQuery<ApiStats>({
     queryKey: ['/api/analysis/stats'],
   });
 
-  const { data: submissions = [] } = useQuery<any[]>({
+  const { data: submissions = [] } = useQuery<ApiSubmission[]>({
     queryKey: ['/api/submissions'],
   });
 
-  const { data: engines = [] } = useQuery<any[]>({
+  const { data: engines = [] } = useQuery<ApiEngine[]>({
     queryKey: ['/api/engines'],
   });
 
@@ -63,9 +64,9 @@ export function PlatformAnalytics() {
   ];
 
   // Engine performance comparison
-  const enginePerformance = engines.slice(0, 8).map((engine: any) => ({
+  const enginePerformance = engines.slice(0, 8).map((engine) => ({
     name: engine.name.substring(0, 15),
-    accuracy: parseFloat(engine.accuracy || "0"),
+    accuracy: parseFloat(engine.accuracy || engine.accuracyRate || "0"),
     speed: Math.random() * 40 + 60, // Mock speed score
     detectionRate: Math.random() * 30 + 70, // Mock detection rate
   }));

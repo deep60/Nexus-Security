@@ -1,17 +1,18 @@
 import { ethers } from "hardhat";
 import { ThreatToken, ReputationSystem, BountyManager } from "../../typechain-types";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 export interface TestFixture {
     threatToken: ThreatToken;
     reputationSystem: ReputationSystem;
     bountyManager: BountyManager;
-    deployer: any;
-    feeCollector: any;
-    analyst1: any;
-    analyst2: any;
-    analyst3: any;
-    submitter: any;
-    users: any[];
+    deployer: HardhatEthersSigner;
+    feeCollector: HardhatEthersSigner;
+    analyst1: HardhatEthersSigner;
+    analyst2: HardhatEthersSigner;
+    analyst3: HardhatEthersSigner;
+    submitter: HardhatEthersSigner;
+    users: HardhatEthersSigner[];
 }
 
 /**
@@ -89,7 +90,7 @@ export async function deployFixture(): Promise<TestFixture> {
 export async function createTestBounty(
     bountyManager: BountyManager,
     threatToken: ThreatToken,
-    creator: any,
+    creator: HardhatEthersSigner,
     rewardAmount: bigint = ethers.parseEther("100")
 ) {
     // Approve tokens
@@ -108,7 +109,7 @@ export async function createTestBounty(
     );
 
     const receipt = await tx.wait();
-    const event = receipt?.logs.find((log: any) => {
+    const event = receipt?.logs.find((log: Record<string, unknown>) => {
         try {
             return bountyManager.interface.parseLog(log)?.name === "BountyCreated";
         } catch {
@@ -127,7 +128,7 @@ export async function createTestBounty(
 export async function submitTestAnalysis(
     bountyManager: BountyManager,
     threatToken: ThreatToken,
-    analyst: any,
+    analyst: HardhatEthersSigner,
     bountyId: bigint,
     verdict: number = 1, // 1 = Malicious
     confidence: number = 90,

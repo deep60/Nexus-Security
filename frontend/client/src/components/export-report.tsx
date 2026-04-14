@@ -10,11 +10,21 @@ import {
 import { Download, FileJson, FileText, Share2, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+export interface AnalysisRecord {
+  engineId?: string;
+  engine?: { name?: string };
+  verdict?: string;
+  confidence?: number;
+  status: string;
+  stakeAmount?: string;
+  completedAt?: string;
+}
+
 interface ExportReportProps {
   submissionId: string;
   fileName: string;
-  consensus?: any;
-  analyses?: any[];
+  consensus?: Record<string, unknown>;
+  analyses?: AnalysisRecord[];
 }
 
 export function ExportReport({ submissionId, fileName, consensus, analyses = [] }: ExportReportProps) {
@@ -27,7 +37,7 @@ export function ExportReport({ submissionId, fileName, consensus, analyses = [] 
         fileName,
         exportedAt: new Date().toISOString(),
         consensus: consensus || null,
-        analyses: analyses.map((analysis: any) => ({
+        analyses: analyses.map((analysis) => ({
           engineId: analysis.engineId,
           engineName: analysis.engine?.name,
           verdict: analysis.verdict,
@@ -38,7 +48,7 @@ export function ExportReport({ submissionId, fileName, consensus, analyses = [] 
         })),
         summary: {
           totalEngines: analyses.length,
-          completedAnalyses: analyses.filter((a: any) => a.status === "completed").length,
+          completedAnalyses: analyses.filter((a) => a.status === "completed").length,
           finalVerdict: consensus?.finalVerdict || "pending",
           confidenceScore: consensus?.confidenceScore || "0",
         },
@@ -64,7 +74,7 @@ export function ExportReport({ submissionId, fileName, consensus, analyses = [] 
           </div>
         ),
       });
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: "Export Failed",
         description: "Failed to export report as JSON",
@@ -95,7 +105,7 @@ export function ExportReport({ submissionId, fileName, consensus, analyses = [] 
         markdown += `| Engine | Verdict | Confidence | Status | Stake |\n`;
         markdown += `|--------|---------|------------|--------|-------|\n`;
 
-        analyses.forEach((analysis: any) => {
+        analyses.forEach((analysis) => {
           markdown += `| ${analysis.engine?.name || "Unknown"} | ${analysis.verdict || "Pending"} | ${analysis.confidence || "N/A"}% | ${analysis.status} | ${analysis.stakeAmount} ETH |\n`;
         });
       }
@@ -122,7 +132,7 @@ export function ExportReport({ submissionId, fileName, consensus, analyses = [] 
           </div>
         ),
       });
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: "Export Failed",
         description: "Failed to export report as Markdown",
@@ -135,7 +145,7 @@ export function ExportReport({ submissionId, fileName, consensus, analyses = [] 
     try {
       let csv = "Engine Name,Verdict,Confidence,Status,Stake Amount,Completed At\n";
 
-      analyses.forEach((analysis: any) => {
+      analyses.forEach((analysis) => {
         csv += `"${analysis.engine?.name || "Unknown"}",`;
         csv += `"${analysis.verdict || "Pending"}",`;
         csv += `"${analysis.confidence || "N/A"}",`;
@@ -163,7 +173,7 @@ export function ExportReport({ submissionId, fileName, consensus, analyses = [] 
           </div>
         ),
       });
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: "Export Failed",
         description: "Failed to export as CSV",

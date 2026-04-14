@@ -95,7 +95,7 @@ export function SubmissionsTableExample() {
     {
       key: 'createdAt',
       label: 'Created',
-      format: (value: Date) => format(new Date(value), 'yyyy-MM-dd HH:mm:ss'),
+      format: (value: unknown) => format(new Date(value as Date), 'yyyy-MM-dd HH:mm:ss'),
     },
     { key: 'fileHash', label: 'File Hash' },
   ];

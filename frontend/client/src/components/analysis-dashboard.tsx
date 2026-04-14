@@ -1,16 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, CheckCircle, AlertTriangle, RotateCw, FileText, Link as LinkIcon, Shield, Zap } from "lucide-react";
+import { Activity, CheckCircle, AlertTriangle, RotateCw, FileText, Link as LinkIcon } from "lucide-react";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { useEffect } from "react";
+import type { ApiSubmission, ApiStats } from "@/lib/api-types";
 
 export function AnalysisDashboard() {
-  const { data: submissions = [], refetch } = useQuery<any[]>({
+  const { data: submissions = [], refetch } = useQuery<ApiSubmission[]>({
     queryKey: ["/api/submissions"],
   });
 
-  const { data: stats } = useQuery<any>({
+  const { data: stats } = useQuery<ApiStats>({
     queryKey: ["/api/analysis/stats"],
   });
 
@@ -61,7 +61,7 @@ export function AnalysisDashboard() {
               <div className="w-3 h-3 bg-accent rounded-full animate-pulse" />
             </div>
             <div className="text-2xl font-bold mb-2" data-testid="text-active-analyses">
-              {stats?.activeAnalyses || 0}
+              {Number(stats?.activeAnalyses ?? 0)}
             </div>
             <div className="text-sm text-muted-foreground">Files being analyzed</div>
             <div className="scanning-animation h-1 w-full mt-4 rounded-full" />
@@ -75,7 +75,7 @@ export function AnalysisDashboard() {
               <CheckCircle className="w-5 h-5 text-primary" />
             </div>
             <div className="text-2xl font-bold mb-2" data-testid="text-completed-today">
-              {stats?.completedToday || 0}
+              {Number(stats?.completedToday ?? 0)}
             </div>
             <div className="text-sm text-muted-foreground">Analyses completed</div>
           </CardContent>
@@ -88,7 +88,7 @@ export function AnalysisDashboard() {
               <AlertTriangle className="w-5 h-5 text-destructive" />
             </div>
             <div className="text-2xl font-bold mb-2" data-testid="text-threats-detected">
-              {Math.floor(stats?.threatsDetected || 0)}
+              {Math.floor(Number(stats?.threatsDetected ?? 0))}
             </div>
             <div className="text-sm text-muted-foreground">Malicious files found</div>
           </CardContent>
@@ -105,28 +105,28 @@ export function AnalysisDashboard() {
                 No submissions yet. Submit a file to get started!
               </div>
             ) : (
-              submissions.slice(0, 5).map((submission: any) => (
+              submissions.slice(0, 5).map((submission) => (
                 <div
                   key={submission.id}
-                  className={`flex items-center justify-between p-4 bg-card rounded-lg border ${getStatusColor(submission.status)}`}
+                  className={`flex items-center justify-between p-4 bg-card rounded-lg border ${getStatusColor(submission.status ?? "")}`}
                   data-testid={`analysis-result-${submission.id}`}
                 >
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center">
-                      {getFileIcon(submission.submissionType)}
+                      {getFileIcon(submission.submissionType ?? "")}
                     </div>
                     <div>
                       <div className="font-semibold" data-testid={`filename-${submission.id}`}>
                         {submission.filename}
                       </div>
                       <div className="text-sm text-muted-foreground font-mono">
-                        SHA256: {submission.fileHash.substring(0, 12)}...
+                        SHA256: {(submission.fileHash ?? "").substring(0, 12)}...
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="flex items-center space-x-2 mb-1">
-                      {getStatusIcon(submission.status)}
+                      {getStatusIcon(submission.status ?? "")}
                       <span className="text-sm font-medium capitalize" data-testid={`status-${submission.id}`}>
                         {submission.status}
                       </span>

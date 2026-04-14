@@ -17,6 +17,7 @@ pub mod submission;
 pub mod user;
 pub mod wallet;
 pub mod webhook;
+pub mod websocket;
 
 #[derive(Error, Debug)]
 pub enum ApiError {

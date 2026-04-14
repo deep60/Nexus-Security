@@ -154,6 +154,7 @@ fn submission_routes() -> Router<AppState> {
         .route("/", get(submission::list_submissions))
         .route("/:submission_id", get(submission::get_submission))
         .route("/", post(submission::create_submission))
+        .route("/file", post(submission::create_file_submission))
         .route("/:submission_id/vote", post(submission::vote_on_submission))
         .route("/:submission_id/verify", post(submission::verify_submission))
         .route("/:submission_id/start-analysis", post(submission::start_analysis))

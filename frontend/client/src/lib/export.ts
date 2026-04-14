@@ -73,7 +73,7 @@ export function exportToJSON<T extends Record<string, unknown>>(
   let formattedData = data;
   if (columns) {
     formattedData = data.map((row) => {
-      const formatted: Record<string, any> = {};
+      const formatted: Record<string, unknown> = {};
       columns.forEach((col) => {
         const value = row[col.key];
         formatted[col.key] = col.format ? col.format(value) : value;
@@ -171,7 +171,7 @@ export function exportToExcel<T extends Record<string, unknown>>(
   let formattedData = data;
   if (columns) {
     formattedData = data.map((row) => {
-      const formatted: Record<string, any> = {};
+      const formatted: Record<string, unknown> = {};
       columns.forEach((col) => {
         const value = row[col.key];
         formatted[col.label] = col.format ? col.format(value) : value;

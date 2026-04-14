@@ -91,7 +91,7 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
           to: endOfDay(today),
         };
         break;
-      case 'lastMonth':
+      case 'lastMonth': {
         const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
         range = {
@@ -99,6 +99,7 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
           to: endOfDay(lastMonthEnd),
         };
         break;
+      }
       case 'custom':
         range = undefined;
         break;

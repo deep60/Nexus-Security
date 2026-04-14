@@ -102,7 +102,7 @@ async function main() {
   const deploymentsDir = join(__dirname, "..", "deployments");
   try {
     mkdirSync(deploymentsDir, { recursive: true });
-  } catch (err) {
+  } catch (_err) {
     // Directory already exists
   }
 
@@ -116,7 +116,7 @@ async function main() {
   try {
     const existingData = require(allDeploymentsFile);
     allDeployments = existingData;
-  } catch (err) {
+  } catch (_err) {
     // File doesn't exist yet
   }
   

@@ -14,7 +14,6 @@ import {
   FileText,
   Clock,
   CheckCircle2,
-  AlertTriangle,
   Shield,
   TrendingUp,
   Bot,
@@ -24,6 +23,7 @@ import {
 } from "lucide-react";
 import { StatCardSkeleton, SubmissionSkeleton } from "@/components/loading-skeleton";
 import { ErrorState } from "@/components/error-state";
+import type { ApiSubmission, ApiAnalysis, ApiConsensus } from "@/lib/api-types";
 
 export default function AnalysisDetails() {
   const [, params] = useRoute("/analysis/:id");
@@ -35,7 +35,7 @@ export default function AnalysisDetails() {
     isLoading: submissionLoading,
     isError: submissionError,
     refetch: refetchSubmission,
-  } = useQuery<any>({
+  } = useQuery<ApiSubmission>({
     queryKey: [`/api/submissions/${submissionId}`],
     enabled: !!submissionId,
   });
@@ -46,13 +46,13 @@ export default function AnalysisDetails() {
     isLoading: analysesLoading,
     isError: analysesError,
     refetch: refetchAnalyses,
-  } = useQuery<any[]>({
+  } = useQuery<ApiAnalysis[]>({
     queryKey: [`/api/submissions/${submissionId}/analyses`],
     enabled: !!submissionId,
   });
 
   // Fetch consensus result
-  const { data: consensus } = useQuery<any>({
+  const { data: consensus } = useQuery<ApiConsensus>({
     queryKey: [`/api/submissions/${submissionId}/consensus`],
     enabled: !!submissionId && submission?.status === "completed",
   });
@@ -113,7 +113,7 @@ export default function AnalysisDetails() {
     );
   }
 
-  const completedAnalyses = analyses.filter((a: any) => a.status === "completed");
+  const completedAnalyses = analyses.filter((a) => a.status === "completed");
   const progress = analyses.length > 0 ? (completedAnalyses.length / analyses.length) * 100 : 0;
 
   const getStatusIcon = (status: string) => {
@@ -169,9 +169,9 @@ export default function AnalysisDetails() {
           </div>
           <ExportReport
             submissionId={submissionId || ""}
-            fileName={submission.filename}
-            consensus={consensus}
-            analyses={analyses}
+            fileName={submission.filename ?? ""}
+            consensus={consensus as Record<string, unknown> | undefined}
+            analyses={analyses as unknown as import("@/components/export-report").AnalysisRecord[]}
           />
         </div>
 
@@ -180,7 +180,7 @@ export default function AnalysisDetails() {
           <Card className="glassmorphism border-primary/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Status</CardTitle>
-              {getStatusIcon(submission.status)}
+              {getStatusIcon(submission.status ?? "")}
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold capitalize">{submission.status}</div>
@@ -214,7 +214,7 @@ export default function AnalysisDetails() {
             <CardContent>
               <div className="text-2xl font-bold capitalize">{submission.analysisType}</div>
               <p className="text-xs text-muted-foreground mt-2">
-                Submitted {new Date(submission.createdAt).toLocaleDateString()}
+                Submitted {new Date(submission.createdAt ?? "").toLocaleDateString()}
               </p>
             </CardContent>
           </Card>
@@ -232,7 +232,7 @@ export default function AnalysisDetails() {
                 <div>
                   <div className="text-sm text-muted-foreground mb-2">Final Verdict</div>
                   <Badge
-                    variant={getVerdictColor(consensus.finalVerdict)}
+                    variant={getVerdictColor(consensus.finalVerdict ?? null)}
                     className="text-lg px-4 py-2"
                   >
                     {consensus.finalVerdict}
@@ -286,19 +286,19 @@ export default function AnalysisDetails() {
                 </CardContent>
               </Card>
             ) : (
-              analyses.map((analysis: any) => (
+              analyses.map((analysis) => (
                 <Card key={analysis.id} className="glassmorphism border-primary/20">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-4 flex-1">
                         <div className="p-3 bg-primary/10 rounded-lg">
-                          {getEngineIcon(analysis.engine?.type)}
+                          {getEngineIcon(analysis.engine?.type ?? "")}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-lg font-semibold">{analysis.engine?.name || "Unknown Engine"}</h3>
                             <Badge variant="outline">{analysis.engine?.type}</Badge>
-                            {getStatusIcon(analysis.status)}
+                            {getStatusIcon(analysis.status ?? "")}
                           </div>
                           <p className="text-sm text-muted-foreground mb-4">
                             {analysis.engine?.description || "Security analysis engine"}
@@ -308,7 +308,7 @@ export default function AnalysisDetails() {
                             <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
                               <div>
                                 <div className="text-sm text-muted-foreground">Verdict</div>
-                                <Badge variant={getVerdictColor(analysis.verdict)} className="mt-1">
+                                <Badge variant={getVerdictColor(analysis.verdict ?? null)} className="mt-1">
                                   {analysis.verdict}
                                 </Badge>
                               </div>
@@ -382,7 +382,7 @@ export default function AnalysisDetails() {
                     <div>
                       <div className="font-semibold">Submission Created</div>
                       <div className="text-sm text-muted-foreground">
-                        {new Date(submission.createdAt).toLocaleString()}
+                        {new Date(submission.createdAt ?? "").toLocaleString()}
                       </div>
                     </div>
                   </div>

@@ -22,8 +22,8 @@ export function FileSubmissionForm() {
   const queryClient = useQueryClient();
 
   const submitMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/submissions", data);
+    mutationFn: async (data: Record<string, unknown>) => {
+      const response = await apiRequest("POST", "/api/submissions/file", data);
       return response.json();
     },
     onSuccess: (data) => {

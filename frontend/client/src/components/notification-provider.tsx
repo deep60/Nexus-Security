@@ -60,11 +60,11 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
           }
           break;
 
-        case "analysis_completed":
+        case "analysis_completed": {
           const { submissionId, consensus } = message.data;
           const isClean = consensus.finalVerdict.toLowerCase() === "clean";
           const isMalicious = consensus.finalVerdict.toLowerCase() === "malicious";
-          const isSuspicious = consensus.finalVerdict.toLowerCase() === "suspicious";
+          const _isSuspicious = consensus.finalVerdict.toLowerCase() === "suspicious";
 
           const verdictIcon = isClean
             ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
@@ -102,6 +102,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
             duration: 10000, // Show longer for completed analyses
           });
           break;
+        }
 
         case "bounty_claimed":
           toast({

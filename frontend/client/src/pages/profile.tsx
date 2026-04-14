@@ -13,18 +13,19 @@ import { Separator } from "@/components/ui/separator";
 import { User, Mail, Wallet, Shield, Award, TrendingUp, FileText, CheckCircle2, BarChart3 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { UserAnalyticsDashboard } from "@/components/user-analytics-dashboard";
+import type { ApiSubmission } from "@/lib/api-types";
 
 export default function Profile() {
   const { user, connectWallet, disconnectWallet } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
 
   // Fetch user submissions
-  const { data: submissions } = useQuery<any[]>({
+  const { data: submissions } = useQuery<ApiSubmission[]>({
     queryKey: ["/api/submissions"],
   });
 
-  const userSubmissions = submissions?.filter((s: any) => s.userId === user?.id) || [];
-  const completedAnalyses = userSubmissions.filter((s: any) => s.status === "completed").length;
+  const userSubmissions = submissions?.filter((s) => s.userId === user?.id) || [];
+  const completedAnalyses = userSubmissions.filter((s) => s.status === "completed").length;
 
   if (!user) {
     return null;
@@ -212,7 +213,7 @@ export default function Profile() {
                   <CardContent>
                     {userSubmissions.length > 0 ? (
                       <div className="space-y-3">
-                        {userSubmissions.map((submission: any) => (
+                        {userSubmissions.map((submission) => (
                           <div
                             key={submission.id}
                             className="flex items-center justify-between p-3 bg-muted/20 rounded-lg border border-border"
@@ -220,7 +221,7 @@ export default function Profile() {
                             <div className="flex-1">
                               <div className="font-medium">{submission.fileName}</div>
                               <div className="text-sm text-muted-foreground">
-                                {new Date(submission.createdAt).toLocaleDateString()}
+                                {new Date(submission.createdAt ?? "").toLocaleDateString()}
                               </div>
                             </div>
                             <Badge

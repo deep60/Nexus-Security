@@ -70,7 +70,7 @@ export function ConsensusVisualization({ consensus }: ConsensusVisualizationProp
               <div>
                 <div className="text-sm text-muted-foreground mb-2">Final Verdict</div>
                 <Badge
-                  variant={getVerdictColor(finalVerdict) as any}
+                  variant={getVerdictColor(finalVerdict) as "default" | "secondary" | "destructive" | "outline"}
                   className="text-xl px-6 py-2 capitalize"
                 >
                   {finalVerdict}

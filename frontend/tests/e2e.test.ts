@@ -156,8 +156,8 @@ describe('E2E: Complete User Workflows', () => {
   });
 
   describe('E2E: Security Engine Registration and Analysis Flow', () => {
-    let accessToken: string;
-    let engineId: string;
+    let _accessToken: string;
+    let _engineId: string;
     let submissionId: string;
 
     it('Step 1: Security researcher registers', async () => {
@@ -171,7 +171,7 @@ describe('E2E: Complete User Workflows', () => {
         .expect(201);
 
       expect(response.body.success).toBe(true);
-      accessToken = response.body.data.accessToken;
+      _accessToken = response.body.data.accessToken;
     });
 
     it('Step 2: Researcher registers their security engine', async () => {
@@ -185,7 +185,7 @@ describe('E2E: Complete User Workflows', () => {
         })
         .expect(201);
 
-      engineId = response.body.id;
+      _engineId = response.body.id;
       expect(response.body.name).toBe('Custom ML Analyzer');
     });
 
@@ -232,7 +232,7 @@ describe('E2E: Complete User Workflows', () => {
   });
 
   describe('E2E: Multiple Submissions Workflow', () => {
-    let accessToken: string;
+    let _accessToken: string;
     const submissionIds: string[] = [];
 
     it('Step 1: User logs in', async () => {
@@ -245,7 +245,7 @@ describe('E2E: Complete User Workflows', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      accessToken = response.body.data.accessToken;
+      _accessToken = response.body.data.accessToken;
     });
 
     it('Step 2: User submits multiple files', async () => {

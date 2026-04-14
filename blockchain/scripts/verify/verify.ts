@@ -1,8 +1,8 @@
 import { run } from "hardhat";
 
-interface ContractToVerify {
+interface _ContractToVerify {
     address: string;
-    constructorArguments: any[];
+    constructorArguments: unknown[];
     contract?: string;
 }
 
@@ -11,7 +11,7 @@ interface ContractToVerify {
  */
 async function verifyContract(
     address: string,
-    constructorArguments: any[],
+    constructorArguments: unknown[],
     contractPath?: string
 ) {
     console.log(`\n🔍 Verifying contract at ${address}...`);
@@ -23,11 +23,12 @@ async function verifyContract(
             contract: contractPath
         });
         console.log(`   ✅ Verified successfully!`);
-    } catch (error: any) {
-        if (error.message.toLowerCase().includes("already verified")) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.toLowerCase().includes("already verified")) {
             console.log(`   ℹ️  Contract already verified`);
         } else {
-            console.error(`   ❌ Verification failed:`, error.message);
+            console.error(`   ❌ Verification failed:`, message);
             throw error;
         }
     }

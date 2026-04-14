@@ -7,9 +7,10 @@ import { Link } from "wouter";
 import { Terminal, Shield, Cpu, Zap, Activity, Code } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { SEO } from "@/components/seo";
+import type { ApiStats } from "@/lib/api-types";
 
 export default function Home() {
-  const { data: stats } = useQuery<any>({
+  const { data: stats } = useQuery<ApiStats>({
     queryKey: ["/api/analysis/stats"],
   });
 

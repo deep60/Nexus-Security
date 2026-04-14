@@ -35,8 +35,8 @@ function apiError(message: string) {
 }
 
 /** Strip password hash from a User object before sending. */
-function safeUser(user: Record<string, any>) {
-  const { passwordHash: _, ...rest } = user;
+function safeUser(user: Record<string, unknown>) {
+  const { passwordHash: _passwordHash, ...rest } = user;
   return rest;
 }
 
@@ -125,7 +125,7 @@ export async function createTestApp(): Promise<{ app: Express; server: Server }>
         refreshToken: randomUUID(),
         expiresIn: 3600,
       }));
-    } catch (e) {
+    } catch (_e) {
       return res.status(500).json(apiError('Internal error'));
     }
   });
@@ -225,7 +225,7 @@ export async function createTestApp(): Promise<{ app: Express; server: Server }>
   // ── SUBMISSION ROUTES ──
 
   app.post('/api/submissions', async (req, res) => {
-    const { filename, originalFilename, submissionType, description, fileHash } = req.body;
+    const { filename, originalFilename, submissionType, fileHash } = req.body;
 
     if (!filename && !originalFilename) {
       return res.status(400).json({ error: 'Missing filename' });
@@ -237,6 +237,32 @@ export async function createTestApp(): Promise<{ app: Express; server: Server }>
     const submission = await getStorage().createSubmission({
       submitterId: '00000000-0000-0000-0000-000000000001', // placeholder
       originalFilename: originalFilename ?? filename ?? null,
+      fileHash: fileHash ?? null,
+      submissionType: submissionType ?? 'file',
+    });
+
+    return res.status(201).json(submission);
+  });
+
+  // POST /api/submissions/file — matches backend POST /submissions/file
+  // Accepts the UI-facing payload from FileSubmissionForm.
+  app.post('/api/submissions/file', async (req, res) => {
+    const {
+      filename, originalFilename, submissionType,
+      fileHash,
+    } = req.body;
+
+    const resolvedFilename = originalFilename ?? filename;
+    if (!resolvedFilename) {
+      return res.status(400).json({ error: 'Missing filename' });
+    }
+    if (!submissionType) {
+      return res.status(400).json({ error: 'Missing submissionType' });
+    }
+
+    const submission = await getStorage().createSubmission({
+      submitterId: '00000000-0000-0000-0000-000000000001',
+      originalFilename: resolvedFilename,
       fileHash: fileHash ?? null,
       submissionType: submissionType ?? 'file',
     });

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 interface WebSocketMessage {
   type: string;
-  data: any;
+  data: unknown;
 }
 
 export function useWebSocket(onMessage?: (message: WebSocketMessage) => void) {
@@ -41,7 +41,7 @@ export function useWebSocket(onMessage?: (message: WebSocketMessage) => void) {
     };
   }, [onMessage]);
 
-  const sendMessage = (message: any) => {
+  const sendMessage = (message: unknown) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(message));
     }
