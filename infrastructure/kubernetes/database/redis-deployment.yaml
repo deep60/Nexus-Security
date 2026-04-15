@@ -19,6 +19,34 @@ spec:
         app: redis
         component: cache
     spec:
+      initContainers:
+      - name: render-config
+        image: redis:7-alpine
+        command:
+        - sh
+        - -c
+        - |
+          sed "s/\${REDIS_PASSWORD}/$REDIS_PASSWORD/g" \
+            /etc/redis-template/redis.conf > /etc/redis/redis.conf
+          chmod 440 /etc/redis/redis.conf
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: password
+        volumeMounts:
+        - name: redis-config-template
+          mountPath: /etc/redis-template
+          readOnly: true
+        - name: redis-config-rendered
+          mountPath: /etc/redis
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 1000
+
       containers:
       - name: redis
         image: redis:7-alpine
@@ -47,8 +75,9 @@ spec:
         volumeMounts:
         - name: redis-storage
           mountPath: /data
-        - name: redis-config
+        - name: redis-config-rendered
           mountPath: /etc/redis
+          readOnly: true
         livenessProbe:
           exec:
             command:
@@ -78,12 +107,15 @@ spec:
       - name: redis-storage
         persistentVolumeClaim:
           claimName: redis-pvc
-      - name: redis-config
+      - name: redis-config-template
         configMap:
           name: redis-config
           items:
           - key: redis.conf
             path: redis.conf
+      - name: redis-config-rendered
+        emptyDir:
+          sizeLimit: 1Mi
       serviceAccountName: redis-sa
       securityContext:
         fsGroup: 1000
@@ -204,6 +236,29 @@ spec:
         app: redis-sentinel
         component: cache
     spec:
+      initContainers:
+      - name: render-config
+        image: redis:7-alpine
+        command:
+        - sh
+        - -c
+        - |
+          sed "s/\${REDIS_PASSWORD}/$REDIS_PASSWORD/g" \
+            /etc/sentinel-template/sentinel.conf > /etc/redis-sentinel/sentinel.conf
+          chmod 440 /etc/redis-sentinel/sentinel.conf
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: password
+        volumeMounts:
+        - name: sentinel-config-template
+          mountPath: /etc/sentinel-template
+          readOnly: true
+        - name: sentinel-config-rendered
+          mountPath: /etc/redis-sentinel
+
       containers:
       - name: redis-sentinel
         image: redis:7-alpine
@@ -228,14 +283,15 @@ spec:
             memory: "256Mi"
             cpu: "200m"
         volumeMounts:
-        - name: sentinel-config
+        - name: sentinel-config-rendered
           mountPath: /etc/redis-sentinel
+          readOnly: true
         livenessProbe:
           exec:
             command:
             - sh
             - -c
-            - "redis-cli -p 26379 ping"
+            - "redis-cli -p 26379 -a $REDIS_PASSWORD ping"
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
@@ -243,13 +299,16 @@ spec:
             command:
             - sh
             - -c
-            - "redis-cli -p 26379 ping"
+            - "redis-cli -p 26379 -a $REDIS_PASSWORD ping"
           initialDelaySeconds: 5
           periodSeconds: 5
       volumes:
-      - name: sentinel-config
+      - name: sentinel-config-template
         configMap:
           name: redis-sentinel-config
+      - name: sentinel-config-rendered
+        emptyDir:
+          sizeLimit: 1Mi
 
 ---
 apiVersion: v1

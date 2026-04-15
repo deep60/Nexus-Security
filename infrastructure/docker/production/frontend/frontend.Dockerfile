@@ -28,8 +28,8 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Copy custom nginx configuration
 COPY infrastructure/docker/production/frontend/nginx.conf /etc/nginx/conf.d/nexus.conf
 
-# Copy built application from builder
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy built application from builder (Vite outputs to dist/public/)
+COPY --from=builder /app/dist/public /usr/share/nginx/html
 
 # Create non-root user (nginx already runs as nginx user in alpine)
 RUN chown -R nginx:nginx /usr/share/nginx/html && \

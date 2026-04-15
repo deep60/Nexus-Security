@@ -11,6 +11,8 @@ backend/target/
 !.env.*.example
 blockchain/.env
 backend/.env
+backend/**/.env
+config/**/*.env
 
 # Node modules
 node_modules/

@@ -136,22 +136,22 @@ jobs:
       matrix:
         include:
           - service: frontend
-            context: ./frontend
-            dockerfile: ./frontend/Dockerfile
+            context: .
+            dockerfile: ./infrastructure/docker/production/frontend/frontend.Dockerfile
             image_suffix: frontend
             changed: frontend
           - service: api-gateway
-            context: ./backend
+            context: .
             dockerfile: ./infrastructure/docker/production/api-gateway/api-gateway.Dockerfile
             image_suffix: api-gateway
             changed: api-gateway
           - service: analysis-engine
-            context: ./backend
+            context: .
             dockerfile: ./infrastructure/docker/production/analysis-engine/analysis-engine.Dockerfile
             image_suffix: analysis-engine
             changed: analysis-engine
           - service: bounty-manager
-            context: ./backend
+            context: .
             dockerfile: ./infrastructure/docker/production/bounty-manager/bounty-manager.Dockerfile
             image_suffix: bounty-manager
             changed: bounty-manager

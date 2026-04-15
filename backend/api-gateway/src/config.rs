@@ -522,6 +522,11 @@ impl AppConfig {
         if let Ok(url) = std::env::var("BOUNTY_MANAGER_URL") {
             config.services.bounty_manager_url = url;
         }
+        if let Ok(path) = std::env::var("UPLOAD_PATH")
+            .or_else(|_| std::env::var("UPLOAD_DIR"))
+        {
+            config.services.upload_path = path;
+        }
 
         // Feature flags
         if let Ok(val) = std::env::var("ENABLE_MFA") {

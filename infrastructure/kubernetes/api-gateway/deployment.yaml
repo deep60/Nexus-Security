@@ -44,29 +44,10 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       
-      # Init container for database migrations
-      initContainers:
-      - name: migrate-db
-        image: nexus-security/api-gateway:latest
-        command: ["./migrate"]
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: nexus-database-secret
-              key: database_url
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
-          runAsUser: 1001
-        volumeMounts:
-        - name: tmp-volume
-          mountPath: /tmp
-      
+      # Note: Database migrations run automatically on startup via
+      # sqlx::migrate!() embedded in the api-gateway binary (main.rs).
+      # No separate init container is needed.
+
       containers:
       - name: api-gateway
         image: nexus-security/api-gateway:latest
@@ -146,17 +127,9 @@ spec:
         
         # Service discovery
         - name: ANALYSIS_ENGINE_URL
-          value: "http://nexus-analysis-service:8080"
+          value: "http://analysis-engine-service:8082"
         - name: BOUNTY_MANAGER_URL
-          value: "http://nexus-bounty-service:8081"
-        - name: ENGINE_MANAGER_URL
-          value: "http://nexus-engine-service:8082"
-        - name: BLOCKCHAIN_SERVICE_URL
-          value: "http://nexus-blockchain-service:8083"
-        - name: AUTH_SERVICE_URL
-          value: "http://nexus-auth-service:8084"
-        - name: REPUTATION_SERVICE_URL
-          value: "http://nexus-reputation-service:8085"
+          value: "http://bounty-manager-service:8083"
         
         # Performance tuning
         - name: TOKIO_WORKER_THREADS
@@ -168,6 +141,10 @@ spec:
         - name: ALLOWED_ORIGINS
           value: "https://nexus-security.com,https://app.nexus-security.com"
         
+        # File upload path (must match the writable volume mount below)
+        - name: UPLOAD_PATH
+          value: "/app/uploads"
+        
         volumeMounts:
         - name: config-volume
           mountPath: /app/config
@@ -176,11 +153,16 @@ spec:
           mountPath: /tmp
         - name: app-cache
           mountPath: /app/cache
+        - name: uploads-volume
+          mountPath: /app/uploads
         
         # Health checks
+        # Liveness: Is the process alive and responsive?
+        # Uses /health/live which always returns 200 — avoids restart loops
+        # when downstream dependencies (DB/Redis/blockchain) are degraded.
         livenessProbe:
           httpGet:
-            path: /api/health
+            path: /api/v1/health/live
             port: http
             scheme: HTTP
           initialDelaySeconds: 30
@@ -189,9 +171,12 @@ spec:
           failureThreshold: 3
           successThreshold: 1
         
+        # Readiness: Can this pod serve traffic?
+        # Uses /health/ready which checks DB + Redis connectivity.
+        # Failing this removes the pod from Service endpoints (no restart).
         readinessProbe:
           httpGet:
-            path: /api/health/ready
+            path: /api/v1/health/ready
             port: http
             scheme: HTTP
           initialDelaySeconds: 10
@@ -200,10 +185,11 @@ spec:
           failureThreshold: 3
           successThreshold: 1
         
-        # Startup probe for slow initialization
+        # Startup: Has the pod finished initializing?
+        # Uses /health/ready — don't accept traffic until deps are connected.
         startupProbe:
           httpGet:
-            path: /api/health
+            path: /api/v1/health/ready
             port: http
             scheme: HTTP
           initialDelaySeconds: 10
@@ -243,6 +229,9 @@ spec:
       - name: app-cache
         emptyDir:
           sizeLimit: 2Gi
+      - name: uploads-volume
+        emptyDir:
+          sizeLimit: 5Gi
       
       # Pod affinity for better distribution
       affinity:

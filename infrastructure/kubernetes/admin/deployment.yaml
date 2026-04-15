@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-admin
+  namespace: nexus-security
+  labels:
+    app: nexus-admin
+    component: admin
+    service: admin
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: nexus-admin
+  template:
+    metadata:
+      labels:
+        app: nexus-admin
+        component: admin
+        service: admin
+    spec:
+      serviceAccountName: nexus-admin-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+
+      containers:
+      - name: admin
+        image: nexus-security/admin:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8888
+          name: http
+          protocol: TCP
+
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "8888"
+        - name: API_BASE_URL
+          value: "http://nexus-api-gateway-service:8080"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: nexus-database-secret
+              key: database_url
+
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+      volumes:
+      - name: tmp-volume
+        emptyDir:
+          sizeLimit: 50Mi
+
+      terminationGracePeriodSeconds: 15
+      restartPolicy: Always

@@ -17,7 +17,7 @@ spec:
   type: ClusterIP
   ports:
   - name: http
-    port: 8000
+    port: 8080
     targetPort: http
     protocol: TCP
   - name: metrics
@@ -47,7 +47,7 @@ spec:
   clusterIP: None
   ports:
   - name: http
-    port: 8000
+    port: 8080
     targetPort: http
     protocol: TCP
   selector:
@@ -145,8 +145,8 @@ spec:
     healthyThreshold: 2
     unhealthyThreshold: 3
     type: HTTP
-    requestPath: /health
-    port: 8000
+    requestPath: /api/v1/health
+    port: 8080
   logging:
     enable: true
     sampleRate: 1.0
