@@ -550,10 +550,38 @@ impl AppConfig {
 
     /// Load configuration with priority: file -> env -> defaults
     pub fn load() -> ConfigResult<Self> {
-        // Try to load from config file first
+        // Try to load from explicit config file
         if let Ok(config_path) = std::env::var("CONFIG_FILE") {
             if Path::new(&config_path).exists() {
-                return Self::from_file(config_path);
+                let mut config = Self::from_file(&config_path)?;
+                config.apply_env_overrides();
+                return Ok(config);
+            }
+        }
+
+        // Try CONFIG_PATH as a directory containing .toml files
+        if let Ok(config_dir) = std::env::var("CONFIG_PATH") {
+            let dir = Path::new(&config_dir);
+            if dir.is_dir() {
+                // Look for app.toml or config.toml in the directory
+                for name in &["app.toml", "config.toml"] {
+                    let candidate = dir.join(name);
+                    if candidate.exists() {
+                        match Self::from_file(&candidate) {
+                            Ok(mut config) => {
+                                config.apply_env_overrides();
+                                return Ok(config);
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "Warning: Failed to load config from {}: {}",
+                                    candidate.display(),
+                                    e
+                                );
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -599,6 +627,41 @@ impl AppConfig {
         }
         if let Ok(jwt_secret) = std::env::var("JWT_SECRET") {
             self.security.jwt_secret = jwt_secret;
+        }
+        if let Ok(origins) = std::env::var("CORS_ALLOWED_ORIGINS") {
+            self.security.cors.allowed_origins =
+                origins.split(',').map(|s| s.trim().to_string()).collect();
+        }
+        if let Ok(path) = std::env::var("UPLOAD_PATH")
+            .or_else(|_| std::env::var("UPLOAD_DIR"))
+        {
+            self.services.upload_path = path;
+        }
+        if let Ok(url) = std::env::var("ANALYSIS_ENGINE_URL") {
+            self.services.analysis_engine_url = url;
+        }
+        if let Ok(url) = std::env::var("BOUNTY_MANAGER_URL") {
+            self.services.bounty_manager_url = url;
+        }
+        if let Ok(rpc_url) = std::env::var("BLOCKCHAIN_RPC_URL")
+            .or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
+        {
+            self.blockchain.rpc_url = rpc_url;
+        }
+        if let Ok(key) = std::env::var("BLOCKCHAIN_PRIVATE_KEY")
+            .or_else(|_| std::env::var("TREASURY_PRIVATE_KEY"))
+            .or_else(|_| std::env::var("PRIVATE_KEY"))
+        {
+            self.blockchain.private_key = key;
+        }
+        if let Ok(env) = std::env::var("ENVIRONMENT") {
+            self.server.environment = match env.to_lowercase().as_str() {
+                "production" | "prod" => Environment::Production,
+                "staging" => Environment::Staging,
+                "development" | "dev" => Environment::Development,
+                "testing" | "test" => Environment::Testing,
+                _ => self.server.environment,
+            };
         }
     }
 

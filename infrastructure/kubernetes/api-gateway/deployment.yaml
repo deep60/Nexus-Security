@@ -122,8 +122,8 @@ spec:
           value: "info,nexus_api_gateway=debug"
         - name: ENVIRONMENT
           value: "production"
-        - name: CONFIG_PATH
-          value: "/app/config"
+        - name: CONFIG_FILE
+          value: "/app/config/app.toml"
         
         # Service discovery
         - name: ANALYSIS_ENGINE_URL
@@ -137,8 +137,8 @@ spec:
         - name: MAX_BLOCKING_THREADS
           value: "16"
         
-        # Security
-        - name: ALLOWED_ORIGINS
+        # Security — must match env var name read by config.rs
+        - name: CORS_ALLOWED_ORIGINS
           value: "https://nexus-security.com,https://app.nexus-security.com"
         
         # File upload path (must match the writable volume mount below)
