@@ -9,8 +9,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title BountyManager
- * @dev Manages bounties for threat intelligence analysis in the Nexus-Security platform
- * @author Nexus-Security Team
+ * @dev Manages bounties for threat intelligence analysis in the Verdyx platform
+ * @author Verdyx Team
  */
 
 

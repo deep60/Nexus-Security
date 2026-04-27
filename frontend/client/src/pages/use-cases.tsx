@@ -8,7 +8,7 @@ export default function UseCases() {
     <div className="min-h-screen bg-slate-950 text-slate-300 font-sans selection:bg-blue-500/30">
       <SEO 
         title="Solutions by Role" 
-        description="Built for SOC Teams, DevSecOps, and Threat Researchers. Nexus-Security adapts to your operational requirements."
+        description="Built for SOC Teams, DevSecOps, and Threat Researchers. Verdyx adapts to your operational requirements."
       />
       <Navigation />
       
@@ -19,7 +19,7 @@ export default function UseCases() {
               Solutions by Role
             </h1>
             <p className="text-lg md:text-xl text-slate-400 leading-relaxed font-sans">
-              Nexus-Security is built layer-by-layer to support the distinct operational requirements of modern security teams.
+              Verdyx is built layer-by-layer to support the distinct operational requirements of modern security teams.
             </p>
           </div>
 
@@ -41,7 +41,7 @@ export default function UseCases() {
                 <div className="space-y-6">
                   <h2 className="text-3xl font-bold text-white">Automate Triage. Eliminate Alert Fatigue.</h2>
                   <p className="text-slate-400 text-lg">
-                    Stop wasting analysts' time on sandbox setup. Feed suspicious payloads into Nexus-Security directly from your SOAR. The consensus engine filters out low-confidence noise.
+                    Stop wasting analysts' time on sandbox setup. Feed suspicious payloads into Verdyx directly from your SOAR. The consensus engine filters out low-confidence noise.
                   </p>
                   <ul className="space-y-4">
                     {["SOAR platform integrations (Splunk, Cortex XSOAR).", "Verifiable audit logs for incident response reports.", "Instant bulk scanning via API without browser uploads."].map((item, i) => (
@@ -80,7 +80,7 @@ export default function UseCases() {
                 <div className="space-y-6">
                   <h2 className="text-3xl font-bold text-white">CI/CD Pipeline Security at Scale.</h2>
                   <p className="text-slate-400 text-lg">
-                    Don't let poisoned dependencies or injected malware reach production. Integrating Nexus-Security as a strict pre-flight check blocks deployments when consensus thresholds are breached.
+                    Don't let poisoned dependencies or injected malware reach production. Integrating Verdyx as a strict pre-flight check blocks deployments when consensus thresholds are breached.
                   </p>
                   <ul className="space-y-4">
                     {["Sub-second latency for artifact scanning.", "Containerized local nodes for air-gapped CI environments.", "GitHub Actions and GitLab CI ready."].map((item, i) => (
@@ -104,13 +104,13 @@ export default function UseCases() {
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Nexus-Security Scan
+      - name: Verdyx Scan
         run: |
-          nexus-cli scan ./build-artifact.tar.gz \\
+          verdyx-cli scan ./build-artifact.tar.gz \\
             --threshold 80 \\
             --fail-on-malicious
         env:
-          NEXUS_TOKEN: \${{ secrets.NEXUS_TOKEN }}`}
+          VERDYX_TOKEN: \${{ secrets.VERDYX_TOKEN }}`}
                     </code>
                   </pre>
                 </div>
@@ -158,8 +158,8 @@ export default function UseCases() {
 
       <footer className="border-t border-slate-800 py-12 bg-slate-950 mt-12">
         <div className="max-w-6xl mx-auto px-4 flex flex-col items-center">
-          <div className="text-slate-500 font-mono text-sm mb-4 bg-slate-900 px-4 py-1 rounded-full border border-slate-800">nexus-security // solutions</div>
-          <p className="text-slate-600 text-xs">© 2026 Nexus-Security. Developer First.</p>
+          <div className="text-slate-500 font-mono text-sm mb-4 bg-slate-900 px-4 py-1 rounded-full border border-slate-800">verdyx // solutions</div>
+          <p className="text-slate-600 text-xs">© 2026 Verdyx. Developer First.</p>
         </div>
       </footer>
     </div>

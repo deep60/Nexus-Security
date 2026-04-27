@@ -2,10 +2,10 @@
 name = "payment-service"
 version = "0.1.0"
 edition = "2021"
-authors = ["Nexus-Security Team"]
-description = "Payment service for Nexus-Security - handles bounty rewards, stakes, and blockchain transactions"
+authors = ["Verdyx Team"]
+description = "Payment service for Verdyx - handles bounty rewards, stakes, and blockchain transactions"
 license = "MIT"
-repository = "https://github.com/nexus-security/deep60"
+repository = "https://github.com/verdyx/deep60"
 
 [dependencies]
 # Web framework

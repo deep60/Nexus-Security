@@ -1,12 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nexus-api-gateway
-  namespace: nexus-security
+  name: verdyx-api-gateway
+  namespace: verdyx
   labels:
-    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/name: verdyx
     app.kubernetes.io/component: api-gateway
-    app.kubernetes.io/part-of: nexus-security-platform
+    app.kubernetes.io/part-of: verdyx-platform
     app.kubernetes.io/version: "1.0.0"
 spec:
   replicas: 3
@@ -17,21 +17,21 @@ spec:
       maxSurge: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: nexus-security
+      app.kubernetes.io/name: verdyx
       app.kubernetes.io/component: api-gateway
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: nexus-security
+        app.kubernetes.io/name: verdyx
         app.kubernetes.io/component: api-gateway
-        app.kubernetes.io/part-of: nexus-security-platform
+        app.kubernetes.io/part-of: verdyx-platform
         app.kubernetes.io/version: "1.0.0"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8080"
         prometheus.io/path: "/api/health/metrics"
     spec:
-      serviceAccountName: nexus-security-sa
+      serviceAccountName: verdyx-sa
       restartPolicy: Always
       terminationGracePeriodSeconds: 30
       
@@ -50,7 +50,7 @@ spec:
 
       containers:
       - name: api-gateway
-        image: nexus-security/api-gateway:latest
+        image: verdyx/api-gateway:latest
         imagePullPolicy: IfNotPresent
         
         ports:
@@ -63,23 +63,23 @@ spec:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: nexus-database-secret
+              name: verdyx-database-secret
               key: database_url
         - name: DATABASE_HOST
-          value: "nexus-postgres-service"
+          value: "verdyx-postgres-service"
         - name: DATABASE_PORT
           value: "5432"
         - name: DATABASE_NAME
-          value: "nexus_security"
+          value: "verdyx"
         
         # Redis configuration
         - name: REDIS_URL
           valueFrom:
             secretKeyRef:
-              name: nexus-redis-secret
+              name: verdyx-redis-secret
               key: redis_url
         - name: REDIS_HOST
-          value: "nexus-redis-service"
+          value: "verdyx-redis-service"
         - name: REDIS_PORT
           value: "6379"
         
@@ -87,39 +87,39 @@ spec:
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
-              name: nexus-auth-secret
+              name: verdyx-auth-secret
               key: jwt_secret
         - name: JWT_REFRESH_SECRET
           valueFrom:
             secretKeyRef:
-              name: nexus-auth-secret
+              name: verdyx-auth-secret
               key: jwt_refresh_secret
         
         # Blockchain configuration
         - name: ETHEREUM_RPC_URL
           valueFrom:
             secretKeyRef:
-              name: nexus-blockchain-secret
+              name: verdyx-blockchain-secret
               key: rpc_url
         - name: CONTRACT_ADDRESS_BOUNTY
           valueFrom:
             configMapKeyRef:
-              name: nexus-blockchain-config
+              name: verdyx-blockchain-config
               key: bounty_contract_address
         - name: CONTRACT_ADDRESS_TOKEN
           valueFrom:
             configMapKeyRef:
-              name: nexus-blockchain-config
+              name: verdyx-blockchain-config
               key: token_contract_address
         - name: PRIVATE_KEY
           valueFrom:
             secretKeyRef:
-              name: nexus-blockchain-secret
+              name: verdyx-blockchain-secret
               key: private_key
         
         # Application configuration
         - name: RUST_LOG
-          value: "info,nexus_api_gateway=debug"
+          value: "info,verdyx_api_gateway=debug"
         - name: ENVIRONMENT
           value: "production"
         - name: CONFIG_FILE
@@ -139,7 +139,7 @@ spec:
         
         # Security — must match env var name read by config.rs
         - name: CORS_ALLOWED_ORIGINS
-          value: "https://nexus-security.com,https://app.nexus-security.com"
+          value: "https://verdyx.com,https://app.verdyx.com"
         
         # File upload path (must match the writable volume mount below)
         - name: UPLOAD_PATH
@@ -221,7 +221,7 @@ spec:
       volumes:
       - name: config-volume
         configMap:
-          name: nexus-api-gateway-config
+          name: verdyx-api-gateway-config
           defaultMode: 0644
       - name: tmp-volume
         emptyDir:
@@ -266,16 +266,16 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: nexus-api-gateway-hpa
-  namespace: nexus-security
+  name: verdyx-api-gateway-hpa
+  namespace: verdyx
   labels:
-    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/name: verdyx
     app.kubernetes.io/component: api-gateway
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: nexus-api-gateway
+    name: verdyx-api-gateway
   minReplicas: 3
   maxReplicas: 10
   metrics:
@@ -313,14 +313,14 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: nexus-api-gateway-pdb
-  namespace: nexus-security
+  name: verdyx-api-gateway-pdb
+  namespace: verdyx
   labels:
-    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/name: verdyx
     app.kubernetes.io/component: api-gateway
 spec:
   minAvailable: 2
   selector:
     matchLabels:
-      app.kubernetes.io/name: nexus-security
+      app.kubernetes.io/name: verdyx
       app.kubernetes.io/component: api-gateway

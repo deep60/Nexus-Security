@@ -11,6 +11,20 @@ export function HeroCanvas() {
     if (!ctx) return;
 
     let animationFrameId: number;
+    let isVisible = true;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          isVisible = entry.isIntersecting;
+          if (isVisible) {
+            render();
+          }
+        });
+      },
+      { threshold: 0 }
+    );
+    observer.observe(canvas);
 
     const resize = () => {
       // Setup high-DPI canvas
@@ -95,13 +109,18 @@ export function HeroCanvas() {
         }
       });
 
-      animationFrameId = requestAnimationFrame(render);
+      if (isVisible) {
+        animationFrameId = requestAnimationFrame(render);
+      }
     };
 
-    render();
+    if (isVisible) {
+      render();
+    }
 
     return () => {
       window.removeEventListener("resize", resize);
+      observer.disconnect();
       cancelAnimationFrame(animationFrameId);
     };
   }, []);

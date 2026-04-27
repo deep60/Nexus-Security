@@ -1,4 +1,4 @@
-//! Common error types for Nexus Security
+//! Common error types for Verdyx
 
 use thiserror::Error;
 

@@ -36,10 +36,10 @@ impl S3Client {
         let endpoint = env::var("S3_ENDPOINT")
             .unwrap_or_else(|_| "http://minio:9000".to_string());
         let region = env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
-        let bucket = env::var("S3_BUCKET").unwrap_or_else(|_| "nexus-submissions".to_string());
-        let access_key = env::var("S3_ACCESS_KEY").unwrap_or_else(|_| "nexus_admin".to_string());
+        let bucket = env::var("S3_BUCKET").unwrap_or_else(|_| "verdyx-submissions".to_string());
+        let access_key = env::var("S3_ACCESS_KEY").unwrap_or_else(|_| "verdyx_admin".to_string());
         let secret_key = env::var("S3_SECRET_KEY")
-            .unwrap_or_else(|_| "nexus_secret_key_2024".to_string());
+            .unwrap_or_else(|_| "verdyx_secret_key_2024".to_string());
 
         info!(
             "Initializing S3 client with endpoint: {}, region: {}, bucket: {}",
@@ -52,7 +52,7 @@ impl S3Client {
             secret_key,
             None,
             None,
-            "nexus-security",
+            "verdyx",
         );
 
         // Build S3 config

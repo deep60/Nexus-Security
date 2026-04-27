@@ -36,11 +36,11 @@ services:
     build:
       context: .
       dockerfile: docker/postgres.Dockerfile
-    container_name: nexus-postgres
+    container_name: verdyx-postgres
     environment:
-      POSTGRES_DB: nexus_security
-      POSTGRES_USER: nexus
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexus_dev_password}
+      POSTGRES_DB: verdyx
+      POSTGRES_USER: verdyx
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-verdyx_dev_password}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     ports:
       - "5432:5432"
@@ -49,9 +49,9 @@ services:
       - ./database/migrations:/docker-entrypoint-initdb.d/migrations
       - ./database/seeds:/docker-entrypoint-initdb.d/seeds
     networks:
-      - nexus-network
+      - verdyx-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus_security"]
+      test: ["CMD-SHELL", "pg_isready -U verdyx -d verdyx"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -59,14 +59,14 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: nexus-redis
+    container_name: verdyx-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
-      - nexus-network
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-nexus_redis_password}
+      - verdyx-network
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-verdyx_redis_password}
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 30s
@@ -78,10 +78,10 @@ services:
     build:
       context: .
       dockerfile: docker/api-gateway.Dockerfile
-    container_name: nexus-api-gateway
+    container_name: verdyx-api-gateway
     environment:
-      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus_dev_password}@postgres:5432/nexus_security
-      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus_redis_password}@redis:6379
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD:-verdyx_dev_password}@postgres:5432/verdyx
+      REDIS_URL: redis://:${REDIS_PASSWORD:-verdyx_redis_password}@redis:6379
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key_here}
       BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL:-http://localhost:8545}
       ANALYSIS_ENGINE_URL: http://analysis-engine:8082
@@ -99,7 +99,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Analysis Engine
@@ -107,10 +107,10 @@ services:
     build:
       context: .
       dockerfile: docker/analysis-engine.Dockerfile
-    container_name: nexus-analysis-engine
+    container_name: verdyx-analysis-engine
     environment:
-      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus_dev_password}@postgres:5432/nexus_security
-      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus_redis_password}@redis:6379
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD:-verdyx_dev_password}@postgres:5432/verdyx
+      REDIS_URL: redis://:${REDIS_PASSWORD:-verdyx_redis_password}@redis:6379
       RUST_LOG: ${RUST_LOG:-info}
       YARA_RULES_PATH: /app/rules
       UPLOAD_DIR: /app/uploads
@@ -127,7 +127,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Bounty Manager
@@ -135,10 +135,10 @@ services:
     build:
       context: .
       dockerfile: docker/bounty-manager.Dockerfile
-    container_name: nexus-bounty-manager
+    container_name: verdyx-bounty-manager
     environment:
-      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus_dev_password}@postgres:5432/nexus_security
-      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus_redis_password}@redis:6379
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD:-verdyx_dev_password}@postgres:5432/verdyx
+      REDIS_URL: redis://:${REDIS_PASSWORD:-verdyx_redis_password}@redis:6379
       BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL:-http://localhost:8545}
       RUST_LOG: ${RUST_LOG:-info}
     ports:
@@ -151,7 +151,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Frontend
@@ -159,7 +159,7 @@ services:
     build:
       context: .
       dockerfile: docker/frontend.Dockerfile
-    container_name: nexus-frontend
+    container_name: verdyx-frontend
     environment:
       REACT_APP_API_URL: http://localhost:8080
       REACT_APP_WS_URL: ws://localhost:8080
@@ -172,13 +172,13 @@ services:
     depends_on:
       - api-gateway
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Local Ethereum Node (for development)
   hardhat:
     image: node:18-alpine
-    container_name: nexus-hardhat
+    container_name: verdyx-hardhat
     working_dir: /app
     command: sh -c "npm install && npx hardhat node --hostname 0.0.0.0"
     environment:
@@ -190,12 +190,12 @@ services:
       - hardhat_cache:/app/cache
       - hardhat_artifacts:/app/artifacts
     networks:
-      - nexus-network
+      - verdyx-network
 
   # IPFS Node (for storing analysis reports)
   ipfs:
     image: ipfs/kubo:latest
-    container_name: nexus-ipfs
+    container_name: verdyx-ipfs
     ports:
       - "4001:4001"    # P2P
       - "5001:5001"    # API
@@ -203,14 +203,14 @@ services:
     volumes:
       - ipfs_data:/data/ipfs
     networks:
-      - nexus-network
+      - verdyx-network
     environment:
       IPFS_PROFILE: server
 
   # Nginx (Reverse Proxy)
   nginx:
     image: nginx:alpine
-    container_name: nexus-nginx
+    container_name: verdyx-nginx
     ports:
       - "80:80"
       - "443:443"
@@ -221,20 +221,20 @@ services:
       - api-gateway
       - frontend
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Monitoring
   prometheus:
     image: prom/prometheus:latest
-    container_name: nexus-prometheus
+    container_name: verdyx-prometheus
     ports:
       - "9090:9090"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     networks:
-      - nexus-network
+      - verdyx-network
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -244,7 +244,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: nexus-grafana
+    container_name: verdyx-grafana
     ports:
       - "3001:3000"
     volumes:
@@ -253,7 +253,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
     networks:
-      - nexus-network
+      - verdyx-network
     depends_on:
       - prometheus
 
@@ -274,7 +274,7 @@ volumes:
     driver: local
 
 networks:
-  nexus-network:
+  verdyx-network:
     driver: bridge
     ipam:
       config:

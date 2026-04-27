@@ -6,7 +6,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: postgres-pvc
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: postgresql
     component: database
@@ -23,7 +23,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: redis-pvc
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: redis
     component: cache

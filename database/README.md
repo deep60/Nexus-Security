@@ -1,6 +1,6 @@
-# Nexus-Security Database Layer
+# Verdyx Database Layer
 
-This directory contains all database configurations, schemas, migrations, and initialization scripts for the Nexus-Security threat intelligence platform.
+This directory contains all database configurations, schemas, migrations, and initialization scripts for the Verdyx threat intelligence platform.
 
 ## 📁 Directory Structure
 
@@ -38,7 +38,7 @@ database/
 
 ## 🗄️ Database Architecture
 
-Nexus-Security uses a **polyglot persistence** architecture with three databases:
+Verdyx uses a **polyglot persistence** architecture with three databases:
 
 ### 1. PostgreSQL (Primary Relational Database)
 **Purpose:** Structured data, transactions, relationships
@@ -134,16 +134,16 @@ docker-compose logs -f
 #### PostgreSQL Setup
 ```bash
 # Create database
-createdb nexus_security
+createdb verdyx
 
 # Run migrations
-psql -d nexus_security -f schema.sql
+psql -d verdyx -f schema.sql
 
 # Load test data (optional)
-psql -d nexus_security -f postgres/seeds/test_data.sql
+psql -d verdyx -f postgres/seeds/test_data.sql
 
 # Verify
-psql -d nexus_security -c "\dt"
+psql -d verdyx -c "\dt"
 ```
 
 #### MongoDB Setup
@@ -152,10 +152,10 @@ psql -d nexus_security -c "\dt"
 mongod --dbpath /data/db
 
 # Initialize database
-mongosh nexus_security < mongodb/init/init-db.js
+mongosh verdyx < mongodb/init/init-db.js
 
 # Verify
-mongosh nexus_security --eval "db.getCollectionNames()"
+mongosh verdyx --eval "db.getCollectionNames()"
 ```
 
 #### Redis Setup
@@ -178,7 +178,7 @@ redis-cli ping
 use sqlx::postgres::PgPoolOptions;
 
 let database_url = std::env::var("DATABASE_URL")
-    .unwrap_or_else(|_| "postgresql://postgres:password@localhost:5432/nexus_security".to_string());
+    .unwrap_or_else(|_| "postgresql://postgres:password@localhost:5432/verdyx".to_string());
 
 let pool = PgPoolOptions::new()
     .max_connections(100)
@@ -196,14 +196,14 @@ let pool = PgPoolOptions::new()
 use mongodb::{Client, options::ClientOptions};
 
 let mongodb_url = std::env::var("MONGODB_URL")
-    .unwrap_or_else(|_| "mongodb://nexus_admin:password@localhost:27017/nexus_security".to_string());
+    .unwrap_or_else(|_| "mongodb://verdyx_admin:password@localhost:27017/verdyx".to_string());
 
 let mut client_options = ClientOptions::parse(&mongodb_url).await?;
-client_options.app_name = Some("NexusSecurity".to_string());
+client_options.app_name = Some("Verdyx".to_string());
 client_options.max_pool_size = Some(50);
 
 let client = Client::with_options(client_options)?;
-let database = client.database("nexus_security");
+let database = client.database("verdyx");
 ```
 
 ### Redis Connection (Rust/redis)
@@ -224,16 +224,16 @@ let mut con = client.get_async_connection().await?;
 
 ### Complete Backend Configuration
 
-The backend services use the configuration structure defined in [backend/api-gateway/src/config.rs](file:///Users/arjun/Developer/Nexus-Security/backend/api-gateway/src/config.rs):
+The backend services use the configuration structure defined in [backend/api-gateway/src/config.rs](file:///Users/arjun/Developer/Verdyx/backend/api-gateway/src/config.rs):
 
 **Environment Variables:**
 ```bash
 # PostgreSQL
-DATABASE_URL=postgresql://postgres:password@localhost:5432/nexus_security
+DATABASE_URL=postgresql://postgres:password@localhost:5432/verdyx
 DATABASE_MAX_CONNECTIONS=100
 
 # MongoDB
-MONGODB_URL=mongodb://nexus_admin:password@localhost:27017/nexus_security
+MONGODB_URL=mongodb://verdyx_admin:password@localhost:27017/verdyx
 
 # Redis
 REDIS_URL=redis://localhost:6379
@@ -242,7 +242,7 @@ REDIS_URL=redis://localhost:6379
 **Configuration File (config.toml):**
 ```toml
 [database]
-url = "postgresql://postgres:password@localhost:5432/nexus_security"
+url = "postgresql://postgres:password@localhost:5432/verdyx"
 max_connections = 100
 min_connections = 10
 connection_timeout_seconds = 30
@@ -257,7 +257,7 @@ max_connections = 50
 connection_timeout_seconds = 5
 pool_timeout_seconds = 10
 enable_cluster = false
-key_prefix = "nexus:"
+key_prefix = "verdyx:"
 default_ttl_seconds = 3600
 ```
 
@@ -320,19 +320,19 @@ default_ttl_seconds = 3600
 **PostgreSQL:**
 ```bash
 # Backup
-pg_dump nexus_security > backup_$(date +%Y%m%d).sql
+pg_dump verdyx > backup_$(date +%Y%m%d).sql
 
 # Restore
-psql nexus_security < backup_20240101.sql
+psql verdyx < backup_20240101.sql
 ```
 
 **MongoDB:**
 ```bash
 # Backup
-mongodump --db nexus_security --out ./backups/
+mongodump --db verdyx --out ./backups/
 
 # Restore
-mongorestore --db nexus_security ./backups/nexus_security/
+mongorestore --db verdyx ./backups/verdyx/
 ```
 
 **Redis:**
@@ -355,7 +355,7 @@ To add a new migration:
 2. Update `schema.sql` to include new migration
 3. Test locally:
 ```bash
-psql nexus_security -f postgres/migrations/00X_description.sql
+psql verdyx -f postgres/migrations/00X_description.sql
 ```
 
 ### Performance Tuning
@@ -370,7 +370,7 @@ FROM pg_tables WHERE schemaname = 'public' ORDER BY pg_total_relation_size(schem
 EXPLAIN ANALYZE SELECT ...;
 
 -- Rebuild indexes
-REINDEX DATABASE nexus_security;
+REINDEX DATABASE verdyx;
 ```
 
 **MongoDB:**
@@ -490,4 +490,4 @@ When contributing to the database layer:
 
 ## 📄 License
 
-This database schema is part of the Nexus-Security project.
+This database schema is part of the Verdyx project.

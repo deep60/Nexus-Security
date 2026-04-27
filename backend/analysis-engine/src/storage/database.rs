@@ -78,7 +78,7 @@ impl Default for DatabaseConfig {
             port: 5432,
             username: "postgres".to_string(),
             password: "postgres".to_string(),
-            database: "nexus_security".to_string(),
+            database: "verdyx".to_string(),
             max_connections: 20,
             min_connections: 2,
             connect_timeout_seconds: 10,

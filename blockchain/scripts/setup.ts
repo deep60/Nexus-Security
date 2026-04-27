@@ -189,7 +189,7 @@ async function displaySystemStatus(deploymentAddresses: DeploymentAddresses, sig
 }
 
 async function main() {
-    console.log("🔧 Starting Nexus-Security post-deployment setup...\n");
+    console.log("🔧 Starting Verdyx post-deployment setup...\n");
 
     const network = await ethers.provider.getNetwork();
     const [deployer] = await ethers.getSigners();
@@ -225,7 +225,7 @@ async function main() {
         await displaySystemStatus(deploymentAddresses, deployer);
 
         console.log("\n🎉 Setup completed successfully!");
-        console.log("The Nexus-Security platform is now configured and ready for use.");
+        console.log("The Verdyx platform is now configured and ready for use.");
 
     } catch (error) {
         console.error("❌ Setup failed:");

@@ -2,10 +2,10 @@
 name = "shared"
 version = "0.1.0"
 edition = "2021"
-authors = ["Nexus-Security Team"]
-description = "Shared utilities and types for Nexus-Security backend services"
+authors = ["Verdyx Team"]
+description = "Shared utilities and types for Verdyx backend services"
 license = "MIT"
-repository = "https://github.com/nexus-security/deep60"
+repository = "https://github.com/verdyx/deep60"
 
 [dependencies]
 # Common dependencies that will be shared across services

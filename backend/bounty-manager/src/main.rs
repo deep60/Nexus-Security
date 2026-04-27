@@ -1,6 +1,4 @@
 use axum::{
-    extract::{Path, Query, State},
-    http::StatusCode,
     response::Json,
     routing::{get, post, put},
     Router,
@@ -29,7 +27,7 @@ use services::reputation;
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
-    pub reputation_server: Arc<reputation::ReputationService>,
+    pub reputation_service: Arc<reputation::ReputationService>,
 }
 
 // Bounty Models
@@ -151,7 +149,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load configuration
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://nexus:password@localhost/nexus_security".to_string());
+        .unwrap_or_else(|_| "postgresql://verdyx:password@localhost/verdyx".to_string());
     
     let redis_url = std::env::var("REDIS_URL")
         .unwrap_or_else(|_| "redis://localhost:6379".to_string());
@@ -169,8 +167,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Running database migrations...");
     sqlx::migrate!("./migrations").run(&db).await?;
 
-    // Initialize reputation service
-    let reputation_service = Arc::new(reputation::ReputationService::new());
+    // Initialize reputation service with database pool
+    let reputation_service = Arc::new(reputation::ReputationService::new(db.clone()));
 
     // Create application state using BountyManagerState
     let state = bounty_crud::BountyManagerState {
@@ -258,9 +256,43 @@ fn create_router(state: bounty_crud::BountyManagerState) -> Router {
         // Stats route
         .route("/bounties/stats", get(bounty_crud::get_bounty_stats))
 
-        // TODO: Add more routes as handlers are implemented
-        // .route("/bounties/:id/submit", post(handlers::submit_analysis))
+        // Submission routes
+        .route("/bounties/:id/submit", post(handlers::submit_analysis))
+        .route("/bounties/:id/submissions", get(handlers::list_submissions_for_bounty))
+        .route("/submissions/:id", get(handlers::get_submission))
+        .route("/submissions/:id/status", put(handlers::update_submission_status))
 
+        // Payout routes
+        .route("/bounties/:id/payout", post(handlers::process_bounty_completion))
+        .route("/payouts/:id/distribute", post(handlers::distribute_rewards))
+        .route("/payouts/:id/slash", post(handlers::handle_stake_slashing))
+        .route("/payouts/history", get(handlers::get_payout_history))
+
+        // Dispute routes
+        .route("/disputes", post(handlers::create_dispute))
+        .route("/disputes", get(handlers::list_disputes))
+        .route("/disputes/:id", get(handlers::get_dispute))
+        .route("/disputes/:id", put(handlers::update_dispute))
+        .route("/disputes/:id/resolve", post(handlers::resolve_dispute))
+        .route("/disputes/:id/vote", post(handlers::vote_on_dispute))
+        .route("/disputes/:id/withdraw", post(handlers::withdraw_dispute))
+        .route("/disputes/stats", get(handlers::get_dispute_stats))
+
+        // Validation routes
+        .route("/submissions/:id/validate", post(handlers::validate_submission))
+        .route("/submissions/:id/validation", get(handlers::get_validation_result))
+        .route("/validations", get(handlers::list_validations))
+        .route("/validations/bulk", post(handlers::bulk_validate_submissions))
+        .route("/validations/stats", get(handlers::get_validation_stats))
+        .route("/submissions/:id/revalidate", post(handlers::revalidate_submission))
+
+        // Reputation routes
+        .route("/reputation/:id", get(handlers::get_engine_reputation))
+        .route("/reputation/:id", put(handlers::update_reputation))
+        .route("/reputation/leaderboard", get(handlers::get_leaderboard))
+        .route("/reputation/:id/history", get(handlers::get_reputation_history))
+        .route("/reputation/decay", post(handlers::apply_reputation_decay))
+        .route("/engines/register", post(handlers::register_engine))
         // State management
         .with_state(state)
 

@@ -4,7 +4,7 @@ port = 8083
 workers = 4
 
 [database]
-url = "postgresql://nexus_user:nexus_password@localhost:5432/nexus_security"
+url = "postgresql://verdyx_user:verdyx_password@localhost:5432/verdyx"
 max_connections = 20
 min_connections = 5
 connect_timeout = 30

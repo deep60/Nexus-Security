@@ -31,9 +31,9 @@ kubectl apply -f infrastructure/kubernetes/ingress
 ## Verify Rollout
 
 ```bash
-kubectl get pods -n nexus-security
-kubectl get svc -n nexus-security
-kubectl get ingress -n nexus-security
+kubectl get pods -n verdyx
+kubectl get svc -n verdyx
+kubectl get ingress -n verdyx
 ```
 
 ## Health Verification
@@ -41,7 +41,7 @@ kubectl get ingress -n nexus-security
 Use port-forward + health endpoint:
 
 ```bash
-kubectl port-forward svc/nexus-api-gateway 8080:8080 -n nexus-security
+kubectl port-forward svc/verdyx-api-gateway 8080:8080 -n verdyx
 curl -f http://localhost:8080/api/v1/health
 ```
 
@@ -56,6 +56,6 @@ Inject values via ConfigMaps and Secrets.
 
 ## Troubleshooting
 
-- Crash loop: `kubectl logs <pod> -n nexus-security --previous`
-- Bad env/secret: `kubectl describe pod <pod> -n nexus-security`
+- Crash loop: `kubectl logs <pod> -n verdyx --previous`
+- Bad env/secret: `kubectl describe pod <pod> -n verdyx`
 - Service routing: inspect Ingress class and service names

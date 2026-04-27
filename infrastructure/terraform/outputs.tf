@@ -1,4 +1,4 @@
-# Nexus Security - Terraform Outputs
+# Verdyx - Terraform Outputs
 
 # VPC Outputs
 output "vpc_id" {
@@ -79,7 +79,7 @@ output "uploads_bucket_arn" {
 # Connection strings for applications
 output "database_url" {
   description = "PostgreSQL connection URL (without password)"
-  value       = "postgresql://nexus@${module.rds.db_instance_endpoint}/nexus_security"
+  value       = "postgresql://verdyx@${module.rds.db_instance_endpoint}/verdyx"
   sensitive   = false
 }
 

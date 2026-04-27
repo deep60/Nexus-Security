@@ -1,4 +1,4 @@
--- Nexus Security Database Initialization Script
+-- Verdyx Database Initialization Script
 
 -- Create extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -13,9 +13,9 @@ CREATE TYPE kyc_status AS ENUM ('not_submitted', 'pending', 'under_review', 'app
 CREATE TYPE analysis_status AS ENUM ('pending', 'in_progress', 'completed', 'failed');
 
 -- Grant permissions
-GRANT ALL PRIVILEGES ON DATABASE nexus_security TO nexus_user;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO nexus_user;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO nexus_user;
+GRANT ALL PRIVILEGES ON DATABASE verdyx TO verdyx_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO verdyx_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO verdyx_user;
 
 -- Log initialization
 INSERT INTO pg_catalog.pg_ts_config_map VALUES ('default', 'postgres', 'pg_catalog.simple');

@@ -45,6 +45,7 @@ pub enum SubmissionStatus {
     Active,      // Stake confirmed, participating in consensus
     Correct,     // Matched final consensus
     Incorrect,   // Did not match consensus
+    Invalid,     // Failed validation checks
     Slashed,     // Stake was slashed for incorrect analysis
     Rewarded,    // Received reward for correct analysis
 }
@@ -190,10 +191,63 @@ pub async fn submit_analysis(
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    // TODO: Validate bounty exists and is active
-    // TODO: Check if engine already submitted to this bounty
-    // TODO: Verify minimum stake requirements
-    // TODO: Check engine reputation requirements
+    // Validate bounty exists and is active
+    let bounty = crate::models::BountyModel::find_by_id(&state.db, bounty_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch bounty {}: {}", bounty_id, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or_else(|| {
+            tracing::warn!("Bounty {} not found", bounty_id);
+            StatusCode::NOT_FOUND
+        })?;
+
+    if bounty.status != "Active" {
+        tracing::warn!("Bounty {} is not active (status: {})", bounty_id, bounty.status);
+        return Err(StatusCode::CONFLICT);
+    }
+
+    if bounty.deadline < Utc::now() {
+        tracing::warn!("Bounty {} deadline has passed", bounty_id);
+        return Err(StatusCode::CONFLICT);
+    }
+
+    // Check if engine already submitted to this bounty
+    let existing_submissions = SubmissionModel::find_by_bounty(&state.db, bounty_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to check existing submissions: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    if existing_submissions.iter().any(|s| s.engine_id == engine_id) {
+        tracing::warn!("Engine {} already submitted to bounty {}", engine_id, bounty_id);
+        return Err(StatusCode::CONFLICT);
+    }
+
+    // Verify minimum stake requirements
+    if req.stake_amount < bounty.min_stake as u64 {
+        tracing::warn!(
+            "Stake amount {} below minimum {} for bounty {}",
+            req.stake_amount, bounty.min_stake, bounty_id
+        );
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Check engine reputation requirements (engines with very low reputation are rejected)
+    let min_reputation = state.reputation_service
+        .calculate_minimum_stake(&engine_id)
+        .await;
+    if let Ok(required_stake) = min_reputation {
+        if req.stake_amount < required_stake {
+            tracing::warn!(
+                "Engine {} reputation requires minimum stake of {}, got {}",
+                engine_id, required_stake, req.stake_amount
+            );
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
 
     let submission_id = Uuid::new_v4();
     let now = Utc::now();
@@ -323,11 +377,56 @@ pub async fn list_submissions_for_bounty(
 
 pub async fn update_submission_status(
     State(state): State<BountyManagerState>,
+    Extension(caller_id): Extension<String>, // From auth middleware
     Path(submission_id): Path<Uuid>,
     Json(status): Json<SubmissionStatus>,
 ) -> Result<Json<ApiResponse<Submission>>, StatusCode> {
-    let status_str = format!("{:?}", status);
+    // Fetch the submission first to verify ownership
+    let db_sub = SubmissionModel::find_by_id(&state.db, submission_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch submission: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
+    // Only the submission's engine owner or the bounty creator may update status
+    let bounty = crate::models::BountyModel::find_by_id(&state.db, db_sub.bounty_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch bounty {}: {}", db_sub.bounty_id, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if db_sub.engine_id != caller_id && bounty.creator != caller_id {
+        tracing::warn!(
+            "Caller {} denied status update on submission {} (owner: {}, bounty creator: {})",
+            caller_id, submission_id, db_sub.engine_id, bounty.creator
+        );
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    // Validate status transition
+    let current_status = match db_sub.status.as_str() {
+        "Active" => SubmissionStatus::Active,
+        "Correct" => SubmissionStatus::Correct,
+        "Incorrect" => SubmissionStatus::Incorrect,
+        "Invalid" => SubmissionStatus::Invalid,
+        "Slashed" => SubmissionStatus::Slashed,
+        "Rewarded" => SubmissionStatus::Rewarded,
+        _ => SubmissionStatus::Pending,
+    };
+
+    if !is_valid_submission_transition(&current_status, &status) {
+        tracing::warn!(
+            "Invalid submission status transition from {:?} to {:?} for {}",
+            current_status, status, submission_id
+        );
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let status_str = format!("{:?}", status);
     SubmissionModel::update_status(&state.db, submission_id, &status_str)
         .await
         .map_err(|e| {
@@ -335,7 +434,8 @@ pub async fn update_submission_status(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let db_sub = SubmissionModel::find_by_id(&state.db, submission_id)
+    // Re-fetch updated submission
+    let updated = SubmissionModel::find_by_id(&state.db, submission_id)
         .await
         .map_err(|e| {
             tracing::error!("Failed to re-fetch submission: {}", e);
@@ -343,11 +443,25 @@ pub async fn update_submission_status(
         })?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let details: AnalysisDetails = serde_json::from_value(db_sub.analysis_details.clone())
+    let details: AnalysisDetails = serde_json::from_value(updated.analysis_details.clone())
         .unwrap_or_else(|_| default_analysis_details());
-    let submission = db_submission_to_handler_submission(db_sub, details);
+    let submission = db_submission_to_handler_submission(updated, details);
 
     Ok(Json(ApiResponse::success(submission)))
+}
+
+/// Allowed submission status transitions
+fn is_valid_submission_transition(from: &SubmissionStatus, to: &SubmissionStatus) -> bool {
+    matches!(
+        (from, to),
+        (SubmissionStatus::Pending, SubmissionStatus::Active)
+        | (SubmissionStatus::Pending, SubmissionStatus::Invalid)
+        | (SubmissionStatus::Active, SubmissionStatus::Correct)
+        | (SubmissionStatus::Active, SubmissionStatus::Incorrect)
+        | (SubmissionStatus::Active, SubmissionStatus::Invalid)
+        | (SubmissionStatus::Incorrect, SubmissionStatus::Slashed)
+        | (SubmissionStatus::Correct, SubmissionStatus::Rewarded)
+    )
 }
 
 // Conversion helper: SubmissionModel (DB) -> Submission (handler DTO)

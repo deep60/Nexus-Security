@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: analysis-engine-config
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: analysis-engine
     component: backend
@@ -21,7 +21,7 @@ data:
   worker-threads: "4"
 
   # API Gateway URL for callbacks
-  api-gateway-url: "http://nexus-api-gateway-service:8000"
+  api-gateway-url: "http://verdyx-api-gateway-service:8000"
 
   # Application configuration
   config.yaml: |
@@ -91,7 +91,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: yara-rules-config
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: analysis-engine
     component: backend
@@ -102,7 +102,7 @@ data:
     {
         meta:
             description = "Detects suspicious strings commonly found in malware"
-            author = "Nexus Security"
+            author = "Verdyx"
             severity = "medium"
 
         strings:
@@ -123,7 +123,7 @@ data:
     {
         meta:
             description = "Identifies PE files with suspicious characteristics"
-            author = "Nexus Security"
+            author = "Verdyx"
             severity = "low"
 
         condition:
@@ -135,7 +135,7 @@ data:
     {
         meta:
             description = "Detects suspicious API imports"
-            author = "Nexus Security"
+            author = "Verdyx"
             severity = "high"
 
         strings:
@@ -154,7 +154,7 @@ data:
     {
         meta:
             description = "Detects crypto-related strings (potential ransomware)"
-            author = "Nexus Security"
+            author = "Verdyx"
             severity = "critical"
 
         strings:
@@ -174,7 +174,7 @@ data:
     {
         meta:
             description = "Detects network-related functionality"
-            author = "Nexus Security"
+            author = "Verdyx"
             severity = "medium"
 
         strings:
@@ -194,7 +194,7 @@ data:
     {
         meta:
             description = "Detects suspicious URL patterns"
-            author = "Nexus Security"
+            author = "Verdyx"
             severity = "high"
 
         strings:

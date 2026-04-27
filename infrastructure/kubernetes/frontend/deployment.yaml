@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nexus-frontend
-  namespace: nexus-security
+  name: verdyx-frontend
+  namespace: verdyx
   labels:
-    app: nexus-frontend
+    app: verdyx-frontend
     component: frontend
     service: web
 spec:
@@ -16,15 +16,15 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: nexus-frontend
+      app: verdyx-frontend
   template:
     metadata:
       labels:
-        app: nexus-frontend
+        app: verdyx-frontend
         component: frontend
         service: web
     spec:
-      serviceAccountName: nexus-frontend-sa
+      serviceAccountName: verdyx-frontend-sa
       securityContext:
         runAsNonRoot: true
         runAsUser: 101     # nginx user in alpine
@@ -33,7 +33,7 @@ spec:
 
       containers:
       - name: frontend
-        image: nexus-security/frontend:latest
+        image: verdyx/frontend:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000
@@ -44,7 +44,7 @@ spec:
         - name: NODE_ENV
           value: "production"
         - name: API_BASE_URL
-          value: "https://api.nexus-security.com"
+          value: "https://api.verdyx.com"
 
         resources:
           requests:
@@ -105,15 +105,15 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: nexus-frontend-hpa
-  namespace: nexus-security
+  name: verdyx-frontend-hpa
+  namespace: verdyx
   labels:
-    app: nexus-frontend
+    app: verdyx-frontend
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: nexus-frontend
+    name: verdyx-frontend
   minReplicas: 2
   maxReplicas: 6
   metrics:

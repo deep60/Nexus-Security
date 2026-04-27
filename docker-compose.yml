@@ -2,20 +2,20 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: nexus-postgres
+    container_name: verdyx-postgres
     environment:
-      POSTGRES_USER: nexus_user
-      POSTGRES_PASSWORD: nexus_password
-      POSTGRES_DB: nexus_security
+      POSTGRES_USER: verdyx_user
+      POSTGRES_PASSWORD: verdyx_password
+      POSTGRES_DB: verdyx
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d
     networks:
-      - nexus-network
+      - verdyx-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexus_user -d nexus_security"]
+      test: ["CMD-SHELL", "pg_isready -U verdyx_user -d verdyx"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,14 +23,14 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: nexus-redis
+    container_name: verdyx-redis
     command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
-      - nexus-network
+      - verdyx-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -42,12 +42,12 @@ services:
     build:
       context: ./backend
       dockerfile: ./api-gateway/Dockerfile
-    container_name: nexus-api-gateway
+    container_name: verdyx-api-gateway
     ports:
       - "8080:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
       - REDIS_URL=redis://redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
@@ -64,7 +64,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # User Service
@@ -72,12 +72,12 @@ services:
     build:
       context: ./backend
       dockerfile: ./user-service/Dockerfile
-    container_name: nexus-user-service
+    container_name: verdyx-user-service
     ports:
       - "8081:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
       - REDIS_URL=redis://redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
@@ -94,24 +94,24 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # MinIO (S3-compatible object storage)
   minio:
     image: minio/minio:latest
-    container_name: nexus-minio
+    container_name: verdyx-minio
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"  # API
       - "9001:9001"  # Console
     environment:
-      MINIO_ROOT_USER: nexus_admin
-      MINIO_ROOT_PASSWORD: nexus_secret_key_2024
+      MINIO_ROOT_USER: verdyx_admin
+      MINIO_ROOT_PASSWORD: verdyx_secret_key_2024
     volumes:
       - minio_data:/data
     networks:
-      - nexus-network
+      - verdyx-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
@@ -122,13 +122,13 @@ services:
   # ClamAV Antivirus Scanner
   clamav:
     image: clamav/clamav:latest
-    container_name: nexus-clamav
+    container_name: verdyx-clamav
     ports:
       - "3310:3310"
     volumes:
       - clamav_data:/var/lib/clamav
     networks:
-      - nexus-network
+      - verdyx-network
     healthcheck:
       test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
       interval: 60s
@@ -142,21 +142,21 @@ services:
     build:
       context: ./backend
       dockerfile: ./analysis-engine/Dockerfile
-    container_name: nexus-analysis-engine
+    container_name: verdyx-analysis-engine
     ports:
       - "8082:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
       - REDIS_URL=redis://redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # S3/MinIO Configuration for file storage
       - S3_ENDPOINT=http://minio:9000
       - S3_REGION=us-east-1
-      - S3_BUCKET=nexus-submissions
-      - S3_ACCESS_KEY=nexus_admin
-      - S3_SECRET_KEY=nexus_secret_key_2024
+      - S3_BUCKET=verdyx-submissions
+      - S3_ACCESS_KEY=verdyx_admin
+      - S3_SECRET_KEY=verdyx_secret_key_2024
       # YARA rules configuration
       - YARA_RULES_PATH=/app/rules
       # ClamAV configuration
@@ -172,7 +172,7 @@ services:
       clamav:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Bounty Manager Service
@@ -180,12 +180,12 @@ services:
     build:
       context: ./backend
       dockerfile: ./bounty-manager/Dockerfile
-    container_name: nexus-bounty-manager
+    container_name: verdyx-bounty-manager
     ports:
       - "8083:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
       - REDIS_URL=redis://redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
@@ -201,7 +201,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Submission Service
@@ -209,7 +209,7 @@ services:
     build:
       context: ./backend
       dockerfile: ./submission-service/Dockerfile
-    container_name: nexus-submission-service
+    container_name: verdyx-submission-service
     ports:
       - "8084:8080"
     environment:
@@ -218,14 +218,14 @@ services:
       - SERVER_PORT=8080
       - SUBMISSION_SERVICE_PORT=8080
       # Database and Redis Configuration
-      - DATABASE_URL=postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
       - REDIS_URL=redis://redis:6379
       # S3/MinIO Configuration
       - S3_ENDPOINT=http://minio:9000
       - S3_REGION=us-east-1
-      - S3_BUCKET=nexus-submissions
-      - S3_ACCESS_KEY=nexus_admin
-      - S3_SECRET_KEY=nexus_secret_key_2024
+      - S3_BUCKET=verdyx-submissions
+      - S3_ACCESS_KEY=verdyx_admin
+      - S3_SECRET_KEY=verdyx_secret_key_2024
     depends_on:
       postgres:
         condition: service_healthy
@@ -234,7 +234,7 @@ services:
       minio:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Consensus Service
@@ -242,12 +242,12 @@ services:
     build:
       context: ./backend
       dockerfile: ./consensus-service/Dockerfile
-    container_name: nexus-consensus-service
+    container_name: verdyx-consensus-service
     ports:
       - "8085:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
       - REDIS_URL=redis://redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
@@ -260,7 +260,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Payment Service
@@ -268,12 +268,12 @@ services:
     build:
       context: ./backend
       dockerfile: ./payment-service/Dockerfile
-    container_name: nexus-payment-service
+    container_name: verdyx-payment-service
     ports:
       - "8086:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
       - REDIS_URL=redis://redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
@@ -290,7 +290,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Reputation Service
@@ -298,12 +298,12 @@ services:
     build:
       context: ./backend
       dockerfile: ./reputation-service/Dockerfile
-    container_name: nexus-reputation-service
+    container_name: verdyx-reputation-service
     ports:
       - "8087:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
       - REDIS_URL=redis://redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
@@ -316,7 +316,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Notification Service
@@ -324,12 +324,12 @@ services:
     build:
       context: ./backend
       dockerfile: ./notification-service/Dockerfile
-    container_name: nexus-notification-service
+    container_name: verdyx-notification-service
     ports:
       - "8088:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
       - REDIS_URL=redis://redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
@@ -338,7 +338,7 @@ services:
       - SMTP_PORT=587
       - SMTP_USERNAME=your-email@gmail.com
       - SMTP_PASSWORD=your-app-password
-      - EMAIL_FROM=noreply@nexus-security.io
+      - EMAIL_FROM=noreply@verdyx.io
       # Webhook Configuration
       - WEBHOOK_TIMEOUT=30
       - MAX_RETRY_ATTEMPTS=3
@@ -348,7 +348,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
   # Frontend Web Application
@@ -356,11 +356,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: nexus-frontend
+    container_name: verdyx-frontend
     environment:
       NODE_ENV: production
       PORT: 5000
-      DATABASE_URL: postgresql://nexus_user:nexus_password@postgres:5432/nexus_security
+      DATABASE_URL: postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
       REDIS_URL: redis://redis:6379
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
@@ -376,7 +376,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/', (r) => {process.exit(r.statusCode < 500 ? 0 : 1)}).on('error', () => process.exit(1))"]
@@ -388,20 +388,20 @@ services:
   # PgAdmin (Optional - for database management)
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: nexus-pgadmin
+    container_name: verdyx-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@nexus-security.io
+      PGADMIN_DEFAULT_EMAIL: admin@verdyx.io
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
       - "5050:80"
     depends_on:
       - postgres
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
 
 networks:
-  nexus-network:
+  verdyx-network:
     driver: bridge
 
 volumes:

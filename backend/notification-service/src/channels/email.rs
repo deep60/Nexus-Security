@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use tracing::{error, info, warn};
 
 use crate::models::{NotificationChannel, NotificationError, NotificationResult};
-use shared::messaging::event_types::{NexusEvent, NotificationPayload};
+use shared::messaging::event_types::{VerdyxEvent, NotificationPayload};
 
 /// Email notification channel implementation
 pub struct EmailChannel {
@@ -87,26 +87,26 @@ impl EmailChannel {
     }
 
     /// Get template name for an event
-    fn get_template_name(event: &NexusEvent) -> &'static str {
+    fn get_template_name(event: &VerdyxEvent) -> &'static str {
         match event {
-            NexusEvent::UserRegistered(_) => "user_registered",
-            NexusEvent::BountyCreated(_) => "bounty_created",
-            NexusEvent::SubmissionReceived(_) => "submission_received",
-            NexusEvent::PaymentProcessed(_) => "payment_processed",
-            NexusEvent::ReputationUpdated(_) => "reputation_updated",
+            VerdyxEvent::UserRegistered(_) => "user_registered",
+            VerdyxEvent::BountyCreated(_) => "bounty_created",
+            VerdyxEvent::SubmissionReceived(_) => "submission_received",
+            VerdyxEvent::PaymentProcessed(_) => "payment_processed",
+            VerdyxEvent::ReputationUpdated(_) => "reputation_updated",
             _ => "generic_notification",
         }
     }
 
     /// Build email template data from event
-    fn build_template_data(event: &NexusEvent) -> HashMap<String, serde_json::Value> {
+    fn build_template_data(event: &VerdyxEvent) -> HashMap<String, serde_json::Value> {
         let mut data = HashMap::new();
 
         data.insert("title".to_string(), serde_json::json!(event.get_title()));
         data.insert("description".to_string(), serde_json::json!(event.get_description()));
 
         match event {
-            NexusEvent::BountyCreated(e) => {
+            VerdyxEvent::BountyCreated(e) => {
                 data.insert("bounty_id".to_string(), serde_json::json!(e.bounty_id.to_string()));
                 data.insert("bounty_title".to_string(), serde_json::json!(e.title));
                 data.insert("reward_amount".to_string(), serde_json::json!(e.reward_amount.to_string()));
@@ -114,23 +114,23 @@ impl EmailChannel {
                 data.insert("expires_at".to_string(), serde_json::json!(e.expires_at.to_rfc3339()));
                 data.insert("tags".to_string(), serde_json::json!(e.tags));
             }
-            NexusEvent::SubmissionReceived(e) => {
+            VerdyxEvent::SubmissionReceived(e) => {
                 data.insert("submission_id".to_string(), serde_json::json!(e.submission_id.to_string()));
                 data.insert("bounty_id".to_string(), serde_json::json!(e.bounty_id.to_string()));
                 data.insert("verdict".to_string(), serde_json::json!(format!("{:?}", e.verdict)));
                 data.insert("confidence_score".to_string(), serde_json::json!(format!("{:.2}%", e.confidence_score * 100.0)));
             }
-            NexusEvent::PaymentProcessed(e) => {
+            VerdyxEvent::PaymentProcessed(e) => {
                 data.insert("amount".to_string(), serde_json::json!(e.amount.to_string()));
                 data.insert("tx_hash".to_string(), serde_json::json!(e.tx_hash));
                 data.insert("bounty_id".to_string(), serde_json::json!(e.bounty_id.to_string()));
             }
-            NexusEvent::ReputationUpdated(e) => {
+            VerdyxEvent::ReputationUpdated(e) => {
                 data.insert("old_score".to_string(), serde_json::json!(e.old_score));
                 data.insert("new_score".to_string(), serde_json::json!(e.new_score));
                 data.insert("change_reason".to_string(), serde_json::json!(e.change_reason));
             }
-            NexusEvent::UserRegistered(e) => {
+            VerdyxEvent::UserRegistered(e) => {
                 data.insert("username".to_string(), serde_json::json!(e.username));
             }
             _ => {}
@@ -142,7 +142,7 @@ impl EmailChannel {
     /// Render email HTML content
     fn render_email_html(
         &self,
-        event: &NexusEvent,
+        event: &VerdyxEvent,
     ) -> Result<String, NotificationError> {
         let template_name = Self::get_template_name(event);
         let template_data = Self::build_template_data(event);
@@ -272,8 +272,8 @@ impl Default for EmailConfig {
             smtp_port: 587,
             smtp_username: String::new(),
             smtp_password: String::new(),
-            from_address: "noreply@nexus-security.io".to_string(),
-            from_name: "Nexus Security".to_string(),
+            from_address: "noreply@verdyx.io".to_string(),
+            from_name: "Verdyx".to_string(),
         }
     }
 }
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn test_template_name_selection() {
-        let event = NexusEvent::UserRegistered(UserRegisteredEvent {
+        let event = VerdyxEvent::UserRegistered(UserRegisteredEvent {
             user_id: Uuid::new_v4(),
             username: "test".to_string(),
             email: "test@example.com".to_string(),

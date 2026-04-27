@@ -35,7 +35,7 @@ async function verifyContract(
 }
 
 /**
- * Verify all Nexus-Security contracts
+ * Verify all Verdyx contracts
  */
 async function verifyAllContracts(
     threatTokenAddress: string,
@@ -43,7 +43,7 @@ async function verifyAllContracts(
     bountyManagerAddress: string,
     feeCollectorAddress: string
 ) {
-    console.log("🔍 Verifying all Nexus-Security contracts...\n");
+    console.log("🔍 Verifying all Verdyx contracts...\n");
 
     // Verify ThreatToken
     await verifyContract(

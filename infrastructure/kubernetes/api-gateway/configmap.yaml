@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nexus-api-gateway-config
-  namespace: nexus-security
+  name: verdyx-api-gateway-config
+  namespace: verdyx
   labels:
-    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/name: verdyx
     app.kubernetes.io/component: api-gateway
-    app.kubernetes.io/part-of: nexus-security-platform
+    app.kubernetes.io/part-of: verdyx-platform
 data:
   # Main application configuration — TOML format to match config.rs::from_file()
   # Field names must match the AppConfig struct hierarchy exactly.
@@ -24,7 +24,7 @@ data:
     environment = "production"
 
     [database]
-    url = "postgresql://placeholder:placeholder@nexus-postgres-service:5432/nexus_security"
+    url = "postgresql://placeholder:placeholder@verdyx-postgres-service:5432/verdyx"
     max_connections = 100
     min_connections = 10
     connection_timeout_seconds = 30
@@ -34,12 +34,12 @@ data:
     run_migrations = true
 
     [redis]
-    url = "redis://nexus-redis-service:6379"
+    url = "redis://verdyx-redis-service:6379"
     max_connections = 50
     connection_timeout_seconds = 5
     pool_timeout_seconds = 10
     enable_cluster = false
-    key_prefix = "nexus:"
+    key_prefix = "verdyx:"
     default_ttl_seconds = 3600
 
     [blockchain]
@@ -75,9 +75,9 @@ data:
 
     [security.cors]
     allowed_origins = [
-      "https://nexus-security.com",
-      "https://app.nexus-security.com",
-      "https://admin.nexus-security.com",
+      "https://verdyx.com",
+      "https://app.verdyx.com",
+      "https://admin.verdyx.com",
     ]
     allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     allowed_headers = ["*"]
@@ -145,7 +145,7 @@ data:
     #!/bin/bash
     set -e
 
-    echo "Starting Nexus Security API Gateway..."
+    echo "Starting Verdyx API Gateway..."
 
     # Wait for database to be ready
     until nc -z $DATABASE_HOST $DATABASE_PORT; do

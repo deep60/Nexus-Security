@@ -1,4 +1,4 @@
-//! Shared utilities and types for Nexus-Security backend services
+//! Shared utilities and types for Verdyx backend services
 
 // Re-export common dependencies
 pub use anyhow;
@@ -11,7 +11,7 @@ pub use uuid;
 
 // Common error types
 #[derive(Debug, thiserror::Error)]
-pub enum NexusError {
+pub enum VerdyxError {
     #[error("Database error: {0}")]
     Database(#[from] anyhow::Error),
     
@@ -28,7 +28,7 @@ pub enum NexusError {
     ExternalService(String),
 }
 
-pub type Result<T> = std::result::Result<T, NexusError>;
+pub type Result<T> = std::result::Result<T, VerdyxError>;
 
 // Export modules
 pub mod types;

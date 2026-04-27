@@ -418,7 +418,7 @@ mod tests {
 
     #[test]
     fn test_sha256_hash() {
-        let data = b"Hello, Nexus-Security!";
+        let data = b"Hello, Verdyx!";
         let hash = HashUtils::sha256(data);
         assert!(!hash.is_empty());
         assert_eq!(hash.len(), 64); // SHA-256 produces 32 bytes = 64 hex chars
@@ -463,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_multi_hash() {
-        let data = b"Nexus-Security test data";
+        let data = b"Verdyx test data";
         let hashes = HashUtils::multi_hash(data);
         
         assert_eq!(hashes.sha256.len(), 64);

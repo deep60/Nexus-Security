@@ -79,7 +79,7 @@ impl Config {
             },
             database: DatabaseConfig {
                 url: env::var("DATABASE_URL")
-                    .unwrap_or_else(|_| "postgresql://nexus:password@localhost/nexus_security".to_string()),
+                    .unwrap_or_else(|_| "postgresql://verdyx:password@localhost/verdyx".to_string()),
                 max_connections: env::var("DB_MAX_CONNECTIONS")
                     .unwrap_or_else(|_| "20".to_string())
                     .parse()
@@ -203,7 +203,7 @@ impl Default for Config {
                 workers: 4,
             },
             database: DatabaseConfig {
-                url: "postgresql://nexus:password@localhost/nexus_security".to_string(),
+                url: "postgresql://verdyx:password@localhost/verdyx".to_string(),
                 max_connections: 20,
                 min_connections: 5,
                 connect_timeout: 30,

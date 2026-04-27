@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Nexus Security - Docker Build Script
-# This script builds all Docker images for the Nexus Security platform
+# Verdyx - Docker Build Script
+# This script builds all Docker images for the Verdyx platform
 
 set -e  # Exit on error
 
@@ -12,13 +12,13 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_REGISTRY="${DOCKER_REGISTRY:-nexus-security}"
+DOCKER_REGISTRY="${DOCKER_REGISTRY:-verdyx}"
 VERSION="${VERSION:-latest}"
 BUILD_MODE="${BUILD_MODE:-production}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 echo -e "${GREEN}================================================${NC}"
-echo -e "${GREEN}   Nexus Security - Docker Build Script${NC}"
+echo -e "${GREEN}   Verdyx - Docker Build Script${NC}"
 echo -e "${GREEN}================================================${NC}"
 echo ""
 echo -e "Registry: ${YELLOW}${DOCKER_REGISTRY}${NC}"

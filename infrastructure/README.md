@@ -1,6 +1,6 @@
-# Nexus Security Infrastructure
+# Verdyx Infrastructure
 
-This directory contains all infrastructure-as-code configurations for deploying the Nexus Security platform.
+This directory contains all infrastructure-as-code configurations for deploying the Verdyx platform.
 
 ## Directory Structure
 
@@ -38,7 +38,7 @@ infrastructure/
 
 1. **Clone and navigate to project:**
    ```bash
-   cd /path/to/Nexus-Security
+   cd /path/to/Verdyx
    ```
 
 2. **Copy environment file:**
@@ -71,7 +71,7 @@ infrastructure/
 
 2. **Push to registry:**
    ```bash
-   export DOCKER_REGISTRY=your-registry.com/nexus-security
+   export DOCKER_REGISTRY=your-registry.com/verdyx
    export VERSION=1.0.0
    ./infrastructure/docker/scripts/push.sh
    ```
@@ -93,7 +93,7 @@ Each backend service expects these environment variables:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://nexus:password@postgres:5432/nexus_security
+DATABASE_URL=postgresql://verdyx:password@postgres:5432/verdyx
 
 # Redis
 REDIS_URL=redis://:password@redis:6379
@@ -129,7 +129,7 @@ BOUNTY_MANAGER_URL=http://bounty-manager:8083
 cd backend
 
 # Set environment variables
-export DATABASE_URL=postgresql://nexus:password@localhost:5432/nexus_security
+export DATABASE_URL=postgresql://verdyx:password@localhost:5432/verdyx
 export REDIS_URL=redis://:password@localhost:6379
 
 # Run specific service
@@ -166,7 +166,7 @@ sqlx migrate run --database-url $DATABASE_URL
        context: ../../..
        dockerfile: infrastructure/docker/production/new-service/new-service.Dockerfile
      environment:
-       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus_security
+       DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD}@postgres:5432/verdyx
      depends_on:
        postgres:
          condition: service_healthy
@@ -194,14 +194,14 @@ sqlx migrate run --database-url $DATABASE_URL
 
 2. **Create secrets:**
    ```bash
-   kubectl create secret generic nexus-database-secret \
-     --from-literal=database_url='postgresql://nexus:password@postgresql-service:5432/nexus_security' \
-     -n nexus-security
+   kubectl create secret generic verdyx-database-secret \
+     --from-literal=database_url='postgresql://verdyx:password@postgresql-service:5432/verdyx' \
+     -n verdyx
 
-   kubectl create secret generic nexus-auth-secret \
+   kubectl create secret generic verdyx-auth-secret \
      --from-literal=jwt_secret='your-jwt-secret' \
      --from-literal=jwt_refresh_secret='your-refresh-secret' \
-     -n nexus-security
+     -n verdyx
    ```
 
 3. **Deploy database:**
@@ -234,13 +234,13 @@ sqlx migrate run --database-url $DATABASE_URL
    ```bash
    # Check if PostgreSQL is healthy
    docker-compose logs postgres
-   docker exec -it nexus-postgres pg_isready -U nexus
+   docker exec -it verdyx-postgres pg_isready -U verdyx
    ```
 
 2. **Service can't connect to Redis:**
    ```bash
    # Verify Redis is running
-   docker exec -it nexus-redis redis-cli ping
+   docker exec -it verdyx-redis redis-cli ping
    ```
 
 3. **Build failures:**
@@ -253,8 +253,8 @@ sqlx migrate run --database-url $DATABASE_URL
 
 4. **Kubernetes pods not starting:**
    ```bash
-   kubectl describe pod <pod-name> -n nexus-security
-   kubectl logs <pod-name> -n nexus-security
+   kubectl describe pod <pod-name> -n verdyx
+   kubectl logs <pod-name> -n verdyx
    ```
 
 ## Security Considerations

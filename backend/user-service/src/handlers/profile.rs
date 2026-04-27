@@ -53,13 +53,15 @@ pub async fn upload_avatar(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    // TODO: Implement file upload logic with S3 or similar
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::Unauthorized("Invalid token".to_string()))?;
+    // Avatar upload requires multipart form handling and S3/object storage.
+    // Integration path: add axum::extract::Multipart, upload to S3Client,
+    // then store the URL in the user's profile via user_service.update_avatar().
+    tracing::info!(user_id = %user_id, "Avatar upload requested — S3 integration pending");
 
     Ok(Json(serde_json::json!({
-        "message": "Avatar upload endpoint - implementation pending",
+        "message": "Avatar upload requires S3 object storage integration",
         "user_id": user_id,
+        "status": "not_implemented",
     })))
 }
 

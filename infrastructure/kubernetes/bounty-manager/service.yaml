@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: bounty-manager-service
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: bounty-manager
     component: backend
@@ -30,7 +30,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: bounty-manager-sa
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: bounty-manager
     component: backend
@@ -40,7 +40,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: bounty-manager-role
-  namespace: nexus-security
+  namespace: verdyx
 rules:
 - apiGroups: [""]
   resources: ["configmaps", "secrets"]
@@ -51,11 +51,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: bounty-manager-rolebinding
-  namespace: nexus-security
+  namespace: verdyx
 subjects:
 - kind: ServiceAccount
   name: bounty-manager-sa
-  namespace: nexus-security
+  namespace: verdyx
 roleRef:
   kind: Role
   name: bounty-manager-role

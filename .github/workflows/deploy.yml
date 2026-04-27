@@ -82,7 +82,7 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: nexus_security_test
+          POSTGRES_DB: verdyx_test
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
         ports:
@@ -111,7 +111,7 @@ jobs:
         working-directory: ./backend
         run: cargo test --workspace
         env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/nexus_security_test
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test
           REDIS_URL: redis://localhost:6379
 
   # ── Build & push Docker images ──────────────────────────────
@@ -179,7 +179,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/nexus-security-${{ matrix.image_suffix }}
+          images: ${{ secrets.DOCKER_USERNAME }}/verdyx-${{ matrix.image_suffix }}
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -208,7 +208,7 @@ jobs:
       !contains(needs.build-and-push.result, 'cancelled')
     environment:
       name: production
-      url: https://nexus-security.io
+      url: https://verdyx.io
 
     steps:
       - uses: actions/checkout@v4
@@ -241,7 +241,7 @@ jobs:
           echo "Deploying services: $SERVICES"
 
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOFSCRIPT
-            cd /opt/nexus-security
+            cd /opt/verdyx
             git pull origin main
             docker-compose pull $SERVICES
             docker-compose up -d $SERVICES
@@ -251,7 +251,7 @@ jobs:
       - name: Health check
         run: |
           sleep 30
-          curl --fail --retry 3 --retry-delay 10 https://nexus-security.io/api/v1/health || exit 1
+          curl --fail --retry 3 --retry-delay 10 https://verdyx.io/api/v1/health || exit 1
 
       - name: Notify deployment status
         uses: 8398a7/action-slack@v3

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: bounty-manager-config
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: bounty-manager
     component: backend

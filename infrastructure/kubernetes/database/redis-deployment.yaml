@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: redis
     component: cache
@@ -126,7 +126,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: redis-service
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: redis
     component: cache
@@ -148,7 +148,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: redis-sa
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: redis
     component: cache
@@ -158,13 +158,13 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: redis-config
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: redis
     component: cache
 data:
   redis.conf: |
-    # Redis configuration for Nexus-Security
+    # Redis configuration for Verdyx
     bind 0.0.0.0
     port 6379
     
@@ -221,7 +221,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis-sentinel
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: redis-sentinel
     component: cache
@@ -315,7 +315,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: redis-sentinel-service
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: redis-sentinel
     component: cache
@@ -334,7 +334,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: redis-sentinel-config
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: redis-sentinel
     component: cache
@@ -345,13 +345,13 @@ data:
     port 26379
     
     # Monitor Redis master
-    sentinel monitor nexus-redis redis-service.nexus-security.svc.cluster.local 6379 2
-    sentinel auth-pass nexus-redis ${REDIS_PASSWORD}
+    sentinel monitor verdyx-redis redis-service.verdyx.svc.cluster.local 6379 2
+    sentinel auth-pass verdyx-redis ${REDIS_PASSWORD}
     
     # Failover configuration
-    sentinel down-after-milliseconds nexus-redis 30000
-    sentinel parallel-syncs nexus-redis 1
-    sentinel failover-timeout nexus-redis 180000
+    sentinel down-after-milliseconds verdyx-redis 30000
+    sentinel parallel-syncs verdyx-redis 1
+    sentinel failover-timeout verdyx-redis 180000
     
     # Security
     requirepass ${REDIS_PASSWORD}

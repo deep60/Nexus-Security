@@ -1,6 +1,6 @@
 # Testing & DevOps Guide
 
-Complete guide for testing, containerization, and deployment of Nexus Security platform.
+Complete guide for testing, containerization, and deployment of Verdyx platform.
 
 ## Table of Contents
 - [Testing Infrastructure](#testing-infrastructure)
@@ -299,7 +299,7 @@ All services have health checks:
 docker-compose ps
 
 # View health check logs
-docker inspect --format='{{json .State.Health}}' nexus-frontend
+docker inspect --format='{{json .State.Health}}' verdyx-frontend
 ```
 
 ### Troubleshooting Docker
@@ -333,7 +333,7 @@ kill -9 <PID>
 docker-compose down -v
 
 # Remove specific volume
-docker volume rm nexus-security_postgres_data
+docker volume rm verdyx_postgres_data
 ```
 
 ---
@@ -448,9 +448,9 @@ act -s GITHUB_TOKEN=your_token
 Add to README.md:
 
 ```markdown
-[![Frontend CI](https://github.com/your-org/nexus-security/workflows/Frontend%20CI/badge.svg)](https://github.com/your-org/nexus-security/actions)
-[![Deploy](https://github.com/your-org/nexus-security/workflows/Deploy%20to%20Production/badge.svg)](https://github.com/your-org/nexus-security/actions)
-[![codecov](https://codecov.io/gh/your-org/nexus-security/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/nexus-security)
+[![Frontend CI](https://github.com/your-org/verdyx/workflows/Frontend%20CI/badge.svg)](https://github.com/your-org/verdyx/actions)
+[![Deploy](https://github.com/your-org/verdyx/workflows/Deploy%20to%20Production/badge.svg)](https://github.com/your-org/verdyx/actions)
+[![codecov](https://codecov.io/gh/your-org/verdyx/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/verdyx)
 ```
 
 ---
@@ -489,8 +489,8 @@ sudo usermod -aG docker deploy
 
 ```bash
 su - deploy
-git clone https://github.com/your-org/nexus-security.git
-cd nexus-security
+git clone https://github.com/your-org/verdyx.git
+cd verdyx
 ```
 
 #### 3. Configure Environment
@@ -508,7 +508,7 @@ nano .env
 NODE_ENV=production
 POSTGRES_PASSWORD=strong_password_here
 JWT_SECRET=very-long-random-string
-FRONTEND_URL=https://nexus-security.io
+FRONTEND_URL=https://verdyx.io
 ```
 
 #### 4. Initialize Database
@@ -545,10 +545,10 @@ docker-compose logs -f frontend
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name nexus-security.io;
+    server_name verdyx.io;
 
-    ssl_certificate /etc/ssl/certs/nexus-security.crt;
-    ssl_certificate_key /etc/ssl/private/nexus-security.key;
+    ssl_certificate /etc/ssl/certs/verdyx.crt;
+    ssl_certificate_key /etc/ssl/private/verdyx.key;
 
     location / {
         proxy_pass http://localhost:5000;
@@ -564,7 +564,7 @@ server {
 #### Using Caddy
 
 ```caddyfile
-nexus-security.io {
+verdyx.io {
     reverse_proxy localhost:5000
 }
 ```
@@ -619,30 +619,30 @@ npx drizzle-kit push
 
 ```bash
 # Create backup script
-cat > /opt/backup-nexus.sh << 'EOF'
+cat > /opt/backup-verdyx.sh << 'EOF'
 #!/bin/bash
 DATE=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR=/opt/backups
 
 # Backup PostgreSQL
-docker-compose exec -T postgres pg_dump -U nexus_user nexus_security > $BACKUP_DIR/postgres_$DATE.sql
+docker-compose exec -T postgres pg_dump -U verdyx_user verdyx > $BACKUP_DIR/postgres_$DATE.sql
 
 # Backup Redis
 docker-compose exec -T redis redis-cli SAVE
-cp /var/lib/docker/volumes/nexus-security_redis_data/_data/dump.rdb $BACKUP_DIR/redis_$DATE.rdb
+cp /var/lib/docker/volumes/verdyx_redis_data/_data/dump.rdb $BACKUP_DIR/redis_$DATE.rdb
 
 # Compress
-tar -czf $BACKUP_DIR/nexus_backup_$DATE.tar.gz $BACKUP_DIR/*_$DATE.*
+tar -czf $BACKUP_DIR/verdyx_backup_$DATE.tar.gz $BACKUP_DIR/*_$DATE.*
 
 # Cleanup old backups (keep 7 days)
-find $BACKUP_DIR -name "nexus_backup_*.tar.gz" -mtime +7 -delete
+find $BACKUP_DIR -name "verdyx_backup_*.tar.gz" -mtime +7 -delete
 EOF
 
-chmod +x /opt/backup-nexus.sh
+chmod +x /opt/backup-verdyx.sh
 
 # Add to crontab
 crontab -e
-# Add: 0 2 * * * /opt/backup-nexus.sh
+# Add: 0 2 * * * /opt/backup-verdyx.sh
 ```
 
 ---
@@ -690,7 +690,7 @@ Monitor with Docker stats:
 docker stats
 
 # Specific containers
-docker stats nexus-frontend nexus-postgres
+docker stats verdyx-frontend verdyx-postgres
 ```
 
 ### Alerts
@@ -731,10 +731,10 @@ docker image prune -a
 
 ```bash
 # Vacuum database
-docker-compose exec postgres vacuumdb -U nexus_user -d nexus_security -v
+docker-compose exec postgres vacuumdb -U verdyx_user -d verdyx -v
 
 # Reindex
-docker-compose exec postgres reindexdb -U nexus_user -d nexus_security
+docker-compose exec postgres reindexdb -U verdyx_user -d verdyx
 ```
 
 ### Troubleshooting
@@ -755,8 +755,8 @@ docker-compose restart frontend
 
 ```bash
 # Enable query logging
-docker-compose exec postgres psql -U nexus_user -d nexus_security
-# ALTER DATABASE nexus_security SET log_min_duration_statement = 1000;
+docker-compose exec postgres psql -U verdyx_user -d verdyx
+# ALTER DATABASE verdyx SET log_min_duration_statement = 1000;
 
 # View slow queries
 docker-compose exec postgres tail -f /var/log/postgresql/postgresql.log
@@ -766,7 +766,7 @@ docker-compose exec postgres tail -f /var/log/postgresql/postgresql.log
 
 ```bash
 # Check network
-docker network inspect nexus-security_nexus-network
+docker network inspect verdyx_verdyx-network
 
 # Recreate network
 docker-compose down

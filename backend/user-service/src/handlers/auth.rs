@@ -108,11 +108,27 @@ pub async fn forgot_password(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ForgotPasswordRequest>,
 ) -> Result<Json<MessageResponse>, AppError> {
-    // Generate reset token
-    // TODO: Implement password reset email via notification service
+    // Generate reset token and store it. Use the user service to create
+    // a time-limited reset token. Always return success to prevent
+    // email enumeration attacks.
+    match state.user_service.create_password_reset_token(&req.email).await {
+        Ok(token) => {
+            // In production, send this token via email/notification service.
+            // For now, log it so developers can use it during testing.
+            tracing::info!(
+                email = %req.email,
+                "Password reset link: /reset-password?token={}",
+                token
+            );
+        }
+        Err(e) => {
+            // Don't leak whether the email exists — just log the error
+            tracing::debug!("Password reset request for {}: {}", req.email, e);
+        }
+    }
 
     Ok(Json(MessageResponse {
-        message: "Password reset email sent".to_string(),
+        message: "If an account with that email exists, a reset link has been sent.".to_string(),
     }))
 }
 
@@ -121,7 +137,15 @@ pub async fn reset_password(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ResetPasswordRequest>,
 ) -> Result<Json<MessageResponse>, AppError> {
-    // TODO: Implement password reset logic
+    // Validate the reset token and apply the new password
+    state
+        .user_service
+        .reset_password_with_token(&req.token, &req.new_password)
+        .await
+        .map_err(|e| {
+            tracing::warn!("Password reset failed: {}", e);
+            AppError::UserError(e)
+        })?;
 
     Ok(Json(MessageResponse {
         message: "Password reset successfully".to_string(),

@@ -118,7 +118,7 @@ describe('E2E: Complete User Workflows', () => {
 
     it('Step 8: User checks platform statistics', async () => {
       const response = await request(app)
-        .get('/api/stats')
+        .get('/api/analysis/stats')
         .expect(200);
 
       expect(response.body.totalSubmissions).toBeGreaterThan(0);
@@ -288,7 +288,7 @@ describe('E2E: Complete User Workflows', () => {
 
     it('Step 5: User checks stats', async () => {
       const response = await request(app)
-        .get('/api/stats')
+        .get('/api/analysis/stats')
         .expect(200);
 
       // We submitted at least 3 files and started analysis on them

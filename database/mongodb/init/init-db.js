@@ -1,9 +1,9 @@
-// MongoDB Initialization Script for Nexus-Security
+// MongoDB Initialization Script for Verdyx
 // This script creates collections and indexes for the threat intelligence platform
 
-db = db.getSiblingDB('nexus_security');
+db = db.getSiblingDB('verdyx');
 
-print('Creating Nexus-Security MongoDB collections...');
+print('Creating Verdyx MongoDB collections...');
 
 // ==================== ANALYSIS RESULTS ====================
 db.createCollection('analysis_results', {

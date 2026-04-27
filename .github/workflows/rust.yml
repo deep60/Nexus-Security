@@ -25,7 +25,7 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: nexus_security_test
+          POSTGRES_DB: verdyx_test
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
         ports:
@@ -60,7 +60,7 @@ jobs:
     - name: Run tests
       run: cargo test --workspace --verbose
       env:
-        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/nexus_security_test
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test
         REDIS_URL: redis://localhost:6379
 
     - name: Clippy

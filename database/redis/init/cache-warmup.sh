@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Redis Cache Warmup Script for Nexus-Security
+# Redis Cache Warmup Script for Verdyx
 # This script pre-populates Redis with commonly used data
 
 set -e
@@ -9,7 +9,7 @@ REDIS_HOST="${REDIS_HOST:-localhost}"
 REDIS_PORT="${REDIS_PORT:-6379}"
 REDIS_PASSWORD="${REDIS_PASSWORD:-}"
 
-echo "Warming up Redis cache for Nexus-Security..."
+echo "Warming up Redis cache for Verdyx..."
 
 # Function to execute Redis commands
 redis_cmd() {

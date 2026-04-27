@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title ThreatToken
- * @dev ERC20 token for Nexus-Security threat intelligence marketplace
+ * @dev ERC20 token for Verdyx threat intelligence marketplace
  * 
  * Features:
  * - Standard ERC20 functionality

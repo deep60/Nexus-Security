@@ -374,7 +374,7 @@ impl StaticAnalyzer {
 
         Ok(DetectionResult {
             detection_id: Uuid::new_v4(),
-            engine_name: "Nexus Static Analyzer".to_string(),
+            engine_name: "Verdyx Static Analyzer".to_string(),
             engine_version: "2.0.0".to_string(),
             engine_type: EngineType::Static,
             verdict,
@@ -626,8 +626,17 @@ impl StaticAnalyzer {
             .filter_map(|e| e.name.map(|n| n.to_string()))
             .collect();
 
-        // Extract resource names (simplified)
-        let resources: Vec<String> = Vec::new(); // TODO: Implement full resource parsing
+        // Extract resource section names from PE sections
+        let resources: Vec<String> = pe.sections.iter()
+            .filter(|s| {
+                let name = String::from_utf8_lossy(&s.name).trim_end_matches('\0').to_string();
+                name == ".rsrc" || name == ".rdata"
+            })
+            .map(|s| {
+                let name = String::from_utf8_lossy(&s.name).trim_end_matches('\0').to_string();
+                format!("{} (size: {} bytes)", name, s.size_of_raw_data)
+            })
+            .collect();
 
         Ok(PEAnalysis {
             machine_type: format!("{:?}", pe.header.coff_header.machine),
@@ -849,7 +858,7 @@ mod tests {
         
         let detection = result.unwrap();
         assert_eq!(detection.verdict, ThreatVerdict::Benign, "Should be classified as benign");
-        assert_eq!(detection.engine_name, "Nexus Static Analyzer");
+        assert_eq!(detection.engine_name, "Verdyx Static Analyzer");
     }
 
     #[tokio::test]

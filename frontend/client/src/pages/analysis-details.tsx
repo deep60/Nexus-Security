@@ -3,6 +3,7 @@ import { useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Navigation } from "@/components/navigation";
 import { ParticleBackground } from "@/components/particle-background";
+import { SEO } from "@/components/seo";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -76,6 +77,7 @@ export default function AnalysisDetails() {
   if (submissionError || analysesError) {
     return (
       <div className="min-h-screen bg-background text-foreground">
+        <SEO title="Error Loading Analysis" description="Failed to load analysis details." />
         <ParticleBackground />
         <Navigation />
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -95,6 +97,7 @@ export default function AnalysisDetails() {
   if (submissionLoading || !submission) {
     return (
       <div className="min-h-screen bg-background text-foreground">
+        <SEO title="Loading Analysis" description="Loading analysis details." />
         <ParticleBackground />
         <Navigation />
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -157,6 +160,7 @@ export default function AnalysisDetails() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SEO title={submission.filename ? `Analysis: ${submission.filename}` : "Analysis Details"} description={submission.description || "Detailed malware analysis results and consensus score."} />
       <ParticleBackground />
       <Navigation />
 

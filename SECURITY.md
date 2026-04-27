@@ -4,7 +4,7 @@
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please report them responsibly via email to: **security@nexus-security.com**
+Instead, please report them responsibly via email to: **security@verdyx.com**
 
 ### What to Include
 
@@ -35,7 +35,7 @@ When reporting a vulnerability, please include:
 
 ## Bug Bounty Program
 
-Nexus-Security operates a bug bounty program to reward security researchers who help us maintain the security of our platform.
+Verdyx operates a bug bounty program to reward security researchers who help us maintain the security of our platform.
 
 ### Scope
 
@@ -118,7 +118,7 @@ In case of a security incident:
 
 ## Compliance
 
-Nexus-Security is committed to:
+Verdyx is committed to:
 
 - GDPR compliance for user data
 - SOC 2 Type II certification (in progress)
@@ -129,8 +129,8 @@ Nexus-Security is committed to:
 
 For security-related questions or concerns:
 
-- **Email**: security@nexus-security.com
-- **PGP Key**: Available at https://nexus-security.com/.well-known/pgp-key.txt
+- **Email**: security@verdyx.com
+- **PGP Key**: Available at https://verdyx.com/.well-known/pgp-key.txt
 - **Discord**: #security channel (for general security discussions only)
 
 ## Acknowledgments

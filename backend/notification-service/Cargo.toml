@@ -2,10 +2,10 @@
 name = "notification-service"
 version = "0.1.0"
 edition = "2021"
-authors = ["Nexus-Security Team"]
-description = "Notification service for Nexus-Security platform - handles email, push, webhook, and WebSocket notifications"
+authors = ["Verdyx Team"]
+description = "Notification service for Verdyx platform - handles email, push, webhook, and WebSocket notifications"
 license = "MIT"
-repository = "https://github.com/nexus-security/deep60"
+repository = "https://github.com/verdyx/deep60"
 
 [dependencies]
 # Web framework

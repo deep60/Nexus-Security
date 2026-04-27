@@ -35,11 +35,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
-RUN groupadd -r nexus && useradd -r -g nexus -s /bin/bash nexus
+RUN groupadd -r verdyx && useradd -r -g verdyx -s /bin/bash verdyx
 
 # Create necessary directories
 RUN mkdir -p /app/logs /app/uploads && \
-    chown -R nexus:nexus /app
+    chown -R verdyx:verdyx /app
 
 # Copy binary from builder stage
 COPY --from=builder /app/target/release/api-gateway /app/api-gateway
@@ -52,7 +52,7 @@ WORKDIR /app
 RUN chmod +x /app/api-gateway
 
 # Switch to non-root user
-USER nexus
+USER verdyx
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

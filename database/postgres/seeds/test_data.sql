@@ -1,4 +1,4 @@
--- Test Data Seeds for Nexus-Security
+-- Test Data Seeds for Verdyx
 -- This file populates the database with test data for development and testing
 -- DO NOT USE IN PRODUCTION
 
@@ -12,11 +12,11 @@ TRUNCATE TABLE governance_votes, governance_proposals, user_stakes, wallet_conne
 
 -- Insert test users
 INSERT INTO users (id, username, email, password_hash, wallet_address, reputation_score, is_verified, is_active) VALUES
-('11111111-1111-1111-1111-111111111111', 'alice_hunter', 'alice@nexus-sec.dev', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5I', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1', 850, TRUE, TRUE),
-('22222222-2222-2222-2222-222222222222', 'bob_analyst', 'bob@nexus-sec.dev', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5I', '0x5A86858aA3b595FD6663c2296741eF4cd8BC4d01', 720, TRUE, TRUE),
-('33333333-3333-3333-3333-333333333333', 'charlie_expert', 'charlie@nexus-sec.dev', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5I', '0x1234567890123456789012345678901234567890', 950, TRUE, TRUE),
-('44444444-4444-4444-4444-444444444444', 'david_newbie', 'david@nexus-sec.dev', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5I', '0x9876543210987654321098765432109876543210', 350, TRUE, TRUE),
-('55555555-5555-5555-5555-555555555555', 'eve_admin', 'eve@nexus-sec.dev', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5I', '0xABCDEF0123456789ABCDEF0123456789ABCDEF01', 1200, TRUE, TRUE);
+('11111111-1111-1111-1111-111111111111', 'alice_hunter', 'alice@verdyx-sec.dev', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5I', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1', 850, TRUE, TRUE),
+('22222222-2222-2222-2222-222222222222', 'bob_analyst', 'bob@verdyx-sec.dev', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5I', '0x5A86858aA3b595FD6663c2296741eF4cd8BC4d01', 720, TRUE, TRUE),
+('33333333-3333-3333-3333-333333333333', 'charlie_expert', 'charlie@verdyx-sec.dev', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5I', '0x1234567890123456789012345678901234567890', 950, TRUE, TRUE),
+('44444444-4444-4444-4444-444444444444', 'david_newbie', 'david@verdyx-sec.dev', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5I', '0x9876543210987654321098765432109876543210', 350, TRUE, TRUE),
+('55555555-5555-5555-5555-555555555555', 'eve_admin', 'eve@verdyx-sec.dev', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5I', '0xABCDEF0123456789ABCDEF0123456789ABCDEF01', 1200, TRUE, TRUE);
 
 COMMENT ON COLUMN users.password_hash IS 'Hash of password "TestPassword123!" for all test users';
 
@@ -178,10 +178,10 @@ BEGIN
     RAISE NOTICE 'Bounties created: %', bounty_count;
     RAISE NOTICE '========================================';
     RAISE NOTICE 'Test Users (password: TestPassword123!):';
-    RAISE NOTICE '  - alice_hunter (alice@nexus-sec.dev)';
-    RAISE NOTICE '  - bob_analyst (bob@nexus-sec.dev)';
-    RAISE NOTICE '  - charlie_expert (charlie@nexus-sec.dev)';
-    RAISE NOTICE '  - david_newbie (david@nexus-sec.dev)';
-    RAISE NOTICE '  - eve_admin (eve@nexus-sec.dev)';
+    RAISE NOTICE '  - alice_hunter (alice@verdyx-sec.dev)';
+    RAISE NOTICE '  - bob_analyst (bob@verdyx-sec.dev)';
+    RAISE NOTICE '  - charlie_expert (charlie@verdyx-sec.dev)';
+    RAISE NOTICE '  - david_newbie (david@verdyx-sec.dev)';
+    RAISE NOTICE '  - eve_admin (eve@verdyx-sec.dev)';
     RAISE NOTICE '========================================';
 END $$;

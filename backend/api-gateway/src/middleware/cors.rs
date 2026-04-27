@@ -30,7 +30,7 @@ impl CorsConfig {
         match env.as_str() {
             "production" => {
                 let origins = std::env::var("ALLOWED_ORIGINS")
-                    .unwrap_or_else(|_| "https://nexus-security.com".to_string())
+                    .unwrap_or_else(|_| "https://verdyx.com".to_string())
                     .split(',')
                     .map(|s| s.trim().to_string())
                     .collect();
@@ -86,8 +86,8 @@ pub fn development_cors() -> CorsLayer {
 /// Staging CORS - Allow specific staging domains
 pub fn staging_cors() -> CorsLayer {
     let allowed_origins = vec![
-        "https://staging.nexus-security.com",
-        "https://preview.nexus-security.com",
+        "https://staging.verdyx.com",
+        "https://preview.verdyx.com",
         "http://localhost:3000",
         "http://localhost:5173", // Vite default
     ];

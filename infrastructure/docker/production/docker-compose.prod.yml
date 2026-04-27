@@ -6,10 +6,10 @@ services:
     build:
       context: ../../..
       dockerfile: infrastructure/docker/postgress.Dockerfile
-    container_name: nexus-postgres-prod
+    container_name: verdyx-postgres-prod
     environment:
-      POSTGRES_DB: nexus_security
-      POSTGRES_USER: nexus
+      POSTGRES_DB: verdyx
+      POSTGRES_USER: verdyx
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     volumes:
@@ -17,9 +17,9 @@ services:
       - ../../../database/migrations:/docker-entrypoint-initdb.d/migrations
       - ../../../database/seeds:/docker-entrypoint-initdb.d/seeds
     networks:
-      - nexus-network
+      - verdyx-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus_security"]
+      test: ["CMD-SHELL", "pg_isready -U verdyx -d verdyx"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,11 +36,11 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: nexus-redis-prod
+    container_name: verdyx-redis-prod
     volumes:
       - redis_data:/data
     networks:
-      - nexus-network
+      - verdyx-network
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
@@ -62,9 +62,9 @@ services:
     build:
       context: ../../..
       dockerfile: infrastructure/docker/production/api-gateway/api-gateway.Dockerfile
-    container_name: nexus-api-gateway-prod
+    container_name: verdyx-api-gateway-prod
     environment:
-      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus_security
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD}@postgres:5432/verdyx
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       JWT_SECRET: ${JWT_SECRET}
       BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL}
@@ -84,7 +84,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
     deploy:
       replicas: 3
@@ -101,9 +101,9 @@ services:
     build:
       context: ../../..
       dockerfile: infrastructure/docker/production/analysis-engine/analysis-engine.Dockerfile
-    container_name: nexus-analysis-engine-prod
+    container_name: verdyx-analysis-engine-prod
     environment:
-      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus_security
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD}@postgres:5432/verdyx
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       RUST_LOG: info
       SERVER_PORT: 8082
@@ -122,7 +122,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
     deploy:
       resources:
@@ -138,9 +138,9 @@ services:
     build:
       context: ../../..
       dockerfile: infrastructure/docker/production/bounty-manager/bounty-manager.Dockerfile
-    container_name: nexus-bounty-manager-prod
+    container_name: verdyx-bounty-manager-prod
     environment:
-      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus_security
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD}@postgres:5432/verdyx
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL}
       RUST_LOG: info
@@ -156,7 +156,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
     deploy:
       resources:
@@ -172,17 +172,17 @@ services:
     build:
       context: ../../..
       dockerfile: infrastructure/docker/production/frontend/frontend.Dockerfile
-    container_name: nexus-frontend-prod
+    container_name: verdyx-frontend-prod
     environment:
-      REACT_APP_API_URL: ${API_URL:-https://api.nexus-security.com}
-      REACT_APP_WS_URL: ${WS_URL:-wss://api.nexus-security.com}
+      REACT_APP_API_URL: ${API_URL:-https://api.verdyx.com}
+      REACT_APP_WS_URL: ${WS_URL:-wss://api.verdyx.com}
       REACT_APP_BLOCKCHAIN_NETWORK: ${BLOCKCHAIN_NETWORK:-mainnet}
     ports:
       - "3000:3000"
     depends_on:
       - api-gateway
     networks:
-      - nexus-network
+      - verdyx-network
     restart: unless-stopped
     deploy:
       resources:
@@ -196,7 +196,7 @@ services:
   # IPFS Node (for storing analysis reports)
   ipfs:
     image: ipfs/kubo:latest
-    container_name: nexus-ipfs-prod
+    container_name: verdyx-ipfs-prod
     ports:
       - "4001:4001"
       - "5001:5001"
@@ -204,7 +204,7 @@ services:
     volumes:
       - ipfs_data:/data/ipfs
     networks:
-      - nexus-network
+      - verdyx-network
     environment:
       IPFS_PROFILE: server
     restart: unless-stopped
@@ -220,14 +220,14 @@ services:
   # Monitoring
   prometheus:
     image: prom/prometheus:latest
-    container_name: nexus-prometheus-prod
+    container_name: verdyx-prometheus-prod
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     networks:
-      - nexus-network
+      - verdyx-network
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -245,7 +245,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: nexus-grafana-prod
+    container_name: verdyx-grafana-prod
     ports:
       - "3001:3000"
     volumes:
@@ -253,10 +253,10 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
-      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://monitoring.nexus-security.com}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://monitoring.verdyx.com}
       GF_INSTALL_PLUGINS: grafana-piechart-panel
     networks:
-      - nexus-network
+      - verdyx-network
     depends_on:
       - prometheus
     restart: unless-stopped
@@ -282,7 +282,7 @@ volumes:
     driver: local
 
 networks:
-  nexus-network:
+  verdyx-network:
     driver: bridge
     ipam:
       config:

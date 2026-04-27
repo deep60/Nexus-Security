@@ -1,8 +1,10 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
+use sqlx::PgPool;
 use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
+use tracing::{info, warn};
+
+use crate::models::ReputationModel;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EngineReputation {
@@ -11,20 +13,11 @@ pub struct EngineReputation {
     pub accuracy_rate: f64,
     pub total_submissions: u64,
     pub correct_predictions: u64,
-    pub stake_history: Vec<StakeEvent>,
-    pub expertise_areas: HashMap<String, f64>, // threat_type -> expertise_score
+    pub total_stake: i64,
+    pub rewards_earned: i64,
+    pub penalties_incurred: i64,
     pub last_updated: DateTime<Utc>,
     pub tier: ReputationTier,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StakeEvent {
-    pub submission_id: Uuid,
-    pub stake_amount: u64,
-    pub prediction: ThreatVerdict,
-    pub actual_result: Option<ThreatVerdict>,
-    pub reward_earned: Option<i64>, // Can be negative for losses
-    pub timestamp: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -55,185 +48,165 @@ pub struct ReputationUpdate {
     pub consensus_confidence: f64,
 }
 
+/// Database-backed reputation service.
+///
+/// All state is persisted in the `reputations` table via `ReputationModel`.
+/// Pure scoring helpers remain stateless.
 pub struct ReputationService {
-    reputations: RwLock<HashMap<String, EngineReputation>>,
+    db: PgPool,
 }
 
 impl ReputationService {
-    pub fn new() -> Self {
-        Self {
-            reputations: RwLock::new(HashMap::new()),
-        }
+    pub fn new(db: PgPool) -> Self {
+        Self { db }
     }
 
-    /// Register a new engine in the reputation system
+    /// Register a new engine in the reputation system (persists to DB).
     pub async fn register_engine(&self, engine_id: String) -> Result<(), ReputationError> {
-        let mut reputations = self.reputations.write().await;
-        
-        if reputations.contains_key(&engine_id) {
+        // Check if already registered
+        if let Some(_) = ReputationModel::find_by_id(&self.db, &engine_id).await
+            .map_err(|e| ReputationError::DatabaseError(e.to_string()))?
+        {
             return Err(ReputationError::EngineAlreadyExists);
         }
 
-        let reputation = EngineReputation {
-            engine_id: engine_id.clone(),
-            total_score: 0.0,
-            accuracy_rate: 0.0,
+        let now = Utc::now();
+        let model = ReputationModel {
+            engine_id,
+            reputation_score: 0.0,
             total_submissions: 0,
-            correct_predictions: 0,
-            stake_history: Vec::new(),
-            expertise_areas: HashMap::new(),
-            last_updated: Utc::now(),
-            tier: ReputationTier::Novice,
+            correct_submissions: 0,
+            accuracy_rate: 0.0,
+            average_confidence: 0.0,
+            total_stake: 0,
+            rewards_earned: 0,
+            penalties_incurred: 0,
+            created_at: now,
+            updated_at: now,
         };
 
-        reputations.insert(engine_id, reputation);
+        ReputationModel::create(&self.db, &model)
+            .await
+            .map_err(|e| ReputationError::DatabaseError(e.to_string()))?;
+
+        info!(engine_id = %model.engine_id, "Registered new engine in reputation system");
         Ok(())
     }
 
-    /// Record a stake submission before analysis results are known
+    /// Record a stake submission — increments total_submissions and adds to total_stake in DB.
     pub async fn record_stake(
         &self,
         engine_id: &str,
-        submission_id: Uuid,
+        _submission_id: Uuid,
         stake_amount: u64,
-        prediction: ThreatVerdict,
+        _prediction: ThreatVerdict,
     ) -> Result<(), ReputationError> {
-        let mut reputations = self.reputations.write().await;
-        
-        let reputation = reputations
-            .get_mut(engine_id)
+        let mut rep = ReputationModel::find_by_id(&self.db, engine_id)
+            .await
+            .map_err(|e| ReputationError::DatabaseError(e.to_string()))?
             .ok_or(ReputationError::EngineNotFound)?;
 
-        let stake_event = StakeEvent {
-            submission_id,
-            stake_amount,
-            prediction,
-            actual_result: None,
-            reward_earned: None,
-            timestamp: Utc::now(),
-        };
+        rep.total_submissions += 1;
+        rep.total_stake += stake_amount as i64;
+        rep.updated_at = Utc::now();
 
-        reputation.stake_history.push(stake_event);
-        reputation.total_submissions += 1;
-        reputation.last_updated = Utc::now();
+        ReputationModel::update(&self.db, &rep)
+            .await
+            .map_err(|e| ReputationError::DatabaseError(e.to_string()))?;
 
         Ok(())
     }
 
-    /// Update reputation based on analysis results
+    /// Update reputation based on analysis results — reads from DB, computes, writes back.
     pub async fn update_reputation(
         &self,
         update: ReputationUpdate,
     ) -> Result<ReputationStats, ReputationError> {
-        let mut reputations = self.reputations.write().await;
-        
-        let reputation = reputations
-            .get_mut(&update.engine_id)
+        let mut rep = ReputationModel::find_by_id(&self.db, &update.engine_id)
+            .await
+            .map_err(|e| ReputationError::DatabaseError(e.to_string()))?
             .ok_or(ReputationError::EngineNotFound)?;
 
-        // Find the corresponding stake event
-        let stake_event = reputation
-            .stake_history
-            .iter_mut()
-            .find(|event| event.submission_id == update.submission_id)
-            .ok_or(ReputationError::StakeEventNotFound)?;
+        let is_correct = update.prediction == update.actual_result;
+        let base_reward = update.stake_amount as f64;
 
-        // Update the stake event with results
-        stake_event.actual_result = Some(update.actual_result.clone());
-        
-        let is_correct = stake_event.prediction == update.actual_result;
-        let base_reward = stake_event.stake_amount as f64;
-        
-        // Calculate reward/penalty based on accuracy and confidence
+        // Calculate reward/penalty
+        let tier = Self::calculate_tier(rep.reputation_score as f64);
         let reward = if is_correct {
-            self.calculate_reward(base_reward, update.consensus_confidence, reputation.tier.clone())
+            Self::calculate_reward(base_reward, update.consensus_confidence, &tier)
         } else {
-            -self.calculate_penalty(base_reward, update.consensus_confidence)
+            -Self::calculate_penalty(base_reward, update.consensus_confidence)
         };
 
-        stake_event.reward_earned = Some(reward as i64);
-
-        // Update overall reputation metrics
+        // Update DB model
         if is_correct {
-            reputation.correct_predictions += 1;
+            rep.correct_submissions += 1;
         }
+        rep.accuracy_rate = if rep.total_submissions > 0 {
+            rep.correct_submissions as f32 / rep.total_submissions as f32
+        } else {
+            0.0
+        };
+        rep.reputation_score += reward as f32;
+        if reward > 0.0 {
+            rep.rewards_earned += reward as i64;
+        } else {
+            rep.penalties_incurred += (-reward) as i64;
+        }
+        rep.average_confidence = (rep.average_confidence * (rep.total_submissions - 1) as f32
+            + update.consensus_confidence as f32)
+            / rep.total_submissions as f32;
+        rep.updated_at = Utc::now();
 
-        reputation.accuracy_rate = reputation.correct_predictions as f64 / reputation.total_submissions as f64;
-        reputation.total_score += reward;
+        ReputationModel::update(&self.db, &rep)
+            .await
+            .map_err(|e| ReputationError::DatabaseError(e.to_string()))?;
 
-        // Update expertise in specific threat type
-        let expertise_score = reputation.expertise_areas
-            .entry(update.threat_type)
-            .or_insert(0.0);
-        
-        *expertise_score += if is_correct { 1.0 } else { -0.5 };
-        *expertise_score = expertise_score.max(0.0); // Don't go below 0
-
-        // Update tier based on total score
-        reputation.tier = self.calculate_tier(reputation.total_score);
-        reputation.last_updated = Utc::now();
+        let new_tier = Self::calculate_tier(rep.reputation_score as f64);
 
         Ok(ReputationStats {
             engine_id: update.engine_id,
-            total_score: reputation.total_score,
-            accuracy_rate: reputation.accuracy_rate,
-            tier: reputation.tier.clone(),
+            total_score: rep.reputation_score as f64,
+            accuracy_rate: rep.accuracy_rate as f64,
+            tier: new_tier,
             reward_earned: reward,
         })
     }
 
-    /// Get reputation for a specific engine
+    /// Get reputation for a specific engine from DB.
     pub async fn get_reputation(&self, engine_id: &str) -> Option<EngineReputation> {
-        let reputations = self.reputations.read().await;
-        reputations.get(engine_id).cloned()
+        match ReputationModel::find_by_id(&self.db, engine_id).await {
+            Ok(Some(rep)) => Some(Self::model_to_engine_rep(rep)),
+            Ok(None) => None,
+            Err(e) => {
+                warn!("Failed to fetch reputation for {}: {}", engine_id, e);
+                None
+            }
+        }
     }
 
-    /// Get top engines by reputation score
+    /// Get top engines by reputation score from DB.
     pub async fn get_top_engines(&self, limit: usize) -> Vec<EngineReputation> {
-        let reputations = self.reputations.read().await;
-        let mut engines: Vec<_> = reputations.values().cloned().collect();
-        
-        engines.sort_by(|a, b| b.total_score.partial_cmp(&a.total_score).unwrap());
-        engines.truncate(limit);
-        engines
+        match ReputationModel::get_leaderboard(&self.db, limit as i64).await {
+            Ok(records) => records.into_iter().map(Self::model_to_engine_rep).collect(),
+            Err(e) => {
+                warn!("Failed to fetch leaderboard: {}", e);
+                Vec::new()
+            }
+        }
     }
 
-    /// Get engines by expertise in a specific threat type
-    pub async fn get_experts_for_threat_type(
-        &self,
-        threat_type: &str,
-        min_expertise: f64,
-    ) -> Vec<EngineReputation> {
-        let reputations = self.reputations.read().await;
-        let mut experts: Vec<_> = reputations
-            .values()
-            .filter(|rep| {
-                rep.expertise_areas
-                    .get(threat_type)
-                    .map(|&score| score >= min_expertise)
-                    .unwrap_or(false)
-            })
-            .cloned()
-            .collect();
-
-        experts.sort_by(|a, b| {
-            let a_score = a.expertise_areas.get(threat_type).unwrap_or(&0.0);
-            let b_score = b.expertise_areas.get(threat_type).unwrap_or(&0.0);
-            b_score.partial_cmp(a_score).unwrap()
-        });
-
-        experts
-    }
-
-    /// Calculate minimum stake required for an engine based on reputation
+    /// Calculate minimum stake required for an engine based on DB reputation.
     pub async fn calculate_minimum_stake(&self, engine_id: &str) -> Result<u64, ReputationError> {
-        let reputations = self.reputations.read().await;
-        let reputation = reputations
-            .get(engine_id)
+        let rep = ReputationModel::find_by_id(&self.db, engine_id)
+            .await
+            .map_err(|e| ReputationError::DatabaseError(e.to_string()))?
             .ok_or(ReputationError::EngineNotFound)?;
 
+        let tier = Self::calculate_tier(rep.reputation_score as f64);
+
         // Base stake requirements by tier
-        let base_stake = match reputation.tier {
+        let base_stake: u64 = match tier {
             ReputationTier::Novice => 100,
             ReputationTier::Skilled => 50,
             ReputationTier::Expert => 25,
@@ -241,12 +214,11 @@ impl ReputationService {
             ReputationTier::Legendary => 5,
         };
 
-        // Adjust based on recent accuracy
-        let recent_accuracy = self.calculate_recent_accuracy(reputation);
-        let multiplier = if recent_accuracy < 0.5 {
-            2.0 // Double the stake for poor recent performance
-        } else if recent_accuracy > 0.8 {
-            0.5 // Halve the stake for excellent recent performance
+        // Adjust based on accuracy
+        let multiplier = if rep.accuracy_rate < 0.5 {
+            2.0 // Double the stake for poor performance
+        } else if rep.accuracy_rate > 0.8 {
+            0.5 // Halve the stake for excellent performance
         } else {
             1.0
         };
@@ -254,28 +226,37 @@ impl ReputationService {
         Ok((base_stake as f64 * multiplier) as u64)
     }
 
-    /// Decay reputation scores over time for inactive engines
+    /// Decay reputation scores for all engines inactive for >30 days — bulk SQL update.
     pub async fn apply_reputation_decay(&self) {
-        let mut reputations = self.reputations.write().await;
-        let cutoff_date = Utc::now() - Duration::days(30);
+        let cutoff = Utc::now() - Duration::days(30);
 
-        for reputation in reputations.values_mut() {
-            if reputation.last_updated < cutoff_date {
-                let decay_factor = 0.95; // 5% decay per month of inactivity
-                reputation.total_score *= decay_factor;
-                reputation.tier = self.calculate_tier(reputation.total_score);
-                
-                // Decay expertise scores as well
-                for expertise_score in reputation.expertise_areas.values_mut() {
-                    *expertise_score *= decay_factor;
-                }
+        match sqlx::query(
+            r#"
+            UPDATE reputations
+            SET reputation_score = reputation_score * 0.95,
+                updated_at = NOW()
+            WHERE updated_at < $1
+            "#,
+        )
+        .bind(cutoff)
+        .execute(&self.db)
+        .await
+        {
+            Ok(result) => {
+                info!(
+                    rows_affected = result.rows_affected(),
+                    "Applied reputation decay for inactive engines"
+                );
+            }
+            Err(e) => {
+                warn!("Failed to apply reputation decay: {}", e);
             }
         }
     }
 
-    // Private helper methods
+    // ── Pure helpers (no DB) ──────────────────────────────────
 
-    fn calculate_reward(&self, base_reward: f64, consensus_confidence: f64, tier: ReputationTier) -> f64 {
+    fn calculate_reward(base_reward: f64, consensus_confidence: f64, tier: &ReputationTier) -> f64 {
         let tier_multiplier = match tier {
             ReputationTier::Novice => 1.0,
             ReputationTier::Skilled => 1.1,
@@ -284,19 +265,16 @@ impl ReputationService {
             ReputationTier::Legendary => 1.5,
         };
 
-        // Higher rewards for high-confidence correct predictions
         let confidence_multiplier = 0.5 + (consensus_confidence * 1.5);
-        
         base_reward * tier_multiplier * confidence_multiplier
     }
 
-    fn calculate_penalty(&self, base_penalty: f64, consensus_confidence: f64) -> f64 {
-        // Higher penalties for high-confidence incorrect predictions
+    fn calculate_penalty(base_penalty: f64, consensus_confidence: f64) -> f64 {
         let confidence_multiplier = 0.5 + (consensus_confidence * 1.5);
         base_penalty * confidence_multiplier
     }
 
-    fn calculate_tier(&self, total_score: f64) -> ReputationTier {
+    pub fn calculate_tier(total_score: f64) -> ReputationTier {
         match total_score as i32 {
             0..=100 => ReputationTier::Novice,
             101..=500 => ReputationTier::Skilled,
@@ -306,27 +284,20 @@ impl ReputationService {
         }
     }
 
-    fn calculate_recent_accuracy(&self, reputation: &EngineReputation) -> f64 {
-        let recent_cutoff = Utc::now() - Duration::days(30);
-        let recent_events: Vec<_> = reputation
-            .stake_history
-            .iter()
-            .filter(|event| event.timestamp > recent_cutoff)
-            .filter(|event| event.actual_result.is_some())
-            .collect();
-
-        if recent_events.is_empty() {
-            return reputation.accuracy_rate;
+    fn model_to_engine_rep(rep: ReputationModel) -> EngineReputation {
+        let tier = Self::calculate_tier(rep.reputation_score as f64);
+        EngineReputation {
+            engine_id: rep.engine_id,
+            total_score: rep.reputation_score as f64,
+            accuracy_rate: rep.accuracy_rate as f64,
+            total_submissions: rep.total_submissions as u64,
+            correct_predictions: rep.correct_submissions as u64,
+            total_stake: rep.total_stake,
+            rewards_earned: rep.rewards_earned,
+            penalties_incurred: rep.penalties_incurred,
+            last_updated: rep.updated_at,
+            tier,
         }
-
-        let correct_recent = recent_events
-            .iter()
-            .filter(|event| {
-                event.actual_result.as_ref().unwrap() == &event.prediction
-            })
-            .count();
-
-        correct_recent as f64 / recent_events.len() as f64
     }
 }
 
@@ -351,57 +322,32 @@ pub enum ReputationError {
     DatabaseError(String),
 }
 
-impl Default for ReputationService {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_register_engine() {
-        let service = ReputationService::new();
-        let engine_id = "test_engine".to_string();
-        
-        assert!(service.register_engine(engine_id.clone()).await.is_ok());
-        assert!(service.register_engine(engine_id).await.is_err());
+    #[test]
+    fn test_tier_calculation() {
+        assert_eq!(ReputationService::calculate_tier(50.0), ReputationTier::Novice);
+        assert_eq!(ReputationService::calculate_tier(200.0), ReputationTier::Skilled);
+        assert_eq!(ReputationService::calculate_tier(750.0), ReputationTier::Expert);
+        assert_eq!(ReputationService::calculate_tier(2000.0), ReputationTier::Master);
+        assert_eq!(ReputationService::calculate_tier(3000.0), ReputationTier::Legendary);
     }
 
-    #[tokio::test]
-    async fn test_reputation_update() {
-        let service = ReputationService::new();
-        let engine_id = "test_engine".to_string();
-        let submission_id = Uuid::new_v4();
-        
-        service.register_engine(engine_id.clone()).await.unwrap();
-        service.record_stake(&engine_id, submission_id, 100, ThreatVerdict::Malicious).await.unwrap();
-        
-        let update = ReputationUpdate {
-            engine_id: engine_id.clone(),
-            submission_id,
-            stake_amount: 100,
-            prediction: ThreatVerdict::Malicious,
-            actual_result: ThreatVerdict::Malicious,
-            threat_type: "trojan".to_string(),
-            consensus_confidence: 0.9,
-        };
-        
-        let stats = service.update_reputation(update).await.unwrap();
-        assert!(stats.reward_earned > 0.0);
-        assert_eq!(stats.accuracy_rate, 1.0);
+    #[test]
+    fn test_reward_calculation() {
+        let reward = ReputationService::calculate_reward(100.0, 0.9, &ReputationTier::Expert);
+        assert!(reward > 0.0);
+        // Expert multiplier 1.2 * (0.5 + 0.9*1.5) = 1.2 * 1.85 = 222.0
+        assert!((reward - 222.0).abs() < 0.01);
     }
 
-    #[tokio::test]
-    async fn test_minimum_stake_calculation() {
-        let service = ReputationService::new();
-        let engine_id = "test_engine".to_string();
-        
-        service.register_engine(engine_id.clone()).await.unwrap();
-        let min_stake = service.calculate_minimum_stake(&engine_id).await.unwrap();
-        
-        assert_eq!(min_stake, 100); // Novice tier base stake
+    #[test]
+    fn test_penalty_calculation() {
+        let penalty = ReputationService::calculate_penalty(100.0, 0.9);
+        assert!(penalty > 0.0);
+        // (0.5 + 0.9*1.5) = 1.85 => 185.0
+        assert!((penalty - 185.0).abs() < 0.01);
     }
 }

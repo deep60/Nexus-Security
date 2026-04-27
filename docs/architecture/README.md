@@ -1,6 +1,6 @@
 # Architecture Docs
 
-Nexus Security uses a service-oriented backend with a Rust API gateway, Rust domain services, PostgreSQL, Redis, optional MinIO/ClamAV, and blockchain integration.
+Verdyx uses a service-oriented backend with a Rust API gateway, Rust domain services, PostgreSQL, Redis, optional MinIO/ClamAV, and blockchain integration.
 
 ## Files
 

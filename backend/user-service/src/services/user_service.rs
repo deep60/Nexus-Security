@@ -121,7 +121,7 @@ impl UserService {
         if let Err(e) = shared::messaging::publish_event(
             &redis::Client::open(self.config.redis.url.clone())
                 .map_err(|e| UserError::DatabaseError(e.to_string()))?,
-            &shared::messaging::event_types::NexusEvent::UserRegistered(user_registered_event),
+            &shared::messaging::event_types::VerdyxEvent::UserRegistered(user_registered_event),
         )
         .await
         {

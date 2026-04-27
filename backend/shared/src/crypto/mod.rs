@@ -1,4 +1,4 @@
-//! Cryptographic utilities for Nexus Security
+//! Cryptographic utilities for Verdyx
 //! 
 //! Provides secure hashing, signing, and encryption functions
 

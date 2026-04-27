@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 /**
  * @title IReputationSystem
- * @dev Interface for the Nexus-Security reputation system
+ * @dev Interface for the Verdyx reputation system
  * @notice Manages reputation scores for security analysts and automated engines
  */
 

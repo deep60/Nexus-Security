@@ -323,65 +323,49 @@ pub async fn update_bounty(
         return Err(StatusCode::CONFLICT);
     }
 
-    // Apply updates via direct SQL for flexibility
-    if let Some(ref title) = req.title {
-        sqlx::query("UPDATE bounties SET title = $1, updated_at = $2 WHERE id = $3")
-            .bind(title)
-            .bind(Utc::now())
-            .bind(bounty_id)
-            .execute(&state.db)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to update bounty title: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-    }
-    if let Some(ref description) = req.description {
-        sqlx::query("UPDATE bounties SET description = $1, updated_at = $2 WHERE id = $3")
-            .bind(description)
-            .bind(Utc::now())
-            .bind(bounty_id)
-            .execute(&state.db)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to update bounty description: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-    }
-    if let Some(ref deadline) = req.deadline {
-        sqlx::query("UPDATE bounties SET deadline = $1, updated_at = $2 WHERE id = $3")
-            .bind(deadline)
-            .bind(Utc::now())
-            .bind(bounty_id)
-            .execute(&state.db)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to update bounty deadline: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-    }
-    if let Some(ref status) = req.status {
-        let status_str = format!("{:?}", status);
-        BountyModel::update_status(&state.db, bounty_id, &status_str)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to update bounty status: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-    }
-    if let Some(ref metadata) = req.metadata {
-        let json_val = serde_json::to_value(metadata).unwrap_or_default();
-        sqlx::query("UPDATE bounties SET metadata = $1, updated_at = $2 WHERE id = $3")
-            .bind(json_val)
-            .bind(Utc::now())
-            .bind(bounty_id)
-            .execute(&state.db)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to update bounty metadata: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-    }
+    // Build a single transactional UPDATE with only the provided fields
+    let mut tx = state.db.begin().await.map_err(|e| {
+        tracing::error!("Failed to begin transaction: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let now = Utc::now();
+    let title = req.title.as_deref().unwrap_or(&db_bounty.title);
+    let description = req.description.as_deref().unwrap_or(&db_bounty.description);
+    let deadline = req.deadline.unwrap_or(db_bounty.deadline);
+    let status = req.status.as_ref()
+        .map(|s| format!("{:?}", s))
+        .unwrap_or(db_bounty.status.clone());
+    let metadata = req.metadata.as_ref()
+        .map(|m| serde_json::to_value(m).unwrap_or_default())
+        .or(db_bounty.metadata.clone());
+
+    sqlx::query(
+        r#"
+        UPDATE bounties
+        SET title = $1, description = $2, deadline = $3,
+            status = $4, metadata = $5, updated_at = $6
+        WHERE id = $7
+        "#,
+    )
+    .bind(title)
+    .bind(description)
+    .bind(deadline)
+    .bind(&status)
+    .bind(&metadata)
+    .bind(now)
+    .bind(bounty_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to update bounty: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    tx.commit().await.map_err(|e| {
+        tracing::error!("Failed to commit transaction: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Re-fetch to return updated state
     let updated = BountyModel::find_by_id(&state.db, bounty_id)

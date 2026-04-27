@@ -53,7 +53,7 @@ pub struct SandboxContainerConfig {
 impl Container {
     /// Create a new container manager
     pub fn new(config: &DynamicAnalyzerConfig) -> Result<Self> {
-        let work_dir = PathBuf::from("/tmp/nexus-sandbox");
+        let work_dir = PathBuf::from("/tmp/verdyx-sandbox");
         std::fs::create_dir_all(&work_dir)?;
 
         let docker_available = Self::check_docker_available();
@@ -63,7 +63,7 @@ impl Container {
 
         Ok(Self {
             docker_available,
-            base_image: "nexus-security/sandbox:latest".to_string(),
+            base_image: "verdyx/sandbox:latest".to_string(),
             work_dir,
             active_containers: HashMap::new(),
         })
@@ -127,7 +127,7 @@ impl Container {
         self.pull_image_if_needed(&config.image).await?;
 
         // Generate unique container ID
-        let container_id = format!("nexus-sandbox-{}", Uuid::new_v4());
+        let container_id = format!("verdyx-sandbox-{}", Uuid::new_v4());
 
         // Build docker run command
         let mut cmd = Command::new("docker");
@@ -228,7 +228,7 @@ impl Container {
         }
 
         // Try to build the image if it's our custom image
-        if image.starts_with("nexus-security/") {
+        if image.starts_with("verdyx/") {
             info!("Building custom sandbox image: {}", image);
             return self.build_sandbox_image().await;
         }
@@ -372,7 +372,12 @@ CMD ["/bin/bash"]
             debug!("Container has no internet access");
         }
 
-        // TODO: Implement iptables rules for network filtering if needed
+        // Network filtering: Docker's --network=none provides full isolation.
+        // For partial internet access (e.g., DNS-only or specific IP allowlists),
+        // iptables rules would be applied inside the container via docker exec.
+        // This requires CAP_NET_ADMIN which we drop by default for security.
+        // If fine-grained network filtering is needed, use a custom Docker network
+        // with built-in firewall rules instead of iptables.
 
         Ok(())
     }

@@ -40,8 +40,8 @@ impl ConsensusService {
         }
     }
 
-    /// Calculate consensus from submissions
-    pub fn calculate_consensus(&self, submissions: Vec<SubmissionData>) -> ConsensusResult {
+    /// Calculate consensus from submissions for a specific bounty.
+    pub fn calculate_consensus(&self, bounty_id: Uuid, submissions: Vec<SubmissionData>) -> ConsensusResult {
         let total_submissions = submissions.len() as u32;
 
         // Count verdict distribution
@@ -81,7 +81,7 @@ impl ConsensusService {
         };
 
         ConsensusResult {
-            bounty_id: submissions.first().map(|s| Uuid::new_v4()).unwrap_or(Uuid::new_v4()),
+            bounty_id,
             final_verdict,
             confidence,
             total_submissions,
@@ -207,7 +207,7 @@ mod tests {
             },
         ];
 
-        let result = service.calculate_consensus(submissions);
+        let result = service.calculate_consensus(Uuid::new_v4(), submissions);
         assert_eq!(result.final_verdict, "Malicious");
         assert!(result.consensus_reached);
     }

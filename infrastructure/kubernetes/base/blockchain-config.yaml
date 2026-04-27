@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nexus-blockchain-config
-  namespace: nexus-security
+  name: verdyx-blockchain-config
+  namespace: verdyx
   labels:
-    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/name: verdyx
     app.kubernetes.io/component: blockchain
 data:
   # Contract addresses — update after deploying to your target chain.

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Nexus Security - Docker Push Script
+# Verdyx - Docker Push Script
 # This script pushes all Docker images to the container registry
 
 set -e  # Exit on error
@@ -12,11 +12,11 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_REGISTRY="${DOCKER_REGISTRY:-nexus-security}"
+DOCKER_REGISTRY="${DOCKER_REGISTRY:-verdyx}"
 VERSION="${VERSION:-latest}"
 
 echo -e "${GREEN}================================================${NC}"
-echo -e "${GREEN}   Nexus Security - Docker Push Script${NC}"
+echo -e "${GREEN}   Verdyx - Docker Push Script${NC}"
 echo -e "${GREEN}================================================${NC}"
 echo ""
 echo -e "Registry: ${YELLOW}${DOCKER_REGISTRY}${NC}"
@@ -24,7 +24,7 @@ echo -e "Version:  ${YELLOW}${VERSION}${NC}"
 echo ""
 
 # Check if logged in to registry
-if [ "${DOCKER_REGISTRY}" != "nexus-security" ]; then
+if [ "${DOCKER_REGISTRY}" != "verdyx" ]; then
     echo -e "${YELLOW}Checking Docker registry login...${NC}"
     if ! docker info | grep -q "Username"; then
         echo -e "${RED}Not logged in to Docker registry${NC}"

@@ -3,7 +3,7 @@ environment: production
 server:
   host: 0.0.0.0
   port: 8080
-  frontend_url: https://app.nexus-security.com
+  frontend_url: https://app.verdyx.com
 
 database:
   url: ${DATABASE_URL}
@@ -12,7 +12,7 @@ database:
 
 redis:
   url: ${REDIS_URL}
-  key_prefix: "nexus:prod:"
+  key_prefix: "verdyx:prod:"
 
 blockchain:
   rpc_url: ${BLOCKCHAIN_RPC_URL}
@@ -23,7 +23,7 @@ blockchain:
     reputation_system: "${REPUTATION_SYSTEM_ADDRESS}"
 
 services:
-  api_gateway: https://api.nexus-security.com
+  api_gateway: https://api.verdyx.com
   analysis_engine: ${ANALYSIS_ENGINE_URL}
   bounty_manager: ${BOUNTY_MANAGER_URL}
   notification_service: ${NOTIFICATION_SERVICE_URL}
@@ -32,7 +32,7 @@ services:
 security:
   jwt_secret: ${JWT_SECRET}
   cors_allowed_origins:
-    - https://app.nexus-security.com
+    - https://app.verdyx.com
 
 features:
   enable_blockchain: true

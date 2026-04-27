@@ -1,15 +1,15 @@
 openapi: 3.0.3
 info:
-  title: Nexus Security API
+  title: Verdyx API
   version: 1.0.0
   description: |
-    Core API gateway routes for Nexus Security.
+    Core API gateway routes for Verdyx.
 servers:
   - url: http://localhost:8080/api/v1
     description: Local
-  - url: https://api-staging.nexus-security.com/api/v1
+  - url: https://api-staging.verdyx.com/api/v1
     description: Staging
-  - url: https://api.nexus-security.com/api/v1
+  - url: https://api.verdyx.com/api/v1
     description: Production
 
 components:

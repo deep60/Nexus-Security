@@ -33,7 +33,7 @@ export default defineConfig({
       '/api': {
         target: process.env.API_GATEWAY_URL || 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (path: string) => path.replace(/^\/api/, '/api/v1'),
+        rewrite: (path: string) => path.startsWith('/api/v1') ? path : path.replace(/^\/api/, '/api/v1'),
       },
       '/ws': {
         target: process.env.WS_GATEWAY_URL || 'ws://localhost:8080',

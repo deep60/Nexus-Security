@@ -202,7 +202,7 @@ async fn main() -> Result<()> {
         .init();
 
     info!(
-        "Starting Nexus-Security API Gateway v{}",
+        "Starting Verdyx API Gateway v{}",
         env!("CARGO_PKG_VERSION")
     );
 
@@ -262,7 +262,7 @@ async fn main() -> Result<()> {
         .await
         .context("Failed to bind to address")?;
 
-    info!("🚀 Nexus-Security API Gateway running on http://{}", addr);
+    info!("🚀 Verdyx API Gateway running on http://{}", addr);
     info!(
         "📚 API Documentation available at http://{}/api/v1/docs",
         addr
@@ -275,6 +275,6 @@ async fn main() -> Result<()> {
         .await
         .context("Server error")?;
 
-    info!("Nexus-Security API Gateway shut down gracefully");
+    info!("Verdyx API Gateway shut down gracefully");
     Ok(())
 }

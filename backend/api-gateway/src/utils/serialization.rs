@@ -421,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_base64_encoding() {
-        let data = b"Hello, Nexus-Security!";
+        let data = b"Hello, Verdyx!";
         let encoded = Base64Utils::encode(data);
         let decoded = Base64Utils::decode(&encoded).unwrap();
 

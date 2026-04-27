@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 /**
  * @title IBountyManager
- * @dev Interface for the Nexus-Security Bounty Manager contract
+ * @dev Interface for the Verdyx Bounty Manager contract
  * @notice Defines the core functionality for managing threat analysis bounties
  */
 interface IBountyManager {

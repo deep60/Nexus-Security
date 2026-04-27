@@ -6,13 +6,13 @@ server:
 
 # Test DB is isolated from development to avoid accidental data loss.
 database:
-  url: postgresql://nexus_user:nexus_password@localhost:5432/nexus_security_test
+  url: postgresql://verdyx_user:verdyx_password@localhost:5432/verdyx_test
   max_connections: 10
   min_connections: 2
 
 redis:
   url: redis://localhost:6379/1
-  key_prefix: "nexus:test:"
+  key_prefix: "verdyx:test:"
 
 blockchain:
   rpc_url: http://localhost:8545

@@ -50,7 +50,7 @@ impl Default for LogConfig {
         Self {
             level: LogLevel::Info,
             format: LogFormat::Pretty,
-            service_name: "nexus-service".to_string(),
+            service_name: "verdyx-service".to_string(),
             include_line_numbers: true,
             include_thread_ids: false,
         }

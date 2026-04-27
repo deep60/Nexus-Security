@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: bounty-manager
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: bounty-manager
     component: backend
@@ -37,7 +37,7 @@ spec:
 
       containers:
       - name: bounty-manager
-        image: nexus-security/bounty-manager:latest
+        image: verdyx/bounty-manager:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8083
@@ -66,19 +66,19 @@ spec:
         - name: REDIS_URL
           valueFrom:
             secretKeyRef:
-              name: nexus-redis-secret
+              name: verdyx-redis-secret
               key: redis_url
 
         # Blockchain
         - name: BLOCKCHAIN_RPC_URL
           valueFrom:
             secretKeyRef:
-              name: nexus-blockchain-secret
+              name: verdyx-blockchain-secret
               key: rpc_url
         - name: PRIVATE_KEY
           valueFrom:
             secretKeyRef:
-              name: nexus-blockchain-secret
+              name: verdyx-blockchain-secret
               key: private_key
         - name: CONTRACT_ADDRESS_BOUNTY
           valueFrom:
@@ -96,7 +96,7 @@ spec:
 
         # Service discovery
         - name: API_GATEWAY_URL
-          value: "http://nexus-api-gateway-service:8080"
+          value: "http://verdyx-api-gateway-service:8080"
         - name: ANALYSIS_ENGINE_URL
           value: "http://analysis-engine-service:8082"
 
@@ -156,7 +156,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: bounty-manager-hpa
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: bounty-manager
 spec:

@@ -15,7 +15,7 @@ export default function HowItWorks() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-16">
             <h1 className="text-4xl md:text-5xl font-bold font-sans text-white tracking-tight mb-6">
-              How Nexus-Security Works
+              How Verdyx Works
             </h1>
             <p className="text-lg md:text-xl text-slate-400 leading-relaxed font-sans">
               A transparent, verifiable pipeline replacing the legacy black-box heuristics of traditional antivirus exactly.
@@ -36,8 +36,8 @@ export default function HowItWorks() {
                 <div className="bg-slate-900 border border-slate-800 rounded-md p-4 overflow-x-auto">
                   <pre className="text-sm font-mono text-emerald-400">
                     <code>
-{`curl -X POST https://api.nexus-security.com/v1/analyze \\
-  -H "Authorization: Bearer $NEXUS_TOKEN" \\
+{`curl -X POST https://api.verdyx.com/v1/analyze \\
+  -H "Authorization: Bearer $VERDYX_TOKEN" \\
   -F "file=@payload.bin" \\
   -F "engines=yara,clamav"`}
                     </code>
@@ -55,10 +55,10 @@ export default function HowItWorks() {
                     <code>
 {`# Docker Compose example for private node
 services:
-  nexus-worker:
-    image: nexus/worker-yara:latest
+  verdyx-worker:
+    image: verdyx/worker-yara:latest
     environment:
-      - NEXUS_ORCHESTRATOR_URL=wss://api.nexus.com
+      - VERDYX_ORCHESTRATOR_URL=wss://api.verdyx.com
       - PRIVATE_RULES_DIR=/rules
     volumes:
       - ./my-rules:/rules:ro`}
@@ -83,8 +83,8 @@ services:
 
       <footer className="border-t border-slate-800 py-12 bg-slate-950 mt-20">
         <div className="max-w-6xl mx-auto px-4 flex flex-col items-center">
-          <div className="text-slate-500 font-mono text-sm mb-4 bg-slate-900 px-4 py-1 rounded-full border border-slate-800">nexus-security // docs</div>
-          <p className="text-slate-600 text-xs">© 2026 Nexus-Security. Developer First.</p>
+          <div className="text-slate-500 font-mono text-sm mb-4 bg-slate-900 px-4 py-1 rounded-full border border-slate-800">verdyx // docs</div>
+          <p className="text-slate-600 text-xs">© 2026 Verdyx. Developer First.</p>
         </div>
       </footer>
     </div>

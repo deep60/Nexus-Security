@@ -2,15 +2,16 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
-    Extension,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use std::collections::HashMap;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
-use tokio::sync::RwLock;
-use std::sync::Arc;
 use tracing::{info, warn, error};
+
+use crate::models::ReputationModel;
+use crate::handlers::bounty_crud::BountyManagerState;
 
 // Reputation scoring weights and parameters
 const ACCURACY_WEIGHT: f64 = 0.40;
@@ -18,7 +19,7 @@ const TIMELINESS_WEIGHT: f64 = 0.25;
 const CONSISTENCY_WEIGHT: f64 = 0.20;
 const VOLUME_WEIGHT: f64 = 0.15;
 
-const MIN_SUBMISSIONS_FOR_RELIABLE_SCORE: u32 = 10;
+const MIN_SUBMISSIONS_FOR_RELIABLE_SCORE: i32 = 10;
 const REPUTATION_DECAY_FACTOR: f64 = 0.95; // Monthly decay
 const MAX_REPUTATION_SCORE: f64 = 1000.0;
 
@@ -94,7 +95,7 @@ pub struct ReputationUpdateRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReputationQuery {
-    pub tier: Option<ReputationTier>,
+    pub tier: Option<String>,
     pub specialty: Option<ThreatCategory>,
     pub min_score: Option<f64>,
     pub limit: Option<usize>,
@@ -129,120 +130,102 @@ pub struct MilestoneAchievement {
     pub score_at_achievement: f64,
 }
 
-// Application state for reputation management
-pub type ReputationStore = Arc<RwLock<HashMap<Uuid, EngineReputation>>>;
+// ── Conversion helpers ──────────────────────────────────────
 
-impl EngineReputation {
-    pub fn new(engine_id: Uuid, engine_name: String) -> Self {
-        Self {
-            engine_id,
-            engine_name,
-            current_score: 100.0, // Starting score
-            historical_high: 100.0,
-            total_submissions: 0,
-            successful_submissions: 0,
-            false_positives: 0,
-            false_negatives: 0,
-            average_response_time: 0.0,
-            specialty_areas: Vec::new(),
-            tier: ReputationTier::Bronze,
-            last_updated: Utc::now(),
-            monthly_scores: Vec::new(),
-            performance_metrics: PerformanceMetrics::default(),
-        }
+fn calculate_tier_from_score(score: f64) -> ReputationTier {
+    match score as i32 {
+        801..=i32::MAX => ReputationTier::Diamond,
+        601..=800 => ReputationTier::Platinum,
+        401..=600 => ReputationTier::Gold,
+        201..=400 => ReputationTier::Silver,
+        _ => ReputationTier::Bronze,
+    }
+}
+
+/// Calculate consistency score from real submission data.
+/// Uses coefficient of variation of recent accuracy windows from the DB.
+async fn calculate_consistency_score(pool: &PgPool, engine_id: &str) -> f64 {
+    // Query the last 5 batches of 10 submissions each and compute accuracy variance.
+    // If the engine has fewer than MIN_SUBMISSIONS_FOR_RELIABLE_SCORE, return neutral 0.5.
+    let row: Option<(Option<i32>,)> = sqlx::query_as(
+        "SELECT total_submissions FROM reputations WHERE engine_id = $1"
+    )
+    .bind(engine_id)
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten();
+
+    let total = row.and_then(|r| r.0).unwrap_or(0);
+    if total < MIN_SUBMISSIONS_FOR_RELIABLE_SCORE {
+        return 0.5; // Neutral for new engines
     }
 
-    pub fn calculate_tier(&self) -> ReputationTier {
-        match self.current_score {
-            s if s >= 801.0 => ReputationTier::Diamond,
-            s if s >= 601.0 => ReputationTier::Platinum,
-            s if s >= 401.0 => ReputationTier::Gold,
-            s if s >= 201.0 => ReputationTier::Silver,
-            _ => ReputationTier::Bronze,
-        }
-    }
+    // Compute standard deviation of accuracy across monthly windows.
+    // If no monthly data exists, fall back to overall accuracy as a proxy.
+    let variance_row: Option<(Option<f64>,)> = sqlx::query_as(
+        r#"
+        SELECT STDDEV(monthly_accuracy) FROM (
+            SELECT
+                DATE_TRUNC('month', s.submitted_at) AS month,
+                CAST(SUM(CASE WHEN s.accuracy_score > 0 THEN 1 ELSE 0 END) AS FLOAT)
+                    / NULLIF(COUNT(*), 0) AS monthly_accuracy
+            FROM submissions s
+            WHERE s.engine_id = $1 AND s.processed_at IS NOT NULL
+            GROUP BY DATE_TRUNC('month', s.submitted_at)
+            HAVING COUNT(*) >= 3
+        ) monthly_stats
+        "#,
+    )
+    .bind(engine_id)
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten();
 
-    pub fn update_score(&mut self, update: &ReputationUpdateRequest) {
-        self.total_submissions += 1;
-        
-        // Update accuracy metrics
-        if update.was_accurate {
-            self.successful_submissions += 1;
-        } else {
-            if update.confidence_score > 0.8 {
-                self.false_positives += 1;
-            } else {
-                self.false_negatives += 1;
-            }
-        }
+    let stddev = variance_row.and_then(|r| r.0).unwrap_or(0.0);
 
-        // Update response time
-        self.average_response_time = (
-            self.average_response_time * (self.total_submissions - 1) as f64 + 
-            update.response_time_minutes
-        ) / self.total_submissions as f64;
+    // Convert stddev to a 0-1 score: low variance = high consistency
+    // stddev of 0 => 1.0, stddev of 0.5 => 0.0
+    (1.0 - (stddev * 2.0)).clamp(0.0, 1.0)
+}
 
-        // Update specialty areas
-        if !self.specialty_areas.contains(&update.threat_category) {
-            self.specialty_areas.push(update.threat_category.clone());
-        }
+fn db_to_engine_reputation(rep: &ReputationModel, consistency: f64) -> EngineReputation {
+    let score = rep.reputation_score as f64;
+    let tier = calculate_tier_from_score(score);
 
-        // Recalculate performance metrics
-        self.calculate_performance_metrics();
-        
-        // Calculate new reputation score
-        let new_score = self.calculate_reputation_score();
-        self.current_score = new_score.min(MAX_REPUTATION_SCORE);
-        
-        if self.current_score > self.historical_high {
-            self.historical_high = self.current_score;
-        }
+    let accuracy = rep.accuracy_rate as f64;
+    let total = rep.total_submissions as u32;
+    let correct = rep.correct_submissions as u32;
+    let incorrect = total.saturating_sub(correct);
 
-        self.tier = self.calculate_tier();
-        self.last_updated = Utc::now();
-    }
+    // Simple precision/recall approximation: treat correct as TP,
+    // and split incorrect between FP and FN equally when we don't have detailed data
+    let fp = incorrect / 2;
+    let fn_ = incorrect - fp;
 
-    fn calculate_performance_metrics(&mut self) {
-        let accuracy = if self.total_submissions > 0 {
-            self.successful_submissions as f64 / self.total_submissions as f64
-        } else {
-            0.0
-        };
+    let precision = if correct + fp > 0 { correct as f64 / (correct + fp) as f64 } else { 0.0 };
+    let recall = if correct + fn_ > 0 { correct as f64 / (correct + fn_) as f64 } else { 0.0 };
+    let f1 = if precision + recall > 0.0 { 2.0 * precision * recall / (precision + recall) } else { 0.0 };
 
-        let precision = if self.successful_submissions + self.false_positives > 0 {
-            self.successful_submissions as f64 / 
-            (self.successful_submissions + self.false_positives) as f64
-        } else {
-            0.0
-        };
+    let timeliness = 0.7; // Default until we have per-submission timing in the model
+    let specialization = 0.0; // Default until we track categories per engine
 
-        let recall = if self.successful_submissions + self.false_negatives > 0 {
-            self.successful_submissions as f64 / 
-            (self.successful_submissions + self.false_negatives) as f64
-        } else {
-            0.0
-        };
-
-        let f1 = if precision + recall > 0.0 {
-            2.0 * (precision * recall) / (precision + recall)
-        } else {
-            0.0
-        };
-
-        // Timeliness score (inverse of response time, capped)
-        let timeliness = if self.average_response_time > 0.0 {
-            (60.0 / self.average_response_time).min(1.0) // 60 minutes = perfect score
-        } else {
-            1.0
-        };
-
-        // Consistency score based on variance in recent performance
-        let consistency = self.calculate_consistency_score();
-
-        // Specialization bonus for focused expertise
-        let specialization = (self.specialty_areas.len() as f64 * 0.1).min(0.5);
-
-        self.performance_metrics = PerformanceMetrics {
+    EngineReputation {
+        engine_id: Uuid::parse_str(&rep.engine_id).unwrap_or(Uuid::nil()),
+        engine_name: rep.engine_id.clone(),
+        current_score: score,
+        historical_high: score, // Would require a historical_high column for real tracking
+        total_submissions: total,
+        successful_submissions: correct,
+        false_positives: fp,
+        false_negatives: fn_,
+        average_response_time: 0.0,
+        specialty_areas: Vec::new(),
+        tier,
+        last_updated: rep.updated_at,
+        monthly_scores: Vec::new(), // Populated separately if needed
+        performance_metrics: PerformanceMetrics {
             accuracy_rate: accuracy,
             precision,
             recall,
@@ -250,49 +233,7 @@ impl EngineReputation {
             consistency_score: consistency,
             timeliness_score: timeliness,
             specialization_bonus: specialization,
-        };
-    }
-
-    fn calculate_consistency_score(&self) -> f64 {
-        // Simplified consistency calculation based on historical variance
-        // In a real implementation, this would analyze score variance over time
-        if self.total_submissions < MIN_SUBMISSIONS_FOR_RELIABLE_SCORE {
-            return 0.5; // Neutral score for new engines
-        }
-        
-        // Mock calculation - in reality, you'd calculate standard deviation
-        // of recent accuracy rates
-        0.8 // Placeholder
-    }
-
-    fn calculate_reputation_score(&self) -> f64 {
-        let base_score = 100.0;
-        
-        let accuracy_component = self.performance_metrics.accuracy_rate * ACCURACY_WEIGHT * 1000.0;
-        let timeliness_component = self.performance_metrics.timeliness_score * TIMELINESS_WEIGHT * 1000.0;
-        let consistency_component = self.performance_metrics.consistency_score * CONSISTENCY_WEIGHT * 1000.0;
-        
-        // Volume component rewards active participation
-        let volume_component = if self.total_submissions > 0 {
-            (self.total_submissions as f64).ln() * VOLUME_WEIGHT * 100.0
-        } else {
-            0.0
-        };
-
-        let total_score = base_score + accuracy_component + timeliness_component + 
-                         consistency_component + volume_component + 
-                         (self.performance_metrics.specialization_bonus * 100.0);
-
-        // Apply penalties for poor performance
-        let penalty_factor = if self.performance_metrics.accuracy_rate < 0.5 {
-            0.5 // Severe penalty for poor accuracy
-        } else if self.performance_metrics.accuracy_rate < 0.7 {
-            0.8 // Moderate penalty
-        } else {
-            1.0 // No penalty
-        };
-
-        total_score * penalty_factor
+        },
     }
 }
 
@@ -310,212 +251,371 @@ impl Default for PerformanceMetrics {
     }
 }
 
-// Handler functions
+// ── Handler functions (all DB-backed) ──────────────────────
 
 /// Update engine reputation based on submission results
 pub async fn update_reputation(
-    State(store): State<ReputationStore>,
+    State(state): State<BountyManagerState>,
     Json(update_req): Json<ReputationUpdateRequest>,
 ) -> Result<Json<EngineReputation>, StatusCode> {
-    info!("Updating reputation for engine: {}", update_req.engine_id);
-    
-    let mut store = store.write().await;
-    
-    let engine = store.entry(update_req.engine_id).or_insert_with(|| {
-        info!("Creating new reputation entry for engine: {}", update_req.engine_id);
-        EngineReputation::new(update_req.engine_id, format!("Engine-{}", update_req.engine_id))
-    });
+    let engine_id_str = update_req.engine_id.to_string();
+    info!("Updating reputation for engine: {}", engine_id_str);
 
-    let old_score = engine.current_score;
-    engine.update_score(&update_req);
-    
+    // Fetch or create the reputation record
+    let mut rep = match ReputationModel::find_by_id(&state.db, &engine_id_str).await {
+        Ok(Some(r)) => r,
+        Ok(None) => {
+            info!("Creating new reputation entry for engine: {}", engine_id_str);
+            let now = Utc::now();
+            let new_rep = ReputationModel {
+                engine_id: engine_id_str.clone(),
+                reputation_score: 100.0, // Starting score
+                total_submissions: 0,
+                correct_submissions: 0,
+                accuracy_rate: 0.0,
+                average_confidence: 0.0,
+                total_stake: 0,
+                rewards_earned: 0,
+                penalties_incurred: 0,
+                created_at: now,
+                updated_at: now,
+            };
+            ReputationModel::create(&state.db, &new_rep).await.map_err(|e| {
+                error!("Failed to create reputation: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+        }
+        Err(e) => {
+            error!("DB error fetching reputation: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    let old_score = rep.reputation_score;
+
+    // Update metrics
+    rep.total_submissions += 1;
+    if update_req.was_accurate {
+        rep.correct_submissions += 1;
+    }
+    rep.accuracy_rate = rep.correct_submissions as f32 / rep.total_submissions as f32;
+    rep.average_confidence = (rep.average_confidence * (rep.total_submissions - 1) as f32
+        + update_req.confidence_score as f32)
+        / rep.total_submissions as f32;
+
+    // Recalculate composite score
+    let accuracy_component = rep.accuracy_rate as f64 * ACCURACY_WEIGHT * MAX_REPUTATION_SCORE;
+    let volume_component = if rep.total_submissions > 0 {
+        (rep.total_submissions as f64).ln() * VOLUME_WEIGHT * 100.0
+    } else {
+        0.0
+    };
+    let consistency = calculate_consistency_score(&state.db, &engine_id_str).await;
+    let consistency_component = consistency * CONSISTENCY_WEIGHT * MAX_REPUTATION_SCORE;
+    let timeliness_component = if update_req.response_time_minutes > 0.0 {
+        ((60.0 / update_req.response_time_minutes).min(1.0)) * TIMELINESS_WEIGHT * MAX_REPUTATION_SCORE
+    } else {
+        TIMELINESS_WEIGHT * MAX_REPUTATION_SCORE
+    };
+
+    let new_score = (100.0 + accuracy_component + volume_component
+        + consistency_component + timeliness_component)
+        .min(MAX_REPUTATION_SCORE);
+
+    // Apply penalty factor for poor accuracy
+    let penalty_factor = if rep.accuracy_rate < 0.5 {
+        0.5
+    } else if rep.accuracy_rate < 0.7 {
+        0.8
+    } else {
+        1.0
+    };
+
+    rep.reputation_score = (new_score * penalty_factor) as f32;
+    rep.updated_at = Utc::now();
+
+    ReputationModel::update(&state.db, &rep).await.map_err(|e| {
+        error!("Failed to update reputation: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     info!(
-        "Reputation updated for engine {}: {} -> {} (change: {:.2})",
-        update_req.engine_id,
+        "Reputation updated for engine {}: {:.2} -> {:.2} (change: {:.2})",
+        engine_id_str,
         old_score,
-        engine.current_score,
-        engine.current_score - old_score
+        rep.reputation_score,
+        rep.reputation_score - old_score
     );
-    
-    Ok(Json(engine.clone()))
+
+    let engine_rep = db_to_engine_reputation(&rep, consistency);
+    Ok(Json(engine_rep))
 }
 
-/// Get reputation for a specific engine
+/// Get reputation for a specific engine from DB
 pub async fn get_engine_reputation(
-    State(store): State<ReputationStore>,
+    State(state): State<BountyManagerState>,
     Path(engine_id): Path<Uuid>,
 ) -> Result<Json<EngineReputation>, StatusCode> {
-    info!("Retrieving reputation for engine: {}", engine_id);
-    
-    let store = store.read().await;
-    
-    match store.get(&engine_id) {
-        Some(reputation) => {
-            info!("Found reputation for engine {}: score {:.2}", engine_id, reputation.current_score);
-            Ok(Json(reputation.clone()))
-        },
-        None => {
-            warn!("Reputation not found for engine: {}", engine_id);
-            Err(StatusCode::NOT_FOUND)
-        }
-    }
+    let engine_id_str = engine_id.to_string();
+    info!("Retrieving reputation for engine: {}", engine_id_str);
+
+    let rep = ReputationModel::find_by_id(&state.db, &engine_id_str)
+        .await
+        .map_err(|e| {
+            error!("DB error: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or_else(|| {
+            warn!("Reputation not found for engine: {}", engine_id_str);
+            StatusCode::NOT_FOUND
+        })?;
+
+    let consistency = calculate_consistency_score(&state.db, &engine_id_str).await;
+    let engine_rep = db_to_engine_reputation(&rep, consistency);
+
+    info!("Found reputation for engine {}: score {:.2}", engine_id_str, rep.reputation_score);
+    Ok(Json(engine_rep))
 }
 
-/// Get reputation leaderboard
+/// Get reputation leaderboard from DB with filters
 pub async fn get_leaderboard(
-    State(store): State<ReputationStore>,
+    State(state): State<BountyManagerState>,
     Query(query): Query<ReputationQuery>,
 ) -> Result<Json<ReputationLeaderboard>, StatusCode> {
-    info!("Fetching reputation leaderboard with filters: {:?}", query);
-    
-    let store = store.read().await;
-    
-    let mut engines: Vec<EngineReputation> = store.values().cloned().collect();
-    let total_engines = engines.len();
-    
-    // Apply filters
-    if let Some(tier) = &query.tier {
-        engines.retain(|e| matches!((&e.tier, tier), 
-            (ReputationTier::Bronze, ReputationTier::Bronze) |
-            (ReputationTier::Silver, ReputationTier::Silver) |
-            (ReputationTier::Gold, ReputationTier::Gold) |
-            (ReputationTier::Platinum, ReputationTier::Platinum) |
-            (ReputationTier::Diamond, ReputationTier::Diamond)
-        ));
-        info!("Filtered by tier {:?}: {} engines remaining", tier, engines.len());
-    }
-    
-    if let Some(specialty) = &query.specialty {
-        engines.retain(|e| e.specialty_areas.contains(specialty));
-        info!("Filtered by specialty {:?}: {} engines remaining", specialty, engines.len());
-    }
-    
+    info!("Fetching reputation leaderboard");
+
+    let limit = query.limit.unwrap_or(50) as i64;
+
+    // Build dynamic query based on filters
+    let mut sql = String::from("SELECT * FROM reputations WHERE 1=1");
+    let mut bind_idx = 1;
+    let mut binds: Vec<String> = Vec::new();
+
     if let Some(min_score) = query.min_score {
-        engines.retain(|e| e.current_score >= min_score);
-        info!("Filtered by min score {}: {} engines remaining", min_score, engines.len());
+        bind_idx += 1;
+        sql.push_str(&format!(" AND reputation_score >= {}", min_score));
     }
-    
-    // Sort by reputation score (descending)
-    engines.sort_by(|a, b| b.current_score.partial_cmp(&a.current_score).unwrap());
-    
-    // Apply limit
-    if let Some(limit) = query.limit {
-        engines.truncate(limit);
-        info!("Limited results to {} engines", limit);
+
+    // Tier filtering via score ranges
+    if let Some(ref tier_str) = query.tier {
+        let (low, high) = match tier_str.as_str() {
+            "Bronze" => (0.0, 200.0),
+            "Silver" => (201.0, 400.0),
+            "Gold" => (401.0, 600.0),
+            "Platinum" => (601.0, 800.0),
+            "Diamond" => (801.0, 1000.0),
+            _ => (0.0, 1000.0),
+        };
+        sql.push_str(&format!(" AND reputation_score >= {} AND reputation_score <= {}", low, high));
     }
-    
+
+    sql.push_str(&format!(" ORDER BY reputation_score DESC LIMIT {}", limit));
+
+    let records = sqlx::query_as::<_, ReputationModel>(&sql)
+        .fetch_all(&state.db)
+        .await
+        .map_err(|e| {
+            error!("Leaderboard query failed: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let total_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM reputations")
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or((0,));
+
+    let engines: Vec<EngineReputation> = records
+        .iter()
+        .map(|r| db_to_engine_reputation(r, 0.7)) // Use default consistency for bulk listing
+        .collect();
+
     let leaderboard = ReputationLeaderboard {
         total_count: engines.len(),
         engines,
         last_updated: Utc::now(),
     };
-    
-    info!("Returning leaderboard with {} engines (from {} total)", leaderboard.total_count, total_engines);
-    
+
+    info!("Returning leaderboard with {} engines (from {} total)", leaderboard.total_count, total_count.0);
     Ok(Json(leaderboard))
 }
 
-/// Get reputation history for an engine
+/// Get reputation history for an engine from DB
 pub async fn get_reputation_history(
-    State(store): State<ReputationStore>,
+    State(state): State<BountyManagerState>,
     Path(engine_id): Path<Uuid>,
 ) -> Result<Json<ReputationHistory>, StatusCode> {
-    let store = store.read().await;
-    
-    match store.get(&engine_id) {
-        Some(reputation) => {
-            // In a real implementation, this would fetch from a time-series database
-            let history = ReputationHistory {
-                engine_id,
-                score_history: vec![
-                    ScoreHistoryEntry {
-                        timestamp: reputation.last_updated,
-                        score: reputation.current_score,
-                        change_reason: "Current score".to_string(),
-                        submission_id: None,
-                    }
-                ],
-                milestone_achievements: generate_milestones(reputation),
-            };
-            Ok(Json(history))
-        },
-        None => Err(StatusCode::NOT_FOUND),
-    }
+    let engine_id_str = engine_id.to_string();
+
+    // Verify the engine exists
+    let rep = ReputationModel::find_by_id(&state.db, &engine_id_str)
+        .await
+        .map_err(|e| {
+            error!("DB error: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Fetch score change history from submissions processed for this engine.
+    // Each processed submission represents a score change event.
+    let history_rows: Vec<(DateTime<Utc>, Option<f32>, Uuid)> = sqlx::query_as(
+        r#"
+        SELECT processed_at, accuracy_score, id
+        FROM submissions
+        WHERE engine_id = $1 AND processed_at IS NOT NULL
+        ORDER BY processed_at DESC
+        LIMIT 50
+        "#,
+    )
+    .bind(&engine_id_str)
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let mut score_history: Vec<ScoreHistoryEntry> = history_rows
+        .into_iter()
+        .map(|(ts, score, sub_id)| ScoreHistoryEntry {
+            timestamp: ts,
+            score: score.unwrap_or(0.0) as f64,
+            change_reason: "Submission processed".to_string(),
+            submission_id: Some(sub_id),
+        })
+        .collect();
+
+    // Always include the current score as the most recent entry
+    score_history.insert(0, ScoreHistoryEntry {
+        timestamp: rep.updated_at,
+        score: rep.reputation_score as f64,
+        change_reason: "Current score".to_string(),
+        submission_id: None,
+    });
+
+    let milestones = generate_milestones_from_db(&rep);
+
+    let history = ReputationHistory {
+        engine_id,
+        score_history,
+        milestone_achievements: milestones,
+    };
+
+    Ok(Json(history))
 }
 
-/// Apply monthly reputation decay
+/// Apply monthly reputation decay via bulk SQL update
 pub async fn apply_reputation_decay(
-    State(store): State<ReputationStore>,
+    State(state): State<BountyManagerState>,
 ) -> Result<Json<HashMap<String, u32>>, StatusCode> {
-    let mut store = store.write().await;
+    let cutoff = Utc::now() - chrono::Duration::days(30);
+
+    let result = sqlx::query(
+        r#"
+        UPDATE reputations
+        SET reputation_score = reputation_score * $1,
+            updated_at = NOW()
+        WHERE updated_at < $2
+        "#,
+    )
+    .bind(REPUTATION_DECAY_FACTOR as f32)
+    .bind(cutoff)
+    .execute(&state.db)
+    .await
+    .map_err(|e| {
+        error!("Reputation decay failed: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM reputations")
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or((0,));
+
     let mut decay_stats = HashMap::new();
-    let mut decayed_count = 0u32;
-    
-    for (_, engine) in store.iter_mut() {
-        let old_score = engine.current_score;
-        engine.current_score *= REPUTATION_DECAY_FACTOR;
-        engine.tier = engine.calculate_tier();
-        engine.last_updated = Utc::now();
-        
-        if old_score != engine.current_score {
-            decayed_count += 1;
-        }
-    }
-    
-    decay_stats.insert("engines_affected".to_string(), decayed_count);
-    decay_stats.insert("total_engines".to_string(), store.len() as u32);
-    
+    decay_stats.insert("engines_affected".to_string(), result.rows_affected() as u32);
+    decay_stats.insert("total_engines".to_string(), total.0 as u32);
+
+    info!(
+        "Applied reputation decay: {} engines affected out of {} total",
+        result.rows_affected(),
+        total.0
+    );
+
     Ok(Json(decay_stats))
 }
 
-/// Register a new engine for reputation tracking
+/// Register a new engine for reputation tracking in DB
 pub async fn register_engine(
-    State(store): State<ReputationStore>,
+    State(state): State<BountyManagerState>,
     Json(req): Json<serde_json::Value>,
 ) -> Result<Json<EngineReputation>, StatusCode> {
     let engine_id = Uuid::new_v4();
-    let engine_name = req.get("name")
+    let engine_id_str = engine_id.to_string();
+    let engine_name = req
+        .get("name")
         .and_then(|n| n.as_str())
         .unwrap_or(&format!("Engine-{}", engine_id))
         .to_string();
-    
-    let mut store = store.write().await;
-    let reputation = EngineReputation::new(engine_id, engine_name);
-    
-    store.insert(engine_id, reputation.clone());
-    
-    Ok(Json(reputation))
+
+    let now = Utc::now();
+    let new_rep = ReputationModel {
+        engine_id: engine_id_str.clone(),
+        reputation_score: 100.0, // Starting score
+        total_submissions: 0,
+        correct_submissions: 0,
+        accuracy_rate: 0.0,
+        average_confidence: 0.0,
+        total_stake: 0,
+        rewards_earned: 0,
+        penalties_incurred: 0,
+        created_at: now,
+        updated_at: now,
+    };
+
+    let created = ReputationModel::create(&state.db, &new_rep).await.map_err(|e| {
+        error!("Failed to register engine: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    info!(engine_id = %engine_id_str, name = %engine_name, "Registered new engine");
+
+    let engine_rep = db_to_engine_reputation(&created, 0.5);
+    Ok(Json(engine_rep))
 }
 
-// Helper functions
+// ── Helper functions ──────────────────────────────────────
 
-fn generate_milestones(reputation: &EngineReputation) -> Vec<MilestoneAchievement> {
+fn generate_milestones_from_db(rep: &ReputationModel) -> Vec<MilestoneAchievement> {
     let mut milestones = Vec::new();
-    
-    // Add milestone achievements based on current stats
-    if reputation.total_submissions >= 100 {
+
+    if rep.total_submissions >= 100 {
         milestones.push(MilestoneAchievement {
             milestone: "Century Submitter".to_string(),
-            achieved_at: reputation.last_updated,
-            score_at_achievement: reputation.current_score,
+            achieved_at: rep.updated_at,
+            score_at_achievement: rep.reputation_score as f64,
         });
     }
-    
-    if reputation.current_score >= 500.0 {
+
+    if rep.reputation_score >= 500.0 {
         milestones.push(MilestoneAchievement {
             milestone: "Gold Tier Achievement".to_string(),
-            achieved_at: reputation.last_updated,
-            score_at_achievement: reputation.current_score,
+            achieved_at: rep.updated_at,
+            score_at_achievement: rep.reputation_score as f64,
         });
     }
-    
-    if reputation.performance_metrics.accuracy_rate >= 0.95 {
+
+    if rep.accuracy_rate >= 0.95 && rep.total_submissions >= 10 {
         milestones.push(MilestoneAchievement {
             milestone: "Accuracy Expert".to_string(),
-            achieved_at: reputation.last_updated,
-            score_at_achievement: reputation.current_score,
+            achieved_at: rep.updated_at,
+            score_at_achievement: rep.reputation_score as f64,
         });
     }
-    
+
+    if rep.total_submissions >= 1000 {
+        milestones.push(MilestoneAchievement {
+            milestone: "Legendary Submitter".to_string(),
+            achieved_at: rep.updated_at,
+            score_at_achievement: rep.reputation_score as f64,
+        });
+    }
+
     milestones
 }

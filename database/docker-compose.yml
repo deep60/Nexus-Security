@@ -4,12 +4,12 @@ services:
   # PostgreSQL Database - Main relational database
   postgres:
     image: postgres:16-alpine
-    container_name: nexus-postgres
+    container_name: verdyx-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: nexus_security
+      POSTGRES_DB: verdyx
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexus_postgres_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-verdyx_postgres_password}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -19,24 +19,24 @@ services:
       - ./schema.sql:/docker-entrypoint-initdb.d/00-schema.sql:ro
       - ./postgres/seeds:/docker-entrypoint-initdb.d/seeds:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d nexus_security"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d verdyx"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     networks:
-      - nexus-network
+      - verdyx-network
 
   # MongoDB - Document store for analysis results and file metadata
   mongodb:
     image: mongo:7.0
-    container_name: nexus-mongodb
+    container_name: verdyx-mongodb
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD:-nexus_mongo_root_password}
-      MONGO_INITDB_DATABASE: nexus_security
-      MONGODB_PASSWORD: ${MONGODB_PASSWORD:-nexus_mongo_password}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD:-verdyx_mongo_root_password}
+      MONGO_INITDB_DATABASE: verdyx
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD:-verdyx_mongo_password}
     ports:
       - "${MONGODB_PORT:-27017}:27017"
     volumes:
@@ -51,12 +51,12 @@ services:
       retries: 5
       start_period: 10s
     networks:
-      - nexus-network
+      - verdyx-network
 
   # Redis - Caching, sessions, and message queue
   redis:
     image: redis:7-alpine
-    container_name: nexus-redis
+    container_name: verdyx-redis
     restart: unless-stopped
     command: redis-server /usr/local/etc/redis/redis.conf
     ports:
@@ -71,15 +71,15 @@ services:
       retries: 5
       start_period: 5s
     networks:
-      - nexus-network
+      - verdyx-network
 
   # pgAdmin - PostgreSQL administration tool (optional, for development)
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: nexus-pgadmin
+    container_name: verdyx-pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@nexus-sec.dev}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@verdyx-sec.dev}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
@@ -90,7 +90,7 @@ services:
     depends_on:
       - postgres
     networks:
-      - nexus-network
+      - verdyx-network
     profiles:
       - dev
       - tools
@@ -98,12 +98,12 @@ services:
   # Mongo Express - MongoDB administration tool (optional, for development)
   mongo-express:
     image: mongo-express:latest
-    container_name: nexus-mongo-express
+    container_name: verdyx-mongo-express
     restart: unless-stopped
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: admin
-      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGODB_ROOT_PASSWORD:-nexus_mongo_root_password}
-      ME_CONFIG_MONGODB_URL: mongodb://admin:${MONGODB_ROOT_PASSWORD:-nexus_mongo_root_password}@mongodb:27017/
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGODB_ROOT_PASSWORD:-verdyx_mongo_root_password}
+      ME_CONFIG_MONGODB_URL: mongodb://admin:${MONGODB_ROOT_PASSWORD:-verdyx_mongo_root_password}@mongodb:27017/
       ME_CONFIG_BASICAUTH_USERNAME: ${MONGOEXPRESS_USER:-admin}
       ME_CONFIG_BASICAUTH_PASSWORD: ${MONGOEXPRESS_PASSWORD:-admin123}
     ports:
@@ -111,7 +111,7 @@ services:
     depends_on:
       - mongodb
     networks:
-      - nexus-network
+      - verdyx-network
     profiles:
       - dev
       - tools
@@ -119,7 +119,7 @@ services:
   # Redis Commander - Redis administration tool (optional, for development)
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: nexus-redis-commander
+    container_name: verdyx-redis-commander
     restart: unless-stopped
     environment:
       REDIS_HOSTS: local:redis:6379
@@ -128,7 +128,7 @@ services:
     depends_on:
       - redis
     networks:
-      - nexus-network
+      - verdyx-network
     profiles:
       - dev
       - tools
@@ -136,7 +136,7 @@ services:
   # Database initialization service - Runs once to warm caches and seed data
   db-init:
     image: redis:7-alpine
-    container_name: nexus-db-init
+    container_name: verdyx-db-init
     restart: "no"
     volumes:
       - ./redis/init/cache-warmup.sh:/scripts/cache-warmup.sh:ro
@@ -153,28 +153,28 @@ services:
       mongodb:
         condition: service_healthy
     networks:
-      - nexus-network
+      - verdyx-network
     profiles:
       - init
 
 volumes:
   postgres_data:
-    name: nexus_postgres_data
+    name: verdyx_postgres_data
     driver: local
   mongodb_data:
-    name: nexus_mongodb_data
+    name: verdyx_mongodb_data
     driver: local
   mongodb_config:
-    name: nexus_mongodb_config
+    name: verdyx_mongodb_config
     driver: local
   redis_data:
-    name: nexus_redis_data
+    name: verdyx_redis_data
     driver: local
   pgadmin_data:
-    name: nexus_pgadmin_data
+    name: verdyx_pgadmin_data
     driver: local
 
 networks:
-  nexus-network:
-    name: nexus-network
+  verdyx-network:
+    name: verdyx-network
     driver: bridge

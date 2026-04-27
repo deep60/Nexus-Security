@@ -1,33 +1,33 @@
 <p align="center">
-  <img src="docs/assets/nexus-security-banner.png" alt="Nexus-Security Logo" width="600"/>
+  <img src="docs/assets/verdyx-banner.png" alt="Verdyx Logo" width="600"/>
 </p>
 
-<h3 align="center">Nexus-Security</h3>
+<h3 align="center">Verdyx</h3>
 <p align="center">
   <em>Decentralized Threat Intelligence Marketplace</em>
 </p>
 
 <p align="center">
-  <a href="https://github.com/your-org/nexus-security/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/your-org/nexus-security/ci.yml?branch=main" alt="Build Status">
+  <a href="https://github.com/your-org/verdyx/actions">
+    <img src="https://img.shields.io/github/actions/workflow/status/your-org/verdyx/ci.yml?branch=main" alt="Build Status">
   </a>
-  <a href="https://github.com/your-org/nexus-security/blob/main/LICENSE">
+  <a href="https://github.com/your-org/verdyx/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
   </a>
   <a href="https://discord.gg/your-invite">
     <img src="https://img.shields.io/discord/123456789.svg?label=Discord&logo=discord&logoColor=white" alt="Chat">
   </a>
-  <a href="https://twitter.com/nexus_security">
-    <img src="https://img.shields.io/twitter/follow/nexus_security?style=social" alt="Twitter">
+  <a href="https://twitter.com/verdyx">
+    <img src="https://img.shields.io/twitter/follow/verdyx?style=social" alt="Twitter">
   </a>
 </p>
 
 ---
 
-## 🚀 Why Nexus-Security?  
+## 🚀 Why Verdyx?  
 Traditional antivirus relies on **single-vendor detection**. This creates blind spots, delays in zero-day response, and centralized control.  
 
-**Nexus-Security flips the model**:  
+**Verdyx flips the model**:  
 - 🧑‍💻 **Crowdsourced experts** + 🤖 **automated engines** work together  
 - 💰 **Bounty incentives** ensure high-quality analysis  
 - ⛓️ **Blockchain transparency** guarantees fair payments & reputation  
@@ -40,7 +40,7 @@ Traditional antivirus relies on **single-vendor detection**. This creates blind 
 2. Multiple **security engines** (human + automated) analyze it.  
 3. Engines **stake tokens** on their verdict (malicious/benign).  
 4. **Accurate engines earn**, inaccurate ones **lose stake**.  
-5. Nexus-Security returns a **confidence score** & report.  
+5. Verdyx returns a **confidence score** & report.  
 
 ---
 
@@ -69,8 +69,8 @@ Traditional antivirus relies on **single-vendor detection**. This creates blind 
 ### Setup  
 ```bash
 # Clone repo
-git clone https://github.com/your-org/nexus-security.git
-cd nexus-security
+git clone https://github.com/your-org/verdyx.git
+cd verdyx
 
 # Backend
 cd backend
@@ -88,7 +88,7 @@ npx hardhat deploy
 ----
 
 ## 📖 API Example
-``` curl -X POST https://api.nexus-security.com/submit \
+``` curl -X POST https://api.verdyx.com/submit \
   -H "Authorization: Bearer <TOKEN>" \
   -F "file=@/path/to/file.exe" \
   -F "bounty=0.05ETH"
@@ -105,7 +105,7 @@ See CONTRIBUTING.md
 ## 🔐 Security
 
 If you discover a security vulnerability, please do not create a public issue.
-Instead, report it responsibly via security@nexus-security.com
+Instead, report it responsibly via security@verdyx.com
 .
 
 ## 🤝 Join the Community
@@ -114,8 +114,8 @@ Instead, report it responsibly via security@nexus-security.com
 
 🐦 Twitter
 
-📧 Email: security@nexus-security.com
+📧 Email: security@verdyx.com
 
 📜 License
 
-MIT License © 2025 Nexus-Security
+MIT License © 2025 Verdyx

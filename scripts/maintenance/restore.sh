@@ -6,8 +6,8 @@ COMPOSE_FILE="docker-compose.yml"
 BACKUP_DIR=""
 AUTO_YES=0
 
-DB_NAME="${DB_NAME:-nexus_security}"
-DB_USER="${DB_USER:-nexus_user}"
+DB_NAME="${DB_NAME:-verdyx}"
+DB_USER="${DB_USER:-verdyx_user}"
 
 usage() {
   cat <<USAGE

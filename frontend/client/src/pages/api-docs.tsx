@@ -30,7 +30,7 @@ export default function ApiDocs() {
 
 # Submit file for analysis
 response = requests.post(
-    'https://api.nexus-security.io/v1/submit',
+    'https://api.verdyx.io/v1/submit',
     headers={
         'Authorization': 'Bearer YOUR_API_KEY',
         'Content-Type': 'multipart/form-data'
@@ -48,7 +48,7 @@ analysis_id = response.json()['id']
 
 # Get results
 results = requests.get(
-    f'https://api.nexus-security.io/v1/analysis/{analysis_id}'
+    f'https://api.verdyx.io/v1/analysis/{analysis_id}'
 )
 
 print(f"Threat score: {results.json()['confidence']}")`;
@@ -82,7 +82,7 @@ print(f"Threat score: {results.json()['confidence']}")`;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <SEO title="API Documentation" description="Integrate Nexus-Security distributed scanning into your CI/CD pipelines via REST and gRPC." />
+      <SEO title="API Documentation" description="Integrate Verdyx distributed scanning into your CI/CD pipelines via REST and gRPC." />
       <ParticleBackground />
       <Navigation />
 
@@ -228,7 +228,7 @@ print(f"Threat score: {results.json()['confidence']}")`;
                 <Card className="bg-muted/10 border-border">
                   <CardContent className="p-4">
                     <code className="text-sm font-mono text-accent">
-                      wss://api.nexus-security.io/ws
+                      wss://api.verdyx.io/ws
                     </code>
                   </CardContent>
                 </Card>

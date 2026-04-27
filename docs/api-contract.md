@@ -1,4 +1,4 @@
-# Nexus Security API Contract Lock
+# Verdyx API Contract Lock
 
 Locked on: 2026-04-15  
 Version: v1.0 (contract freeze)

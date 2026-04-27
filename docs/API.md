@@ -1,12 +1,12 @@
-# Nexus Security API Guide
+# Verdyx API Guide
 
 This guide documents the currently implemented API gateway surface at `backend/api-gateway`.
 
 ## Base URLs
 
 - Local: `http://localhost:8080/api/v1`
-- Staging (example): `https://api-staging.nexus-security.com/api/v1`
-- Production (example): `https://api.nexus-security.com/api/v1`
+- Staging (example): `https://api-staging.verdyx.com/api/v1`
+- Production (example): `https://api.verdyx.com/api/v1`
 
 ## Authentication
 
@@ -109,5 +109,5 @@ curl -X POST http://localhost:8080/api/v1/bounties \
 ## Related Files
 
 - OpenAPI spec: `docs/api/openapi.yaml`
-- Postman collection: `docs/api/postman/Nexus-Security.postman_collection.json`
+- Postman collection: `docs/api/postman/Verdyx.postman_collection.json`
 - JSON examples: `docs/api/examples/`

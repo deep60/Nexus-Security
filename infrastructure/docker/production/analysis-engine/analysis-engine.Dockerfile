@@ -49,11 +49,11 @@ RUN pip3 install --no-cache-dir \
     && apt-get autoremove -y
 
 # Create non-root user for security
-RUN groupadd -r nexus && useradd -r -g nexus -s /bin/bash nexus
+RUN groupadd -r verdyx && useradd -r -g verdyx -s /bin/bash verdyx
 
 # Create necessary directories
 RUN mkdir -p /app/rules /app/uploads /app/logs && \
-    chown -R nexus:nexus /app
+    chown -R verdyx:verdyx /app
 
 # Copy binary from builder stage
 COPY --from=builder /app/target/release/analysis-engine /app/analysis-engine
@@ -66,7 +66,7 @@ WORKDIR /app
 RUN chmod +x /app/analysis-engine
 
 # Switch to non-root user
-USER nexus
+USER verdyx
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -106,7 +106,7 @@ CMD ["./analysis-engine"]
 
 
 # # Build analysis engine
-# docker build -f docker/analysis-engine.Dockerfile -t nexus-analysis-engine .
+# docker build -f docker/analysis-engine.Dockerfile -t verdyx-analysis-engine .
 
 # # Build API gateway  
-# docker build -f docker/api-gateway.Dockerfile -t nexus-api-gateway .
+# docker build -f docker/api-gateway.Dockerfile -t verdyx-api-gateway .

@@ -78,7 +78,7 @@ The system distinguishes between *Scanners* (artifact-type specific parsing) and
 ### 4. Sandbox Subsystem (`src/sandbox/`)
 Provides isolated execution for dynamic analysis.
 -   **`container.rs`**: Manages Docker containers.
-    -   Custom image: `nexus-security/sandbox` (Ubuntu-based with Wine, Python, Node, strace, tcpdump).
+    -   Custom image: `verdyx/sandbox` (Ubuntu-based with Wine, Python, Node, strace, tcpdump).
     -   Security: `no-new-privileges`, `seccomp=unconfined`, mostly no network access (unless configured).
 -   **`monitor.rs`**: Real-time behavior capture.
     -   **File System**: Uses `strace` to track `open`, `write`, `unlink`.

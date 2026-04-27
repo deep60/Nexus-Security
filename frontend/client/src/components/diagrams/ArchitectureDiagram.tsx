@@ -39,7 +39,10 @@ export function ArchitectureDiagram() {
           viewBox="0 0 400 500"
           className="w-full max-w-sm h-auto drop-shadow-2xl"
           xmlns="http://www.w3.org/2000/svg"
+          role="img"
+          aria-label="Verdyx Architecture Diagram"
         >
+          <title>Verdyx Architecture Diagram</title>
           <defs>
             <linearGradient id="cyberGradient" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />

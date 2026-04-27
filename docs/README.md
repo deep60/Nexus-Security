@@ -1,4 +1,4 @@
-# Nexus Security Documentation
+# Verdyx Documentation
 
 This folder contains the operational docs for local development, deployment, architecture, APIs, and security.
 

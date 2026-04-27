@@ -2,10 +2,10 @@
 name = "api-gateway"
 version = "0.1.0"
 edition = "2021"
-authors = ["Nexus-Security Team"]
-description = "API Gateway for Nexus-Security decentralized threat intelligence platform"
+authors = ["Verdyx Team"]
+description = "API Gateway for Verdyx decentralized threat intelligence platform"
 license = "MIT"
-repository = "https://github.com/nexus-security/deep60"
+repository = "https://github.com/verdyx/deep60"
 
 
 [dependencies]

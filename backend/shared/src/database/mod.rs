@@ -45,9 +45,9 @@ impl Default for DatabaseConfig {
         Self {
             host: "localhost".to_string(),
             port: 5432,
-            username: "nexus_user".to_string(),
-            password: "nexus_password".to_string(),
-            database_name: "nexus_security".to_string(),
+            username: "verdyx_user".to_string(),
+            password: "verdyx_password".to_string(),
+            database_name: "verdyx".to_string(),
             max_connections: 20,
             min_connections: 1,
             connection_timeout: 30,

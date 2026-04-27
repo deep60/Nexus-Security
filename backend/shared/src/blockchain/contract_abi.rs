@@ -1,4 +1,4 @@
-//! Smart contract ABI definitions for Nexus Security
+//! Smart contract ABI definitions for Verdyx
 
 use ethers::abi::{Abi, Token};
 use ethers::types::{H160, U256};

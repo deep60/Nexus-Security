@@ -41,7 +41,7 @@ export const config = {
   smtpPort: parseInt(process.env.SMTP_PORT || '587', 10),
   smtpUser: process.env.SMTP_USER || '',
   smtpPassword: process.env.SMTP_PASSWORD || '',
-  emailFrom: process.env.EMAIL_FROM || 'noreply@nexus-security.com',
+  emailFrom: process.env.EMAIL_FROM || 'noreply@verdyx.com',
 
   // Monitoring
   sentryDsn: process.env.SENTRY_DSN || '',

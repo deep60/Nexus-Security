@@ -23,8 +23,8 @@ impl Default for KafkaConfig {
     fn default() -> Self {
         Self {
             brokers: vec!["localhost:9092".to_string()],
-            client_id: "nexus-security".to_string(),
-            group_id: "nexus-security-group".to_string(),
+            client_id: "verdyx".to_string(),
+            group_id: "verdyx-group".to_string(),
         }
     }
 }
@@ -41,8 +41,12 @@ impl KafkaClient {
 
     /// Connect to Kafka brokers
     pub async fn connect(&self) -> MessageResult<()> {
-        // TODO: Implement actual Kafka connection
-        // Use rdkafka or similar Kafka client library
+        // Kafka is not yet connected. Add rdkafka dependency and broker
+        // configuration to enable real Kafka message streaming.
+        tracing::warn!(
+            brokers = ?self.config.brokers,
+            "Kafka connection requested but client is not yet implemented"
+        );
         Err(MessageError::Connection(
             "Kafka client not yet implemented".to_string(),
         ))
@@ -52,21 +56,21 @@ impl KafkaClient {
 #[async_trait::async_trait]
 impl MessageQueue for KafkaClient {
     async fn publish(&self, topic: &str, message: &[u8]) -> Result<(), MessageError> {
-        // TODO: Implement Kafka message publishing
+        tracing::warn!(topic = topic, "Kafka publish requested — client not yet implemented");
         Err(MessageError::Connection(
             "Kafka publishing not yet implemented".to_string(),
         ))
     }
 
     async fn subscribe(&self, topic: &str) -> Result<MessageSubscription, MessageError> {
-        // TODO: Implement Kafka subscription
+        tracing::warn!(topic = topic, "Kafka subscribe requested — client not yet implemented");
         Err(MessageError::Subscription(
             "Kafka subscription not yet implemented".to_string(),
         ))
     }
 
     async fn unsubscribe(&self, subscription: MessageSubscription) -> Result<(), MessageError> {
-        // TODO: Implement Kafka unsubscribe
+        tracing::warn!("Kafka unsubscribe requested — client not yet implemented");
         Ok(())
     }
 }

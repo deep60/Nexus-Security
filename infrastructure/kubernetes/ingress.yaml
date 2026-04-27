@@ -1,10 +1,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: nexus-security-ingress
-  namespace: nexus-security
+  name: verdyx-ingress
+  namespace: verdyx
   labels:
-    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/name: verdyx
     app.kubernetes.io/component: ingress
   annotations:
     # NGINX Ingress Controller annotations
@@ -35,7 +35,7 @@ metadata:
     
     # CORS for web3 integration
     nginx.ingress.kubernetes.io/enable-cors: "true"
-    nginx.ingress.kubernetes.io/cors-allow-origin: "https://nexus-security.com, https://app.nexus-security.com"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://verdyx.com, https://app.verdyx.com"
     nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
     nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-API-Key"
     
@@ -44,45 +44,45 @@ metadata:
     
     # WebSocket support for real-time updates
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
-    nginx.ingress.kubernetes.io/websocket-services: "nexus-api-gateway-service"
+    nginx.ingress.kubernetes.io/websocket-services: "verdyx-api-gateway-service"
 
 spec:
   tls:
   - hosts:
-    - nexus-security.com
-    - api.nexus-security.com
-    - app.nexus-security.com
-    secretName: nexus-security-tls
+    - verdyx.com
+    - api.verdyx.com
+    - app.verdyx.com
+    secretName: verdyx-tls
   
   rules:
   # Main web application
-  - host: nexus-security.com
+  - host: verdyx.com
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: nexus-frontend-service
+            name: verdyx-frontend-service
             port:
               number: 3000
   
   # Web application (app subdomain)
-  - host: app.nexus-security.com
+  - host: app.verdyx.com
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: nexus-frontend-service
+            name: verdyx-frontend-service
             port:
               number: 3000
   
   # API endpoints — all routed through the api-gateway
   # The gateway handles internal routing to microservices,
   # auth middleware, rate limiting, and logging.
-  - host: api.nexus-security.com
+  - host: api.verdyx.com
     http:
       paths:
       # WebSocket upgrade — must be before the catch-all
@@ -90,7 +90,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: nexus-api-gateway-service
+            name: verdyx-api-gateway-service
             port:
               number: 8080
       
@@ -99,7 +99,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: nexus-api-gateway-service
+            name: verdyx-api-gateway-service
             port:
               number: 8080
 
@@ -108,32 +108,32 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: nexus-security-admin-ingress
-  namespace: nexus-security
+  name: verdyx-admin-ingress
+  namespace: verdyx
   labels:
-    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/name: verdyx
     app.kubernetes.io/component: admin-ingress
   annotations:
     kubernetes.io/ingress.class: "nginx"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/auth-type: basic
-    nginx.ingress.kubernetes.io/auth-secret: nexus-admin-auth
-    nginx.ingress.kubernetes.io/auth-realm: "Nexus Security Admin Area"
+    nginx.ingress.kubernetes.io/auth-secret: verdyx-admin-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Verdyx Admin Area"
     nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
 spec:
   tls:
   - hosts:
-    - admin.nexus-security.com
-    secretName: nexus-security-admin-tls
+    - admin.verdyx.com
+    secretName: verdyx-admin-tls
   
   rules:
-  - host: admin.nexus-security.com
+  - host: admin.verdyx.com
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: nexus-admin-service
+            name: verdyx-admin-service
             port:
               number: 8888

@@ -136,7 +136,18 @@ pub async fn create_bounty(
             (chrono::Utc::now() + chrono::Duration::hours(24)).timestamp() as u64
         ));
 
-    let artifact_hash = String::new(); // TODO: derive from submission
+    // Derive artifact hash from the submission's file hash when available
+    let artifact_hash = match state.db.get_submission_file_hash(request.submission_id).await {
+        Ok(Some(hash)) => hash,
+        Ok(None) => {
+            tracing::debug!("No file hash found for submission {}, using empty hash", request.submission_id);
+            String::new()
+        }
+        Err(e) => {
+            tracing::warn!("Failed to fetch file hash for submission {}: {}", request.submission_id, e);
+            String::new()
+        }
+    };
     let artifact_type = "file".to_string();
 
     let bc_params = crate::services::blockchain::CreateBountyParams {

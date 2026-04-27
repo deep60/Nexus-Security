@@ -48,7 +48,7 @@ impl Default for UrlScannerConfig {
             check_redirect_chain: true,
             max_redirects: 5,
             timeout_seconds: 30,
-            user_agent: "Mozilla/5.0 (Nexus-Security URL Scanner)".to_string(),
+            user_agent: "Mozilla/5.0 (Verdyx URL Scanner)".to_string(),
         }
     }
 }

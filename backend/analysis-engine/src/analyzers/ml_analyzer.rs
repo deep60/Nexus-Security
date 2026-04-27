@@ -131,7 +131,7 @@ impl MlAnalyzer {
         // Initialize ONNX Runtime environment
         let environment = Arc::new(
             Environment::builder()
-                .with_name("nexus-ml-analyzer")
+                .with_name("verdyx-ml-analyzer")
                 .build()?
         );
 

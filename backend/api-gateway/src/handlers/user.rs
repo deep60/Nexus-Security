@@ -124,15 +124,35 @@ pub async fn update_profile(
     claims: crate::middleware::auth::Claims,
     Json(payload): Json<UpdateProfileRequest>,
 ) -> Result<Json<UserProfile>, StatusCode> {
-    // This requires implementing an update_user method in DatabaseService, which currently only has `update_user_reputation`.
-    // For now we will return NOT_IMPLEMENTED until DB service is expanded, or just update reputation if that was the only thing.
-    // However, proper implementation requires expanding `DatabaseService`.
-    // Given the constraints, I will leave a TODO for the DatabaseService expansion but implement the handler logic structure.
+    // Update profile fields directly via SQL
+    if let Some(ref username) = payload.username {
+        if username.is_empty() {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
 
-    // TODO: Implement `update_user` in DatabaseService
-    // state.db.update_user(claims.sub, payload).await...
+    sqlx::query(
+        r#"
+        UPDATE users SET
+            username = COALESCE($1, username),
+            email = COALESCE($2, email),
+            wallet_address = COALESCE($3, wallet_address),
+            updated_at = NOW()
+        WHERE id = $4
+        "#,
+    )
+    .bind(&payload.username)
+    .bind(&payload.email)
+    .bind(&payload.ethereum_address)
+    .bind(claims.sub)
+    .execute(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to update user profile: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
-    // Fallback to fetching current user to satisfy return type for now
+    // Return updated profile
     get_current_user(State(state), claims).await
 }
 
@@ -161,14 +181,69 @@ pub async fn get_user_stats(
             benign_detections: Some(0),
         });
 
+    // Query bounty and reward stats
+    let bounties_created: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM bounties WHERE creator_id = $1"
+    )
+    .bind(claims.sub)
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or((0,));
+
+    let bounties_participated: (i64,) = sqlx::query_as(
+        "SELECT COUNT(DISTINCT bounty_id) FROM bounty_submissions WHERE engine_id = $1::text"
+    )
+    .bind(claims.sub.to_string())
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or((0,));
+
+    let rewards_earned: (Option<i64>,) = sqlx::query_as(
+        "SELECT COALESCE(SUM(amount), 0) FROM payouts WHERE recipient = $1 AND status = 'Processed'"
+    )
+    .bind(claims.sub.to_string())
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or((Some(0),));
+
+    let rewards_paid: (Option<i64>,) = sqlx::query_as(
+        "SELECT COALESCE(SUM(CAST(reward_amount AS BIGINT)), 0) FROM bounties WHERE creator_id = $1 AND bounty_status = 'completed'"
+    )
+    .bind(claims.sub)
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or((Some(0),));
+
+    // Streak: count consecutive days with at least one analysis
+    let streak_days: (i64,) = sqlx::query_as(
+        r#"
+        WITH daily AS (
+            SELECT DATE(created_at) as d FROM analysis_results
+            WHERE engine_id = $1::text
+            GROUP BY DATE(created_at)
+            ORDER BY d DESC
+        ),
+        ranked AS (
+            SELECT d, d - INTERVAL '1 day' * ROW_NUMBER() OVER (ORDER BY d DESC) AS grp
+            FROM daily
+        )
+        SELECT COUNT(*) FROM ranked
+        WHERE grp = (SELECT grp FROM ranked LIMIT 1)
+        "#
+    )
+    .bind(claims.sub.to_string())
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or((0,));
+
     Ok(Json(UserStats {
         total_analyses: stats.total_analyses.unwrap_or(0) as u64,
-        total_bounties_created: 0, // TODO: Add to DB query or separate query
-        total_bounties_participated: 0, // TODO: Add to DB query
-        total_rewards_earned: "0".to_string(), // TODO: Add to DB query
-        total_rewards_paid: "0".to_string(), // TODO: Add to DB query
+        total_bounties_created: bounties_created.0 as u64,
+        total_bounties_participated: bounties_participated.0 as u64,
+        total_rewards_earned: rewards_earned.0.unwrap_or(0).to_string(),
+        total_rewards_paid: rewards_paid.0.unwrap_or(0).to_string(),
         average_accuracy: stats.avg_confidence.unwrap_or(0.0),
-        streak_days: 0, // TODO: Track streaks
+        streak_days: streak_days.0 as u32,
     }))
 }
 
@@ -179,12 +254,40 @@ pub async fn get_user_activity(
     State(state): State<AppState>,
     Query(params): Query<ActivityQuery>,
 ) -> Result<Json<ActivityListResponse>, StatusCode> {
-    // TODO: Fetch activity from database
+    // Fetch recent activity from analysis_results and bounty_submissions
+    let page = params.page.unwrap_or(1);
+    let limit = params.limit.unwrap_or(20).min(100);
+    let offset = ((page.saturating_sub(1)) * limit) as i64;
+
+    let activities: Vec<Activity> = sqlx::query_as::<_, Activity>(
+        r#"
+        SELECT
+            id,
+            'analysis' AS activity_type,
+            CONCAT('Analysis on bounty ', bounty_id) AS description,
+            json_build_object('verdict', verdict, 'confidence', confidence) AS metadata,
+            created_at AS timestamp
+        FROM analysis_results
+        ORDER BY created_at DESC
+        LIMIT $1 OFFSET $2
+        "#
+    )
+    .bind(limit as i64)
+    .bind(offset)
+    .fetch_all(state.db.pool())
+    .await
+    .unwrap_or_default();
+
+    let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM analysis_results")
+        .fetch_one(state.db.pool())
+        .await
+        .unwrap_or((0,));
+
     Ok(Json(ActivityListResponse {
-        activities: vec![],
-        total: 0,
-        page: params.page.unwrap_or(1),
-        limit: params.limit.unwrap_or(20),
+        activities,
+        total: total.0 as u64,
+        page,
+        limit,
     }))
 }
 

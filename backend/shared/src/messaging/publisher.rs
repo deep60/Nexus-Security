@@ -3,7 +3,7 @@ use redis::AsyncCommands;
 use serde::Serialize;
 use tracing::{info, error};
 
-use super::event_types::NexusEvent;
+use super::event_types::VerdyxEvent;
 
 /// Redis Pub/Sub channel prefix for events
 const EVENT_CHANNEL_PREFIX: &str = "events:";
@@ -27,7 +27,7 @@ impl EventPublisher {
     }
 
     /// Publish an event to the appropriate Redis Pub/Sub channel
-    pub async fn publish(&self, event: &NexusEvent) -> Result<()> {
+    pub async fn publish(&self, event: &VerdyxEvent) -> Result<()> {
         let channel = self.get_channel_for_event(event);
         let payload = serde_json::to_string(event)
             .map_err(|e| anyhow!("Failed to serialize event: {}", e))?;
@@ -46,7 +46,7 @@ impl EventPublisher {
     }
 
     /// Publish multiple events in batch
-    pub async fn publish_batch(&self, events: Vec<NexusEvent>) -> Result<()> {
+    pub async fn publish_batch(&self, events: Vec<VerdyxEvent>) -> Result<()> {
         if events.is_empty() {
             return Ok(());
         }
@@ -73,36 +73,36 @@ impl EventPublisher {
     }
 
     /// Get the Redis channel name for a given event
-    fn get_channel_for_event(&self, event: &NexusEvent) -> String {
+    fn get_channel_for_event(&self, event: &VerdyxEvent) -> String {
         let event_name = match event {
-            NexusEvent::BountyCreated(_) => "bounty_created",
-            NexusEvent::BountyUpdated(_) => "bounty_updated",
-            NexusEvent::BountyCompleted(_) => "bounty_completed",
-            NexusEvent::BountyExpired(_) => "bounty_expired",
-            NexusEvent::BountyCancelled(_) => "bounty_cancelled",
+            VerdyxEvent::BountyCreated(_) => "bounty_created",
+            VerdyxEvent::BountyUpdated(_) => "bounty_updated",
+            VerdyxEvent::BountyCompleted(_) => "bounty_completed",
+            VerdyxEvent::BountyExpired(_) => "bounty_expired",
+            VerdyxEvent::BountyCancelled(_) => "bounty_cancelled",
 
-            NexusEvent::SubmissionReceived(_) => "submission_received",
-            NexusEvent::SubmissionValidated(_) => "submission_validated",
-            NexusEvent::SubmissionRejected(_) => "submission_rejected",
+            VerdyxEvent::SubmissionReceived(_) => "submission_received",
+            VerdyxEvent::SubmissionValidated(_) => "submission_validated",
+            VerdyxEvent::SubmissionRejected(_) => "submission_rejected",
 
-            NexusEvent::AnalysisStarted(_) => "analysis_started",
-            NexusEvent::AnalysisCompleted(_) => "analysis_completed",
-            NexusEvent::AnalysisFailed(_) => "analysis_failed",
+            VerdyxEvent::AnalysisStarted(_) => "analysis_started",
+            VerdyxEvent::AnalysisCompleted(_) => "analysis_completed",
+            VerdyxEvent::AnalysisFailed(_) => "analysis_failed",
 
-            NexusEvent::ReputationUpdated(_) => "reputation_updated",
+            VerdyxEvent::ReputationUpdated(_) => "reputation_updated",
 
-            NexusEvent::PaymentProcessed(_) => "payment_processed",
-            NexusEvent::PaymentFailed(_) => "payment_failed",
-            NexusEvent::StakeSlashed(_) => "stake_slashed",
+            VerdyxEvent::PaymentProcessed(_) => "payment_processed",
+            VerdyxEvent::PaymentFailed(_) => "payment_failed",
+            VerdyxEvent::StakeSlashed(_) => "stake_slashed",
 
-            NexusEvent::UserRegistered(_) => "user_registered",
-            NexusEvent::UserVerified(_) => "user_verified",
-            NexusEvent::EngineRegistered(_) => "engine_registered",
+            VerdyxEvent::UserRegistered(_) => "user_registered",
+            VerdyxEvent::UserVerified(_) => "user_verified",
+            VerdyxEvent::EngineRegistered(_) => "engine_registered",
 
-            NexusEvent::DisputeCreated(_) => "dispute_created",
-            NexusEvent::DisputeResolved(_) => "dispute_resolved",
+            VerdyxEvent::DisputeCreated(_) => "dispute_created",
+            VerdyxEvent::DisputeResolved(_) => "dispute_resolved",
 
-            NexusEvent::SystemAlert(_) => "system_alert",
+            VerdyxEvent::SystemAlert(_) => "system_alert",
         };
 
         format!("{}{}", EVENT_CHANNEL_PREFIX, event_name)
@@ -110,7 +110,7 @@ impl EventPublisher {
 }
 
 /// Publish a single event (convenience function)
-pub async fn publish_event(redis_client: &redis::Client, event: &NexusEvent) -> Result<()> {
+pub async fn publish_event(redis_client: &redis::Client, event: &VerdyxEvent) -> Result<()> {
     let publisher = EventPublisher::new(redis_client.clone());
     publisher.publish(event).await
 }
@@ -149,7 +149,7 @@ mod tests {
         let redis_client = redis::Client::open("redis://localhost:6379").unwrap();
         let publisher = EventPublisher::new(redis_client);
 
-        let event = NexusEvent::UserRegistered(UserRegisteredEvent {
+        let event = VerdyxEvent::UserRegistered(UserRegisteredEvent {
             user_id: Uuid::new_v4(),
             username: "test_user".to_string(),
             email: "test@example.com".to_string(),
@@ -166,7 +166,7 @@ mod tests {
         let redis_client = redis::Client::open("redis://localhost:6379").unwrap();
         let publisher = EventPublisher::new(redis_client);
 
-        let event = NexusEvent::PaymentProcessed(PaymentProcessedEvent {
+        let event = VerdyxEvent::PaymentProcessed(PaymentProcessedEvent {
             bounty_id: Uuid::new_v4(),
             recipient_id: Uuid::new_v4(),
             amount: 1000,

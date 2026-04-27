@@ -1,12 +1,12 @@
-# Contributing to Nexus-Security
+# Contributing to Verdyx
 
-Thank you for your interest in contributing to Nexus-Security! We welcome contributions from the community.
+Thank you for your interest in contributing to Verdyx! We welcome contributions from the community.
 
 ## How to Contribute
 
 ### Reporting Bugs
 
-1. Check if the bug has already been reported in [Issues](https://github.com/your-org/nexus-security/issues)
+1. Check if the bug has already been reported in [Issues](https://github.com/your-org/verdyx/issues)
 2. If not, create a new issue with:
    - Clear description of the bug
    - Steps to reproduce
@@ -25,8 +25,8 @@ Thank you for your interest in contributing to Nexus-Security! We welcome contri
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/nexus-security.git
-cd nexus-security
+git clone https://github.com/your-org/verdyx.git
+cd verdyx
 
 # Install dependencies
 cd backend && cargo build
@@ -137,4 +137,4 @@ Contributors will be recognized in:
 - Release notes
 - Project website (if applicable)
 
-Thank you for helping make Nexus-Security better!
+Thank you for helping make Verdyx better!

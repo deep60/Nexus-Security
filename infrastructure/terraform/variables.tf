@@ -1,4 +1,4 @@
-# Nexus Security - Terraform Variables
+# Verdyx - Terraform Variables
 
 variable "aws_region" {
   description = "AWS region"
@@ -9,7 +9,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Project name for resource naming"
   type        = string
-  default     = "nexus-security"
+  default     = "verdyx"
 }
 
 variable "environment" {
@@ -46,7 +46,7 @@ variable "public_subnet_cidrs" {
 variable "cluster_name" {
   description = "EKS cluster name"
   type        = string
-  default     = "nexus-security-cluster"
+  default     = "verdyx-cluster"
 }
 
 variable "kubernetes_version" {
@@ -109,7 +109,7 @@ variable "redis_node_type" {
 variable "domain_name" {
   description = "Primary domain name"
   type        = string
-  default     = "nexus-security.com"
+  default     = "verdyx.com"
 }
 
 # Tags

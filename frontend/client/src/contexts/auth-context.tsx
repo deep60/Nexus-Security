@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       toast({
         title: "Account created!",
-        description: "Welcome to Nexus-Security",
+        description: "Welcome to Verdyx",
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Email may already be in use";
@@ -203,7 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const walletAddress = accounts[0];
 
       // Sign a message to prove wallet ownership
-      const message = `Connect wallet ${walletAddress} to Nexus-Security at ${Date.now()}`;
+      const message = `Connect wallet ${walletAddress} to Verdyx at ${Date.now()}`;
       const signature = await window.ethereum.request({
         method: "personal_sign",
         params: [message, walletAddress],

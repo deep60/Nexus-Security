@@ -142,7 +142,7 @@ export function SubmissionsTableExample() {
           data={filteredSubmissions}
           columns={exportColumns}
           defaultFilename="submissions"
-          title="Nexus Security - Submissions Report"
+          title="Verdyx - Submissions Report"
         />
       </div>
 

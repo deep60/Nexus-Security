@@ -3,7 +3,7 @@
 echo "🧪 Testing Docker Build Fix..."
 echo ""
 
-cd /Users/arjun/Developer/Nexus-Security
+cd /Users/arjun/Developer/Verdyx
 
 # Step 1: Check .env exists
 if [ ! -f .env ]; then

@@ -24,7 +24,7 @@ max_connections = 100
 connection_timeout_seconds = 5
 pool_timeout_seconds = 10
 enable_cluster = false
-key_prefix = "nexus:staging:"
+key_prefix = "verdyx:staging:"
 default_ttl_seconds = 3600
 
 [blockchain]
@@ -60,7 +60,7 @@ lockout_duration_minutes = 15
 session_timeout_minutes = 60
 
 [security.cors]
-allowed_origins = ["https://staging.nexus-security.com"]
+allowed_origins = ["https://staging.verdyx.com"]
 allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 allowed_headers = ["*"]
 expose_headers = []

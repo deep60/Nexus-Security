@@ -158,7 +158,7 @@ pub struct DatabaseConfig {
 impl DatabaseConfig {
     pub fn from_env() -> Result<Self> {
         let url = env::var("DATABASE_URL").unwrap_or_else(|_| {
-            "postgresql://nexus:nexus_password@localhost:5432/nexus_analysis".to_string()
+            "postgresql://verdyx:verdyx_password@localhost:5432/verdyx_analysis".to_string()
         });
 
         Ok(Self {
@@ -211,7 +211,7 @@ impl DatabaseConfig {
 impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
-            url: "postgresql://nexus:nexus_password@localhost:5432/nexus_analysis".to_string(),
+            url: "postgresql://verdyx:verdyx_password@localhost:5432/verdyx_analysis".to_string(),
             max_connections: 100,
             min_connections: 10,
             connection_timeout_seconds: 30,
@@ -302,7 +302,7 @@ impl StorageConfig {
             s3_region: env::var("S3_REGION")
                 .unwrap_or_else(|_| "us-east-1".to_string()),
             s3_bucket: env::var("S3_BUCKET")
-                .unwrap_or_else(|_| "nexus-security-artifacts".to_string()),
+                .unwrap_or_else(|_| "verdyx-artifacts".to_string()),
             s3_access_key: env::var("S3_ACCESS_KEY")
                 .unwrap_or_else(|_| "minioadmin".to_string()),
             s3_secret_key: env::var("S3_SECRET_KEY")
@@ -316,7 +316,7 @@ impl StorageConfig {
                 .parse()
                 .unwrap_or(true),
             upload_dir: PathBuf::from(
-                env::var("UPLOAD_DIR").unwrap_or_else(|_| "./temp/nexus-uploads".to_string()),
+                env::var("UPLOAD_DIR").unwrap_or_else(|_| "./temp/verdyx-uploads".to_string()),
             ),
             max_file_size_mb: env::var("MAX_FILE_SIZE_MB")
                 .unwrap_or_else(|_| "500".to_string())
@@ -353,12 +353,12 @@ impl Default for StorageConfig {
         Self {
             s3_endpoint: "http://localhost:9000".to_string(),
             s3_region: "us-east-1".to_string(),
-            s3_bucket: "nexus-security-artifacts".to_string(),
+            s3_bucket: "verdyx-artifacts".to_string(),
             s3_access_key: "minioadmin".to_string(),
             s3_secret_key: "minioadmin".to_string(),
             s3_use_ssl: false,
             s3_path_style: true,
-            upload_dir: PathBuf::from("./temp/nexus-uploads"),
+            upload_dir: PathBuf::from("./temp/verdyx-uploads"),
             max_file_size_mb: 500,
             enable_cache: true,
             cache_ttl_seconds: 300,

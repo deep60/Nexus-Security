@@ -1,5 +1,5 @@
 #!/bin/bash
-# Nexus-Security Blockchain & Backend Integration Script
+# Verdyx Blockchain & Backend Integration Script
 # This script integrates the blockchain smart contracts with backend services
 
 set -e
@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║   Nexus-Security Blockchain Integration Setup           ║${NC}"
+echo -e "${BLUE}║   Verdyx Blockchain Integration Setup           ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -121,7 +121,7 @@ CONFIRMATION_BLOCKS=3
 RETRY_ATTEMPTS=3
 
 # Database Configuration
-DATABASE_URL=postgresql://nexus_user:nexus_password@localhost:5432/nexus_security
+DATABASE_URL=postgresql://verdyx_user:verdyx_password@localhost:5432/verdyx
 
 # Redis Configuration
 REDIS_URL=redis://localhost:6379
@@ -222,4 +222,4 @@ echo "  - Integration Report: ./INTEGRATION_REPORT.md"
 echo "  - ABIs Location: ./blockchain/abis/"
 echo "  - Deployed Addresses: ./blockchain/deployed-addresses.json"
 echo ""
-echo "🎉 Happy building with Nexus-Security!"
+echo "🎉 Happy building with Verdyx!"

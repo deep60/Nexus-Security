@@ -80,7 +80,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .with_timer(tracing_subscriber::fmt::time::time())
         .init();
 
-    info!("Starting Nexus-Security Analysis Engine");
+    info!("Starting Verdyx Analysis Engine");
 
     // Load configuration
     let database_url = env::var("DATABASE_URL")
@@ -95,7 +95,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let yara_rule_path = env::var("YARA_RULE_PATH")
         .unwrap_or_else(|_| "./rules".to_string());
     let upload_dir = env::var("UPLOAD_DIR")
-        .unwrap_or_else(|_| "./temp/nexus-uploads".to_string());
+        .unwrap_or_else(|_| "./temp/verdyx-uploads".to_string());
 
     // Initialize database connection pool
     info!("Connecting to database...");

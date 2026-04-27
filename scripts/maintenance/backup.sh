@@ -7,8 +7,8 @@ BACKUP_ROOT="${BACKUP_ROOT:-$ROOT_DIR/backups}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP"
 
-DB_NAME="${DB_NAME:-nexus_security}"
-DB_USER="${DB_USER:-nexus_user}"
+DB_NAME="${DB_NAME:-verdyx}"
+DB_USER="${DB_USER:-verdyx_user}"
 
 usage() {
   cat <<USAGE

@@ -26,7 +26,7 @@ RUN apk add --no-cache curl
 RUN rm /etc/nginx/conf.d/default.conf
 
 # Copy custom nginx configuration
-COPY infrastructure/docker/production/frontend/nginx.conf /etc/nginx/conf.d/nexus.conf
+COPY infrastructure/docker/production/frontend/nginx.conf /etc/nginx/conf.d/verdyx.conf
 
 # Copy built application from builder (Vite outputs to dist/public/)
 COPY --from=builder /app/dist/public /usr/share/nginx/html

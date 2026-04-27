@@ -1,24 +1,24 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: nexus-security
+  name: verdyx
   labels:
-    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/name: verdyx
     app.kubernetes.io/component: threat-intelligence
-    app.kubernetes.io/part-of: nexus-security-platform
+    app.kubernetes.io/part-of: verdyx-platform
     environment: production
-    project: nexus-security
+    project: verdyx
   annotations:
     description: "Decentralized threat intelligence marketplace namespace"
-    contact: "security-team@nexus-security.com"
+    contact: "security-team@verdyx.com"
     version: "1.0.0"
 ---
 # Resource Quota for the namespace
 apiVersion: v1
 kind: ResourceQuota
 metadata:
-  name: nexus-security-quota
-  namespace: nexus-security
+  name: verdyx-quota
+  namespace: verdyx
 spec:
   hard:
     requests.cpu: "10"
@@ -35,8 +35,8 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: nexus-security-network-policy
-  namespace: nexus-security
+  name: verdyx-network-policy
+  namespace: verdyx
 spec:
   podSelector: {}
   policyTypes:
@@ -46,7 +46,7 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          name: nexus-security
+          name: verdyx
     - namespaceSelector:
         matchLabels:
           name: ingress-nginx
@@ -56,13 +56,13 @@ spec:
   egress:
   - {} # Allow all egress for blockchain connectivity and external APIs
 ---
-# Service Account for Nexus Security applications
+# Service Account for Verdyx applications
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nexus-security-sa
-  namespace: nexus-security
+  name: verdyx-sa
+  namespace: verdyx
   labels:
-    app.kubernetes.io/name: nexus-security
+    app.kubernetes.io/name: verdyx
     app.kubernetes.io/component: service-account
 automountServiceAccountToken: true

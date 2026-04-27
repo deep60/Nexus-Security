@@ -130,8 +130,8 @@ export default function Home() {
       {/* Footer Minimal */}
       <footer className="border-t border-slate-800 py-12 bg-slate-950">
         <div className="max-w-6xl mx-auto px-4 flex flex-col items-center">
-          <div className="text-slate-500 font-mono text-sm mb-4 bg-slate-900 px-4 py-1 rounded-full border border-slate-800">nexus-security // v2.0-stable</div>
-          <p className="text-slate-600 text-xs">© 2026 Nexus-Security. Developer First.</p>
+          <div className="text-slate-500 font-mono text-sm mb-4 bg-slate-900 px-4 py-1 rounded-full border border-slate-800">verdyx // v2.0-stable</div>
+          <p className="text-slate-600 text-xs">© 2026 Verdyx. Developer First.</p>
         </div>
       </footer>
     </div>

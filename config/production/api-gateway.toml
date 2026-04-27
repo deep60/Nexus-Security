@@ -24,7 +24,7 @@ max_connections = 150
 connection_timeout_seconds = 5
 pool_timeout_seconds = 10
 enable_cluster = true
-key_prefix = "nexus:prod:"
+key_prefix = "verdyx:prod:"
 default_ttl_seconds = 3600
 
 [blockchain]
@@ -60,7 +60,7 @@ lockout_duration_minutes = 30
 session_timeout_minutes = 30
 
 [security.cors]
-allowed_origins = ["https://app.nexus-security.com"]
+allowed_origins = ["https://app.verdyx.com"]
 allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 allowed_headers = ["Authorization", "Content-Type", "X-API-Key"]
 expose_headers = ["X-Request-Id"]
@@ -84,7 +84,7 @@ ml_service_url = "${ML_SERVICE_URL}"
 max_file_size_mb = 100
 supported_file_types = ["exe", "dll", "pdf", "apk", "zip"]
 analysis_timeout_seconds = 300
-upload_path = "/var/lib/nexus/uploads"
+upload_path = "/var/lib/verdyx/uploads"
 
 [features]
 enable_file_uploads = true

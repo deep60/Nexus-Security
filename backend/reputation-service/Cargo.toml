@@ -2,10 +2,10 @@
 name = "reputation-service"
 version = "0.1.0"
 edition = "2021"
-authors = ["Nexus-Security Team"]
-description = "Reputation service for Nexus-Security - calculates and manages analyst reputation scores"
+authors = ["Verdyx Team"]
+description = "Reputation service for Verdyx - calculates and manages analyst reputation scores"
 license = "MIT"
-repository = "https://github.com/nexus-security/deep60"
+repository = "https://github.com/verdyx/deep60"
 
 [dependencies]
 # Web framework

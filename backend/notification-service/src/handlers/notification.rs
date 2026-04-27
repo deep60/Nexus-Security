@@ -6,7 +6,7 @@ use uuid::Uuid;
 use chrono::Utc;
 use crate::AppState;
 use shared::messaging::event_types::{
-    NexusEvent, UserRegisteredEvent, PaymentProcessedEvent,
+    VerdyxEvent, UserRegisteredEvent, PaymentProcessedEvent,
     NotificationPayload, NotificationChannel, NotificationPriority, PaymentType,
 };
 
@@ -32,7 +32,7 @@ pub async fn send_notification(
     // Create test event based on request
     let event = match req.event_type.as_str() {
         "user_registered" => {
-            NexusEvent::UserRegistered(UserRegisteredEvent {
+            VerdyxEvent::UserRegistered(UserRegisteredEvent {
                 user_id: test_user_id,
                 username: "test_user".to_string(),
                 email: req.email.clone(),
@@ -41,7 +41,7 @@ pub async fn send_notification(
             })
         }
         "payment_processed" => {
-            NexusEvent::PaymentProcessed(PaymentProcessedEvent {
+            VerdyxEvent::PaymentProcessed(PaymentProcessedEvent {
                 bounty_id: Uuid::new_v4(),
                 recipient_id: test_user_id,
                 amount: 1000u128,

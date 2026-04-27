@@ -20,7 +20,7 @@ interface DeploymentAddresses {
 }
 
 async function main() {
-    console.log("🚀 Starting Nexus-Security smart contract deployment...\n");
+    console.log("🚀 Starting Verdyx smart contract deployment...\n");
 
     // Get network information
     const network = await ethers.provider.getNetwork();

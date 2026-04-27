@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use tracing::{error, info, warn};
 
 use crate::models::{NotificationChannel, NotificationError, NotificationResult};
-use shared::messaging::event_types::{NexusEvent, NotificationPayload, NotificationPriority};
+use shared::messaging::event_types::{VerdyxEvent, NotificationPayload, NotificationPriority};
 
 /// Push notification channel implementation
 /// Supports Firebase Cloud Messaging (FCM) and Apple Push Notification Service (APNS)
@@ -157,16 +157,16 @@ impl PushChannel {
 
         // Add event-specific data
         match &payload.event {
-            NexusEvent::BountyCreated(e) => {
+            VerdyxEvent::BountyCreated(e) => {
                 data.insert("bounty_id".to_string(), e.bounty_id.to_string());
                 data.insert("action".to_string(), "view_bounty".to_string());
             }
-            NexusEvent::SubmissionReceived(e) => {
+            VerdyxEvent::SubmissionReceived(e) => {
                 data.insert("submission_id".to_string(), e.submission_id.to_string());
                 data.insert("bounty_id".to_string(), e.bounty_id.to_string());
                 data.insert("action".to_string(), "view_submission".to_string());
             }
-            NexusEvent::PaymentProcessed(e) => {
+            VerdyxEvent::PaymentProcessed(e) => {
                 data.insert("bounty_id".to_string(), e.bounty_id.to_string());
                 data.insert("tx_hash".to_string(), e.tx_hash.clone());
                 data.insert("action".to_string(), "view_transaction".to_string());
@@ -183,47 +183,47 @@ impl PushChannel {
             priority: payload.priority.clone(),
             data,
             click_action: Some("OPEN_APP".to_string()),
-            thread_id: Some("nexus_security".to_string()),
+            thread_id: Some("verdyx".to_string()),
             category: Some(Self::get_notification_category(&payload.event)),
             ttl: Some(86400), // 24 hours
         }
     }
 
     /// Get event type string
-    fn get_event_type(event: &NexusEvent) -> String {
+    fn get_event_type(event: &VerdyxEvent) -> String {
         match event {
-            NexusEvent::BountyCreated(_) => "bounty_created",
-            NexusEvent::BountyUpdated(_) => "bounty_updated",
-            NexusEvent::BountyCompleted(_) => "bounty_completed",
-            NexusEvent::BountyExpired(_) => "bounty_expired",
-            NexusEvent::BountyCancelled(_) => "bounty_cancelled",
-            NexusEvent::SubmissionReceived(_) => "submission_received",
-            NexusEvent::SubmissionValidated(_) => "submission_validated",
-            NexusEvent::SubmissionRejected(_) => "submission_rejected",
-            NexusEvent::AnalysisStarted(_) => "analysis_started",
-            NexusEvent::AnalysisCompleted(_) => "analysis_completed",
-            NexusEvent::AnalysisFailed(_) => "analysis_failed",
-            NexusEvent::ReputationUpdated(_) => "reputation_updated",
-            NexusEvent::PaymentProcessed(_) => "payment_processed",
-            NexusEvent::PaymentFailed(_) => "payment_failed",
-            NexusEvent::StakeSlashed(_) => "stake_slashed",
-            NexusEvent::UserRegistered(_) => "user_registered",
-            NexusEvent::UserVerified(_) => "user_verified",
-            NexusEvent::EngineRegistered(_) => "engine_registered",
-            NexusEvent::DisputeCreated(_) => "dispute_created",
-            NexusEvent::DisputeResolved(_) => "dispute_resolved",
-            NexusEvent::SystemAlert(_) => "system_alert",
+            VerdyxEvent::BountyCreated(_) => "bounty_created",
+            VerdyxEvent::BountyUpdated(_) => "bounty_updated",
+            VerdyxEvent::BountyCompleted(_) => "bounty_completed",
+            VerdyxEvent::BountyExpired(_) => "bounty_expired",
+            VerdyxEvent::BountyCancelled(_) => "bounty_cancelled",
+            VerdyxEvent::SubmissionReceived(_) => "submission_received",
+            VerdyxEvent::SubmissionValidated(_) => "submission_validated",
+            VerdyxEvent::SubmissionRejected(_) => "submission_rejected",
+            VerdyxEvent::AnalysisStarted(_) => "analysis_started",
+            VerdyxEvent::AnalysisCompleted(_) => "analysis_completed",
+            VerdyxEvent::AnalysisFailed(_) => "analysis_failed",
+            VerdyxEvent::ReputationUpdated(_) => "reputation_updated",
+            VerdyxEvent::PaymentProcessed(_) => "payment_processed",
+            VerdyxEvent::PaymentFailed(_) => "payment_failed",
+            VerdyxEvent::StakeSlashed(_) => "stake_slashed",
+            VerdyxEvent::UserRegistered(_) => "user_registered",
+            VerdyxEvent::UserVerified(_) => "user_verified",
+            VerdyxEvent::EngineRegistered(_) => "engine_registered",
+            VerdyxEvent::DisputeCreated(_) => "dispute_created",
+            VerdyxEvent::DisputeResolved(_) => "dispute_resolved",
+            VerdyxEvent::SystemAlert(_) => "system_alert",
         }
         .to_string()
     }
 
     /// Get notification category for iOS
-    fn get_notification_category(event: &NexusEvent) -> String {
+    fn get_notification_category(event: &VerdyxEvent) -> String {
         match event {
-            NexusEvent::BountyCreated(_) => "BOUNTY_NOTIFICATION",
-            NexusEvent::SubmissionReceived(_) => "SUBMISSION_NOTIFICATION",
-            NexusEvent::PaymentProcessed(_) => "PAYMENT_NOTIFICATION",
-            NexusEvent::ReputationUpdated(_) => "REPUTATION_NOTIFICATION",
+            VerdyxEvent::BountyCreated(_) => "BOUNTY_NOTIFICATION",
+            VerdyxEvent::SubmissionReceived(_) => "SUBMISSION_NOTIFICATION",
+            VerdyxEvent::PaymentProcessed(_) => "PAYMENT_NOTIFICATION",
+            VerdyxEvent::ReputationUpdated(_) => "REPUTATION_NOTIFICATION",
             _ => "GENERAL_NOTIFICATION",
         }
         .to_string()
@@ -344,7 +344,7 @@ impl Default for ApnsConfig {
         Self {
             endpoint: "https://api.push.apple.com".to_string(),
             auth_token: String::new(),
-            bundle_id: "io.nexus-security.app".to_string(),
+            bundle_id: "io.verdyx.app".to_string(),
         }
     }
 }
@@ -432,7 +432,7 @@ mod tests {
 
     #[test]
     fn test_get_event_type() {
-        let event = NexusEvent::BountyCreated(BountyCreatedEvent {
+        let event = VerdyxEvent::BountyCreated(BountyCreatedEvent {
             bounty_id: Uuid::new_v4(),
             creator_id: Uuid::new_v4(),
             title: "Test".to_string(),

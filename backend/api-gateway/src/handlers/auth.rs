@@ -468,8 +468,7 @@ pub async fn forgot_password(
             )
             .await;
 
-        // TODO: Send email with reset link containing the token
-        tracing::info!("Password reset token generated for user {}", user.id);
+        // Email delivery not yet connected. Log the reset link for development use.\n        // In production, integrate with an email provider (SendGrid, SES, etc.).\n        tracing::info!(\n            user_id = %user.id,\n            \"Password reset link: /reset-password?token={}\",\n            reset_token\n        );
     }
 
     // Always return success to prevent email enumeration

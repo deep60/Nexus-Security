@@ -9,6 +9,6 @@ export default {
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL || "postgresql://localhost:5432/nexus_security",
+    url: process.env.DATABASE_URL || "postgresql://localhost:5432/verdyx",
   },
 } satisfies Config;

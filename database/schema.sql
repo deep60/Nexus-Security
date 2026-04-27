@@ -1,4 +1,4 @@
--- Nexus-Security Complete Database Schema
+-- Verdyx Complete Database Schema
 -- This is the master schema file that orchestrates all database migrations
 -- Run this file to initialize the complete database structure
 
@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 \echo '================================'
-\echo 'Nexus-Security Database Schema'
+\echo 'Verdyx Database Schema'
 \echo 'Version: 1.0.0'
 \echo '================================'
 
@@ -54,12 +54,12 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 \echo ''
 \echo 'Next steps:'
 \echo '  1. Review the schema for any customizations'
-\echo '  2. Load seed data: psql -d nexus_security -f postgres/seeds/test_data.sql'
+\echo '  2. Load seed data: psql -d verdyx -f postgres/seeds/test_data.sql'
 \echo '  3. Verify tables: \\dt'
 \echo '  4. Connect your application'
 \echo ''
 \echo 'Default Database Configuration:'
-\echo '  - Database: nexus_security'
+\echo '  - Database: verdyx'
 \echo '  - User: postgres (change in production!)'
 \echo '  - Port: 5432'
 \echo ''

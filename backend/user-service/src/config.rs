@@ -85,7 +85,7 @@ impl Config {
                 smtp_username: std::env::var("SMTP_USERNAME").unwrap_or_default(),
                 smtp_password: std::env::var("SMTP_PASSWORD").unwrap_or_default(),
                 from_address: std::env::var("EMAIL_FROM")
-                    .unwrap_or_else(|_| "noreply@nexus-security.io".to_string()),
+                    .unwrap_or_else(|_| "noreply@verdyx.io".to_string()),
             },
         })
     }

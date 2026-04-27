@@ -376,7 +376,7 @@ impl HashAnalyzer {
         
         let http_client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_seconds))
-            .user_agent("Nexus-Security/2.0")
+            .user_agent("Verdyx/2.0")
             .build()
             .map_err(|e| HashAnalysisError::NetworkError { 
                 message: format!("Failed to create HTTP client: {}", e) 
@@ -958,38 +958,19 @@ impl HashAnalyzer {
         
         debug!("Querying local database for hash: {}", hash);
         
-        // TODO: Implement actual database connection
-        // This would connect to your PostgreSQL database and check against known hashes
-        // Example implementation:
-        /*
-        use sqlx::PgPool;
-        
-        let pool = self.db_pool.as_ref().ok_or_else(|| {
-            HashAnalysisError::DatabaseError {
-                message: "Database pool not initialized".to_string()
-            }
-        })?;
-
-        let row = sqlx::query!(
-            "SELECT verdict, confidence, first_seen, detection_names, threat_types 
-             FROM threat_intelligence 
-             WHERE hash = $1 AND updated_at > NOW() - INTERVAL '7 days'",
-            hash
-        )
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| HashAnalysisError::DatabaseError {
-            message: format!("Database query failed: {}", e)
-        })?;
-
-        if let Some(row) = row {
-            // Process database result...
-        }
-        */
+        // Local threat intelligence database query. Requires a db_pool field on
+        // HashAnalyzer and a `threat_intelligence` table with columns:
+        //   hash TEXT, verdict TEXT, confidence FLOAT, first_seen TIMESTAMPTZ,
+        //   detection_names JSONB, threat_types JSONB, updated_at TIMESTAMPTZ
+        // Until the database pool is injected, return Unknown.
+        tracing::debug!(
+            hash = hash,
+            "Local threat DB not yet connected - returning Unknown"
+        );
         
         let query_time = start_time.elapsed().as_millis() as u64;
         
-        // Placeholder implementation
+        // Fallback implementation
         Ok(HashReputation {
             source: "Local Database".to_string(),
             verdict: ThreatVerdict::Unknown,

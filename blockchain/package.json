@@ -1,7 +1,7 @@
 {
-  "name": "nexus-security-contracts",
+  "name": "verdyx-contracts",
   "version": "1.0.0",
-  "description": "Smart contracts for Nexus-Security threat intelligence marketplace",
+  "description": "Smart contracts for Verdyx threat intelligence marketplace",
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",

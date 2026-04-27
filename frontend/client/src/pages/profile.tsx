@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { User, Mail, Wallet, Shield, Award, TrendingUp, FileText, CheckCircle2, BarChart3 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { UserAnalyticsDashboard } from "@/components/user-analytics-dashboard";
+import { SEO } from "@/components/seo";
 import type { ApiSubmission } from "@/lib/api-types";
 
 export default function Profile() {
@@ -39,6 +40,7 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SEO title="Profile" description="Manage your Verdyx profile, view submissions, and track your reputation." />
       <ParticleBackground />
       <Navigation />
 

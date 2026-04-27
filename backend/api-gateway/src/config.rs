@@ -245,7 +245,7 @@ impl Default for ServerConfig {
 impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
-            url: "postgresql://postgres:postgres@localhost:5432/nexus_security".to_string(),
+            url: "postgresql://postgres:postgres@localhost:5432/verdyx".to_string(),
             max_connections: 100,
             min_connections: 10,
             connection_timeout_seconds: 30,
@@ -265,7 +265,7 @@ impl Default for RedisConfig {
             connection_timeout_seconds: 5,
             pool_timeout_seconds: 10,
             enable_cluster: false,
-            key_prefix: "nexus:".to_string(),
+            key_prefix: "verdyx:".to_string(),
             default_ttl_seconds: 3600,
         }
     }
@@ -747,7 +747,7 @@ impl AppConfig {
 
     /// Print configuration summary (without sensitive data)
     pub fn print_summary(&self) {
-        println!("=== Nexus Security API Gateway Configuration ===");
+        println!("=== Verdyx API Gateway Configuration ===");
         println!("Environment: {:?}", self.server.environment);
         println!("Server: {}:{}", self.server.host, self.server.port);
         println!(

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: postgresql
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: postgresql
     component: database
@@ -109,7 +109,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgresql-service
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: postgresql
     component: database
@@ -128,7 +128,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: postgres-sa
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: postgresql
     component: database
@@ -138,14 +138,14 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: postgres-config
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: postgresql
     component: database
 data:
-  database-name: "nexus_security"
+  database-name: "verdyx"
   postgresql.conf: |
-    # PostgreSQL configuration for Nexus-Security
+    # PostgreSQL configuration for Verdyx
     listen_addresses = '*'
     port = 5432
     max_connections = 200
@@ -179,19 +179,19 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: postgres-init-scripts
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: postgresql
     component: database
 data:
   01-init-extensions.sql: |
-    -- Enable required extensions for Nexus-Security
+    -- Enable required extensions for Verdyx
     CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
     CREATE EXTENSION IF NOT EXISTS "pgcrypto";
     CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
     
   02-init-schema.sql: |
-    -- Basic schema initialization for Nexus-Security
+    -- Basic schema initialization for Verdyx
     -- This will be replaced by your migration scripts
     
     -- Users table

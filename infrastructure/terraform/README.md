@@ -1,6 +1,6 @@
-# Nexus Security - Terraform Infrastructure
+# Verdyx - Terraform Infrastructure
 
-This Terraform configuration deploys the cloud infrastructure for Nexus Security on AWS.
+This Terraform configuration deploys the cloud infrastructure for Verdyx on AWS.
 
 ## Resources Created
 

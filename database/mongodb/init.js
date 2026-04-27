@@ -7,29 +7,29 @@ db = db.getSiblingDB('admin');
 
 // Create application database user with appropriate permissions
 db.createUser({
-    user: 'nexus_admin',
-    pwd: process.env.MONGODB_PASSWORD || 'nexus_secure_password',
+    user: 'verdyx_admin',
+    pwd: process.env.MONGODB_PASSWORD || 'verdyx_secure_password',
     roles: [
         {
             role: 'readWrite',
-            db: 'nexus_security'
+            db: 'verdyx'
         },
         {
             role: 'dbAdmin',
-            db: 'nexus_security'
+            db: 'verdyx'
         }
     ]
 });
 
-print('Created database user: nexus_admin');
+print('Created database user: verdyx_admin');
 
 // Switch to application database
-db = db.getSiblingDB('nexus_security');
+db = db.getSiblingDB('verdyx');
 
 // Load and execute the main initialization script
 load('/docker-entrypoint-initdb.d/init/init-db.js');
 
 print('MongoDB initialization complete!');
-print('Database: nexus_security');
-print('User: nexus_admin');
+print('Database: verdyx');
+print('User: verdyx_admin');
 print('Ready for connections...');

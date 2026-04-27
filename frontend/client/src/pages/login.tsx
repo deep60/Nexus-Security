@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ParticleBackground } from "@/components/particle-background";
 import { Wallet, Mail, Lock, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SEO } from "@/components/seo";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -43,13 +44,14 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
+      <SEO title="Sign In" description="Sign in to your Verdyx account to start submitting and analyzing threats." />
       <ParticleBackground />
 
       <Card className="w-full max-w-md glassmorphism border-primary/20 relative z-10">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
             <div className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              NEXUS-SECURITY
+              VERDYX
             </div>
           </div>
           <CardTitle className="text-2xl text-center">Welcome back</CardTitle>

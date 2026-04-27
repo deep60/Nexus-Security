@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Nexus Security Frontend
+# Multi-stage Dockerfile for Verdyx Frontend
 # Stage 1: Build the application
 FROM node:20-alpine AS builder
 

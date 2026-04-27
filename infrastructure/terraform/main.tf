@@ -1,4 +1,4 @@
-# Nexus Security - Terraform Infrastructure
+# Verdyx - Terraform Infrastructure
 # This configuration supports AWS, but can be adapted for GCP or Azure
 
 terraform {
@@ -21,11 +21,11 @@ terraform {
 
   # Remote state configuration - uncomment for production
   # backend "s3" {
-  #   bucket         = "nexus-security-terraform-state"
+  #   bucket         = "verdyx-terraform-state"
   #   key            = "infrastructure/terraform.tfstate"
   #   region         = "us-east-1"
   #   encrypt        = true
-  #   dynamodb_table = "nexus-terraform-locks"
+  #   dynamodb_table = "verdyx-terraform-locks"
   # }
 }
 
@@ -35,7 +35,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "nexus-security"
+      Project     = "verdyx"
       Environment = var.environment
       ManagedBy   = "terraform"
     }
@@ -179,8 +179,8 @@ module "rds" {
   allocated_storage     = var.rds_allocated_storage
   max_allocated_storage = var.rds_max_allocated_storage
 
-  db_name  = "nexus_security"
-  username = "nexus"
+  db_name  = "verdyx"
+  username = "verdyx"
   port     = 5432
 
   multi_az               = var.environment == "production"

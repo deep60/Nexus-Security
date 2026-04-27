@@ -62,9 +62,9 @@ impl Config {
                 smtp_username: std::env::var("SMTP_USERNAME").unwrap_or_default(),
                 smtp_password: std::env::var("SMTP_PASSWORD").unwrap_or_default(),
                 from_address: std::env::var("EMAIL_FROM_ADDRESS")
-                    .unwrap_or_else(|_| "noreply@nexus-security.io".to_string()),
+                    .unwrap_or_else(|_| "noreply@verdyx.io".to_string()),
                 from_name: std::env::var("EMAIL_FROM_NAME")
-                    .unwrap_or_else(|_| "Nexus Security".to_string()),
+                    .unwrap_or_else(|_| "Verdyx".to_string()),
             },
             push: PushConfig {
                 fcm: if std::env::var("FCM_SERVER_KEY").is_ok() {
@@ -82,7 +82,7 @@ impl Config {
                             .unwrap_or_else(|_| "https://api.push.apple.com".to_string()),
                         auth_token: std::env::var("APNS_AUTH_TOKEN").unwrap(),
                         bundle_id: std::env::var("APNS_BUNDLE_ID")
-                            .unwrap_or_else(|_| "io.nexus-security.app".to_string()),
+                            .unwrap_or_else(|_| "io.verdyx.app".to_string()),
                     })
                 } else {
                     None

@@ -7,7 +7,7 @@ import "./ThreatToken.sol";
 
 /**
  * @title Governance
- * @dev Decentralized governance system for Nexus-Security platform
+ * @dev Decentralized governance system for Verdyx platform
  * @notice Allows token holders to propose and vote on platform changes
  */
 contract Governance is AccessControl, ReentrancyGuard {

@@ -2,10 +2,10 @@
 name = "consensus-service"
 version = "0.1.0"
 edition = "2021"
-authors = ["Nexus-Security Team"]
-description = "Consensus service for Nexus-Security - aggregates analysis results using weighted voting"
+authors = ["Verdyx Team"]
+description = "Consensus service for Verdyx - aggregates analysis results using weighted voting"
 license = "MIT"
-repository = "https://github.com/nexus-security/deep60"
+repository = "https://github.com/verdyx/deep60"
 
 [dependencies]
 # Web framework

@@ -35,14 +35,28 @@ impl ValidationWorker {
 
     /// Validate all pending submissions
     async fn validate_pending_submissions(&self) -> Result<(), WorkerError> {
-        // TODO: Implement actual validation logic
-        // This is a placeholder that would:
-        // 1. Get all pending submissions
-        // 2. Run validation checks
-        // 3. Update submission status
-        
         info!("Checking for submissions to validate...");
-        
+
+        // Get all pending submissions
+        let pending: Vec<SubmissionModel> = sqlx::query_as(
+            "SELECT * FROM submissions WHERE status = 'Pending' ORDER BY submitted_at ASC LIMIT 50"
+        )
+        .fetch_all(&self.db)
+        .await
+        .map_err(|e| WorkerError::DatabaseError(e.to_string()))?;
+
+        if pending.is_empty() {
+            return Ok(());
+        }
+
+        info!("Validating {} pending submissions", pending.len());
+
+        for submission in &pending {
+            if let Err(e) = self.validate_submission(submission.id).await {
+                error!("Failed to validate submission {}: {}", submission.id, e);
+            }
+        }
+
         Ok(())
     }
 
@@ -90,8 +104,19 @@ impl ValidationWorker {
             return Ok(false);
         }
 
-        // Check 3: Analysis details are present
-        // TODO: Parse and validate analysis_details JSON
+        // Check 3: Analysis details are present and have valid structure
+        let details = &submission.analysis_details;
+        if details.is_null() {
+            return Ok(false);
+        }
+        // Ensure the JSON has at least one meaningful field
+        let has_content = details.get("threat_indicators").is_some()
+            || details.get("malware_families").is_some()
+            || details.get("behavioral_analysis").is_some()
+            || details.get("static_analysis").is_some();
+        if !has_content {
+            return Ok(false);
+        }
 
         // Check 4: Transaction hash is valid (if present)
         if let Some(tx_hash) = &submission.transaction_hash {

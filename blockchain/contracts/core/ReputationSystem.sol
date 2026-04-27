@@ -7,7 +7,7 @@ import "../Interfaces/IReputationSystem.sol";
 
 /**
  * @title ReputationSystem
- * @dev Manages reputation scores for security analysts and engines in the Nexus-Security platform
+ * @dev Manages reputation scores for security analysts and engines in the Verdyx platform
  * @notice This contract tracks accuracy, participation, and calculates weighted reputation scores
  */
 contract ReputationSystem is IReputationSystem, AccessControl {

@@ -66,15 +66,15 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_bounties_reward ON bounties(reward_a
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_wallet_address ON users USING hash(wallet_address);
 
 -- Enable row level security
-ALTER DATABASE nexus_security SET row_security = on;
+ALTER DATABASE verdyx SET row_security = on;
 
 -- Create roles
-CREATE ROLE nexus_api WITH LOGIN PASSWORD 'api_password';
-CREATE ROLE nexus_readonly WITH LOGIN PASSWORD 'readonly_password';
+CREATE ROLE verdyx_api WITH LOGIN PASSWORD 'api_password';
+CREATE ROLE verdyx_readonly WITH LOGIN PASSWORD 'readonly_password';
 
 -- Grant permissions
-GRANT CONNECT ON DATABASE nexus_security TO nexus_api;
-GRANT CONNECT ON DATABASE nexus_security TO nexus_readonly;
+GRANT CONNECT ON DATABASE verdyx TO verdyx_api;
+GRANT CONNECT ON DATABASE verdyx TO verdyx_readonly;
 
 -- Create audit logging function
 CREATE OR REPLACE FUNCTION audit_trigger() RETURNS trigger AS $$
@@ -158,16 +158,16 @@ done
 # Grant permissions after all tables are created
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" << EOSQL
 -- Grant permissions to api role
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO nexus_api;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO nexus_api;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO verdyx_api;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO verdyx_api;
 
 -- Grant read-only permissions
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO nexus_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO verdyx_readonly;
 
 -- Set default permissions for future tables
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO nexus_api;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO nexus_api;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO nexus_readonly;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO verdyx_api;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO verdyx_api;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO verdyx_readonly;
 EOSQL
 
 EOF
@@ -176,7 +176,7 @@ RUN chmod +x /docker-entrypoint-initdb.d/99-run-migrations.sh
 
 # Custom PostgreSQL configuration
 RUN cat > /usr/local/share/postgresql/postgresql.conf.sample << 'EOF'
-# Custom configuration for Nexus Security
+# Custom configuration for Verdyx
 shared_preload_libraries = 'pg_stat_statements'
 max_connections = 200
 shared_buffers = 256MB

@@ -6,7 +6,7 @@ use tracing::{error, info, warn};
 use chrono::{DateTime, Utc};
 
 use crate::models::{NotificationChannel, NotificationError, NotificationResult};
-use shared::messaging::event_types::{NexusEvent, NotificationPayload};
+use shared::messaging::event_types::{VerdyxEvent, NotificationPayload};
 
 /// Webhook notification channel implementation
 /// Sends HTTP POST requests to registered webhook URLs
@@ -20,7 +20,7 @@ impl WebhookChannel {
     pub fn new(signing_secret: Option<String>) -> Self {
         let http_client = Client::builder()
             .timeout(Duration::from_secs(30))
-            .user_agent("NexusSecurity-Webhook/1.0")
+            .user_agent("Verdyx-Webhook/1.0")
             .build()
             .unwrap_or_else(|_| Client::new());
 
@@ -56,29 +56,29 @@ impl WebhookChannel {
     }
 
     /// Get event type string
-    fn get_event_type(event: &NexusEvent) -> String {
+    fn get_event_type(event: &VerdyxEvent) -> String {
         match event {
-            NexusEvent::BountyCreated(_) => "bounty.created",
-            NexusEvent::BountyUpdated(_) => "bounty.updated",
-            NexusEvent::BountyCompleted(_) => "bounty.completed",
-            NexusEvent::BountyExpired(_) => "bounty.expired",
-            NexusEvent::BountyCancelled(_) => "bounty.cancelled",
-            NexusEvent::SubmissionReceived(_) => "submission.received",
-            NexusEvent::SubmissionValidated(_) => "submission.validated",
-            NexusEvent::SubmissionRejected(_) => "submission.rejected",
-            NexusEvent::AnalysisStarted(_) => "analysis.started",
-            NexusEvent::AnalysisCompleted(_) => "analysis.completed",
-            NexusEvent::AnalysisFailed(_) => "analysis.failed",
-            NexusEvent::ReputationUpdated(_) => "reputation.updated",
-            NexusEvent::PaymentProcessed(_) => "payment.processed",
-            NexusEvent::PaymentFailed(_) => "payment.failed",
-            NexusEvent::StakeSlashed(_) => "stake.slashed",
-            NexusEvent::UserRegistered(_) => "user.registered",
-            NexusEvent::UserVerified(_) => "user.verified",
-            NexusEvent::EngineRegistered(_) => "engine.registered",
-            NexusEvent::DisputeCreated(_) => "dispute.created",
-            NexusEvent::DisputeResolved(_) => "dispute.resolved",
-            NexusEvent::SystemAlert(_) => "system.alert",
+            VerdyxEvent::BountyCreated(_) => "bounty.created",
+            VerdyxEvent::BountyUpdated(_) => "bounty.updated",
+            VerdyxEvent::BountyCompleted(_) => "bounty.completed",
+            VerdyxEvent::BountyExpired(_) => "bounty.expired",
+            VerdyxEvent::BountyCancelled(_) => "bounty.cancelled",
+            VerdyxEvent::SubmissionReceived(_) => "submission.received",
+            VerdyxEvent::SubmissionValidated(_) => "submission.validated",
+            VerdyxEvent::SubmissionRejected(_) => "submission.rejected",
+            VerdyxEvent::AnalysisStarted(_) => "analysis.started",
+            VerdyxEvent::AnalysisCompleted(_) => "analysis.completed",
+            VerdyxEvent::AnalysisFailed(_) => "analysis.failed",
+            VerdyxEvent::ReputationUpdated(_) => "reputation.updated",
+            VerdyxEvent::PaymentProcessed(_) => "payment.processed",
+            VerdyxEvent::PaymentFailed(_) => "payment.failed",
+            VerdyxEvent::StakeSlashed(_) => "stake.slashed",
+            VerdyxEvent::UserRegistered(_) => "user.registered",
+            VerdyxEvent::UserVerified(_) => "user.verified",
+            VerdyxEvent::EngineRegistered(_) => "engine.registered",
+            VerdyxEvent::DisputeCreated(_) => "dispute.created",
+            VerdyxEvent::DisputeResolved(_) => "dispute.resolved",
+            VerdyxEvent::SystemAlert(_) => "system.alert",
         }
         .to_string()
     }
@@ -129,13 +129,13 @@ impl WebhookChannel {
             .http_client
             .post(url)
             .header(header::CONTENT_TYPE, "application/json")
-            .header("X-Nexus-Event", &payload.event_type)
-            .header("X-Nexus-Delivery-ID", payload.id.to_string())
-            .header("X-Nexus-Timestamp", payload.timestamp.to_rfc3339());
+            .header("X-Verdyx-Event", &payload.event_type)
+            .header("X-Verdyx-Delivery-ID", payload.id.to_string())
+            .header("X-Verdyx-Timestamp", payload.timestamp.to_rfc3339());
 
         // Add signature if configured
         if let Some(signature) = self.generate_signature(&payload_json) {
-            request = request.header("X-Nexus-Signature", signature);
+            request = request.header("X-Verdyx-Signature", signature);
         }
 
         let start_time = Utc::now();
@@ -259,7 +259,7 @@ pub struct WebhookPayload {
     /// Timestamp of the event
     pub timestamp: DateTime<Utc>,
     /// The actual event data
-    pub event: NexusEvent,
+    pub event: VerdyxEvent,
     /// API version
     pub version: String,
 }
@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn test_get_event_type() {
-        let event = NexusEvent::BountyCreated(BountyCreatedEvent {
+        let event = VerdyxEvent::BountyCreated(BountyCreatedEvent {
             bounty_id: Uuid::new_v4(),
             creator_id: Uuid::new_v4(),
             title: "Test".to_string(),

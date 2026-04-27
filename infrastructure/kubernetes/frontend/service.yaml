@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: nexus-frontend-service
-  namespace: nexus-security
+  name: verdyx-frontend-service
+  namespace: verdyx
   labels:
-    app: nexus-frontend
+    app: verdyx-frontend
     component: frontend
     service: web
 spec:
@@ -15,15 +15,15 @@ spec:
     targetPort: http
     protocol: TCP
   selector:
-    app: nexus-frontend
+    app: verdyx-frontend
   sessionAffinity: None
 
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nexus-frontend-sa
-  namespace: nexus-security
+  name: verdyx-frontend-sa
+  namespace: verdyx
   labels:
-    app: nexus-frontend
+    app: verdyx-frontend
     component: frontend

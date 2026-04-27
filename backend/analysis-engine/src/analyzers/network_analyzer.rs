@@ -162,7 +162,7 @@ impl NetworkAnalyzer {
         
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(config.timeout_seconds))
-            .user_agent("Nexus-Security-Analyzer/1.0")
+            .user_agent("Verdyx-Analyzer/1.0")
             .build()?;
 
         Ok(Self {
@@ -570,7 +570,7 @@ impl NetworkAnalyzer {
             method: "HEAD".to_string(),
             url: url.to_string(),
             headers,
-            user_agent: "Nexus-Security-Analyzer/1.0".to_string(),
+            user_agent: "Verdyx-Analyzer/1.0".to_string(),
             status_code: response.status().as_u16(),
             response_size: 0,
             timing,

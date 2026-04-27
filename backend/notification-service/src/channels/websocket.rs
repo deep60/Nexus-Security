@@ -9,7 +9,7 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use crate::models::{NotificationChannel, NotificationError, NotificationResult};
-use shared::messaging::event_types::{NexusEvent, NotificationPayload};
+use shared::messaging::event_types::{VerdyxEvent, NotificationPayload};
 
 /// WebSocket notification channel implementation
 /// Maintains active WebSocket connections and broadcasts notifications to connected clients
@@ -86,29 +86,29 @@ impl WebSocketChannel {
     }
 
     /// Get event type string
-    fn get_event_type(event: &NexusEvent) -> String {
+    fn get_event_type(event: &VerdyxEvent) -> String {
         match event {
-            NexusEvent::BountyCreated(_) => "bounty.created",
-            NexusEvent::BountyUpdated(_) => "bounty.updated",
-            NexusEvent::BountyCompleted(_) => "bounty.completed",
-            NexusEvent::BountyExpired(_) => "bounty.expired",
-            NexusEvent::BountyCancelled(_) => "bounty.cancelled",
-            NexusEvent::SubmissionReceived(_) => "submission.received",
-            NexusEvent::SubmissionValidated(_) => "submission.validated",
-            NexusEvent::SubmissionRejected(_) => "submission.rejected",
-            NexusEvent::AnalysisStarted(_) => "analysis.started",
-            NexusEvent::AnalysisCompleted(_) => "analysis.completed",
-            NexusEvent::AnalysisFailed(_) => "analysis.failed",
-            NexusEvent::ReputationUpdated(_) => "reputation.updated",
-            NexusEvent::PaymentProcessed(_) => "payment.processed",
-            NexusEvent::PaymentFailed(_) => "payment.failed",
-            NexusEvent::StakeSlashed(_) => "stake.slashed",
-            NexusEvent::UserRegistered(_) => "user.registered",
-            NexusEvent::UserVerified(_) => "user.verified",
-            NexusEvent::EngineRegistered(_) => "engine.registered",
-            NexusEvent::DisputeCreated(_) => "dispute.created",
-            NexusEvent::DisputeResolved(_) => "dispute.resolved",
-            NexusEvent::SystemAlert(_) => "system.alert",
+            VerdyxEvent::BountyCreated(_) => "bounty.created",
+            VerdyxEvent::BountyUpdated(_) => "bounty.updated",
+            VerdyxEvent::BountyCompleted(_) => "bounty.completed",
+            VerdyxEvent::BountyExpired(_) => "bounty.expired",
+            VerdyxEvent::BountyCancelled(_) => "bounty.cancelled",
+            VerdyxEvent::SubmissionReceived(_) => "submission.received",
+            VerdyxEvent::SubmissionValidated(_) => "submission.validated",
+            VerdyxEvent::SubmissionRejected(_) => "submission.rejected",
+            VerdyxEvent::AnalysisStarted(_) => "analysis.started",
+            VerdyxEvent::AnalysisCompleted(_) => "analysis.completed",
+            VerdyxEvent::AnalysisFailed(_) => "analysis.failed",
+            VerdyxEvent::ReputationUpdated(_) => "reputation.updated",
+            VerdyxEvent::PaymentProcessed(_) => "payment.processed",
+            VerdyxEvent::PaymentFailed(_) => "payment.failed",
+            VerdyxEvent::StakeSlashed(_) => "stake.slashed",
+            VerdyxEvent::UserRegistered(_) => "user.registered",
+            VerdyxEvent::UserVerified(_) => "user.verified",
+            VerdyxEvent::EngineRegistered(_) => "engine.registered",
+            VerdyxEvent::DisputeCreated(_) => "dispute.created",
+            VerdyxEvent::DisputeResolved(_) => "dispute.resolved",
+            VerdyxEvent::SystemAlert(_) => "system.alert",
         }
         .to_string()
     }
@@ -282,7 +282,7 @@ pub struct WebSocketMessage {
     /// Message body
     pub body: String,
     /// Full event data
-    pub event: NexusEvent,
+    pub event: VerdyxEvent,
     /// Timestamp
     pub timestamp: chrono::DateTime<chrono::Utc>,
     /// Priority
@@ -361,7 +361,7 @@ mod tests {
 
     #[test]
     fn test_get_event_type() {
-        let event = NexusEvent::BountyCreated(BountyCreatedEvent {
+        let event = VerdyxEvent::BountyCreated(BountyCreatedEvent {
             bounty_id: Uuid::new_v4(),
             creator_id: Uuid::new_v4(),
             title: "Test".to_string(),

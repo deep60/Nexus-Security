@@ -1,11 +1,11 @@
-# Nexus Security - Terraform Variables Example
+# Verdyx - Terraform Variables Example
 # Copy this file to terraform.tfvars and customize values
 
 # AWS Configuration
 aws_region = "us-east-1"
 
 # Project Configuration
-project_name = "nexus-security"
+project_name = "verdyx"
 environment  = "development"  # development, staging, production
 
 # VPC Configuration
@@ -14,7 +14,7 @@ private_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
 public_subnet_cidrs  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 
 # EKS Configuration
-cluster_name       = "nexus-security-cluster"
+cluster_name       = "verdyx-cluster"
 kubernetes_version = "1.28"
 node_instance_types = ["t3.large", "t3.xlarge"]
 min_node_count     = 2
@@ -30,7 +30,7 @@ rds_max_allocated_storage = 100
 redis_node_type = "cache.t3.medium"
 
 # Domain
-domain_name = "nexus-security.com"
+domain_name = "verdyx.com"
 
 # Additional Tags
 additional_tags = {

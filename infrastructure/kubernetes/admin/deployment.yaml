@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nexus-admin
-  namespace: nexus-security
+  name: verdyx-admin
+  namespace: verdyx
   labels:
-    app: nexus-admin
+    app: verdyx-admin
     component: admin
     service: admin
 spec:
@@ -16,15 +16,15 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: nexus-admin
+      app: verdyx-admin
   template:
     metadata:
       labels:
-        app: nexus-admin
+        app: verdyx-admin
         component: admin
         service: admin
     spec:
-      serviceAccountName: nexus-admin-sa
+      serviceAccountName: verdyx-admin-sa
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -33,7 +33,7 @@ spec:
 
       containers:
       - name: admin
-        image: nexus-security/admin:latest
+        image: verdyx/admin:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8888
@@ -46,11 +46,11 @@ spec:
         - name: PORT
           value: "8888"
         - name: API_BASE_URL
-          value: "http://nexus-api-gateway-service:8080"
+          value: "http://verdyx-api-gateway-service:8080"
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: nexus-database-secret
+              name: verdyx-database-secret
               key: database_url
 
         resources:

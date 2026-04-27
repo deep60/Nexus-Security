@@ -4,7 +4,7 @@
 
 ```bash
 git clone <your-fork-url>
-cd Nexus-Security
+cd Verdyx
 scripts/development/setup.sh
 ```
 

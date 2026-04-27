@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 /**
  * @title ValidationLib
- * @dev Library for common validation operations in the Nexus-Security platform
+ * @dev Library for common validation operations in the Verdyx platform
  * @notice Provides reusable validation functions with custom error messages
  */
 library ValidationLib {

@@ -32,7 +32,7 @@ export default function Features() {
       icon: Database,
       title: "Private Rule Processing",
       description: "Deploy a local node to scan payloads against your proprietary YARA rules without uploading the rules.",
-      code: `docker run -v ./rules:/rules nexus/worker`
+      code: `docker run -v ./rules:/rules verdyx/worker`
     },
     {
       icon: Network,
@@ -46,7 +46,7 @@ export default function Features() {
     <div className="min-h-screen bg-slate-950 text-slate-300 font-sans selection:bg-blue-500/30">
       <SEO 
         title="Features & Capabilities" 
-        description="Technical capabilities of the Nexus-Security engine. API-first, verifiable, multi-engine threat detection."
+        description="Technical capabilities of the Verdyx engine. API-first, verifiable, multi-engine threat detection."
       />
       <Navigation />
       
@@ -84,8 +84,8 @@ export default function Features() {
 
       <footer className="border-t border-slate-800 py-12 bg-slate-950 mt-12">
         <div className="max-w-6xl mx-auto px-4 flex flex-col items-center">
-          <div className="text-slate-500 font-mono text-sm mb-4 bg-slate-900 px-4 py-1 rounded-full border border-slate-800">nexus-security // features</div>
-          <p className="text-slate-600 text-xs">© 2026 Nexus-Security. Developer First.</p>
+          <div className="text-slate-500 font-mono text-sm mb-4 bg-slate-900 px-4 py-1 rounded-full border border-slate-800">verdyx // features</div>
+          <p className="text-slate-600 text-xs">© 2026 Verdyx. Developer First.</p>
         </div>
       </footer>
     </div>

@@ -1,4 +1,4 @@
--- Initial database schema for Nexus Security
+-- Initial database schema for Verdyx
 -- Aligned with database/postgres/migrations/001_user_engine.sql + 002_bounty_system.sql
 -- Uses IF NOT EXISTS so this is idempotent with the root schema
 

@@ -1,6 +1,6 @@
-# 🐳 Docker Setup Guide - Nexus Security
+# 🐳 Docker Setup Guide - Verdyx
 
-This guide explains how to run the Nexus Security platform using Docker.
+This guide explains how to run the Verdyx platform using Docker.
 
 ## Prerequisites
 
@@ -48,7 +48,7 @@ Once started, services will be available at:
 | **Redis** | localhost:6379 | Cache |
 
 **PgAdmin Login:**
-- Email: `admin@nexus-security.io`
+- Email: `admin@verdyx.io`
 - Password: `admin`
 
 ## Docker Commands Reference
@@ -118,7 +118,7 @@ docker-compose exec user-service sh
 docker-compose exec user-service /usr/local/bin/app migrate
 
 # Check PostgreSQL
-docker-compose exec postgres psql -U nexus_user -d nexus_security
+docker-compose exec postgres psql -U verdyx_user -d verdyx
 
 # Check Redis
 docker-compose exec redis redis-cli
@@ -131,13 +131,13 @@ docker-compose exec redis redis-cli
 docker volume ls
 
 # Inspect volume
-docker volume inspect nexus-security_postgres_data
+docker volume inspect verdyx_postgres_data
 
 # Backup database
-docker-compose exec postgres pg_dump -U nexus_user nexus_security > backup.sql
+docker-compose exec postgres pg_dump -U verdyx_user verdyx > backup.sql
 
 # Restore database
-docker-compose exec -T postgres psql -U nexus_user nexus_security < backup.sql
+docker-compose exec -T postgres psql -U verdyx_user verdyx < backup.sql
 ```
 
 ## Service Architecture
@@ -192,7 +192,7 @@ docker-compose ps postgres
 docker-compose logs postgres
 
 # Test connection
-docker-compose exec postgres psql -U nexus_user -d nexus_security -c "SELECT 1;"
+docker-compose exec postgres psql -U verdyx_user -d verdyx -c "SELECT 1;"
 ```
 
 ### Port Already in Use
@@ -266,7 +266,7 @@ For Kubernetes deployment, see `kubernetes/` directory for manifests.
 kubectl apply -f kubernetes/
 
 # Check status
-kubectl get pods -n nexus-security
+kubectl get pods -n verdyx
 ```
 
 ## Additional Resources
@@ -278,5 +278,5 @@ kubectl get pods -n nexus-security
 ## Support
 
 For issues or questions:
-- GitHub Issues: https://github.com/nexus-security/deep60/issues
-- Documentation: https://docs.nexus-security.io
+- GitHub Issues: https://github.com/verdyx/deep60/issues
+- Documentation: https://docs.verdyx.io

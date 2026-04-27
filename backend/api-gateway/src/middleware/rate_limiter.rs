@@ -221,11 +221,16 @@ pub async fn ip_rate_limit_middleware(
     let ip = addr.ip().to_string();
 
     match limiter.check_rate_limit(&ip).await {
-        RateLimitResult::Allowed { .. } => {
+        RateLimitResult::Allowed { limit, remaining, .. } => {
             let mut response = next.run(request).await;
 
-            // Add rate limit headers
-            // TODO: Add headers to response
+            // Add rate limit headers to successful responses
+            if let Ok(limit_value) = limit.to_string().parse() {
+                response.headers_mut().insert("X-RateLimit-Limit", limit_value);
+            }
+            if let Ok(remaining_value) = remaining.to_string().parse() {
+                response.headers_mut().insert("X-RateLimit-Remaining", remaining_value);
+            }
 
             Ok(response)
         }
@@ -256,8 +261,12 @@ pub async fn user_rate_limit_middleware(
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, Response> {
-    // TODO: Extract user ID from request extensions (set by auth middleware)
-    let user_id = "anonymous"; // Placeholder
+    // Extract user ID from request extensions (set by auth middleware)
+    let user_id = request
+        .extensions()
+        .get::<crate::middleware::auth::Claims>()
+        .map(|claims| claims.sub.to_string())
+        .unwrap_or_else(|| "anonymous".to_string());
 
     match limiter.check_rate_limit(user_id).await {
         RateLimitResult::Allowed { limit, remaining, .. } => {

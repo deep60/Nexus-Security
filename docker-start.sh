@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Nexus Security - Docker Startup Script
+# Verdyx - Docker Startup Script
 
 set -e
 
-echo "🚀 Starting Nexus Security Platform..."
+echo "🚀 Starting Verdyx Platform..."
 
 # Check if .env file exists
 if [ ! -f .env ]; then
@@ -28,7 +28,7 @@ echo "📦 Pulling latest base images..."
 docker-compose pull postgres redis pgadmin
 
 # Build services
-echo "🔨 Building Nexus Security services..."
+echo "🔨 Building Verdyx services..."
 docker-compose build
 
 # Start services
@@ -44,7 +44,7 @@ echo "🏥 Checking service health..."
 docker-compose ps
 
 echo ""
-echo "✅ Nexus Security Platform is running!"
+echo "✅ Verdyx Platform is running!"
 echo ""
 echo "📊 Service URLs:"
 echo "   - API Gateway:         http://localhost:8080"

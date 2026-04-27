@@ -39,14 +39,32 @@ impl ReputationWorker {
 
     /// Update reputations for all engines with recent activity
     async fn update_reputations(&self) -> Result<(), WorkerError> {
-        // TODO: Implement reputation updates
-        // This would:
-        // 1. Find engines with processed submissions
-        // 2. Calculate new reputation scores
-        // 3. Update reputation records
-        
         info!("Checking for reputation updates...");
-        
+
+        // Find engines with recently processed submissions (Correct or Incorrect)
+        let engine_ids: Vec<(String,)> = sqlx::query_as(
+            r#"
+            SELECT DISTINCT engine_id FROM submissions
+            WHERE status IN ('Correct', 'Incorrect')
+            AND processed_at > NOW() - INTERVAL '5 minutes'
+            "#
+        )
+        .fetch_all(&self.db)
+        .await
+        .map_err(|e| WorkerError::DatabaseError(e.to_string()))?;
+
+        if engine_ids.is_empty() {
+            return Ok(());
+        }
+
+        info!("Updating reputations for {} engines", engine_ids.len());
+
+        for (engine_id,) in &engine_ids {
+            if let Err(e) = self.update_engine_reputation(engine_id).await {
+                error!("Failed to update reputation for {}: {}", engine_id, e);
+            }
+        }
+
         Ok(())
     }
 

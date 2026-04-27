@@ -5,8 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 COMPOSE_FILE="docker-compose.dev.yml"
 SEED_FILE="database/postgres/seeds/test_data.sql"
 
-DB_NAME="${DB_NAME:-nexus_security}"
-DB_USER="${DB_USER:-nexus_user}"
+DB_NAME="${DB_NAME:-verdyx}"
+DB_USER="${DB_USER:-verdyx_user}"
 
 usage() {
   cat <<USAGE

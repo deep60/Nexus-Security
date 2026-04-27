@@ -5,7 +5,9 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct NotificationService {
-    // TODO: Add Redis or message queue connection
+    // In-memory notification service. In production, this would hold a Redis or
+    // message queue connection for persistent notification delivery (email,
+    // WebSocket push, etc.). Currently notifications are logged via tracing.
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,7 +40,8 @@ impl NotificationService {
 
     /// Send a notification to a user
     pub async fn send_notification(&self, notification: Notification) -> Result<(), NotificationError> {
-        // TODO: Implement actual notification sending (email, websocket, push, etc.)
+        // Notification delivery is currently log-only. Production would dispatch
+        // to email, WebSocket, or push notification providers here.
         tracing::info!(
             "Sending notification to {}: {}",
             notification.recipient,

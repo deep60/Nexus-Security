@@ -6,9 +6,9 @@ COMPOSE_FILE="docker-compose.dev.yml"
 AUTO_YES=0
 WITH_SEED=0
 
-DB_NAME="${DB_NAME:-nexus_security}"
-DB_USER="${DB_USER:-nexus_user}"
-DB_PASSWORD="${DB_PASSWORD:-nexus_password}"
+DB_NAME="${DB_NAME:-verdyx}"
+DB_USER="${DB_USER:-verdyx_user}"
+DB_PASSWORD="${DB_PASSWORD:-verdyx_password}"
 
 usage() {
   cat <<USAGE

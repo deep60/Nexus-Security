@@ -315,8 +315,36 @@ async fn store_analysis_results(
     .await
     .map_err(|e| anyhow!("Failed to store analysis results: {}", e))?;
 
-    // TODO: Store individual detection results in analysis_results table
-    // This would require the full schema for analysis_results table
+    // Store individual detection results in analysis_results table
+    for detection in &analysis_result.detections {
+        let detection_meta = serde_json::to_value(&detection.metadata).unwrap_or_default();
+        if let Err(e) = sqlx::query(
+            r#"
+            INSERT INTO analysis_results (
+                id, submission_id, engine_name, engine_version,
+                verdict, confidence, severity, categories,
+                metadata, detected_at, processing_time_ms
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            "#,
+        )
+        .bind(detection.detection_id)
+        .bind(submission_id)
+        .bind(&detection.engine_name)
+        .bind(&detection.engine_version)
+        .bind(format!("{:?}", detection.verdict))
+        .bind(detection.confidence)
+        .bind(format!("{:?}", detection.severity))
+        .bind(serde_json::to_value(&detection.categories).unwrap_or_default())
+        .bind(detection_meta)
+        .bind(detection.detected_at)
+        .bind(detection.processing_time_ms as i64)
+        .execute(db_pool)
+        .await
+        {
+            warn!("Failed to store detection result for submission {}: {}", submission_id, e);
+        }
+    }
 
     info!(
         "Stored analysis results for submission {}: malicious={}, confidence={}",

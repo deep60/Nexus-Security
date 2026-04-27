@@ -2,7 +2,7 @@
 
 ## Scope
 
-Nexus Security handles:
+Verdyx handles:
 
 - User auth and session workflows
 - File or URL submission data

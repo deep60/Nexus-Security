@@ -8,10 +8,10 @@ use crate::types::common::{
     TokenAmount, TransactionHash
 };
 
-/// Core event types for the Nexus-Security platform
+/// Core event types for the Verdyx platform
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "event_type", content = "data")]
-pub enum NexusEvent {
+pub enum VerdyxEvent {
     // Bounty events
     BountyCreated(BountyCreatedEvent),
     BountyUpdated(BountyUpdatedEvent),
@@ -276,7 +276,7 @@ pub struct NotificationPayload {
     pub notification_id: Uuid,
     pub user_id: UserId,
     pub channels: Vec<NotificationChannel>,
-    pub event: NexusEvent,
+    pub event: VerdyxEvent,
     pub priority: NotificationPriority,
     pub created_at: DateTime<Utc>,
 }
@@ -297,50 +297,50 @@ pub enum NotificationPriority {
     Critical,
 }
 
-impl NexusEvent {
+impl VerdyxEvent {
     /// Get a human-readable title for the event
     pub fn get_title(&self) -> String {
         match self {
-            NexusEvent::BountyCreated(e) => format!("New Bounty Created: {}", e.title),
-            NexusEvent::BountyUpdated(_) => "Bounty Updated".to_string(),
-            NexusEvent::BountyCompleted(_) => "Bounty Completed".to_string(),
-            NexusEvent::BountyExpired(_) => "Bounty Expired".to_string(),
-            NexusEvent::BountyCancelled(_) => "Bounty Cancelled".to_string(),
-            NexusEvent::SubmissionReceived(_) => "New Submission Received".to_string(),
-            NexusEvent::SubmissionValidated(_) => "Submission Validated".to_string(),
-            NexusEvent::SubmissionRejected(_) => "Submission Rejected".to_string(),
-            NexusEvent::AnalysisStarted(_) => "Analysis Started".to_string(),
-            NexusEvent::AnalysisCompleted(_) => "Analysis Completed".to_string(),
-            NexusEvent::AnalysisFailed(_) => "Analysis Failed".to_string(),
-            NexusEvent::ReputationUpdated(_) => "Reputation Updated".to_string(),
-            NexusEvent::PaymentProcessed(_) => "Payment Processed".to_string(),
-            NexusEvent::PaymentFailed(_) => "Payment Failed".to_string(),
-            NexusEvent::StakeSlashed(_) => "Stake Slashed".to_string(),
-            NexusEvent::UserRegistered(_) => "Welcome to Nexus Security!".to_string(),
-            NexusEvent::UserVerified(_) => "Account Verified".to_string(),
-            NexusEvent::EngineRegistered(_) => "Engine Registered".to_string(),
-            NexusEvent::DisputeCreated(_) => "Dispute Created".to_string(),
-            NexusEvent::DisputeResolved(_) => "Dispute Resolved".to_string(),
-            NexusEvent::SystemAlert(e) => format!("System Alert: {}", e.title),
+            VerdyxEvent::BountyCreated(e) => format!("New Bounty Created: {}", e.title),
+            VerdyxEvent::BountyUpdated(_) => "Bounty Updated".to_string(),
+            VerdyxEvent::BountyCompleted(_) => "Bounty Completed".to_string(),
+            VerdyxEvent::BountyExpired(_) => "Bounty Expired".to_string(),
+            VerdyxEvent::BountyCancelled(_) => "Bounty Cancelled".to_string(),
+            VerdyxEvent::SubmissionReceived(_) => "New Submission Received".to_string(),
+            VerdyxEvent::SubmissionValidated(_) => "Submission Validated".to_string(),
+            VerdyxEvent::SubmissionRejected(_) => "Submission Rejected".to_string(),
+            VerdyxEvent::AnalysisStarted(_) => "Analysis Started".to_string(),
+            VerdyxEvent::AnalysisCompleted(_) => "Analysis Completed".to_string(),
+            VerdyxEvent::AnalysisFailed(_) => "Analysis Failed".to_string(),
+            VerdyxEvent::ReputationUpdated(_) => "Reputation Updated".to_string(),
+            VerdyxEvent::PaymentProcessed(_) => "Payment Processed".to_string(),
+            VerdyxEvent::PaymentFailed(_) => "Payment Failed".to_string(),
+            VerdyxEvent::StakeSlashed(_) => "Stake Slashed".to_string(),
+            VerdyxEvent::UserRegistered(_) => "Welcome to Verdyx!".to_string(),
+            VerdyxEvent::UserVerified(_) => "Account Verified".to_string(),
+            VerdyxEvent::EngineRegistered(_) => "Engine Registered".to_string(),
+            VerdyxEvent::DisputeCreated(_) => "Dispute Created".to_string(),
+            VerdyxEvent::DisputeResolved(_) => "Dispute Resolved".to_string(),
+            VerdyxEvent::SystemAlert(e) => format!("System Alert: {}", e.title),
         }
     }
 
     /// Get a human-readable description for the event
     pub fn get_description(&self) -> String {
         match self {
-            NexusEvent::BountyCreated(e) => format!(
+            VerdyxEvent::BountyCreated(e) => format!(
                 "A new bounty has been created with a reward of {} tokens. {}",
                 e.reward_amount, e.description
             ),
-            NexusEvent::SubmissionReceived(e) => format!(
+            VerdyxEvent::SubmissionReceived(e) => format!(
                 "Your submission for bounty {} has been received with verdict: {:?}",
                 e.bounty_id, e.verdict
             ),
-            NexusEvent::PaymentProcessed(e) => format!(
+            VerdyxEvent::PaymentProcessed(e) => format!(
                 "Payment of {} tokens has been processed. Transaction: {}",
                 e.amount, e.tx_hash
             ),
-            NexusEvent::ReputationUpdated(e) => format!(
+            VerdyxEvent::ReputationUpdated(e) => format!(
                 "Your reputation has changed from {} to {}. Reason: {}",
                 e.old_score, e.new_score, e.change_reason
             ),

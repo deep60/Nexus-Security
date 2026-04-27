@@ -40,7 +40,7 @@ export function Navigation() {
           <Link href="/" data-testid="link-home">
             <div className="flex items-center space-x-2 text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
               <Shield className="h-8 w-8 text-primary" />
-              <span>NEXUS-SECURITY</span>
+              <span>VERDYX</span>
             </div>
           </Link>
 

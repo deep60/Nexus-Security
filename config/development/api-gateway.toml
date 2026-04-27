@@ -9,7 +9,7 @@ graceful_shutdown_timeout_seconds = 30
 environment = "development"
 
 [database]
-url = "postgresql://nexus_user:nexus_password@localhost:5432/nexus_security"
+url = "postgresql://verdyx_user:verdyx_password@localhost:5432/verdyx"
 max_connections = 25
 min_connections = 5
 connection_timeout_seconds = 30
@@ -24,7 +24,7 @@ max_connections = 50
 connection_timeout_seconds = 5
 pool_timeout_seconds = 10
 enable_cluster = false
-key_prefix = "nexus:dev:"
+key_prefix = "verdyx:dev:"
 default_ttl_seconds = 3600
 
 [blockchain]

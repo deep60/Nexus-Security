@@ -272,9 +272,9 @@ describe('API Integration Tests', () => {
   });
 
   describe('Statistics Endpoints', () => {
-    it('GET /api/stats - should get platform statistics', async () => {
+    it('GET /api/analysis/stats - should get platform statistics', async () => {
       const response = await request(app)
-        .get('/api/stats')
+        .get('/api/analysis/stats')
         .expect(200);
 
       expect(response.body).toHaveProperty('totalSubmissions');

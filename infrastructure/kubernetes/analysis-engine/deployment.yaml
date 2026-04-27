@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: analysis-engine
-  namespace: nexus-security
+  namespace: verdyx
   labels:
     app: analysis-engine
     component: backend
@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: analysis-engine
-        image: nexus-security/analysis-engine:latest
+        image: verdyx/analysis-engine:latest
         ports:
         - containerPort: 8082
           name: http

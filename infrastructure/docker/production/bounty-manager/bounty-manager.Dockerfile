@@ -35,11 +35,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
-RUN groupadd -r nexus && useradd -r -g nexus -s /bin/bash nexus
+RUN groupadd -r verdyx && useradd -r -g verdyx -s /bin/bash verdyx
 
 # Create necessary directories
 RUN mkdir -p /app/logs && \
-    chown -R nexus:nexus /app
+    chown -R verdyx:verdyx /app
 
 # Copy binary from builder stage
 COPY --from=builder /app/target/release/bounty-manager /app/bounty-manager
@@ -49,7 +49,7 @@ WORKDIR /app
 RUN chmod +x /app/bounty-manager
 
 # Switch to non-root user
-USER nexus
+USER verdyx
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

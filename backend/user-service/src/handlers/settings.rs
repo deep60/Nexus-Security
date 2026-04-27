@@ -119,7 +119,7 @@ pub async fn enable_2fa(
 
     // Generate QR code URL for authenticator apps
     let qr_code_url = format!(
-        "otpauth://totp/NexusSecurity:{}?secret={}&issuer=NexusSecurity",
+        "otpauth://totp/Verdyx:{}?secret={}&issuer=Verdyx",
         claims.email, secret
     );
 

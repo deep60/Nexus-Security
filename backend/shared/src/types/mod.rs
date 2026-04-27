@@ -1,4 +1,4 @@
-//! Shared type definitions for the Nexus-Security threat intelligence platform
+//! Shared type definitions for the Verdyx threat intelligence platform
 //!
 //! This module contains all the common data structures, enums, and types used across
 //! different services in the backend. It includes:

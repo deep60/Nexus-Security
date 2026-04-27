@@ -98,7 +98,7 @@ impl BountyModel {
         Ok(())
     }
 
-    /// List bounties with filters
+    /// List bounties with parameterized filters
     pub async fn list(
         pool: &PgPool,
         status: Option<&str>,
@@ -106,36 +106,68 @@ impl BountyModel {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<BountyModel>, sqlx::Error> {
-        let mut query = String::from("SELECT * FROM bounties WHERE 1=1");
-
-        if let Some(s) = status {
-            query.push_str(&format!(" AND status = '{}'", s));
-        }
-
-        if let Some(c) = creator {
-            query.push_str(&format!(" AND creator = '{}'", c));
-        }
-
-        query.push_str(&format!(" ORDER BY created_at DESC LIMIT {} OFFSET {}", limit, offset));
-
-        let records = sqlx::query_as::<_, BountyModel>(&query)
-            .fetch_all(pool)
-            .await?;
+        // Build parameterized query based on which filters are provided
+        let records = match (status, creator) {
+            (Some(s), Some(c)) => {
+                sqlx::query_as::<_, BountyModel>(
+                    "SELECT * FROM bounties WHERE status = $1 AND creator = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4"
+                )
+                .bind(s)
+                .bind(c)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(pool)
+                .await?
+            }
+            (Some(s), None) => {
+                sqlx::query_as::<_, BountyModel>(
+                    "SELECT * FROM bounties WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3"
+                )
+                .bind(s)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(pool)
+                .await?
+            }
+            (None, Some(c)) => {
+                sqlx::query_as::<_, BountyModel>(
+                    "SELECT * FROM bounties WHERE creator = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3"
+                )
+                .bind(c)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(pool)
+                .await?
+            }
+            (None, None) => {
+                sqlx::query_as::<_, BountyModel>(
+                    "SELECT * FROM bounties ORDER BY created_at DESC LIMIT $1 OFFSET $2"
+                )
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(pool)
+                .await?
+            }
+        };
 
         Ok(records)
     }
 
-    /// Count total bounties
+    /// Count total bounties with parameterized filter
     pub async fn count(pool: &PgPool, status: Option<&str>) -> Result<i64, sqlx::Error> {
-        let mut query = String::from("SELECT COUNT(*) as count FROM bounties WHERE 1=1");
-
-        if let Some(s) = status {
-            query.push_str(&format!(" AND status = '{}'", s));
-        }
-
-        let result: (i64,) = sqlx::query_as(&query)
-            .fetch_one(pool)
-            .await?;
+        let result: (i64,) = match status {
+            Some(s) => {
+                sqlx::query_as("SELECT COUNT(*) FROM bounties WHERE status = $1")
+                    .bind(s)
+                    .fetch_one(pool)
+                    .await?
+            }
+            None => {
+                sqlx::query_as("SELECT COUNT(*) FROM bounties")
+                    .fetch_one(pool)
+                    .await?
+            }
+        };
 
         Ok(result.0)
     }

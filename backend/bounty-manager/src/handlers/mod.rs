@@ -67,7 +67,14 @@ pub use reputation_handler::{
     ThreatCategory,
     ReputationUpdateRequest,
     ReputationLeaderboard,
-    // TODO: Add more exports as handlers are implemented
+    ReputationHistory,
+    PerformanceMetrics,
+    update_reputation,
+    get_engine_reputation,
+    get_leaderboard,
+    get_reputation_history,
+    apply_reputation_decay,
+    register_engine,
 };
 
 pub use dispute::{

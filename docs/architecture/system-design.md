@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Nexus Security is organized around an API gateway fronting multiple domain services. The gateway handles auth, request shaping, and route orchestration while domain services own business logic and persistence boundaries.
+Verdyx is organized around an API gateway fronting multiple domain services. The gateway handles auth, request shaping, and route orchestration while domain services own business logic and persistence boundaries.
 
 ## 2. Core Components
 
