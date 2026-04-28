@@ -131,7 +131,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     info!("Initializing analysis engines...");
     let mut config = AnalysisEngineConfig::default();
     config.yara_engine.rules_directory = std::path::PathBuf::from(yara_rule_path);
-    let analysis_engine = Arc::new(Mutex::new(AnalysisEngine::new(config)?));
+    let analysis_engine = Arc::new(Mutex::new(AnalysisEngine::new(config).await?));
     let file_handler = Arc::new(FileHandler::new(&upload_dir)?);
 
     // Initialize scanners

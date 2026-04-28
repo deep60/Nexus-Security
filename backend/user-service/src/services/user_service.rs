@@ -299,6 +299,54 @@ impl UserService {
         })
     }
 
+    pub async fn create_password_reset_token(&self, email: &str) -> UserResult<String> {
+        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
+            .bind(email)
+            .fetch_optional(&self.db_pool)
+            .await
+            .map_err(|e| UserError::DatabaseError(e.to_string()))?
+            .ok_or(UserError::NotFound)?;
+
+        let token = self.auth_service.generate_verification_token();
+        let token_key = format!("password_reset:{}", token);
+        let mut conn = self.redis_conn.clone();
+        conn.set_ex::<_, _, ()>(&token_key, user.id.to_string(), 3600)
+            .await
+            .map_err(|e| UserError::DatabaseError(e.to_string()))?;
+
+        Ok(token)
+    }
+
+    pub async fn reset_password_with_token(
+        &self,
+        token: &str,
+        new_password: &str,
+    ) -> UserResult<()> {
+        let token_key = format!("password_reset:{}", token);
+        let mut conn = self.redis_conn.clone();
+        let user_id: Option<String> = conn
+            .get(&token_key)
+            .await
+            .map_err(|e| UserError::DatabaseError(e.to_string()))?;
+
+        let user_id = user_id.ok_or(UserError::InvalidToken)?;
+        let user_id = Uuid::parse_str(&user_id).map_err(|_| UserError::InvalidToken)?;
+        let password_hash = self.auth_service.hash_password(new_password)?;
+
+        sqlx::query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2")
+            .bind(password_hash)
+            .bind(user_id)
+            .execute(&self.db_pool)
+            .await
+            .map_err(|e| UserError::DatabaseError(e.to_string()))?;
+
+        conn.del::<_, ()>(&token_key)
+            .await
+            .map_err(|e| UserError::DatabaseError(e.to_string()))?;
+
+        Ok(())
+    }
+
     /// Verify email
     pub async fn verify_email(&self, user_id: Uuid, token: &str) -> UserResult<()> {
         let token_key = format!("email_verification:{}", user_id);

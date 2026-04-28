@@ -1,13 +1,9 @@
 use std::collections::HashMap;
 use std::path::Path;
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use regex::Regex;
-
-use crate::models::{AnalysisResult, ThreatIndicator, ScanJob};
-use crate::analyzers::AnalyzerTrait;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeuristicMatch {
@@ -415,57 +411,12 @@ impl HeuristicEngine {
     }
 }
 
-#[async_trait]
-impl AnalyzerTrait for HeuristicEngine {
-    async fn analyze(&self, scan_job: &ScanJob) -> Result<AnalysisResult, Box<dyn std::error::Error + Send + Sync>> {
-        let file_path = Path::new(&scan_job.file_path);
-        let matches = self.analyze_file(file_path).await?;
-        
-        let risk_score = self.calculate_risk_score(&matches);
-        let is_malicious = risk_score > 50.0;
-        
-        let mut indicators = Vec::new();
-        for mat in &matches {
-            indicators.push(ThreatIndicator {
-                indicator_type: "heuristic".to_string(),
-                value: mat.matched_content.clone().unwrap_or_default(),
-                description: Some(mat.description.clone()),
-                severity: match mat.severity {
-                    HeuristicSeverity::Info => "info".to_string(),
-                    HeuristicSeverity::Low => "low".to_string(),
-                    HeuristicSeverity::Medium => "medium".to_string(),
-                    HeuristicSeverity::High => "high".to_string(),
-                    HeuristicSeverity::Critical => "critical".to_string(),
-                },
-                confidence: mat.confidence,
-                first_seen: chrono::Utc::now(),
-                last_seen: chrono::Utc::now(),
-                metadata: serde_json::to_value(&mat.context)?,
-            });
-        }
-
-        Ok(AnalysisResult {
-            scan_job_id: scan_job.id.clone(),
-            analyzer_name: "heuristic_engine".to_string(),
-            analyzer_version: "1.0.0".to_string(),
-            is_malicious,
-            confidence_score: risk_score / 100.0,
-            threat_types: matches.iter().map(|m| m.rule_name.clone()).collect(),
-            indicators,
-            metadata: serde_json::json!({
-                "total_matches": matches.len(),
-                "risk_score": risk_score,
-                "analysis_time": chrono::Utc::now()
-            }),
-            created_at: chrono::Utc::now(),
-        })
-    }
-
-    fn name(&self) -> &str {
+impl HeuristicEngine {
+    pub fn name(&self) -> &str {
         "heuristic_engine"
     }
 
-    fn version(&self) -> &str {
+    pub fn version(&self) -> &str {
         "1.0.0"
     }
 }
@@ -556,13 +507,7 @@ fn extract_base64_context(content: &str, offset: usize) -> HashMap<String, Strin
     let end = std::cmp::min(offset + 200, content.len());
     let b64_content = &content[start..end];
     
-    // Try to decode base64 to see what's inside
-    if let Ok(decoded) = base64::decode(b64_content.trim()) {
-        if let Ok(decoded_str) = String::from_utf8(decoded) {
-            context.insert("decoded_content".to_string(), decoded_str);
-        }
-    }
-    
+    context.insert("encoded_preview".to_string(), b64_content.trim().to_string());
     context.insert("encoded_length".to_string(), b64_content.len().to_string());
     
     context

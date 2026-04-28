@@ -268,7 +268,7 @@ pub async fn upload_file(
             .bind(&filename)
             .bind(data.len() as i64)
             .bind(&file_type_str)
-            .bind(file_path.to_str().unwrap_or_default())
+            .bind(&file_path)
             .bind(upload_timestamp)
             .execute(state.db.pool())
             .await
@@ -302,6 +302,7 @@ pub async fn upload_file(
 
 pub async fn create_submission(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Json(request): Json<CreateSubmissionRequest>,
 ) -> Result<Json<SubmissionResponse>, StatusCode> {
     // Construct BountySubmission
@@ -309,7 +310,7 @@ pub async fn create_submission(
     let submission = crate::models::bounty::BountySubmission {
         id: submission_id,
         bounty_id: request.bounty_id,
-        engine_id: Uuid::new_v4(), // Placeholder, request needs proper ID
+        engine_id: claims.sub, // Authenticated user as the engine submitter
         engine_name: request.engine_name.clone(),
         engine_address: "0x0000000000000000000000000000000000000000".to_string(), // Placeholder
         verdict: request.verdict.clone(),
@@ -492,13 +493,18 @@ pub async fn get_submission_details(
 
 pub async fn update_submission(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Path(submission_id): Path<Uuid>,
     Json(request): Json<UpdateSubmissionRequest>,
 ) -> Result<Json<SubmissionResponse>, StatusCode> {
-    // Ownership verification: in production the auth middleware injects the
-    // engine/user identity. For now we proceed since the update endpoint is
-    // gated by authenticated routes. Full per-submission ownership would
-    // require storing the creator_engine_id on extended_submissions.
+    // Verify the caller owns this submission
+    let existing = state.db.get_extended_submission_by_id(submission_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    if existing.submission.engine_id != claims.sub {
+        tracing::warn!("User {} denied update on submission {} (owner: {})", claims.sub, submission_id, existing.submission.engine_id);
+        return Err(StatusCode::FORBIDDEN);
+    }
 
     match state.db.update_submission(submission_id, &request).await {
         Ok(updated_submission) => {
@@ -537,18 +543,24 @@ pub async fn update_submission(
 
 pub async fn delete_submission(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Path(submission_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    // Ownership verification: same as update_submission above.
-    // Finalized submissions (status = Verified/Completed) should be rejected.
-    // Check finalization status before allowing deletion.
-    let maybe_sub = state.db.get_extended_submission_by_id(submission_id).await;
-    if let Ok(Some(ref sub)) = maybe_sub {
-        let status_str = format!("{:?}", sub.status);
-        if status_str == "Verified" || status_str == "Completed" {
-            tracing::warn!("Cannot delete finalized submission {}", submission_id);
-            return Err(StatusCode::CONFLICT);
-        }
+    // Verify the caller owns this submission
+    let sub = state.db.get_extended_submission_by_id(submission_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if sub.submission.engine_id != claims.sub {
+        tracing::warn!("User {} denied deletion of submission {} (owner: {})", claims.sub, submission_id, sub.submission.engine_id);
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    // Finalized submissions cannot be deleted
+    let status_str = format!("{:?}", sub.status);
+    if status_str == "Verified" || status_str == "Completed" {
+        tracing::warn!("Cannot delete finalized submission {}", submission_id);
+        return Err(StatusCode::CONFLICT);
     }
 
     match state.db.delete_submission(submission_id).await {
@@ -563,6 +575,7 @@ pub async fn delete_submission(
 
 pub async fn bulk_create_submissions(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Json(requests): Json<Vec<CreateSubmissionRequest>>,
 ) -> Result<Json<BulkSubmissionResponse>, StatusCode> {
     let mut successful = Vec::new();
@@ -570,7 +583,7 @@ pub async fn bulk_create_submissions(
     let total_processed = requests.len() as u32;
 
     for (index, request) in requests.into_iter().enumerate() {
-        match process_single_submission(&state, request.clone()).await {
+        match process_single_submission(&state, claims.clone(), request.clone()).await {
             Ok(response) => successful.push(response),
             Err(error) => failed.push(SubmissionError {
                 index: index as u32,
@@ -632,12 +645,12 @@ fn detect_file_type(data: &[u8]) -> String {
 
 async fn process_single_submission(
     state: &AppState,
+    claims: crate::middleware::auth::Claims,
     request: CreateSubmissionRequest,
 ) -> Result<SubmissionResponse, StatusCode> {
     // This is a simplified version of create_submission for bulk processing
-    // You might want to optimize this further for bulk operations
     let json_request = Json(request);
-    match create_submission(State(state.clone()), json_request).await {
+    match create_submission(State(state.clone()), claims, json_request).await {
         Ok(Json(response)) => Ok(response),
         Err(status) => Err(status),
     }
@@ -651,6 +664,7 @@ async fn process_single_submission(
 /// inserts a row in the `submissions` table (not `bounty_submissions`).
 pub async fn create_file_submission(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Json(request): Json<CreateFileSubmissionRequest>,
 ) -> Result<Json<FileSubmissionResponse>, StatusCode> {
     let filename = request.original_filename.as_deref()
@@ -663,8 +677,8 @@ pub async fn create_file_submission(
 
     let submission_id = Uuid::new_v4();
     let now = Utc::now();
-    // Placeholder submitter; in production the auth middleware injects the real user id.
-    let submitter_id = Uuid::nil();
+    // Authenticated user from JWT claims
+    let submitter_id = claims.sub;
 
     let metadata = serde_json::json!({
         "analysisType": request.analysis_type,
@@ -748,9 +762,12 @@ pub async fn get_submission(
 /// Vote on a submission
 pub async fn vote_on_submission(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Path(submission_id): Path<Uuid>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
+    let voter_id = claims.sub;
+
     let verdict = payload
         .get("verdict")
         .and_then(|v| v.as_str())
@@ -766,14 +783,41 @@ pub async fn vote_on_submission(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    // Prevent the submission owner from voting on their own submission
+    if let Ok(Some(sub)) = state.db.get_extended_submission_by_id(submission_id).await {
+        if sub.submission.engine_id == voter_id {
+            tracing::warn!("User {} cannot vote on their own submission {}", voter_id, submission_id);
+            return Err(StatusCode::FORBIDDEN);
+        }
+    }
+
+    // Prevent duplicate votes
+    let existing_vote: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT id FROM submission_votes WHERE submission_id = $1 AND voter_id = $2 LIMIT 1"
+    )
+    .bind(submission_id)
+    .bind(voter_id)
+    .fetch_optional(state.db.pool())
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to check existing votes: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    if existing_vote.is_some() {
+        tracing::warn!("User {} already voted on submission {}", voter_id, submission_id);
+        return Err(StatusCode::CONFLICT);
+    }
+
     let vote_id = Uuid::new_v4();
 
-    // Record the vote
+    // Record the vote with voter identity
     sqlx::query(
-        "INSERT INTO submission_votes (id, submission_id, verdict, confidence, created_at) VALUES ($1, $2, $3, $4, $5)"
+        "INSERT INTO submission_votes (id, submission_id, voter_id, verdict, confidence, created_at) VALUES ($1, $2, $3, $4, $5, $6)"
     )
     .bind(vote_id)
     .bind(submission_id)
+    .bind(voter_id)
     .bind(verdict)
     .bind(confidence)
     .bind(Utc::now())
@@ -788,6 +832,7 @@ pub async fn vote_on_submission(
         "success": true,
         "vote_id": vote_id,
         "submission_id": submission_id,
+        "voter_id": voter_id,
         "verdict": verdict,
         "confidence": confidence,
     })))
@@ -796,8 +841,15 @@ pub async fn vote_on_submission(
 /// Verify a submission
 pub async fn verify_submission(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Path(submission_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
+    // Only admins/moderators can verify submissions
+    if claims.role != "admin" && claims.role != "moderator" {
+        tracing::warn!("User {} (role: {}) denied verify on submission {}", claims.sub, claims.role, submission_id);
+        return Err(StatusCode::FORBIDDEN);
+    }
+
     // Update the submission status to Verified
     let result = sqlx::query(
         "UPDATE extended_submissions SET status = 'Verified', updated_at = NOW() WHERE submission_id = $1"
@@ -817,9 +869,12 @@ pub async fn verify_submission(
     // Invalidate cache
     let _ = state.redis.invalidate_submission_cache(submission_id).await;
 
+    tracing::info!(admin = %claims.sub, submission = %submission_id, "Submission verified by admin");
+
     Ok(Json(serde_json::json!({
         "success": true,
         "submission_id": submission_id,
+        "verified_by": claims.sub,
         "status": "Verified",
         "message": "Submission has been verified"
     })))
@@ -827,25 +882,62 @@ pub async fn verify_submission(
 
 /// Get current user's submissions
 pub async fn get_my_submissions(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
 ) -> Result<Json<SubmissionListResponse>, StatusCode> {
+    // Query submissions owned by the authenticated user
+    let user_id = claims.sub;
+    let filters = SubmissionFilters {
+        bounty_id: None,
+        engine_id: Some(user_id.to_string()),
+        verdict: None,
+        min_confidence: None,
+        max_confidence: None,
+        status: None,
+        date_from: None,
+        date_to: None,
+        page: Some(1),
+        limit: Some(20),
+    };
+
+    let (submissions, total) = state
+        .db
+        .get_submissions_with_filters(&filters, 1, 20)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch user submissions: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let response_items: Vec<SubmissionResponse> = submissions
+        .into_iter()
+        .map(|s| SubmissionResponse {
+            id: s.id,
+            bounty_id: s.bounty_id,
+            engine_id: s.engine_id.to_string(),
+            engine_name: s.engine_name,
+            engine_version: "1.0".to_string(),
+            verdict: s.verdict,
+            confidence: s.confidence as f32,
+            threat_types: vec![],
+            risk_score: 0,
+            analysis_summary: "".to_string(),
+            stake_amount: s.stake_amount.parse().unwrap_or(0),
+            submitted_at: s.submitted_at,
+            updated_at: None,
+            status: SubmissionStatus::Completed,
+            is_winner: None,
+            reward_earned: None,
+            reputation_change: None,
+        })
+        .collect();
+
     Ok(Json(SubmissionListResponse {
-        submissions: vec![],
-        total_count: 0,
+        submissions: response_items,
+        total_count: total,
         page: 1,
         limit: 20,
-        filters_applied: SubmissionFilters {
-            bounty_id: None,
-            engine_id: None,
-            verdict: None,
-            min_confidence: None,
-            max_confidence: None,
-            status: None,
-            date_from: None,
-            date_to: None,
-            page: None,
-            limit: None,
-        },
+        filters_applied: filters,
     }))
 }
 
@@ -859,8 +951,19 @@ pub async fn get_my_submissions(
 /// for engine analysis.
 pub async fn start_analysis(
     State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
     Path(submission_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
+    // Verify the caller owns this submission or is an admin
+    if let Ok(Some(sub)) = state.db.get_extended_submission_by_id(submission_id).await {
+        if sub.submission.engine_id != claims.sub && claims.role != "admin" && claims.role != "moderator" {
+            tracing::warn!("User {} denied start_analysis on submission {} (owner: {})", claims.sub, submission_id, sub.submission.engine_id);
+            return Err(StatusCode::FORBIDDEN);
+        }
+    } else {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
     // Update status to Processing
     let result = sqlx::query(
         "UPDATE extended_submissions SET status = 'Processing', updated_at = NOW() WHERE submission_id = $1",

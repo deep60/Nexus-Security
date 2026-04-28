@@ -10,6 +10,8 @@ use uuid::Uuid;
 pub mod hash_analyzer;
 pub mod static_analyzer;
 pub mod dynamic_analyzer;
+pub mod heuristic_engine;
+pub mod signature_matcher;
 
 #[cfg(feature = "yara-engine")]
 pub mod yara_engine;
@@ -19,6 +21,11 @@ pub mod clamav_analyzer;
 // Re-export commonly used types
 pub use hash_analyzer::{HashAnalyzer, HashAnalyzerConfig, HashInfo, HashType};
 pub use static_analyzer::{StaticAnalyzer, StaticAnalyzerConfig, FileType, PEAnalysis, StringAnalysis, EntropyAnalysis};
+pub use heuristic_engine::{HeuristicEngine, HeuristicMatch, HeuristicSeverity};
+pub use signature_matcher::{
+    SignatureMatcher, SignatureMatcherConfig, SignatureMatch, ThreatSeverity as SignatureSeverity,
+};
+
 
 #[cfg(feature = "yara-engine")]
 pub use yara_engine::{YaraEngine, YaraEngineConfig, YaraMatch, YaraRule, YaraEngineError};
@@ -104,6 +111,7 @@ pub struct AnalysisEngineConfig {
     pub static_analyzer: StaticAnalyzerConfig,
     pub yara_engine: YaraEngineConfig,
     pub clamav_analyzer: ClamAvAnalyzerConfig,
+    pub signature_matcher: SignatureMatcherConfig,
     pub enable_parallel_analysis: bool,
     pub analysis_timeout_seconds: u64,
     pub require_all_analyzers: bool,
@@ -116,6 +124,7 @@ impl Default for AnalysisEngineConfig {
             static_analyzer: StaticAnalyzerConfig::default(),
             yara_engine: YaraEngineConfig::default(),
             clamav_analyzer: ClamAvAnalyzerConfig::default(),
+            signature_matcher: SignatureMatcherConfig::default(),
             enable_parallel_analysis: true,
             analysis_timeout_seconds: 120,
             require_all_analyzers: false,
@@ -139,6 +148,8 @@ pub struct AnalysisOptions {
     pub enable_static_analysis: bool,
     pub enable_yara_analysis: bool,
     pub enable_clamav_analysis: bool,
+    pub enable_heuristic_analysis: bool,
+    pub enable_signature_analysis: bool,
     pub priority: AnalysisPriority,
     pub custom_metadata: HashMap<String, String>,
 }
@@ -157,6 +168,8 @@ impl Default for AnalysisOptions {
             enable_static_analysis: true,
             enable_yara_analysis: cfg!(feature = "yara-engine"),
             enable_clamav_analysis: cfg!(feature = "clamav"),
+            enable_heuristic_analysis: true,
+            enable_signature_analysis: true,
             priority: AnalysisPriority::Normal,
             custom_metadata: HashMap::new(),
         }
@@ -170,11 +183,13 @@ pub struct AnalysisEngine {
     static_analyzer: StaticAnalyzer,
     yara_engine: YaraEngine,
     clamav_analyzer: ClamAvAnalyzer,
+    heuristic_engine: HeuristicEngine,
+    signature_matcher: SignatureMatcher,
 }
 
 impl AnalysisEngine {
     /// Create a new analysis engine with the given configuration
-    pub fn new(config: AnalysisEngineConfig) -> Result<Self> {
+    pub async fn new(config: AnalysisEngineConfig) -> Result<Self> {
         info!("Initializing analysis engine");
 
         let hash_analyzer = HashAnalyzer::new(config.hash_analyzer.clone())
@@ -185,6 +200,10 @@ impl AnalysisEngine {
             .map_err(|e| anyhow!("Failed to initialize YARA engine: {}", e))?;
 
         let clamav_analyzer = ClamAvAnalyzer::new(config.clamav_analyzer.clone());
+        let heuristic_engine = HeuristicEngine::new();
+        let signature_matcher = SignatureMatcher::new(config.signature_matcher.clone())
+            .await
+            .map_err(|e| anyhow!("Failed to initialize signature matcher: {}", e))?;
 
         Ok(Self {
             config,
@@ -192,6 +211,8 @@ impl AnalysisEngine {
             static_analyzer,
             yara_engine,
             clamav_analyzer,
+            heuristic_engine,
+            signature_matcher,
         })
     }
 
@@ -232,9 +253,18 @@ impl AnalysisEngine {
             let static_future = self.run_static_analysis(request);
             let yara_future = self.run_yara_analysis(request);
             let clamav_future = self.run_clamav_analysis(request);
+            let heuristic_future = self.run_heuristic_analysis(request);
+            let signature_future = self.run_signature_analysis(request);
 
-            let (hash_res, static_res, yara_res, clamav_res) =
-                tokio::join!(hash_future, static_future, yara_future, clamav_future);
+            let (hash_res, static_res, yara_res, clamav_res, heuristic_res, signature_res) =
+                tokio::join!(
+                    hash_future,
+                    static_future,
+                    yara_future,
+                    clamav_future,
+                    heuristic_future,
+                    signature_future
+                );
 
             // Collect results and errors
             match hash_res {
@@ -265,6 +295,20 @@ impl AnalysisEngine {
                     analysis_errors.push(format!("ClamAV: {}", e));
                 }
             }
+            match heuristic_res {
+                Ok(det) => detections.push(det),
+                Err(e) => {
+                    warn!("Heuristic analysis failed: {}", e);
+                    analysis_errors.push(format!("Heuristic: {}", e));
+                }
+            }
+            match signature_res {
+                Ok(det) => detections.push(det),
+                Err(e) => {
+                    warn!("Signature matching failed: {}", e);
+                    analysis_errors.push(format!("Signature: {}", e));
+                }
+            }
         } else {
             // Run sequentially
             if let Ok(mut dets) = self.run_hash_analysis(request).await {
@@ -277,6 +321,12 @@ impl AnalysisEngine {
                 detections.push(det);
             }
             if let Ok(det) = self.run_clamav_analysis(request).await {
+                detections.push(det);
+            }
+            if let Ok(det) = self.run_heuristic_analysis(request).await {
+                detections.push(det);
+            }
+            if let Ok(det) = self.run_signature_analysis(request).await {
                 detections.push(det);
             }
         }
@@ -340,6 +390,115 @@ impl AnalysisEngine {
         } else {
             Err(anyhow!("ClamAV analysis disabled"))
         }
+    }
+
+    async fn run_heuristic_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
+        if !request.analysis_options.enable_heuristic_analysis {
+            return Err(anyhow!("Heuristic analysis disabled"));
+        }
+
+        let start = std::time::Instant::now();
+        let content = String::from_utf8_lossy(&request.file_data);
+        let matches = self
+            .heuristic_engine
+            .analyze_content(&content, std::path::Path::new(&request.filename))
+            .await
+            .map_err(|e| anyhow!("Heuristic analysis error: {}", e))?;
+        let risk_score = self.heuristic_engine.calculate_risk_score(&matches);
+
+        Ok(DetectionResult {
+            detection_id: Uuid::new_v4(),
+            engine_name: "Verdyx Heuristic Engine".to_string(),
+            engine_version: self.heuristic_engine.version().to_string(),
+            engine_type: EngineType::Static,
+            verdict: if risk_score >= 50.0 {
+                ThreatVerdict::Malicious
+            } else if risk_score >= 15.0 {
+                ThreatVerdict::Suspicious
+            } else {
+                ThreatVerdict::Benign
+            },
+            confidence: (risk_score / 100.0).clamp(0.0, 1.0),
+            severity: Self::heuristic_severity(&matches),
+            categories: vec![ThreatCategory::Malware],
+            metadata: HashMap::from([
+                ("match_count".to_string(), serde_json::json!(matches.len())),
+                ("risk_score".to_string(), serde_json::json!(risk_score)),
+                ("matches".to_string(), serde_json::to_value(&matches)?),
+            ]),
+            detected_at: Utc::now(),
+            processing_time_ms: start.elapsed().as_millis() as u64,
+            error_message: None,
+        })
+    }
+
+    async fn run_signature_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
+        if !request.analysis_options.enable_signature_analysis {
+            return Err(anyhow!("Signature analysis disabled"));
+        }
+
+        let start = std::time::Instant::now();
+        let matches = self
+            .signature_matcher
+            .match_bytes(&request.file_data)
+            .await
+            .map_err(|e| anyhow!("Signature matching error: {}", e))?;
+        let confidence = matches
+            .iter()
+            .map(|m| m.confidence)
+            .fold(0.0_f32, f32::max);
+
+        Ok(DetectionResult {
+            detection_id: Uuid::new_v4(),
+            engine_name: "Verdyx Signature Matcher".to_string(),
+            engine_version: "1.0.0".to_string(),
+            engine_type: EngineType::Static,
+            verdict: if matches.is_empty() {
+                ThreatVerdict::Benign
+            } else if confidence >= 0.7 {
+                ThreatVerdict::Malicious
+            } else {
+                ThreatVerdict::Suspicious
+            },
+            confidence,
+            severity: Self::signature_severity(&matches),
+            categories: vec![ThreatCategory::Malware],
+            metadata: HashMap::from([
+                ("match_count".to_string(), serde_json::json!(matches.len())),
+                ("matches".to_string(), serde_json::to_value(&matches)?),
+            ]),
+            detected_at: Utc::now(),
+            processing_time_ms: start.elapsed().as_millis() as u64,
+            error_message: None,
+        })
+    }
+
+    fn heuristic_severity(matches: &[HeuristicMatch]) -> SeverityLevel {
+        matches
+            .iter()
+            .map(|m| match m.severity {
+                HeuristicSeverity::Critical => SeverityLevel::Critical,
+                HeuristicSeverity::High => SeverityLevel::High,
+                HeuristicSeverity::Medium => SeverityLevel::Medium,
+                HeuristicSeverity::Low => SeverityLevel::Low,
+                HeuristicSeverity::Info => SeverityLevel::Info,
+            })
+            .max()
+            .unwrap_or(SeverityLevel::Info)
+    }
+
+    fn signature_severity(matches: &[SignatureMatch]) -> SeverityLevel {
+        matches
+            .iter()
+            .map(|m| match m.severity {
+                SignatureSeverity::Critical => SeverityLevel::Critical,
+                SignatureSeverity::High => SeverityLevel::High,
+                SignatureSeverity::Medium => SeverityLevel::Medium,
+                SignatureSeverity::Low => SeverityLevel::Low,
+                SignatureSeverity::Info => SeverityLevel::Info,
+            })
+            .max()
+            .unwrap_or(SeverityLevel::Info)
     }
 
     fn create_file_metadata(&self, request: &FileAnalysisRequest) -> FileMetadata {
@@ -406,6 +565,8 @@ mod tests {
             enable_static_analysis: true,
             enable_yara_analysis: true,
             enable_clamav_analysis: false,
+            enable_heuristic_analysis: true,
+            enable_signature_analysis: true,
             priority: AnalysisPriority::High,
             custom_metadata: HashMap::from([
                 ("source".to_string(), "unit_test".to_string()),

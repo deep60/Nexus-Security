@@ -1,14 +1,14 @@
 use anyhow::Result;
 use futures_util::StreamExt;
 use redis::aio::ConnectionManager;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use std::sync::Arc;
 use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::channels::{EmailChannel, PushChannel, WebhookChannel, WebSocketChannel};
 use crate::config::Config;
-use crate::models::{NotificationChannel, NotificationPreferences, NotificationRecord, NotificationStatus};
+use crate::models::{NotificationChannel, NotificationPreferences};
 use shared::messaging::event_types::NotificationPayload;
 
 pub struct NotificationManager {
@@ -83,10 +83,10 @@ impl NotificationManager {
 
     async fn get_user_preferences(&self, user_id: Uuid) -> Result<NotificationPreferences> {
         // Query notification preferences from the database
-        let prefs = sqlx::query_as::<_, NotificationPreferences>(
+        let row = sqlx::query(
             r#"
             SELECT user_id, email_enabled, email_address, push_enabled,
-                   webhook_enabled, websocket_enabled
+                   webhook_enabled, webhook_url, websocket_enabled
             FROM notification_preferences
             WHERE user_id = $1
             "#
@@ -95,7 +95,31 @@ impl NotificationManager {
         .fetch_optional(&self.db_pool)
         .await?;
 
-        Ok(prefs.unwrap_or_default())
+        let Some(row) = row else {
+            return Ok(NotificationPreferences {
+                user_id,
+                ..NotificationPreferences::default()
+            });
+        };
+
+        Ok(NotificationPreferences {
+            user_id: row.try_get("user_id")?,
+            email_enabled: row.try_get("email_enabled")?,
+            email_address: row.try_get("email_address")?,
+            push_enabled: row.try_get("push_enabled")?,
+            push_tokens: Vec::new(),
+            webhook_enabled: row.try_get("webhook_enabled")?,
+            webhook_urls: row
+                .try_get::<Option<String>, _>("webhook_url")?
+                .into_iter()
+                .collect(),
+            websocket_enabled: row.try_get("websocket_enabled")?,
+            event_filters: Vec::new(),
+            do_not_disturb: false,
+            quiet_hours_start: None,
+            quiet_hours_end: None,
+            updated_at: chrono::Utc::now(),
+        })
     }
 
     pub async fn start_event_listener(&self) -> Result<()> {
@@ -211,10 +235,11 @@ impl NotificationManager {
 
         loop {
             // Fetch failed notifications that haven't exceeded max retries
-            let failed: Vec<NotificationRecord> = sqlx::query_as(
+            let failed = sqlx::query(
                 r#"
-                SELECT * FROM notification_records
-                WHERE status = 'failed' AND retry_count < 3
+                SELECT id, payload
+                FROM notification_history
+                WHERE status = 'failed'
                 ORDER BY created_at ASC
                 LIMIT 50
                 "#
@@ -229,33 +254,39 @@ impl NotificationManager {
 
             for record in &failed {
                 // Reconstruct payload from the stored record and re-attempt
-                if let Some(ref payload_json) = record.payload {
-                    match serde_json::from_value::<NotificationPayload>(payload_json.clone()) {
+                let record_id: Uuid = record.try_get("id").unwrap_or_else(|_| Uuid::nil());
+                let payload_json: serde_json::Value = record
+                    .try_get("payload")
+                    .unwrap_or_else(|_| serde_json::Value::Null);
+
+                if !payload_json.is_null() {
+                    match serde_json::from_value::<NotificationPayload>(payload_json) {
                         Ok(payload) => {
                             match self.send_notification(&payload).await {
                                 Ok(_) => {
                                     // Mark as sent
                                     let _ = sqlx::query(
-                                        "UPDATE notification_records SET status = 'sent', updated_at = NOW() WHERE id = $1"
+                                        "UPDATE notification_history SET status = 'sent', sent_at = NOW() WHERE id = $1"
                                     )
-                                    .bind(record.id)
+                                    .bind(record_id)
                                     .execute(&self.db_pool)
                                     .await;
                                 }
                                 Err(e) => {
                                     // Increment retry count
                                     let _ = sqlx::query(
-                                        "UPDATE notification_records SET retry_count = retry_count + 1, updated_at = NOW() WHERE id = $1"
+                                        "UPDATE notification_history SET error_message = $1 WHERE id = $2"
                                     )
-                                    .bind(record.id)
+                                    .bind(e.to_string())
+                                    .bind(record_id)
                                     .execute(&self.db_pool)
                                     .await;
-                                    error!("Retry failed for notification {}: {}", record.id, e);
+                                    error!("Retry failed for notification {}: {}", record_id, e);
                                 }
                             }
                         }
                         Err(e) => {
-                            error!("Cannot deserialize payload for notification {}: {}", record.id, e);
+                            error!("Cannot deserialize payload for notification {}: {}", record_id, e);
                         }
                     }
                 }

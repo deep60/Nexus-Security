@@ -306,7 +306,7 @@ pub struct ActivityListResponse {
     pub limit: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct Activity {
     pub id: Uuid,
     pub activity_type: String,

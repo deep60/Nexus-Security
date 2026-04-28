@@ -9,6 +9,7 @@ use sha2::{Sha256, Digest};
 use hex;
 
 /// Signature types supported by the matcher
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum SignatureType {
     FileHash,
     BinaryPattern,
@@ -34,7 +35,7 @@ pub struct SignatureMatch {
 }
 
 /// Threat severity levels
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ThreatSeverity {
     Info,
     Low,
@@ -66,7 +67,7 @@ pub struct SignaturePattern {
     pub wildcard: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PatternType {
     Hex,
     String,
@@ -416,7 +417,10 @@ impl SignatureMatcher {
 
     /// Calculate MD5 hash
     fn calculate_md5(&self, content: &[u8]) -> String {
-        format!("{:x}", md5::compute(content))
+        use md5::{Digest, Md5};
+        let mut hasher = Md5::new();
+        hasher.update(content);
+        hex::encode(hasher.finalize())
     }
 
     /// Calculate SHA1 hash

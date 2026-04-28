@@ -217,6 +217,18 @@ impl DatabaseService {
         Ok(bounty)
     }
 
+    pub async fn get_submission_file_hash(&self, submission_id: Uuid) -> Result<Option<String>> {
+        let row: Option<(Option<String>,)> = sqlx::query_as(
+            "SELECT file_hash FROM submissions WHERE id = $1"
+        )
+        .bind(submission_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to fetch submission file hash")?;
+
+        Ok(row.and_then(|(hash,)| hash))
+    }
+
     pub async fn get_active_bounties(&self, limit: i64, offset: i64) -> Result<Vec<Bounty>> {
         let bounties = sqlx::query_as::<_, Bounty>(
             r#"

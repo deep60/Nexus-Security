@@ -268,7 +268,7 @@ pub async fn user_rate_limit_middleware(
         .map(|claims| claims.sub.to_string())
         .unwrap_or_else(|| "anonymous".to_string());
 
-    match limiter.check_rate_limit(user_id).await {
+    match limiter.check_rate_limit(&user_id).await {
         RateLimitResult::Allowed { limit, remaining, .. } => {
             let mut response = next.run(request).await;
 
