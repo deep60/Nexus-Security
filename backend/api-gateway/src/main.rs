@@ -80,6 +80,20 @@ async fn auth_middleware(
 
     if let Some(auth_header) = auth_header {
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
+            // Check if token is blacklisted
+            let blacklist_key = format!("jwt_blacklist:{}", token);
+            if let Ok(mut conn) = state.redis.get_connection().await {
+                let is_blacklisted: Option<String> = redis::cmd("GET")
+                    .arg(&blacklist_key)
+                    .query(&mut conn)
+                    .ok();
+                
+                if is_blacklisted.is_some() {
+                    warn!("Attempted use of blacklisted token");
+                    return Err(StatusCode::UNAUTHORIZED);
+                }
+            }
+
             // Validate JWT token
             match utils::crypto::validate_jwt(token, &state.config.security.jwt_secret) {
                 Ok(claims) => {
@@ -103,7 +117,10 @@ async fn auth_middleware(
     let path = request.uri().path();
     if path.starts_with("/api/v1/health")
         || path.starts_with("/api/v1/auth/login")
-        || path.starts_with("api/v1/auth/register")
+        || path.starts_with("/api/v1/auth/register")
+        || path.starts_with("/api/v1/auth/refresh")
+        || path.starts_with("/api/v1/auth/forgot-password")
+        || path.starts_with("/api/v1/auth/reset-password")
     {
         return Ok(next.run(request).await);
     }

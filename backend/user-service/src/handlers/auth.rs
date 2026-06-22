@@ -1,6 +1,6 @@
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{header::HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Extension, Json,
 };
@@ -63,14 +63,45 @@ pub async fn login(
     Ok(Json(response))
 }
 
-/// Logout user
+/// Logout user - blacklist the JWT token
 pub async fn logout(
+    headers: HeaderMap,
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<MessageResponse>, AppError> {
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Unauthorized("Invalid token".to_string()))?;
 
+    // Extract the raw token to blacklist it
+    if let Some(auth_header) = headers.get(header::AUTHORIZATION) {
+        if let Ok(token) = auth_header.to_str() {
+            if let Some(token) = token.strip_prefix("Bearer ") {
+                // Calculate token TTL
+                let exp = claims.exp;
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|_| AppError::Internal("System time error".to_string()))?
+                    .as_secs() as i64;
+                
+                let ttl = (exp - now).max(0) as usize;
+                
+                if ttl > 0 {
+                    // Blacklist the token in Redis
+                    let blacklist_key = format!("jwt_blacklist:{}", token);
+                    let mut conn = state.redis_conn.clone();
+                    
+                    let _: Result<(), redis::RedisError> = redis::cmd("SETEX")
+                        .arg(&blacklist_key)
+                        .arg(ttl)
+                        .arg("blacklisted")
+                        .query(&mut conn)
+                        .await;
+                }
+            }
+        }
+    }
+
+    // Also remove session
     state.user_service.logout(user_id).await?;
 
     Ok(Json(MessageResponse {

@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/auth-context";
 import { NotificationProvider } from "@/components/notification-provider";
 import { ProtectedRoute } from "@/components/protected-route";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { initCsrfToken } from "@/lib/csrf";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import Marketplace from "@/pages/marketplace";
@@ -19,6 +21,8 @@ import HowItWorks from "@/pages/how-it-works";
 import Features from "@/pages/features";
 import UseCases from "@/pages/use-cases";
 import Pricing from "@/pages/pricing";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 
 function Router() {
   return (
@@ -30,6 +34,8 @@ function Router() {
       <Route path="/pricing" component={Pricing} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/marketplace" component={Marketplace} />
       <Route path="/analysis/:id" component={AnalysisDetails} />
@@ -45,17 +51,22 @@ function Router() {
 }
 
 function App() {
+  // Initialize CSRF token on app startup
+  initCsrfToken();
+  
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <NotificationProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </NotificationProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <NotificationProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </NotificationProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

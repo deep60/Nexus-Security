@@ -13,7 +13,7 @@ use axum::{
 };
 use std::sync::Arc;
 use tower_http::{
-    cors::{Any, CorsLayer},
+    cors::CorsLayer,
     trace::TraceLayer,
 };
 use tracing::info;
@@ -83,11 +83,29 @@ async fn main() -> Result<()> {
         user_service,
     });
 
-    // Configure CORS
+    // Configure CORS - allow specific origins from environment
+    let allowed_origins: Vec<_> = std::env::var("CORS_ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:3000,http://localhost:5173".to_string())
+        .split(',')
+        .filter_map(|origin| origin.trim().parse::<axum::http::HeaderValue>().ok())
+        .collect();
+    
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin(allowed_origins)
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PUT,
+            axum::http::Method::DELETE,
+            axum::http::Method::PATCH,
+            axum::http::Method::OPTIONS,
+        ])
+        .allow_headers([
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::ACCEPT,
+        ])
+        .allow_credentials(true);
 
     // Public routes (no authentication required)
     let public_routes = Router::new()

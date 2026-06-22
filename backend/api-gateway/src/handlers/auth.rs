@@ -109,11 +109,58 @@ pub async fn register(
     Json(payload): Json<RegisterRequest>,
 ) -> ApiResult<Json<ApiResponse<AuthResponse>>> {
     // Validate input
-
-    if payload.username.is_empty() || payload.email.is_empty() || payload.password.len() < 8 {
+    if payload.username.is_empty() || payload.email.is_empty() {
         return Err(ApiError::Validation(
-            "Invalid input: username and email required, password must be 8 characters"
-            .to_string(),
+            "Username and email are required".to_string(),
+        ));
+    }
+
+    // Validate password strength
+    if payload.password.len() < 8 {
+        return Err(ApiError::Validation(
+            "Password must be at least 8 characters".to_string(),
+        ));
+    }
+
+    // Check for at least one uppercase letter
+    if !payload.password.chars().any(|c| c.is_uppercase()) {
+        return Err(ApiError::Validation(
+            "Password must contain at least one uppercase letter".to_string(),
+        ));
+    }
+
+    // Check for at least one lowercase letter
+    if !payload.password.chars().any(|c| c.is_lowercase()) {
+        return Err(ApiError::Validation(
+            "Password must contain at least one lowercase letter".to_string(),
+        ));
+    }
+
+    // Check for at least one digit
+    if !payload.password.chars().any(|c| c.is_numeric()) {
+        return Err(ApiError::Validation(
+            "Password must contain at least one number".to_string(),
+        ));
+    }
+
+    // Check for at least one special character
+    if !payload.password.chars().any(|c| !c.is_alphanumeric()) {
+        return Err(ApiError::Validation(
+            "Password must contain at least one special character".to_string(),
+        ));
+    }
+
+    // Validate username format (alphanumeric and underscores only)
+    if !payload.username.chars().all(|c| c.is_alphanumeric() || c == '_') {
+        return Err(ApiError::Validation(
+            "Username can only contain letters, numbers, and underscores".to_string(),
+        ));
+    }
+
+    // Validate username length
+    if payload.username.len() < 3 || payload.username.len() > 30 {
+        return Err(ApiError::Validation(
+            "Username must be between 3 and 30 characters".to_string(),
         ));
     }
 
@@ -210,13 +257,52 @@ pub async fn logout(
     // Extract token from header
     let token = extract_token_from_header(&headers)?;
 
-    // Add token to blacklist (you might want to implement a Redis-based blacklist)
-    // For now, we'll just return success
+    // Decode token to get expiration
+    match decode_token(&token, &state.config.security.jwt_secret) {
+        Ok(claims) => {
+            // Calculate remaining TTL for the token
+            let exp = claims.exp;
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|_| ApiError::Internal("System time error".to_string()))?
+                .as_secs() as i64;
+            
+            let ttl = (exp - now).max(0) as usize;
+            
+            if ttl > 0 {
+                // Store token in Redis blacklist
+                let blacklist_key = format!("jwt_blacklist:{}", token);
+                let redis_key = redis::Value::Data(blacklist_key.as_bytes().to_vec());
+                
+                // Use Redis SETEX to store token with TTL
+                let mut conn = state.redis.get_connection().await
+                    .map_err(|e| ApiError::Internal(format!("Redis connection failed: {}", e)))?;
+                
+                let _: () = redis::cmd("SETEX")
+                    .arg(&blacklist_key)
+                    .arg(ttl)
+                    .arg("blacklisted")
+                    .query(&mut conn)
+                    .map_err(|e| ApiError::Internal(format!("Failed to blacklist token: {}", e)))?;
+                
+                // Also remove from active sessions
+                let mut sessions = state.active_sessions.write().await;
+                sessions.remove(&claims.sub);
+            }
 
-    Ok(Json(ApiResponse::success_with_message(
-        (),
-        "Successfully logged out".to_string(),
-    )))
+            Ok(Json(ApiResponse::success_with_message(
+                (),
+                "Successfully logged out".to_string(),
+            )))
+        }
+        Err(e) => {
+            // Token invalid or expired - still consider logout success for UX
+            Ok(Json(ApiResponse::success_with_message(
+                (),
+                "Successfully logged out".to_string(),
+            )))
+        }
+    }
 }
 
 pub async fn refresh_token(

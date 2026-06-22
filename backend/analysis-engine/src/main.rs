@@ -84,7 +84,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     // Load configuration
     let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
+        .map_err(|_| anyhow::anyhow!("DATABASE_URL must be set"))?;
     let redis_url = env::var("REDIS_URL")
         .unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let port = env::var("SERVER_PORT")
@@ -97,30 +97,46 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let upload_dir = env::var("UPLOAD_DIR")
         .unwrap_or_else(|_| "./temp/verdyx-uploads".to_string());
 
-    // Initialize database connection pool
+    // Initialize database connection pool with proper error handling
     info!("Connecting to database...");
-    let db_pool = sqlx::PgPool::connect(&database_url)
-        .await
-        .expect("Failed to connect to database");
-    info!("Database connection established");
+    let db_pool = match sqlx::PgPool::connect(&database_url).await {
+        Ok(pool) => {
+            info!("Database connection established");
+            pool
+        }
+        Err(e) => {
+            error!("Failed to connect to database: {}", e);
+            return Err(anyhow::anyhow!("Database connection failed: {}", e).into());
+        }
+    };
 
-    // Run migrations
+    // Run migrations with error handling
     info!("Running database migrations...");
-    sqlx::migrate!("./migrations")
-        .run(&db_pool)
-        .await
-        .expect("Failed to run database migrations");
-    info!("Database migrations complete");
+    if let Err(e) = sqlx::migrate!("./migrations").run(&db_pool).await {
+        error!("Failed to run database migrations: {}", e);
+        // Don't fail startup - migrations might already be applied
+        info!("Continuing despite migration error...");
+    } else {
+        info!("Database migrations complete");
+    }
 
-    // Initialize Redis client
+    // Initialize Redis client with error handling
     info!("Connecting to Redis...");
-    let redis_client = redis::Client::open(redis_url.clone())
-        .expect("Failed to create Redis client");
-    redis_client
-        .get_multiplexed_async_connection()
-        .await
-        .expect("Failed to connect to Redis");
-    info!("Redis connection established");
+    let redis_client = match redis::Client::open(redis_url.clone()) {
+        Ok(client) => client,
+        Err(e) => {
+            error!("Failed to create Redis client: {}", e);
+            return Err(anyhow::anyhow!("Redis client creation failed: {}", e).into());
+        }
+    };
+    
+    match redis_client.get_multiplexed_async_connection().await {
+        Ok(_) => info!("Redis connection established"),
+        Err(e) => {
+            error!("Failed to connect to Redis: {}", e);
+            return Err(anyhow::anyhow!("Redis connection failed: {}", e).into());
+        }
+    }
 
     // Initialize S3 client
     info!("Initializing S3 client...");

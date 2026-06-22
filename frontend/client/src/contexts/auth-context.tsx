@@ -1,5 +1,10 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  setAuthCookies, 
+  clearAuthCookies, 
+  getUserFromCookie 
+} from "@/lib/cookie-auth";
 
 interface User {
   id: string;
@@ -111,9 +116,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const authData = await unwrapApiResponse<AuthResponseData>(response);
 
       setUser(authData.user);
+      // Store in both localStorage (fallback) and cookies for better security
       localStorage.setItem("token", authData.accessToken);
       localStorage.setItem("refreshToken", authData.refreshToken);
       localStorage.setItem("user", JSON.stringify(authData.user));
+      // Also set cookies
+      setAuthCookies(authData.accessToken, authData.refreshToken, authData.user, authData.expiresIn);
 
       toast({
         title: "Welcome back!",
@@ -141,9 +149,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const authData = await unwrapApiResponse<AuthResponseData>(response);
 
       setUser(authData.user);
+      // Store in both localStorage (fallback) and cookies for better security
       localStorage.setItem("token", authData.accessToken);
       localStorage.setItem("refreshToken", authData.refreshToken);
       localStorage.setItem("user", JSON.stringify(authData.user));
+      // Also set cookies
+      setAuthCookies(authData.accessToken, authData.refreshToken, authData.user, authData.expiresIn);
 
       toast({
         title: "Account created!",
@@ -178,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
+      clearAuthCookies();
       toast({
         title: "Logged out",
         description: "See you soon!",
@@ -202,8 +214,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const walletAddress = accounts[0];
 
-      // Sign a message to prove wallet ownership
-      const message = `Connect wallet ${walletAddress} to Verdyx at ${Date.now()}`;
+      // Generate a unique nonce for this connection request (prevents replay attacks)
+      const nonce = crypto.randomUUID();
+      const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes expiration
+      
+      // Sign a message to prove wallet ownership with expiration
+      const message = JSON.stringify({
+        action: 'connect_wallet',
+        wallet: walletAddress,
+        nonce,
+        expiresAt,
+        domain: window.location.hostname,
+      });
+      
       const signature = await window.ethereum.request({
         method: "personal_sign",
         params: [message, walletAddress],
@@ -222,6 +245,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             wallet_address: walletAddress,
             signature,
             message,
+            nonce,
+            expiresAt,
           }),
         });
 
@@ -229,6 +254,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const updatedUser = await unwrapApiResponse<User>(response);
           setUser(updatedUser);
           localStorage.setItem("user", JSON.stringify(updatedUser));
+          // Update cookie as well
+          setAuthCookies(
+            localStorage.getItem('token') || '',
+            localStorage.getItem('refreshToken') || '',
+            updatedUser,
+            86400
+          );
         }
       }
 

@@ -166,13 +166,67 @@ pub async fn create_bounty(
     Extension(user_address): Extension<String>, // From auth middleware
     Json(req): Json<CreateBountyRequest>,
 ) -> Result<Json<ApiResponse<Bounty>>, StatusCode> {
-    // Validate request
-    if req.title.is_empty() || req.description.is_empty() {
+    // Validate request - basic checks
+    if req.title.trim().is_empty() {
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    if req.reward_amount == 0 || req.min_stake == 0 {
+    if req.description.trim().is_empty() {
         return Err(StatusCode::BAD_REQUEST);
+    }
+
+    if req.reward_amount == 0 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    if req.min_stake == 0 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Validate title length
+    if req.title.len() > 200 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Validate description length
+    if req.description.len() > 10000 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Validate deadline hours
+    if req.deadline_hours < 1 || req.deadline_hours > 8760 {
+        // Max 1 year
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Validate reward amount (reasonable limits)
+    if req.reward_amount > 1_000_000_000 {
+        // Max 1 billion tokens
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Validate min_stake <= reward_amount
+    if req.min_stake > req.reward_amount {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Validate currency (alphanumeric, 3-10 chars)
+    if req.currency.len() < 3 || req.currency.len() > 10 || !req.currency.chars().all(|c| c.is_alphanumeric()) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Validate max_participants if provided
+    if let Some(max) = req.max_participants {
+        if max < 1 || max > 1000 {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+
+    // Validate consensus threshold
+    if let Some(threshold) = req.consensus_threshold {
+        if !(0.5..=1.0).contains(&threshold) {
+            return Err(StatusCode::BAD_REQUEST);
+        }
     }
 
     let bounty_id = Uuid::new_v4();

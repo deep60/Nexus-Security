@@ -1,10 +1,11 @@
+use anyhow;
 use axum::{
     extract::State,
     routing::{get, post},
     Router,
 };
 use std::{net::SocketAddr, sync::Arc};
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tracing_subscriber;
 use sqlx::PgPool;
 
@@ -34,30 +35,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load environment variables
     dotenvy::dotenv().ok();
 
-    // Initialize database connection
+    // Initialize database connection with proper error handling
     let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
+        .map_err(|_| anyhow::anyhow!("DATABASE_URL must be set"))?;
 
     tracing::info!("Connecting to database...");
-    let db_pool = PgPool::connect(&database_url)
-        .await
-        .expect("Failed to connect to database");
-    tracing::info!("Database connection established");
+    let db_pool = match PgPool::connect(&database_url).await {
+        Ok(pool) => {
+            tracing::info!("Database connection established");
+            pool
+        }
+        Err(e) => {
+            tracing::error!("Failed to connect to database: {}", e);
+            return Err(anyhow::anyhow!("Database connection failed: {}", e).into());
+        }
+    };
 
-    // Initialize Redis client
+    // Initialize Redis client with error handling
     let redis_url = std::env::var("REDIS_URL")
         .unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     tracing::info!("Connecting to Redis at {}...", redis_url);
-    let redis_client = redis::Client::open(redis_url)
-        .expect("Failed to create Redis client");
+    let redis_client = match redis::Client::open(redis_url) {
+        Ok(client) => client,
+        Err(e) => {
+            tracing::error!("Failed to create Redis client: {}", e);
+            return Err(anyhow::anyhow!("Redis client creation failed: {}", e).into());
+        }
+    };
 
     // Test Redis connection
-    let mut redis_conn = redis_client.get_multiplexed_async_connection()
-        .await
-        .expect("Failed to connect to Redis");
-    tracing::info!("Redis connection established");
-    drop(redis_conn);
+    match redis_client.get_multiplexed_async_connection().await {
+        Ok(_) => tracing::info!("Redis connection established"),
+        Err(e) => {
+            tracing::error!("Failed to connect to Redis: {}", e);
+            return Err(anyhow::anyhow!("Redis connection failed: {}", e).into());
+        }
+    }
 
     // Initialize S3 client
     let s3_client = S3Client::new().await?;
@@ -70,11 +84,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         redis_client,
     };
 
-    // Build CORS layer
+    // Build CORS layer - allow specific origins from environment
+    let allowed_origins: Vec<_> = std::env::var("CORS_ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:3000,http://localhost:5173".to_string())
+        .split(',')
+        .filter_map(|origin| origin.trim().parse::<axum::http::HeaderValue>().ok())
+        .collect();
+    
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin(allowed_origins)
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PUT,
+            axum::http::Method::DELETE,
+            axum::http::Method::PATCH,
+            axum::http::Method::OPTIONS,
+        ])
+        .allow_headers([
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::ACCEPT,
+        ])
+        .allow_credentials(true);
 
     // Build our application with routes
     let app = Router::new()

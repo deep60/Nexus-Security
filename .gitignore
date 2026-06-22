@@ -6,6 +6,7 @@ backend/target/
 .env.local
 .env.*.local
 .env.blockchain
+.env.production
 .env.*
 !.env.example
 !.env.*.example

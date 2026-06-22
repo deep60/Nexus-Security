@@ -3,10 +3,12 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: verdyx-postgres
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: verdyx_user
-      POSTGRES_PASSWORD: verdyx_password
-      POSTGRES_DB: verdyx
+      POSTGRES_USER: ${POSTGRES_USER:-verdyx_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-verdyx}
     ports:
       - "5432:5432"
     volumes:
@@ -24,7 +26,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: verdyx-redis
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    env_file:
+      - .env
     ports:
       - "6379:6379"
     volumes:
@@ -32,7 +36,7 @@ services:
     networks:
       - verdyx-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,21 +47,23 @@ services:
       context: ./backend
       dockerfile: ./api-gateway/Dockerfile
     container_name: verdyx-api-gateway
+    env_file:
+      - .env
     ports:
       - "8080:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-verdyx}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
-      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - JWT_SECRET=${JWT_SECRET}
       # Blockchain Configuration
-      - BLOCKCHAIN_RPC_URL=http://host.docker.internal:8545
-      - THREAT_TOKEN_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-      - REPUTATION_SYSTEM_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
-      - BOUNTY_MANAGER_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
-      - CHAIN_ID=31337
+      - BLOCKCHAIN_RPC_URL=${BLOCKCHAIN_RPC_URL}
+      - THREAT_TOKEN_ADDRESS=${THREAT_TOKEN_ADDRESS}
+      - REPUTATION_SYSTEM_ADDRESS=${REPUTATION_SYSTEM_ADDRESS}
+      - BOUNTY_MANAGER_ADDRESS=${BOUNTY_MANAGER_ADDRESS}
+      - CHAIN_ID=${CHAIN_ID:-31337}
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,21 +79,23 @@ services:
       context: ./backend
       dockerfile: ./user-service/Dockerfile
     container_name: verdyx-user-service
+    env_file:
+      - .env
     ports:
       - "8081:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-verdyx}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
-      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - JWT_SECRET=${JWT_SECRET}
       # Blockchain Configuration
-      - BLOCKCHAIN_RPC_URL=http://host.docker.internal:8545
-      - THREAT_TOKEN_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-      - REPUTATION_SYSTEM_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
-      - BOUNTY_MANAGER_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
-      - CHAIN_ID=31337
+      - BLOCKCHAIN_RPC_URL=${BLOCKCHAIN_RPC_URL}
+      - THREAT_TOKEN_ADDRESS=${THREAT_TOKEN_ADDRESS}
+      - REPUTATION_SYSTEM_ADDRESS=${REPUTATION_SYSTEM_ADDRESS}
+      - BOUNTY_MANAGER_ADDRESS=${BOUNTY_MANAGER_ADDRESS}
+      - CHAIN_ID=${CHAIN_ID:-31337}
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,18 +104,26 @@ services:
     networks:
       - verdyx-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # MinIO (S3-compatible object storage)
   minio:
     image: minio/minio:latest
     container_name: verdyx-minio
     command: server /data --console-address ":9001"
+    env_file:
+      - .env
     ports:
       - "9000:9000"  # API
       - "9001:9001"  # Console
     environment:
-      MINIO_ROOT_USER: verdyx_admin
-      MINIO_ROOT_PASSWORD: verdyx_secret_key_2024
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-verdyx_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - minio_data:/data
     networks:
@@ -143,20 +159,22 @@ services:
       context: ./backend
       dockerfile: ./analysis-engine/Dockerfile
     container_name: verdyx-analysis-engine
+    env_file:
+      - .env
     ports:
       - "8082:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-verdyx}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # S3/MinIO Configuration for file storage
       - S3_ENDPOINT=http://minio:9000
       - S3_REGION=us-east-1
       - S3_BUCKET=verdyx-submissions
-      - S3_ACCESS_KEY=verdyx_admin
-      - S3_SECRET_KEY=verdyx_secret_key_2024
+      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-verdyx_admin}
+      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       # YARA rules configuration
       - YARA_RULES_PATH=/app/rules
       # ClamAV configuration
@@ -181,20 +199,22 @@ services:
       context: ./backend
       dockerfile: ./bounty-manager/Dockerfile
     container_name: verdyx-bounty-manager
+    env_file:
+      - .env
     ports:
       - "8083:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-verdyx}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # Blockchain Configuration
-      - BLOCKCHAIN_RPC_URL=http://host.docker.internal:8545
-      - THREAT_TOKEN_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-      - REPUTATION_SYSTEM_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
-      - BOUNTY_MANAGER_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
-      - CHAIN_ID=31337
+      - BLOCKCHAIN_RPC_URL=${BLOCKCHAIN_RPC_URL}
+      - THREAT_TOKEN_ADDRESS=${THREAT_TOKEN_ADDRESS}
+      - REPUTATION_SYSTEM_ADDRESS=${REPUTATION_SYSTEM_ADDRESS}
+      - BOUNTY_MANAGER_ADDRESS=${BOUNTY_MANAGER_ADDRESS}
+      - CHAIN_ID=${CHAIN_ID:-31337}
     depends_on:
       postgres:
         condition: service_healthy
@@ -203,6 +223,12 @@ services:
     networks:
       - verdyx-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # Submission Service
   submission-service:
@@ -210,6 +236,8 @@ services:
       context: ./backend
       dockerfile: ./submission-service/Dockerfile
     container_name: verdyx-submission-service
+    env_file:
+      - .env
     ports:
       - "8084:8080"
     environment:
@@ -218,14 +246,14 @@ services:
       - SERVER_PORT=8080
       - SUBMISSION_SERVICE_PORT=8080
       # Database and Redis Configuration
-      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-verdyx}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       # S3/MinIO Configuration
       - S3_ENDPOINT=http://minio:9000
       - S3_REGION=us-east-1
       - S3_BUCKET=verdyx-submissions
-      - S3_ACCESS_KEY=verdyx_admin
-      - S3_SECRET_KEY=verdyx_secret_key_2024
+      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-verdyx_admin}
+      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
@@ -243,17 +271,25 @@ services:
       context: ./backend
       dockerfile: ./consensus-service/Dockerfile
     container_name: verdyx-consensus-service
+    env_file:
+      - .env
     ports:
       - "8085:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-verdyx}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # Consensus algorithm configuration
       - CONSENSUS_THRESHOLD=0.7
       - MIN_SUBMISSIONS_REQUIRED=3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
@@ -269,21 +305,29 @@ services:
       context: ./backend
       dockerfile: ./payment-service/Dockerfile
     container_name: verdyx-payment-service
+    env_file:
+      - .env
     ports:
       - "8086:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-verdyx}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # Blockchain Configuration
-      - BLOCKCHAIN_RPC_URL=http://host.docker.internal:8545
-      - BLOCKCHAIN_CHAIN_ID=31337
-      - TREASURY_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      - BLOCKCHAIN_RPC_URL=${BLOCKCHAIN_RPC_URL}
+      - BLOCKCHAIN_CHAIN_ID=${CHAIN_ID:-31337}
+      - TREASURY_ADDRESS=${TREASURY_ADDRESS}
       - TREASURY_PRIVATE_KEY=${TREASURY_PRIVATE_KEY}
-      - TOKEN_CONTRACT_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-      - PAYMENT_CONTRACT_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+      - TOKEN_CONTRACT_ADDRESS=${THREAT_TOKEN_ADDRESS}
+      - PAYMENT_CONTRACT_ADDRESS=${BOUNTY_MANAGER_ADDRESS}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
@@ -299,17 +343,25 @@ services:
       context: ./backend
       dockerfile: ./reputation-service/Dockerfile
     container_name: verdyx-reputation-service
+    env_file:
+      - .env
     ports:
       - "8087:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-verdyx}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # Reputation calculation parameters
       - REPUTATION_DECAY_RATE=0.95
       - REPUTATION_UPDATE_INTERVAL=3600
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
@@ -325,23 +377,31 @@ services:
       context: ./backend
       dockerfile: ./notification-service/Dockerfile
     container_name: verdyx-notification-service
+    env_file:
+      - .env
     ports:
       - "8088:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-verdyx}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # Email Configuration
-      - SMTP_HOST=smtp.gmail.com
-      - SMTP_PORT=587
-      - SMTP_USERNAME=your-email@gmail.com
-      - SMTP_PASSWORD=your-app-password
-      - EMAIL_FROM=noreply@verdyx.io
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - EMAIL_FROM=${EMAIL_FROM}
       # Webhook Configuration
       - WEBHOOK_TIMEOUT=30
       - MAX_RETRY_ATTEMPTS=3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
@@ -350,6 +410,12 @@ services:
     networks:
       - verdyx-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # Frontend Web Application
   frontend:
@@ -357,13 +423,16 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: verdyx-frontend
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
       PORT: 5000
-      DATABASE_URL: postgresql://verdyx_user:verdyx_password@postgres:5432/verdyx
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-verdyx}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      JWT_SECRET: ${JWT_SECRET}
+      API_URL: ${API_URL:-http://localhost:8080}
       BCRYPT_SALT_ROUNDS: 12
       SESSION_EXPIRY: 604800000
       RATE_LIMIT_WINDOW_MS: 900000
@@ -389,15 +458,18 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: verdyx-pgadmin
+    env_file:
+      - .env
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@verdyx.io
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@verdyx.io}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-CHANGE_ME}
     ports:
       - "5050:80"
     depends_on:
       - postgres
     networks:
       - verdyx-network
+    restart: unless-stopped
     restart: unless-stopped
 
 networks:
