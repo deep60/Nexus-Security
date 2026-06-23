@@ -82,11 +82,14 @@ async fn auth_middleware(
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
             // Check if token is blacklisted
             let blacklist_key = format!("jwt_blacklist:{}", token);
-            if let Ok(mut conn) = state.redis.get_connection().await {
+            {
+                let mut conn = state.redis.connection_pool.clone();
                 let is_blacklisted: Option<String> = redis::cmd("GET")
                     .arg(&blacklist_key)
-                    .query(&mut conn)
-                    .ok();
+                    .query_async(&mut conn)
+                    .await
+                    .ok()
+                    .flatten();
                 
                 if is_blacklisted.is_some() {
                     warn!("Attempted use of blacklisted token");

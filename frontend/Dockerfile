@@ -18,10 +18,17 @@ RUN npm run build
 
 # Bundle the server TypeScript into a single JS file
 # tsconfig has noEmit:true so tsc won't produce .js files — use esbuild instead
-RUN npx esbuild server/index.ts --bundle --platform=node --outfile=dist/server.js \
+# - format=esm: package.json has "type":"module" and index.ts uses top-level await
+# - banner defines __dirname/__filename which don't exist in ESM output
+# - vite is bundled in (it's a devDependency, not installed in the prod stage),
+#   but its lazy/optional native deps are marked external so bundling succeeds.
+#   Those code paths only run in dev (setupVite), never in production serveStatic.
+RUN npx esbuild server/index.ts --bundle --platform=node --format=esm --outfile=dist/server.js \
+    --banner:js="import{createRequire as _cr}from'module';import{fileURLToPath as _f}from'url';import{dirname as _d}from'path';const require=_cr(import.meta.url);const __filename=_f(import.meta.url);const __dirname=_d(__filename);" \
     --external:express --external:dotenv --external:drizzle-orm --external:drizzle-kit \
     --external:pg --external:connect-pg-simple --external:express-session \
-    --external:memorystore --external:ws --external:cors
+    --external:memorystore --external:ws --external:cors \
+    --external:lightningcss --external:@babel/preset-typescript --external:fsevents
 
 # Stage 2: Production image
 FROM node:20-alpine

@@ -1,6 +1,6 @@
 use axum::{
     extract::{Query, State},
-    http::{header::HeaderMap, StatusCode},
+    http::{header, header::HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Extension, Json,
 };
@@ -80,7 +80,7 @@ pub async fn logout(
                 let exp = claims.exp;
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .map_err(|_| AppError::Internal("System time error".to_string()))?
+                    .map_err(|_| AppError::InternalError("System time error".to_string()))?
                     .as_secs() as i64;
                 
                 let ttl = (exp - now).max(0) as usize;
@@ -94,7 +94,7 @@ pub async fn logout(
                         .arg(&blacklist_key)
                         .arg(ttl)
                         .arg("blacklisted")
-                        .query(&mut conn)
+                        .query_async(&mut conn)
                         .await;
                 }
             }

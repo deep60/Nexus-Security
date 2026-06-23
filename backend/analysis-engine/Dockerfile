@@ -1,28 +1,19 @@
-FROM rust:1.85-slim-bookworm as builder
+FROM rust:1.88-slim-bookworm AS builder
 
-# Install build dependencies including YARA
-RUN apt-get update && apt-get install -y \
+# Install build dependencies. YARA is installed from Debian bookworm-backports
+# (libyara 4.5.x) instead of compiling from source, which avoids the autoconf
+# "PKG_CHECK_MODULES / PROTOBUF_C" bootstrap failure.
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
+        > /etc/apt/sources.list.d/backports.list && \
+    apt-get update && \
+    apt-get install -y \
     pkg-config \
     libssl-dev \
     libpq-dev \
-    automake \
-    libtool \
     make \
     gcc \
-    wget \
+    && apt-get install -y -t bookworm-backports libyara-dev \
     && rm -rf /var/lib/apt/lists/*
-
-# Install YARA from source
-RUN wget https://github.com/VirusTotal/yara/archive/v4.5.0.tar.gz && \
-    tar -zxf v4.5.0.tar.gz && \
-    cd yara-4.5.0 && \
-    ./bootstrap.sh && \
-    ./configure && \
-    make && \
-    make install && \
-    ldconfig && \
-    cd .. && \
-    rm -rf yara-4.5.0 v4.5.0.tar.gz
 
 WORKDIR /app
 
@@ -44,29 +35,17 @@ RUN cargo build --release --bin analysis-engine
 
 FROM debian:bookworm-slim
 
-# Install runtime dependencies including YARA
-RUN apt-get update && apt-get install -y \
+# Install runtime dependencies including the YARA shared library from
+# bookworm-backports (matches the build stage).
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
+        > /etc/apt/sources.list.d/backports.list && \
+    apt-get update && \
+    apt-get install -y \
     ca-certificates \
     libssl3 \
     libpq5 \
-    automake \
-    libtool \
-    make \
-    gcc \
-    wget \
+    && apt-get install -y -t bookworm-backports libyara10 \
     && rm -rf /var/lib/apt/lists/*
-
-# Install YARA from source (runtime)
-RUN wget https://github.com/VirusTotal/yara/archive/v4.5.0.tar.gz && \
-    tar -zxf v4.5.0.tar.gz && \
-    cd yara-4.5.0 && \
-    ./bootstrap.sh && \
-    ./configure && \
-    make && \
-    make install && \
-    ldconfig && \
-    cd .. && \
-    rm -rf yara-4.5.0 v4.5.0.tar.gz
 
 RUN useradd -m -u 1000 app
 COPY --from=builder /app/target/release/analysis-engine /usr/local/bin/app

@@ -267,22 +267,21 @@ pub async fn logout(
                 .map_err(|_| ApiError::Internal("System time error".to_string()))?
                 .as_secs() as i64;
             
-            let ttl = (exp - now).max(0) as usize;
+            let ttl = (exp as i64 - now).max(0) as usize;
             
             if ttl > 0 {
                 // Store token in Redis blacklist
                 let blacklist_key = format!("jwt_blacklist:{}", token);
-                let redis_key = redis::Value::Data(blacklist_key.as_bytes().to_vec());
-                
+
                 // Use Redis SETEX to store token with TTL
-                let mut conn = state.redis.get_connection().await
-                    .map_err(|e| ApiError::Internal(format!("Redis connection failed: {}", e)))?;
+                let mut conn = state.redis.connection_pool.clone();
                 
                 let _: () = redis::cmd("SETEX")
                     .arg(&blacklist_key)
                     .arg(ttl)
                     .arg("blacklisted")
-                    .query(&mut conn)
+                    .query_async(&mut conn)
+                    .await
                     .map_err(|e| ApiError::Internal(format!("Failed to blacklist token: {}", e)))?;
                 
                 // Also remove from active sessions
