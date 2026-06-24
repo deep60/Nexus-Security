@@ -13,7 +13,7 @@ import "dotenv/config";
 
 // Helper to check if private key is valid (64 hex chars = 32 bytes)
 const getPrivateKey = (): string[] => {
-  const pk = process.env.PRIVATE_KEY;
+  const pk = process.env.PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY;
   if (!pk) return [];
 
   // Remove 0x prefix if present
@@ -43,7 +43,7 @@ const config: HardhatUserConfig = {
       url: "http://127.0.0.1:8545",
     },
     sepolia: {
-      url: process.env.SEPOLIA_RPC || "",
+      url: process.env.SEPOLIA_RPC || process.env.RPC_URL || "",
       accounts: getPrivateKey(),
     },
     polygon: {
@@ -57,7 +57,7 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
-      sepolia: process.env.ETHERSCAN_API || "",
+      sepolia: process.env.ETHERSCAN_API || process.env.ETHERSCAN_API_KEY || "",
       polygon: process.env.POLYGONSCAN_API || "",
       polygonMumbai: process.env.POLYGONSCAN_API || "",
     },

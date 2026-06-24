@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: verdyx
+  labels:
+    app: payment-service
+    component: backend
+    service: payment
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+        component: backend
+        service: payment
+    spec:
+      serviceAccountName: payment-service-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+      - name: payment-service
+        image: verdyx/payment-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: SERVER_PORT
+          value: "8080"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: verdyx-redis-secret
+              key: redis_url
+        - name: BLOCKCHAIN_RPC_URL
+          valueFrom:
+            secretKeyRef:
+              name: verdyx-blockchain-secret
+              key: rpc_url
+        - name: TREASURY_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: verdyx-blockchain-secret
+              key: private_key
+        - name: TREASURY_ADDRESS
+          valueFrom:
+            secretKeyRef:
+              name: verdyx-blockchain-secret
+              key: treasury_address
+        - name: TOKEN_CONTRACT_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: blockchain-config
+              key: token_contract_address
+        - name: PAYMENT_CONTRACT_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: blockchain-config
+              key: bounty_contract_address
+        - name: BLOCKCHAIN_CHAIN_ID
+          value: "1"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "150m"
+          limits:
+            memory: "512Mi"
+            cpu: "400m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
+      volumes:
+      - name: tmp-volume
+        emptyDir:
+          sizeLimit: 100Mi
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always

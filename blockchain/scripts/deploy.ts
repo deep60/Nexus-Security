@@ -13,6 +13,7 @@ interface DeploymentAddresses {
     threatToken: string;
     reputationSystem: string;
     bountyManager: string;
+    governance: string;
     deployer: string;
     network: string;
     blockNumber: number;
@@ -45,7 +46,7 @@ async function main() {
     );
     await threatToken.waitForDeployment();
     const threatTokenAddress = await threatToken.getAddress();
-    console.log('✅ ThreatToken deployed at: ${threatTokenAddress}');
+    console.log(`✅ ThreatToken deployed at: ${threatTokenAddress}`);
 
     // Deploy ReputationSystem next
     console.log("\n📋 Deploying ReputationSystem...");
@@ -66,6 +67,14 @@ async function main() {
   await bountyManager.waitForDeployment();
   const bountyManagerAddress = await bountyManager.getAddress();
   console.log(`✅ BountyManager deployed at: ${bountyManagerAddress}`);
+
+  // Deploy Governance (DAO) bound to the ThreatToken
+  console.log("\n 📋 Deploying Governance...");
+  const GovernanceFactory = await ethers.getContractFactory("Governance");
+  const governance = await GovernanceFactory.deploy(threatTokenAddress);
+  await governance.waitForDeployment();
+  const governanceAddress = await governance.getAddress();
+  console.log(`✅ Governance deployed at: ${governanceAddress}`);
 
   // Setup initial configuration
   console.log("\n⚙️  Setting up initial configuration...");
@@ -92,6 +101,7 @@ async function main() {
     threatToken: threatTokenAddress,
     reputationSystem: reputationSystemAddress,
     bountyManager: bountyManagerAddress,
+    governance: governanceAddress,
     deployer: deployer.address,
     network: network.name,
     blockNumber: currentBlock,
@@ -123,6 +133,24 @@ async function main() {
   allDeployments[`${network.name}-${network.chainId}`] = deploymentData;
   writeFileSync(allDeploymentsFile, JSON.stringify(allDeployments, null, 2));
 
+  // Also write the canonical deployed-addresses.json that the backend reads.
+  const canonical = {
+    network: network.name,
+    chainId: Number(network.chainId),
+    deployedAt: new Date(timestamp * 1000).toISOString(),
+    contracts: {
+      ThreatToken: { address: threatTokenAddress, deployer: deployer.address, blockNumber: currentBlock },
+      ReputationSystem: { address: reputationSystemAddress, deployer: deployer.address, blockNumber: currentBlock },
+      BountyManager: { address: bountyManagerAddress, deployer: deployer.address, blockNumber: currentBlock },
+      Governance: { address: governanceAddress, deployer: deployer.address, blockNumber: currentBlock },
+    },
+    notes: `Deployed to ${network.name} (chainId ${network.chainId}).`,
+  };
+  writeFileSync(
+    join(__dirname, "..", "deployed-addresses.json"),
+    JSON.stringify(canonical, null, 2)
+  );
+
   console.log("\n🎉 Deployment completed successfully!");
   console.log("📄 Deployment summary:");
   console.log("═".repeat(50));
@@ -132,6 +160,7 @@ async function main() {
   console.log(`ThreatToken: ${threatTokenAddress}`);
   console.log(`ReputationSystem: ${reputationSystemAddress}`);
   console.log(`BountyManager: ${bountyManagerAddress}`);
+  console.log(`Governance: ${governanceAddress}`);
   console.log("═".repeat(50));
   console.log(`📁 Deployment data saved to: ${deploymentFile}`);
 

@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: consensus-service
+  namespace: verdyx
+  labels:
+    app: consensus-service
+    component: backend
+    service: consensus
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: consensus-service
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: consensus-service-sa
+  namespace: verdyx
+  labels:
+    app: consensus-service
+    component: backend
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: consensus-service-role
+  namespace: verdyx
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: consensus-service-rolebinding
+  namespace: verdyx
+subjects:
+- kind: ServiceAccount
+  name: consensus-service-sa
+  namespace: verdyx
+roleRef:
+  kind: Role
+  name: consensus-service-role
+  apiGroup: rbac.authorization.k8s.io

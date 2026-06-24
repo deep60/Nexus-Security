@@ -5,7 +5,7 @@ services:
   postgres:
     build:
       context: ../../..
-      dockerfile: infrastructure/docker/postgress.Dockerfile
+      dockerfile: infrastructure/docker/postgres.Dockerfile
     container_name: verdyx-postgres-prod
     environment:
       POSTGRES_DB: verdyx

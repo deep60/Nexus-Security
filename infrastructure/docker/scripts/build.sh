@@ -61,7 +61,7 @@ echo -e "${GREEN}Building backend services...${NC}"
 echo ""
 
 # PostgreSQL
-build_service "postgres" "infrastructure/docker/postgress.Dockerfile"
+build_service "postgres" "infrastructure/docker/postgres.Dockerfile"
 
 # API Gateway
 build_service "api-gateway" "infrastructure/docker/production/api-gateway/api-gateway.Dockerfile"

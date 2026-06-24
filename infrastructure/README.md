@@ -14,7 +14,7 @@ infrastructure/
 │   │   ├── bounty-manager/
 │   │   └── frontend/
 │   ├── scripts/               # Build & push scripts
-│   └── postgress.Dockerfile   # Custom PostgreSQL image
+│   └── postgres.Dockerfile   # Custom PostgreSQL image
 ├── kubernetes/                # Kubernetes manifests
 │   ├── api-gateway/
 │   ├── analysis-engine/

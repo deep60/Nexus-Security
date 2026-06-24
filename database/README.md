@@ -1,5 +1,26 @@
 # Verdyx Database Layer
 
+> ## ⚠️ SOURCE OF TRUTH (read this first)
+>
+> The **authoritative schema is the per-service `migrations/` folder inside each
+> backend service** (e.g. `backend/user-service/migrations/`,
+> `backend/consensus-service/migrations/`, etc.). At runtime:
+>
+> 1. `database/init/01-init-databases.sql` runs once on first Postgres start and
+>    creates **one database per service** (`verdyx_gateway`, `verdyx_users`,
+>    `verdyx_analysis`, `verdyx_bounty`, `verdyx_submissions`,
+>    `verdyx_consensus`, `verdyx_payments`, `verdyx_reputation`,
+>    `verdyx_notifications`).
+> 2. Each service then applies its own migrations via `sqlx::migrate!` on boot.
+>
+> Therefore the files under `database/postgres/migrations/` and the master
+> `database/schema.sql` in this folder are **LEGACY / REFERENCE ONLY**. They are
+> not executed by any service and may drift from reality. Do **not** treat them
+> as the live schema. If you change a table, change it in the owning service's
+> `migrations/` folder. The sections below that describe a single monolithic
+> `verdyx` database are historical and kept for high-level domain reference only.
+
+
 This directory contains all database configurations, schemas, migrations, and initialization scripts for the Verdyx threat intelligence platform.
 
 ## 📁 Directory Structure

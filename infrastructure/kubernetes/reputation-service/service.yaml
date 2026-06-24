@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: reputation-service
+  namespace: verdyx
+  labels:
+    app: reputation-service
+    component: backend
+    service: reputation
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: reputation-service
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: reputation-service-sa
+  namespace: verdyx
+  labels:
+    app: reputation-service
+    component: backend
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: reputation-service-role
+  namespace: verdyx
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: reputation-service-rolebinding
+  namespace: verdyx
+subjects:
+- kind: ServiceAccount
+  name: reputation-service-sa
+  namespace: verdyx
+roleRef:
+  kind: Role
+  name: reputation-service-role
+  apiGroup: rbac.authorization.k8s.io

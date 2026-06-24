@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: submission-service
+  namespace: verdyx
+  labels:
+    app: submission-service
+    component: backend
+    service: submission
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: submission-service
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: submission-service-sa
+  namespace: verdyx
+  labels:
+    app: submission-service
+    component: backend
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: submission-service-role
+  namespace: verdyx
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: submission-service-rolebinding
+  namespace: verdyx
+subjects:
+- kind: ServiceAccount
+  name: submission-service-sa
+  namespace: verdyx
+roleRef:
+  kind: Role
+  name: submission-service-role
+  apiGroup: rbac.authorization.k8s.io

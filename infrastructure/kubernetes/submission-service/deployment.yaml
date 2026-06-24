@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: submission-service
+  namespace: verdyx
+  labels:
+    app: submission-service
+    component: backend
+    service: submission
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: submission-service
+  template:
+    metadata:
+      labels:
+        app: submission-service
+        component: backend
+        service: submission
+    spec:
+      serviceAccountName: submission-service-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+      - name: submission-service
+        image: verdyx/submission-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: SERVER_PORT
+          value: "8080"
+        - name: SUBMISSION_SERVICE_PORT
+          value: "8080"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: verdyx-redis-secret
+              key: redis_url
+        - name: S3_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: storage-config
+              key: s3_endpoint
+        - name: S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: storage-config
+              key: s3_bucket
+        - name: S3_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: verdyx-storage-secret
+              key: access_key
+        - name: S3_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: verdyx-storage-secret
+              key: secret_key
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "150m"
+          limits:
+            memory: "512Mi"
+            cpu: "400m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
+      volumes:
+      - name: tmp-volume
+        emptyDir:
+          sizeLimit: 500Mi
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
