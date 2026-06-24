@@ -95,9 +95,56 @@ pub async fn send_notification(
 }
 
 pub async fn get_notification_history(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
 ) -> (StatusCode, Json<Value>) {
-    (StatusCode::OK, Json(json!({"notifications": []})))
+    let user_id = headers
+        .get("x-user-id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| Uuid::parse_str(v).ok());
+
+    let Some(user_id) = user_id else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "missing x-user-id" })),
+        );
+    };
+
+    let rows = sqlx::query_as::<_, (Uuid, String, String, Value, String, Option<chrono::DateTime<Utc>>)>(
+        r#"
+        SELECT id, channel, event_type, payload, status, sent_at
+        FROM notification_history
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 100
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(&state.db_pool)
+    .await;
+
+    match rows {
+        Ok(rows) => {
+            let items: Vec<Value> = rows
+                .into_iter()
+                .map(|(id, channel, event_type, payload, status, sent_at)| {
+                    json!({
+                        "id": id,
+                        "channel": channel,
+                        "event_type": event_type,
+                        "payload": payload,
+                        "status": status,
+                        "sent_at": sent_at,
+                    })
+                })
+                .collect();
+            (StatusCode::OK, Json(json!({ "notifications": items })))
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
 }
 
 pub async fn retry_notification(

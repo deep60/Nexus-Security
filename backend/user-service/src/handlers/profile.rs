@@ -48,23 +48,75 @@ pub async fn update_profile(
     Ok(Json(profile))
 }
 
-/// Upload avatar
+/// Upload avatar (multipart form field "file"). Stores to S3/MinIO and
+/// records the resulting URL on the user's profile.
 pub async fn upload_avatar(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
+    mut multipart: axum::extract::Multipart,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Unauthorized("Invalid token".to_string()))?;
 
-    // Avatar upload requires multipart form handling and S3/object storage.
-    // Integration path: add axum::extract::Multipart, upload to S3Client,
-    // then store the URL in the user's profile via user_service.update_avatar().
-    tracing::info!(user_id = %user_id, "Avatar upload requested - S3 integration pending");
+    let storage = state.avatar_storage.as_ref().ok_or_else(|| {
+        AppError::InternalError("Avatar storage is not configured".to_string())
+    })?;
+
+    // Pull the first file field from the multipart body.
+    let mut field_data: Option<(Vec<u8>, String)> = None;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::UserError(UserError::ValidationError(format!("invalid upload: {e}"))))?
+    {
+        let content_type = field
+            .content_type()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "application/octet-stream".to_string());
+        let data = field
+            .bytes()
+            .await
+            .map_err(|e| AppError::UserError(UserError::ValidationError(format!("read failed: {e}"))))?
+            .to_vec();
+        field_data = Some((data, content_type));
+        break;
+    }
+
+    let (data, content_type) = field_data.ok_or_else(|| {
+        AppError::UserError(UserError::ValidationError("no file provided".to_string()))
+    })?;
+
+    // Basic validation: image content type and size cap (5 MB).
+    if !content_type.starts_with("image/") {
+        return Err(AppError::UserError(UserError::ValidationError(
+            "avatar must be an image".to_string(),
+        )));
+    }
+    if data.len() > 5 * 1024 * 1024 {
+        return Err(AppError::UserError(UserError::ValidationError(
+            "avatar exceeds 5MB limit".to_string(),
+        )));
+    }
+
+    let ext = match content_type.as_str() {
+        "image/png" => "png",
+        "image/jpeg" | "image/jpg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        _ => "img",
+    };
+    let key = format!("avatars/{}.{}", user_id, ext);
+
+    let url = storage
+        .upload_avatar(&key, data, &content_type)
+        .await
+        .map_err(|e| AppError::InternalError(format!("upload failed: {e}")))?;
+
+    let profile = state.user_service.update_avatar(user_id, &url).await?;
 
     Ok(Json(serde_json::json!({
-        "message": "Avatar upload requires S3 object storage integration",
-        "user_id": user_id,
-        "status": "not_implemented",
+        "message": "avatar updated",
+        "avatar_url": profile.avatar_url,
     })))
 }
 

@@ -4,102 +4,76 @@ use std::sync::Arc;
 use crate::AppState;
 use crate::models::*;
 
+/// Map a PaymentError to an HTTP status + JSON body.
+fn map_err(e: PaymentError) -> (StatusCode, Json<Value>) {
+    let status = match &e {
+        PaymentError::ValidationError(_) => StatusCode::BAD_REQUEST,
+        PaymentError::InsufficientBalance(_) => StatusCode::BAD_REQUEST,
+        PaymentError::NotFound(_) => StatusCode::NOT_FOUND,
+        PaymentError::AlreadyProcessed(_) => StatusCode::CONFLICT,
+        _ => StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    (status, Json(json!({ "error": e.to_string() })))
+}
+
 pub async fn deposit_bounty_reward(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<DepositBountyRequest>,
 ) -> (StatusCode, Json<Value>) {
-    // Pre-flight check: verify the creator has sufficient token balance
-    match state.payment_service.get_token_balance(&payload.creator_address).await {
-        Ok(balance) => {
-            let required = ethers::types::U256::from_dec_str(&payload.amount.to_string()).unwrap_or_default();
-            if balance < required {
-                return (StatusCode::BAD_REQUEST, Json(json!({
-                    "error": "Insufficient token balance",
-                    "balance": format!("{}", balance),
-                    "required": format!("{}", required)
-                })));
-            }
-            (StatusCode::OK, Json(json!({
-                "message": "Bounty deposit pre-check passed",
-                "balance": format!("{}", balance),
-                "bounty_id": payload.bounty_id
-            })))
-        }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
-            "error": format!("Failed to check balance: {}", e)
-        }))),
+    match state.payment_service.record_deposit_intent(&payload).await {
+        Ok(resp) => (StatusCode::OK, Json(json!(resp))),
+        Err(e) => map_err(e),
     }
 }
 
 pub async fn distribute_bounty_reward(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(payload): Json<DistributeBountyRequest>,
 ) -> (StatusCode, Json<Value>) {
-    // Distribution is handled by BountyManager.resolveBounty() on-chain
-    (StatusCode::OK, Json(json!({
-        "message": "Bounty distribution queued — will be processed by on-chain resolveBounty",
-        "bounty_id": payload.bounty_id
-    })))
+    match state.payment_service.distribute_reward(&payload).await {
+        Ok(resp) => (StatusCode::OK, Json(json!(resp))),
+        Err(e) => map_err(e),
+    }
 }
 
 pub async fn lock_stake(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<LockStakeRequest>,
 ) -> (StatusCode, Json<Value>) {
-    // Pre-check: user must have sufficient balance for staking
-    match state.payment_service.get_token_balance(&payload.address).await {
-        Ok(balance) => {
-            let required = ethers::types::U256::from_dec_str(&payload.amount.to_string()).unwrap_or_default();
-            if balance < required {
-                return (StatusCode::BAD_REQUEST, Json(json!({
-                    "error": "Insufficient balance for stake",
-                    "balance": format!("{}", balance)
-                })));
-            }
-            (StatusCode::OK, Json(json!({
-                "message": "Stake pre-check passed",
-                "balance": format!("{}", balance),
-                "bounty_id": payload.bounty_id
-            })))
-        }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
-            "error": format!("Failed to check balance: {}", e)
-        }))),
+    match state.payment_service.record_stake_lock(&payload).await {
+        Ok(resp) => (StatusCode::OK, Json(json!(resp))),
+        Err(e) => map_err(e),
     }
 }
 
 pub async fn unlock_stake(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(payload): Json<UnlockStakeRequest>,
 ) -> (StatusCode, Json<Value>) {
-    // Stake unlocking is handled by the smart contract during bounty resolution
-    (StatusCode::OK, Json(json!({
-        "message": "Stake unlock is handled by on-chain bounty resolution",
-        "stake_id": payload.stake_id
-    })))
+    match state.payment_service.unlock_stake(payload.stake_id).await {
+        Ok(resp) => (StatusCode::OK, Json(json!(resp))),
+        Err(e) => map_err(e),
+    }
 }
 
 pub async fn slash_stake(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(payload): Json<SlashStakeRequest>,
 ) -> (StatusCode, Json<Value>) {
-    // Stake slashing is handled by the smart contract during bounty resolution
-    (StatusCode::OK, Json(json!({
-        "message": "Stake slashing is handled by on-chain bounty resolution",
-        "stake_id": payload.stake_id,
-        "slash_amount": payload.slash_amount.to_string()
-    })))
+    match state.payment_service.slash_stake(&payload).await {
+        Ok(resp) => (StatusCode::OK, Json(json!(resp))),
+        Err(e) => map_err(e),
+    }
 }
 
 pub async fn withdraw_funds(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(payload): Json<WithdrawRequest>,
 ) -> (StatusCode, Json<Value>) {
-    (StatusCode::OK, Json(json!({
-        "message": "Withdrawal queued for processing",
-        "to_address": payload.to_address,
-        "amount": payload.amount.to_string()
-    })))
+    match state.payment_service.process_withdrawal(&payload).await {
+        Ok(resp) => (StatusCode::OK, Json(json!(resp))),
+        Err(e) => map_err(e),
+    }
 }
 
 pub async fn get_balance(

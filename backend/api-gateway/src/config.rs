@@ -357,9 +357,9 @@ impl Default for RateLimitingConfig {
 impl Default for ServicesConfig {
     fn default() -> Self {
         Self {
-            analysis_engine_url: "http://localhost:8081".to_string(),
-            bounty_manager_url: "http://localhost:8082".to_string(),
-            notification_service_url: "http://localhost:8083".to_string(),
+            analysis_engine_url: "http://localhost:8082".to_string(),
+            bounty_manager_url: "http://localhost:8083".to_string(),
+            notification_service_url: "http://localhost:8088".to_string(),
             storage_service_url: "http://localhost:8084".to_string(),
             ml_service_url: None,
             max_file_size_mb: 100,

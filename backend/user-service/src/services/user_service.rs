@@ -419,6 +419,25 @@ impl UserService {
         Ok(profile)
     }
 
+    /// Set a user's avatar URL.
+    pub async fn update_avatar(&self, user_id: Uuid, avatar_url: &str) -> UserResult<UserProfile> {
+        let profile = sqlx::query_as::<_, UserProfile>(
+            r#"
+            UPDATE user_profiles
+            SET avatar_url = $1, updated_at = NOW()
+            WHERE user_id = $2
+            RETURNING *
+            "#,
+        )
+        .bind(avatar_url)
+        .bind(user_id)
+        .fetch_one(&self.db_pool)
+        .await
+        .map_err(|e| UserError::DatabaseError(e.to_string()))?;
+
+        Ok(profile)
+    }
+
     // ============= Settings Methods =============
 
     /// Get user settings

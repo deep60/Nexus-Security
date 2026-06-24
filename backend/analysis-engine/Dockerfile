@@ -48,8 +48,20 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -u 1000 app
+
+# Run from /app so the service's relative paths (./rules, ./temp, ./models)
+# resolve to a writable, app-owned location instead of / (which caused the
+# "Permission denied (os error 13)" when create_dir_all ran as non-root).
+WORKDIR /app
+
 COPY --from=builder /app/target/release/analysis-engine /usr/local/bin/app
-RUN chown -R app:app /usr/local/bin/app
+
+# Ship the signature/YARA rules and pre-create the writable working dirs the
+# service touches at startup (signature matcher, file handler upload/temp).
+COPY analysis-engine/rules ./rules
+RUN mkdir -p ./rules/signatures ./rules/yara ./temp/verdyx-uploads ./models ./logs && \
+    chown -R app:app /usr/local/bin/app /app
+
 USER app
 EXPOSE 8080
 CMD ["/usr/local/bin/app"]

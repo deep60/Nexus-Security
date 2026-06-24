@@ -19,7 +19,7 @@ COPY user-service ./user-service
 RUN cargo build --release --bin consensus-service
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ca-certificates libssl3 libpq5 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates libssl3 libpq5 curl && rm -rf /var/lib/apt/lists/*
 RUN useradd -m -u 1000 app
 COPY --from=builder /app/target/release/consensus-service /usr/local/bin/app
 RUN chown -R app:app /usr/local/bin/app

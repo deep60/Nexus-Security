@@ -4,6 +4,7 @@ mod handlers;
 mod models;
 mod services;
 mod middleware;
+mod storage;
 
 use anyhow::Result;
 use axum::{
@@ -75,12 +76,25 @@ async fn main() -> Result<()> {
     );
     info!("User service initialized");
 
+    // Initialize avatar storage (optional - only if S3/MinIO is reachable).
+    let avatar_storage = match storage::AvatarStorage::from_env().await {
+        Ok(s) => {
+            info!("Avatar storage initialized");
+            Some(Arc::new(s))
+        }
+        Err(e) => {
+            info!("Avatar storage unavailable ({}); avatar uploads disabled", e);
+            None
+        }
+    };
+
     // Build application state
     let app_state = Arc::new(AppState {
         config: config.clone(),
         db_pool,
         redis_conn,
         user_service,
+        avatar_storage,
     });
 
     // Configure CORS - allow specific origins from environment
@@ -182,4 +196,5 @@ pub struct AppState {
     pub db_pool: sqlx::PgPool,
     pub redis_conn: redis::aio::ConnectionManager,
     pub user_service: Arc<UserService>,
+    pub avatar_storage: Option<Arc<storage::AvatarStorage>>,
 }

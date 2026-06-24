@@ -77,13 +77,33 @@ impl ServiceRegistry {
     pub fn default_services() -> Self {
         let mut registry = Self::new();
 
+        // NOTE: In Docker, every backend service listens internally on port 8080
+        // and is reachable by its container name (e.g. http://analysis-engine:8080).
+        // The *_URL env vars are set in docker-compose.yml to those container URLs.
+        // The localhost defaults below match the host-exposed ports in
+        // docker-compose.yml so running the gateway on the host (against
+        // port-mapped containers) also works.
+
+        // User Service
+        registry.register(
+            "user-service".to_string(),
+            ServiceEndpoint {
+                name: "User Service".to_string(),
+                base_url: std::env::var("USER_SERVICE_URL")
+                    .unwrap_or_else(|_| "http://localhost:8081".to_string()),
+                health_check_path: Some("/health".to_string()),
+                api_version: "v1".to_string(),
+                requires_auth: true,
+            },
+        );
+
         // Analysis Engine
         registry.register(
             "analysis-engine".to_string(),
             ServiceEndpoint {
                 name: "Analysis Engine".to_string(),
                 base_url: std::env::var("ANALYSIS_ENGINE_URL")
-                    .unwrap_or_else(|_| "http://localhost:8081".to_string()),
+                    .unwrap_or_else(|_| "http://localhost:8082".to_string()),
                 health_check_path: Some("/health".to_string()),
                 api_version: "v1".to_string(),
                 requires_auth: true,
@@ -96,7 +116,60 @@ impl ServiceRegistry {
             ServiceEndpoint {
                 name: "Bounty Manager".to_string(),
                 base_url: std::env::var("BOUNTY_MANAGER_URL")
-                    .unwrap_or_else(|_| "http://localhost:8082".to_string()),
+                    .unwrap_or_else(|_| "http://localhost:8083".to_string()),
+                health_check_path: Some("/health".to_string()),
+                api_version: "v1".to_string(),
+                requires_auth: true,
+            },
+        );
+
+        // Submission Service (also referenced as the storage service)
+        registry.register(
+            "submission-service".to_string(),
+            ServiceEndpoint {
+                name: "Submission Service".to_string(),
+                base_url: std::env::var("SUBMISSION_SERVICE_URL")
+                    .or_else(|_| std::env::var("STORAGE_SERVICE_URL"))
+                    .unwrap_or_else(|_| "http://localhost:8084".to_string()),
+                health_check_path: Some("/health".to_string()),
+                api_version: "v1".to_string(),
+                requires_auth: true,
+            },
+        );
+
+        // Consensus Service
+        registry.register(
+            "consensus-service".to_string(),
+            ServiceEndpoint {
+                name: "Consensus Service".to_string(),
+                base_url: std::env::var("CONSENSUS_SERVICE_URL")
+                    .unwrap_or_else(|_| "http://localhost:8085".to_string()),
+                health_check_path: Some("/health".to_string()),
+                api_version: "v1".to_string(),
+                requires_auth: true,
+            },
+        );
+
+        // Payment Service
+        registry.register(
+            "payment-service".to_string(),
+            ServiceEndpoint {
+                name: "Payment Service".to_string(),
+                base_url: std::env::var("PAYMENT_SERVICE_URL")
+                    .unwrap_or_else(|_| "http://localhost:8086".to_string()),
+                health_check_path: Some("/health".to_string()),
+                api_version: "v1".to_string(),
+                requires_auth: true,
+            },
+        );
+
+        // Reputation Service
+        registry.register(
+            "reputation-service".to_string(),
+            ServiceEndpoint {
+                name: "Reputation Service".to_string(),
+                base_url: std::env::var("REPUTATION_SERVICE_URL")
+                    .unwrap_or_else(|_| "http://localhost:8087".to_string()),
                 health_check_path: Some("/health".to_string()),
                 api_version: "v1".to_string(),
                 requires_auth: true,
@@ -109,7 +182,7 @@ impl ServiceRegistry {
             ServiceEndpoint {
                 name: "Notification Service".to_string(),
                 base_url: std::env::var("NOTIFICATION_SERVICE_URL")
-                    .unwrap_or_else(|_| "http://localhost:8083".to_string()),
+                    .unwrap_or_else(|_| "http://localhost:8088".to_string()),
                 health_check_path: Some("/health".to_string()),
                 api_version: "v1".to_string(),
                 requires_auth: true,

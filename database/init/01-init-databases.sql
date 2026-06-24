@@ -1,22 +1,76 @@
 -- Verdyx Database Initialization Script
+-- Creates one database per microservice so each owns its own schema and
+-- its own _sqlx_migrations table (no cross-service migration version collisions).
+--
+-- This runs only on first initialization of an empty Postgres data volume.
+-- It is executed by the postgres entrypoint as ${POSTGRES_USER} connected to
+-- the default ${POSTGRES_DB} database.
 
--- Create extensions
+-- ---------------------------------------------------------------------------
+-- Create one database per service (owned by verdyx_user)
+-- ---------------------------------------------------------------------------
+CREATE DATABASE verdyx_gateway        OWNER verdyx_user;
+CREATE DATABASE verdyx_users          OWNER verdyx_user;
+CREATE DATABASE verdyx_analysis       OWNER verdyx_user;
+CREATE DATABASE verdyx_bounty         OWNER verdyx_user;
+CREATE DATABASE verdyx_submissions    OWNER verdyx_user;
+CREATE DATABASE verdyx_consensus      OWNER verdyx_user;
+CREATE DATABASE verdyx_payments       OWNER verdyx_user;
+CREATE DATABASE verdyx_reputation     OWNER verdyx_user;
+CREATE DATABASE verdyx_notifications  OWNER verdyx_user;
+
+-- ---------------------------------------------------------------------------
+-- Install required extensions in every database.
+-- (Extensions are per-database, so we connect to each one.)
+-- Service migrations are responsible for creating their own enums/tables.
+-- ---------------------------------------------------------------------------
+
+\connect verdyx
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- For fuzzy text search
-CREATE EXTENSION IF NOT EXISTS "pgcrypto"; -- For cryptographic functions
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Create custom types
-CREATE TYPE bounty_status AS ENUM ('draft', 'open', 'in_progress', 'under_review', 'completed', 'cancelled', 'expired');
-CREATE TYPE threat_verdict AS ENUM ('malicious', 'benign', 'suspicious', 'unknown');
-CREATE TYPE artifact_type AS ENUM ('file', 'url', 'hash', 'ip', 'domain');
-CREATE TYPE kyc_status AS ENUM ('not_submitted', 'pending', 'under_review', 'approved', 'rejected');
-CREATE TYPE analysis_status AS ENUM ('pending', 'in_progress', 'completed', 'failed');
+\connect verdyx_gateway
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Grant permissions
-GRANT ALL PRIVILEGES ON DATABASE verdyx TO verdyx_user;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO verdyx_user;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO verdyx_user;
+\connect verdyx_users
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Log initialization
-INSERT INTO pg_catalog.pg_ts_config_map VALUES ('default', 'postgres', 'pg_catalog.simple');
+\connect verdyx_analysis
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+\connect verdyx_bounty
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\connect verdyx_submissions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\connect verdyx_consensus
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\connect verdyx_payments
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\connect verdyx_reputation
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\connect verdyx_notifications
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
