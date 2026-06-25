@@ -10,6 +10,12 @@ data:
     global:
       scrape_interval: 15s
       evaluation_interval: 15s
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+    alerting:
+      alertmanagers:
+      - static_configs:
+        - targets: ['alertmanager:9093']
     scrape_configs:
       # Scrape any pod in the verdyx namespace that opts in via
       # prometheus.io/scrape annotations (set on the service deployments).
@@ -67,6 +73,8 @@ spec:
         volumeMounts:
         - name: config-volume
           mountPath: /etc/prometheus
+        - name: rules-volume
+          mountPath: /etc/prometheus/rules
         - name: data-volume
           mountPath: /prometheus
         resources:
@@ -80,6 +88,9 @@ spec:
       - name: config-volume
         configMap:
           name: prometheus-config
+      - name: rules-volume
+        configMap:
+          name: prometheus-alerts
       - name: data-volume
         emptyDir: {}
 

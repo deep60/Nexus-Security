@@ -17,22 +17,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const API_GATEWAY_URL =
     process.env.API_GATEWAY_URL || config.apiGatewayUrl || "http://localhost:8080";
 
-  // Proxy all /api/* requests to the Rust api-gateway, rewriting
-  // /api/… → /api/v1/… to match the gateway's versioned routes.
+  // Proxy all /api/* requests to the Rust api-gateway. The gateway mounts
+  // routes under both /api and /api/v1, but to match the dev-mode Vite proxy
+  // we normalize: paths that already start with /api/v1 pass through unchanged,
+  // anything else gets the /api → /api/v1 rewrite.
   app.use(
     "/api",
     createProxyMiddleware({
       target: API_GATEWAY_URL,
       changeOrigin: true,
-      pathRewrite: { "^/api": "/api/v1" },
+      pathRewrite: (path) =>
+        path.startsWith("/api/v1") ? path : path.replace(/^\/api/, "/api/v1"),
       // Forward WebSocket upgrade requests
       ws: true,
       // Log proxy events for debugging
       on: {
         proxyReq: (proxyReq, req) => {
-          console.log(
-            `[proxy] ${req.method} ${req.url} → ${API_GATEWAY_URL}/api/v1${req.url}`
-          );
+          console.log(`[proxy] ${req.method} ${req.url} → ${API_GATEWAY_URL}`);
         },
         error: (err, req, res) => {
           console.error(`[proxy] Error proxying ${req.url}:`, err.message);

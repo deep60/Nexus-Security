@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: consensus-service-config
+  namespace: verdyx
+  labels:
+    app: consensus-service
+    component: backend
+    service: consensus
+data:
+  # Non-secret runtime tuning. Secrets (DB url, redis url) come from
+  # the verdyx-* Kubernetes Secrets — see deployment.yaml.
+  CONSENSUS_THRESHOLD: "0.7"
+  MIN_SUBMISSIONS_REQUIRED: "3"
+  MAX_SUBMISSIONS_PER_BOUNTY: "10"
+  DISPUTE_RESOLUTION_TIMEOUT_SECONDS: "604800"   # 7 days
+  VALIDATION_TIMEOUT_SECONDS: "3600"             # 1 hour
+  WORKER_POLL_INTERVAL_SECONDS: "30"
+  RUST_LOG: "info,consensus_service=debug"
+  ENVIRONMENT: "production"

@@ -1,0 +1,36 @@
+---
+- name: Ensure install path exists
+  ansible.builtin.file:
+    path: "{{ verdyx_install_path }}"
+    state: directory
+    owner: "{{ verdyx_user }}"
+    group: "{{ verdyx_user }}"
+    mode: '0750'
+
+- name: Clone repo
+  ansible.builtin.git:
+    repo: "{{ verdyx_repo_url }}"
+    dest: "{{ verdyx_install_path }}"
+    version: "{{ verdyx_repo_branch }}"
+  become_user: "{{ verdyx_user }}"
+
+- name: Render production .env from template + vault secrets
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ verdyx_install_path }}/.env"
+    owner: "{{ verdyx_user }}"
+    group: "{{ verdyx_user }}"
+    mode: '0600'
+
+- name: Install backup cron (daily 03:00 UTC)
+  ansible.builtin.cron:
+    name: "verdyx-daily-backup"
+    user: "{{ verdyx_user }}"
+    minute: "0"
+    hour: "3"
+    job: "cd {{ verdyx_install_path }} && ./scripts/maintenance/backup.sh >> /var/log/verdyx-backup.log 2>&1"
+
+- name: Bring up the stack
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ verdyx_install_path }}"

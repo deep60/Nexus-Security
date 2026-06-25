@@ -1,0 +1,16 @@
+---
+# Run an on-demand backup of every Verdyx data store via the maintenance script.
+- name: Backup Verdyx data
+  hosts: verdyx
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Run backup script
+      ansible.builtin.command:
+        cmd: ./scripts/maintenance/backup.sh
+        chdir: "{{ verdyx_install_path }}"
+      register: backup_result
+
+    - name: Show backup output
+      ansible.builtin.debug:
+        var: backup_result.stdout_lines

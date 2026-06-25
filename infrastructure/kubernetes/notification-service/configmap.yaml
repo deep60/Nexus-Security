@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-service-config
+  namespace: verdyx
+  labels:
+    app: notification-service
+    component: backend
+    service: notification
+data:
+  # SMTP credentials live in verdyx-smtp-secret. Non-sensitive defaults below.
+  SMTP_PORT: "587"
+  EMAIL_FROM: "noreply@verdyx.com"
+  WEBHOOK_TIMEOUT: "30"
+  WEBHOOK_MAX_RETRY_ATTEMPTS: "3"
+  WEBHOOK_RETRY_BACKOFF_SECONDS: "5"
+  WEBSOCKET_PING_INTERVAL_SECONDS: "30"
+  WEBSOCKET_MAX_CLIENTS: "10000"
+  NOTIFICATION_BATCH_SIZE: "100"
+  NOTIFICATION_QUEUE_POLL_INTERVAL_MS: "500"
+  RUST_LOG: "info,notification_service=debug"
+  ENVIRONMENT: "production"

@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alerts
+  namespace: verdyx
+  labels:
+    app: prometheus
+data:
+  alerts.yml: |
+    groups:
+    - name: verdyx.platform
+      interval: 30s
+      rules:
+
+      - alert: ServiceDown
+        expr: up{job="verdyx-pods"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.app }} pod is down"
+          description: "{{ $labels.app }} pod {{ $labels.instance }} has been unreachable for over 2 minutes."
+
+      - alert: HighErrorRate5xx
+        expr: |
+          sum by (app) (rate(http_requests_total{status=~"5.."}[5m]))
+            / sum by (app) (rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.app }} 5xx rate above 5%"
+          description: "5xx error rate for {{ $labels.app }} is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      - alert: HighRequestLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum by (app, le) (rate(http_request_duration_seconds_bucket[5m]))
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.app }} p95 latency > 1s"
+          description: "{{ $labels.app }} p95 request latency is {{ $value }}s."
+
+      - alert: PodMemoryPressure
+        expr: |
+          container_memory_working_set_bytes{namespace="verdyx"}
+            / container_spec_memory_limit_bytes{namespace="verdyx"} > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.pod }} memory > 90% of limit"
+
+      - alert: PodCPUPressure
+        expr: |
+          rate(container_cpu_usage_seconds_total{namespace="verdyx"}[5m])
+            / on (pod) group_left() container_spec_cpu_quota{namespace="verdyx"} > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.pod }} CPU > 90% of limit"
+
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total{namespace="verdyx"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash-looping"
+
+      - alert: PostgresDown
+        expr: up{app="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+
+      - alert: RedisDown
+        expr: up{app="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+
+      - alert: BlockchainRpcStale
+        expr: time() - blockchain_last_block_seen_timestamp_seconds > 120
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Blockchain RPC has not produced a new block for 2+ minutes"
+
+      - alert: CertificateExpiringSoon
+        expr: (cert_manager_certificate_expiration_timestamp_seconds - time()) / 86400 < 14
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS certificate {{ $labels.name }} expires in less than 14 days"
+
+      - alert: BackupMissing
+        expr: time() - verdyx_backup_last_success_timestamp_seconds > 90000
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "No successful backup in the last 25 hours"
+          description: "The most recent successful backup was over 25 hours ago. Check the backup cron and the verdyx-daily-backup logs."

@@ -1,0 +1,34 @@
+---
+# Optional host-level nginx in front of compose. Skip this role if you
+# are running Kubernetes ingress instead of bare compose on a VM.
+- name: Install nginx + certbot
+  ansible.builtin.apt:
+    name:
+      - nginx
+      - certbot
+      - python3-certbot-nginx
+    state: present
+    update_cache: yes
+
+- name: Configure verdyx vhost
+  ansible.builtin.template:
+    src: verdyx.conf.j2
+    dest: /etc/nginx/sites-available/verdyx.conf
+    mode: '0644'
+  notify: reload nginx
+
+- name: Enable verdyx vhost
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/verdyx.conf
+    dest: /etc/nginx/sites-enabled/verdyx.conf
+    state: link
+  notify: reload nginx
+
+- name: Obtain TLS cert via certbot (idempotent)
+  ansible.builtin.command:
+    cmd: >
+      certbot --nginx
+      -d {{ verdyx_domain }} -d app.{{ verdyx_domain }} -d api.{{ verdyx_domain }}
+      --non-interactive --agree-tos --email ops@{{ verdyx_domain }}
+      --redirect
+    creates: /etc/letsencrypt/live/{{ verdyx_domain }}/fullchain.pem

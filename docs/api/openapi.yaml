@@ -1,16 +1,34 @@
 openapi: 3.0.3
 info:
   title: Verdyx API
-  version: 1.0.0
   description: |
-    Core API gateway routes for Verdyx.
+    Public REST API for the Verdyx decentralized threat intelligence
+    platform. All requests go through the API Gateway, which fans out
+    to the appropriate microservice.
+
+    This file is hand-maintained for now. To regenerate from code, add
+    `utoipa` annotations to the Rust handlers and serve at /openapi.json.
+  version: "1.0.0"
+  license:
+    name: MIT
 servers:
-  - url: http://localhost:8080/api/v1
-    description: Local
-  - url: https://api-staging.verdyx.com/api/v1
-    description: Staging
   - url: https://api.verdyx.com/api/v1
     description: Production
+  - url: https://api.staging.verdyx.com/api/v1
+    description: Staging
+  - url: http://localhost:8080/api/v1
+    description: Local development
+
+tags:
+  - { name: Health,        description: Liveness and readiness probes }
+  - { name: Auth,          description: User registration, login, JWT issuance }
+  - { name: Users,         description: Profile and account management }
+  - { name: Submissions,   description: File and URL submissions for analysis }
+  - { name: Analysis,      description: Analysis results and scanner output }
+  - { name: Bounties,      description: Bounty marketplace }
+  - { name: Reputation,    description: Reputation scores and leaderboard }
+  - { name: Wallets,       description: Wallet linkage and on-chain identity }
+  - { name: Webhooks,      description: Outbound event subscriptions }
 
 components:
   securitySchemes:
@@ -19,187 +37,230 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
-    ErrorResponse:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:    { type: string, example: invalid_request }
+        message: { type: string, example: "missing field: email" }
+        details: { type: object, additionalProperties: true }
+
+    HealthStatus:
       type: object
       properties:
-        error:
-          type: string
+        status:    { type: string, enum: [ok, degraded, down] }
+        timestamp: { type: string, format: date-time }
+        version:   { type: string }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, username]
+      properties:
+        email:    { type: string, format: email }
+        username: { type: string, minLength: 3, maxLength: 32 }
+        password: { type: string, minLength: 12, format: password }
+
     LoginRequest:
       type: object
       required: [email, password]
       properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-    AuthTokenResponse:
+        email:    { type: string, format: email }
+        password: { type: string, format: password }
+
+    AuthResponse:
+      type: object
+      required: [access_token, token_type]
+      properties:
+        access_token:  { type: string }
+        refresh_token: { type: string }
+        token_type:    { type: string, example: Bearer }
+        expires_in:    { type: integer, description: Seconds until token expires }
+
+    Submission:
       type: object
       properties:
-        access_token:
-          type: string
-        refresh_token:
-          type: string
-        token_type:
-          type: string
-          example: Bearer
-        expires_in:
-          type: integer
-    CreateBountyRequest:
+        id:         { type: string, format: uuid }
+        sha256:     { type: string }
+        file_name:  { type: string }
+        size_bytes: { type: integer }
+        status:     { type: string, enum: [pending, analyzing, completed, failed] }
+        created_at: { type: string, format: date-time }
+
+    Bounty:
       type: object
-      required: [title, description, reward_amount, expires_at]
       properties:
-        title:
-          type: string
-        description:
-          type: string
-        reward_amount:
-          type: number
-        expires_at:
-          type: string
-          format: date-time
+        id:           { type: string, format: uuid }
+        title:        { type: string }
+        description:  { type: string }
+        reward:       { type: string, description: Token amount as decimal string }
+        status:       { type: string, enum: [open, claimed, completed, expired, disputed] }
+        creator:      { type: string, description: Wallet address }
+        expires_at:   { type: string, format: date-time }
+
+security:
+  - bearerAuth: []
 
 paths:
-  /health:
-    get:
-      summary: Service health
-      responses:
-        '200':
-          description: Healthy
-
-  /health/ready:
-    get:
-      summary: Readiness check
-      responses:
-        '200':
-          description: Ready
-
   /health/live:
     get:
-      summary: Liveness check
+      tags: [Health]
+      summary: Liveness probe — process is up
+      security: []
       responses:
-        '200':
-          description: Live
-
-  /auth/login:
-    post:
-      summary: Login and get JWT tokens
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LoginRequest'
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/HealthStatus' } } } }
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe — process can serve traffic (DB, Redis reachable)
+      security: []
       responses:
-        '200':
-          description: Authenticated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthTokenResponse'
-        '401':
-          description: Invalid credentials
+        '200': { description: Ready }
+        '503': { description: Not ready, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /auth/register:
     post:
-      summary: Register user
+      tags: [Auth]
+      summary: Register a new user
+      security: []
       requestBody:
         required: true
         content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                  format: email
-                username:
-                  type: string
-                password:
-                  type: string
+          application/json: { schema: { $ref: '#/components/schemas/RegisterRequest' } }
       responses:
-        '201':
-          description: User created
-        '400':
-          description: Validation failed
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: Email or username already in use }
 
-  /bounties:
-    get:
-      summary: List bounties
-      responses:
-        '200':
-          description: Bounty list
+  /auth/login:
     post:
-      summary: Create a bounty
-      security:
-        - bearerAuth: []
+      tags: [Auth]
+      summary: Exchange credentials for a JWT
+      security: []
       requestBody:
         required: true
         content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateBountyRequest'
+          application/json: { schema: { $ref: '#/components/schemas/LoginRequest' } }
       responses:
-        '201':
-          description: Bounty created
-        '401':
-          description: Unauthorized
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '401': { description: Invalid credentials }
+        '429': { description: Too many login attempts }
 
-  /bounties/{bounty_id}:
-    get:
-      summary: Get bounty by id
-      parameters:
-        - in: path
-          name: bounty_id
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Bounty details
-        '404':
-          description: Not found
-
-  /analysis:
-    get:
-      summary: List analyses
-      responses:
-        '200':
-          description: Analysis list
-
-  /analysis/submit:
+  /auth/refresh:
     post:
-      summary: Submit analysis
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                bounty_id:
-                  type: string
-                verdict:
-                  type: string
-                confidence:
-                  type: number
-                report:
-                  type: string
+      tags: [Auth]
+      summary: Exchange a refresh token for a new access token
       responses:
-        '200':
-          description: Analysis submitted
-        '401':
-          description: Unauthorized
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
 
   /users/me:
     get:
-      summary: Current user profile
-      security:
-        - bearerAuth: []
+      tags: [Users]
+      summary: Current user's profile
       responses:
-        '200':
-          description: User profile
-        '401':
-          description: Unauthorized
+        '200': { description: OK }
+        '401': { description: Unauthenticated }
+
+  /submissions:
+    post:
+      tags: [Submissions]
+      summary: Upload a file for analysis
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Submission' } } } }
+        '413': { description: File too large }
+    get:
+      tags: [Submissions]
+      summary: List the current user's submissions
+      parameters:
+        - { name: page,     in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200': { description: OK }
+
+  /submissions/{id}:
+    get:
+      tags: [Submissions]
+      summary: Get one submission and its analysis status
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Submission' } } } }
+        '404': { description: Not found }
+
+  /analysis/{submissionId}:
+    get:
+      tags: [Analysis]
+      summary: Fetch the analysis result for a submission
+      parameters:
+        - { name: submissionId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: OK }
+        '404': { description: Not found }
+
+  /bounties:
+    get:
+      tags: [Bounties]
+      summary: List bounties
+      security: []
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [open, claimed, completed, expired, disputed] } }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Bounties]
+      summary: Create a new bounty
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Bounty' } } } }
+
+  /bounties/{id}:
+    get:
+      tags: [Bounties]
+      security: []
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Bounty' } } } }
+
+  /bounties/{id}/submit:
+    post:
+      tags: [Bounties]
+      summary: Submit an analysis to claim a bounty
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '202': { description: Accepted }
+
+  /reputation/me:
+    get:
+      tags: [Reputation]
+      summary: Current user's reputation score
+      responses:
+        '200': { description: OK }
+
+  /reputation/leaderboard:
+    get:
+      tags: [Reputation]
+      summary: Top contributors leaderboard
+      security: []
+      responses:
+        '200': { description: OK }
+
+  /wallets:
+    post:
+      tags: [Wallets]
+      summary: Link a wallet to the authenticated user (signature-verified)
+      responses:
+        '200': { description: Linked }
+
+  /webhooks:
+    post:
+      tags: [Webhooks]
+      summary: Subscribe to event webhooks
+      responses:
+        '201': { description: Created }

@@ -1,0 +1,27 @@
+# Staging override: smaller footprint, single replica per service, staging certs.
+global:
+  environment: staging
+  imageTag: staging
+
+services:
+  apiGateway:        { enabled: true, replicas: 1 }
+  userService:       { enabled: true, replicas: 1 }
+  submissionService: { enabled: true, replicas: 1 }
+  consensusService:  { enabled: true, replicas: 1 }
+  bountyManager:     { enabled: true, replicas: 1 }
+  paymentService:    { enabled: true, replicas: 1 }
+  reputationService: { enabled: true, replicas: 1 }
+  notificationService:{ enabled: true, replicas: 1 }
+  analysisEngine:    { enabled: true, replicas: 1 }
+  frontend:          { enabled: true, replicas: 1 }
+
+ingress:
+  hosts:
+    - staging.verdyx.com
+    - api.staging.verdyx.com
+  tls:
+    secretName: verdyx-staging-tls
+    issuer: letsencrypt-staging
+
+blockchain:
+  chainId: 11155111   # Sepolia

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reputation-service-config
+  namespace: verdyx
+  labels:
+    app: reputation-service
+    component: backend
+    service: reputation
+data:
+  # Reputation calculation knobs. Database/Redis URLs are still injected
+  # from secrets in deployment.yaml.
+  REPUTATION_DECAY_RATE: "0.95"
+  REPUTATION_UPDATE_INTERVAL: "3600"          # 1 hour
+  LEADERBOARD_UPDATE_INTERVAL: "300"          # 5 minutes
+  CORRECT_ANALYSIS_POINTS: "10"
+  INCORRECT_ANALYSIS_PENALTY: "5"
+  EARLY_SUBMISSION_BONUS: "2"
+  MIN_REPUTATION_TO_PARTICIPATE: "0"
+  MAX_REPUTATION_PER_BOUNTY: "100"
+  RUST_LOG: "info,reputation_service=debug"
+  ENVIRONMENT: "production"

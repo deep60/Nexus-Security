@@ -1,0 +1,14 @@
+---
+# Full bootstrap of a Verdyx host. Idempotent; safe to re-run.
+- name: Bootstrap Verdyx host
+  hosts: verdyx
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../group_vars/all/vault.yml
+  roles:
+    - common
+    - docker
+    - verdyx
+    - nginx
+    - monitoring

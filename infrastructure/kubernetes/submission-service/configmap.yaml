@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: submission-service-config
+  namespace: verdyx
+  labels:
+    app: submission-service
+    component: backend
+    service: submission
+data:
+  MAX_FILE_SIZE_BYTES: "104857600"     # 100 MB
+  UPLOAD_TIMEOUT_SECONDS: "300"
+  PRESIGNED_URL_TTL_SECONDS: "3600"
+  ALLOWED_MIME_TYPES: "application/x-executable,application/x-dosexec,application/pdf,application/zip,application/x-rar,application/octet-stream"
+  RUST_LOG: "info,submission_service=debug"
+  ENVIRONMENT: "production"
+---
+# Referenced by submission-service deployment.yaml as `storage-config`.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-config
+  namespace: verdyx
+  labels:
+    app: submission-service
+    component: backend
+data:
+  s3_endpoint: "http://minio-service:9000"
+  s3_region:   "us-east-1"
+  s3_bucket:   "verdyx-submissions"

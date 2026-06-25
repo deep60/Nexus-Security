@@ -11,6 +11,9 @@ metadata:
     kubernetes.io/ingress.class: "nginx"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # cert-manager: auto-issue and renew the verdyx-tls Secret via Let's Encrypt.
+    # Toggle to letsencrypt-staging during initial wiring to avoid rate limits.
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
     
     # Security headers
     nginx.ingress.kubernetes.io/configuration-snippet: |
@@ -120,6 +123,7 @@ metadata:
     nginx.ingress.kubernetes.io/auth-secret: verdyx-admin-auth
     nginx.ingress.kubernetes.io/auth-realm: "Verdyx Admin Area"
     nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   tls:
   - hosts:

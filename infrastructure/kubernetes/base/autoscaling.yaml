@@ -1,0 +1,148 @@
+# HorizontalPodAutoscaler for every backend microservice.
+# Targets average CPU 70% and memory 80% utilization. Tune per service later
+# based on observed traffic patterns. The api-gateway already has its own HPA
+# in api-gateway/deployment.yaml — keep this file for the other 9 services.
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: user-service-hpa
+  namespace: verdyx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: user-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  - { type: Resource, resource: { name: cpu,    target: { type: Utilization, averageUtilization: 70 } } }
+  - { type: Resource, resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: submission-service-hpa
+  namespace: verdyx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: submission-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - { type: Resource, resource: { name: cpu,    target: { type: Utilization, averageUtilization: 70 } } }
+  - { type: Resource, resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: consensus-service-hpa
+  namespace: verdyx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: consensus-service
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - { type: Resource, resource: { name: cpu,    target: { type: Utilization, averageUtilization: 70 } } }
+  - { type: Resource, resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bounty-manager-hpa
+  namespace: verdyx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bounty-manager
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - { type: Resource, resource: { name: cpu,    target: { type: Utilization, averageUtilization: 70 } } }
+  - { type: Resource, resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-service-hpa
+  namespace: verdyx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payment-service
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - { type: Resource, resource: { name: cpu,    target: { type: Utilization, averageUtilization: 70 } } }
+  - { type: Resource, resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: reputation-service-hpa
+  namespace: verdyx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: reputation-service
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - { type: Resource, resource: { name: cpu,    target: { type: Utilization, averageUtilization: 70 } } }
+  - { type: Resource, resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notification-service-hpa
+  namespace: verdyx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: notification-service
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - { type: Resource, resource: { name: cpu,    target: { type: Utilization, averageUtilization: 70 } } }
+  - { type: Resource, resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: analysis-engine-hpa
+  namespace: verdyx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: analysis-engine
+  minReplicas: 2
+  maxReplicas: 12
+  metrics:
+  - { type: Resource, resource: { name: cpu,    target: { type: Utilization, averageUtilization: 75 } } }
+  - { type: Resource, resource: { name: memory, target: { type: Utilization, averageUtilization: 85 } } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: frontend-hpa
+  namespace: verdyx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: verdyx-frontend
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  - { type: Resource, resource: { name: cpu,    target: { type: Utilization, averageUtilization: 70 } } }
+  - { type: Resource, resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } } }

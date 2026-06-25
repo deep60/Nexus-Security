@@ -1,0 +1,79 @@
+# cert-manager ClusterIssuer + a Verdyx-managed Certificate.
+#
+# Prerequisite: install cert-manager once per cluster:
+#   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.15.3/cert-manager.yaml
+# Wait for the cert-manager pods to become Ready before applying this file.
+#
+# This file:
+#   - Defines a Let's Encrypt staging and production ClusterIssuer (HTTP-01).
+#   - Issues a wildcard-shaped TLS cert for all Verdyx hostnames into the
+#     `verdyx-tls` Secret used by ingress.yaml.
+#
+# Replace the email address below before applying.
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: ops@verdyx.com         # <-- replace
+    privateKeySecretRef:
+      name: letsencrypt-staging-account
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: ops@verdyx.com         # <-- replace
+    privateKeySecretRef:
+      name: letsencrypt-prod-account
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+---
+# Certificate for the public-facing Verdyx hostnames.
+# After this is Ready, ingress.yaml's `secretName: verdyx-tls` will be
+# populated automatically and TLS will start working.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: verdyx-tls
+  namespace: verdyx
+spec:
+  secretName: verdyx-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: verdyx.com
+  dnsNames:
+  - verdyx.com
+  - app.verdyx.com
+  - api.verdyx.com
+  duration: 2160h    # 90 days
+  renewBefore: 360h  # renew 15 days before expiry
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: verdyx-admin-tls
+  namespace: verdyx
+spec:
+  secretName: verdyx-admin-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: admin.verdyx.com
+  dnsNames:
+  - admin.verdyx.com
+  duration: 2160h
+  renewBefore: 360h

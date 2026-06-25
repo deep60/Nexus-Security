@@ -1,0 +1,54 @@
+# Default values for the Verdyx chart.
+# Override per environment with values-<env>.yaml or --set on `helm upgrade`.
+global:
+  environment: production
+  imageRegistry: docker.io/verdyx
+  imagePullPolicy: IfNotPresent
+  imageTag: latest
+
+# Per-service replica + resource overrides. Defaults match the raw manifests
+# under infrastructure/kubernetes/<service>/deployment.yaml.
+services:
+  apiGateway:        { enabled: true, replicas: 3, port: 8080 }
+  userService:       { enabled: true, replicas: 2, port: 8080 }
+  submissionService: { enabled: true, replicas: 2, port: 8080 }
+  consensusService:  { enabled: true, replicas: 2, port: 8080 }
+  bountyManager:     { enabled: true, replicas: 2, port: 8080 }
+  paymentService:    { enabled: true, replicas: 2, port: 8080 }
+  reputationService: { enabled: true, replicas: 2, port: 8080 }
+  notificationService:{ enabled: true, replicas: 2, port: 8080 }
+  analysisEngine:    { enabled: true, replicas: 2, port: 8080 }
+  frontend:          { enabled: true, replicas: 2, port: 3000 }
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - verdyx.com
+    - app.verdyx.com
+    - api.verdyx.com
+  tls:
+    enabled: true
+    secretName: verdyx-tls
+    issuer: letsencrypt-prod
+
+postgres:
+  external: true               # Use a managed DB in production.
+  host: db.internal
+  port: 5432
+  database: verdyx
+  existingSecret: verdyx-database-secret
+
+redis:
+  external: true
+  host: redis.internal
+  port: 6379
+  existingSecret: verdyx-redis-secret
+
+blockchain:
+  chainId: 1
+  rpcSecret: verdyx-blockchain-secret
+
+monitoring:
+  prometheus: { enabled: true }
+  grafana:    { enabled: true }

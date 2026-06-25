@@ -19,6 +19,11 @@
 > as the live schema. If you change a table, change it in the owning service's
 > `migrations/` folder. The sections below that describe a single monolithic
 > `verdyx` database are historical and kept for high-level domain reference only.
+>
+> **Operations:**
+> - Backup all databases + Redis + MinIO: `scripts/maintenance/backup.sh`
+> - Restore from a snapshot: `scripts/maintenance/restore.sh --backup <dir>`
+> - Migration authoring rules and rollback procedure: [`docs/database/migrations.md`](../docs/database/migrations.md)
 
 
 This directory contains all database configurations, schemas, migrations, and initialization scripts for the Verdyx threat intelligence platform.

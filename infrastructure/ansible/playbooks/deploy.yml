@@ -1,0 +1,29 @@
+---
+# Pull latest code and roll the compose stack. Use after a merge to main.
+- name: Deploy Verdyx
+  hosts: verdyx
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all/vault.yml
+  tasks:
+    - name: Pull latest source
+      ansible.builtin.git:
+        repo: "{{ verdyx_repo_url }}"
+        dest: "{{ verdyx_install_path }}"
+        version: "{{ verdyx_repo_branch }}"
+        force: yes
+      become_user: "{{ verdyx_user }}"
+
+    - name: Pull latest images
+      ansible.builtin.command:
+        cmd: docker compose pull
+        chdir: "{{ verdyx_install_path }}"
+
+    - name: Apply rolling restart
+      ansible.builtin.command:
+        cmd: docker compose up -d --remove-orphans
+        chdir: "{{ verdyx_install_path }}"
+
+    - name: Prune unused images
+      ansible.builtin.command: docker system prune -af --filter until=24h

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: verdyx
+description: Decentralized threat intelligence marketplace - Helm chart
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - threat-intelligence
+  - blockchain
+  - security
+home: https://verdyx.com
+sources:
+  - https://github.com/verdyx/deep60
+maintainers:
+  - name: Verdyx Team
+    email: ops@verdyx.com

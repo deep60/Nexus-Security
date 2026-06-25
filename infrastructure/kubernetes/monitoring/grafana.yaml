@@ -1,0 +1,180 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: verdyx
+  labels:
+    app: grafana
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus:9090
+      isDefault: true
+      jsonData:
+        timeInterval: 30s
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-config
+  namespace: verdyx
+  labels:
+    app: grafana
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+    - name: 'verdyx'
+      orgId: 1
+      folder: 'Verdyx'
+      type: file
+      disableDeletion: false
+      updateIntervalSeconds: 30
+      options:
+        path: /etc/grafana/provisioning/dashboards/files
+---
+# Dashboards are mounted from this ConfigMap. Each key becomes a JSON file
+# under /etc/grafana/provisioning/dashboards/files. Replace the bodies with
+# real dashboards exported from Grafana once you have one running.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: verdyx
+  labels:
+    app: grafana
+data:
+  platform-overview.json: |
+    {
+      "title": "Verdyx — Platform Overview",
+      "uid": "verdyx-platform",
+      "schemaVersion": 39,
+      "version": 1,
+      "editable": true,
+      "tags": ["verdyx"],
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Pods up",
+          "targets": [{ "expr": "sum(up{job=\"verdyx-pods\"})" }],
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 }
+        },
+        {
+          "type": "timeseries",
+          "title": "Request rate per service",
+          "targets": [{ "expr": "sum by (app) (rate(http_requests_total[5m]))" }],
+          "gridPos": { "h": 8, "w": 12, "x": 6, "y": 0 }
+        },
+        {
+          "type": "timeseries",
+          "title": "5xx rate per service",
+          "targets": [{ "expr": "sum by (app) (rate(http_requests_total{status=~\"5..\"}[5m]))" }],
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 }
+        },
+        {
+          "type": "timeseries",
+          "title": "p95 latency",
+          "targets": [{ "expr": "histogram_quantile(0.95, sum by (app, le) (rate(http_request_duration_seconds_bucket[5m])))" }],
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 }
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: verdyx
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:11.2.0
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          value: admin
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: verdyx-grafana-secret
+              key: admin_password
+        - name: GF_USERS_ALLOW_SIGN_UP
+          value: "false"
+        - name: GF_INSTALL_PLUGINS
+          value: ""
+        volumeMounts:
+        - name: datasources
+          mountPath: /etc/grafana/provisioning/datasources
+        - name: dashboards-config
+          mountPath: /etc/grafana/provisioning/dashboards
+        - name: dashboards-files
+          mountPath: /etc/grafana/provisioning/dashboards/files
+        - name: data
+          mountPath: /var/lib/grafana
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet: { path: /api/health, port: http }
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet: { path: /api/health, port: http }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: datasources
+        configMap: { name: grafana-datasources }
+      - name: dashboards-config
+        configMap: { name: grafana-dashboards-config }
+      - name: dashboards-files
+        configMap: { name: grafana-dashboards }
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: verdyx
+  labels:
+    app: grafana
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+  selector:
+    app: grafana
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: verdyx-grafana-secret
+  namespace: verdyx
+type: Opaque
+stringData:
+  # Replace before applying. Generate: openssl rand -hex 16
+  admin_password: CHANGE_ME_GRAFANA_ADMIN_PASSWORD
