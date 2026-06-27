@@ -4,16 +4,16 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use sqlx::PgPool;
 use std::{net::SocketAddr, sync::Arc};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber;
-use sqlx::PgPool;
 
+mod db;
 mod handlers;
 mod models;
-mod storage;
-mod db;
 mod queue;
+mod storage;
 
 use storage::s3_client::S3Client;
 
@@ -36,8 +36,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
 
     // Initialize database connection with proper error handling
-    let database_url = std::env::var("DATABASE_URL")
-        .map_err(|_| anyhow::anyhow!("DATABASE_URL must be set"))?;
+    let database_url =
+        std::env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL must be set"))?;
 
     tracing::info!("Connecting to database...");
     let db_pool = match PgPool::connect(&database_url).await {
@@ -52,8 +52,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Initialize Redis client with error handling
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     tracing::info!("Connecting to Redis at {}...", redis_url);
     let redis_client = match redis::Client::open(redis_url) {
@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .split(',')
         .filter_map(|origin| origin.trim().parse::<axum::http::HeaderValue>().ok())
         .collect();
-    
+
     let cors = CorsLayer::new()
         .allow_origin(allowed_origins)
         .allow_methods([

@@ -43,16 +43,16 @@ pub struct CreateFileSubmissionRequest {
     #[serde(rename = "originalFilename")]
     pub original_filename: Option<String>,
     #[serde(rename = "submissionType")]
-    pub submission_type: String,        // "file" | "url"
+    pub submission_type: String, // "file" | "url"
     pub description: Option<String>,
     #[serde(rename = "fileHash")]
     pub file_hash: Option<String>,
     #[serde(rename = "fileSize")]
     pub file_size: Option<i64>,
     #[serde(rename = "analysisType")]
-    pub analysis_type: Option<String>,   // "full", "quick", "deep", "behavioral"
+    pub analysis_type: Option<String>, // "full", "quick", "deep", "behavioral"
     #[serde(rename = "bountyAmount")]
-    pub bounty_amount: Option<String>,   // ETH amount as string
+    pub bounty_amount: Option<String>, // ETH amount as string
     pub priority: Option<bool>,
 }
 
@@ -280,7 +280,12 @@ pub async fn upload_file(
             if let Ok(redis_url) = std::env::var("REDIS_URL") {
                 if let Ok(client) = redis::Client::open(redis_url) {
                     if let Ok(mut conn) = client.get_multiplexed_async_connection().await {
-                        let _: Result<(), _> = redis::AsyncCommands::lpush(&mut conn, "analysis_queue", file_id.to_string()).await;
+                        let _: Result<(), _> = redis::AsyncCommands::lpush(
+                            &mut conn,
+                            "analysis_queue",
+                            file_id.to_string(),
+                        )
+                        .await;
                         tracing::info!(file_id = %file_id, "Queued file for automatic analysis");
                     }
                 }
@@ -431,7 +436,11 @@ pub async fn get_submission_details(
                 false_positive_rate: None, // Requires historical accuracy tracking across bounties
                 detection_accuracy: None,  // Requires ground-truth labeling pipeline
                 resource_usage: ResourceUsage {
-                    cpu_time_ms: extended_sub.processing_metrics.as_ref().map(|m| m.processing_time_ms).unwrap_or(0),
+                    cpu_time_ms: extended_sub
+                        .processing_metrics
+                        .as_ref()
+                        .map(|m| m.processing_time_ms)
+                        .unwrap_or(0),
                     memory_usage_mb: 0, // Not yet captured in ProcessingMetrics
                     disk_io_mb: 0,      // Not yet captured in ProcessingMetrics
                 },
@@ -498,11 +507,19 @@ pub async fn update_submission(
     Json(request): Json<UpdateSubmissionRequest>,
 ) -> Result<Json<SubmissionResponse>, StatusCode> {
     // Verify the caller owns this submission
-    let existing = state.db.get_extended_submission_by_id(submission_id).await
+    let existing = state
+        .db
+        .get_extended_submission_by_id(submission_id)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
     if existing.submission.engine_id != claims.sub {
-        tracing::warn!("User {} denied update on submission {} (owner: {})", claims.sub, submission_id, existing.submission.engine_id);
+        tracing::warn!(
+            "User {} denied update on submission {} (owner: {})",
+            claims.sub,
+            submission_id,
+            existing.submission.engine_id
+        );
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -547,12 +564,20 @@ pub async fn delete_submission(
     Path(submission_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
     // Verify the caller owns this submission
-    let sub = state.db.get_extended_submission_by_id(submission_id).await
+    let sub = state
+        .db
+        .get_extended_submission_by_id(submission_id)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
     if sub.submission.engine_id != claims.sub {
-        tracing::warn!("User {} denied deletion of submission {} (owner: {})", claims.sub, submission_id, sub.submission.engine_id);
+        tracing::warn!(
+            "User {} denied deletion of submission {} (owner: {})",
+            claims.sub,
+            submission_id,
+            sub.submission.engine_id
+        );
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -667,7 +692,9 @@ pub async fn create_file_submission(
     claims: crate::middleware::auth::Claims,
     Json(request): Json<CreateFileSubmissionRequest>,
 ) -> Result<Json<FileSubmissionResponse>, StatusCode> {
-    let filename = request.original_filename.as_deref()
+    let filename = request
+        .original_filename
+        .as_deref()
         .or(request.filename.as_deref())
         .unwrap_or("unknown");
 
@@ -786,14 +813,18 @@ pub async fn vote_on_submission(
     // Prevent the submission owner from voting on their own submission
     if let Ok(Some(sub)) = state.db.get_extended_submission_by_id(submission_id).await {
         if sub.submission.engine_id == voter_id {
-            tracing::warn!("User {} cannot vote on their own submission {}", voter_id, submission_id);
+            tracing::warn!(
+                "User {} cannot vote on their own submission {}",
+                voter_id,
+                submission_id
+            );
             return Err(StatusCode::FORBIDDEN);
         }
     }
 
     // Prevent duplicate votes
     let existing_vote: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT id FROM submission_votes WHERE submission_id = $1 AND voter_id = $2 LIMIT 1"
+        "SELECT id FROM submission_votes WHERE submission_id = $1 AND voter_id = $2 LIMIT 1",
     )
     .bind(submission_id)
     .bind(voter_id)
@@ -805,7 +836,11 @@ pub async fn vote_on_submission(
     })?;
 
     if existing_vote.is_some() {
-        tracing::warn!("User {} already voted on submission {}", voter_id, submission_id);
+        tracing::warn!(
+            "User {} already voted on submission {}",
+            voter_id,
+            submission_id
+        );
         return Err(StatusCode::CONFLICT);
     }
 
@@ -846,7 +881,12 @@ pub async fn verify_submission(
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // Only admins/moderators can verify submissions
     if claims.role != "admin" && claims.role != "moderator" {
-        tracing::warn!("User {} (role: {}) denied verify on submission {}", claims.sub, claims.role, submission_id);
+        tracing::warn!(
+            "User {} (role: {}) denied verify on submission {}",
+            claims.sub,
+            claims.role,
+            submission_id
+        );
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -956,8 +996,16 @@ pub async fn start_analysis(
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // Verify the caller owns this submission or is an admin
     if let Ok(Some(sub)) = state.db.get_extended_submission_by_id(submission_id).await {
-        if sub.submission.engine_id != claims.sub && claims.role != "admin" && claims.role != "moderator" {
-            tracing::warn!("User {} denied start_analysis on submission {} (owner: {})", claims.sub, submission_id, sub.submission.engine_id);
+        if sub.submission.engine_id != claims.sub
+            && claims.role != "admin"
+            && claims.role != "moderator"
+        {
+            tracing::warn!(
+                "User {} denied start_analysis on submission {} (owner: {})",
+                claims.sub,
+                submission_id,
+                sub.submission.engine_id
+            );
             return Err(StatusCode::FORBIDDEN);
         }
     } else {
@@ -1001,16 +1049,15 @@ pub async fn get_submission_analyses(
     Path(submission_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // Look up the bounty_id for this submission, then fetch analyses
-    let bounty_id: Option<Uuid> = sqlx::query_scalar(
-        "SELECT bounty_id FROM bounty_submissions WHERE id = $1",
-    )
-    .bind(submission_id)
-    .fetch_optional(state.db.pool())
-    .await
-    .map_err(|e| {
-        tracing::error!("DB error: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let bounty_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT bounty_id FROM bounty_submissions WHERE id = $1")
+            .bind(submission_id)
+            .fetch_optional(state.db.pool())
+            .await
+            .map_err(|e| {
+                tracing::error!("DB error: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
 
     let bid = bounty_id.unwrap_or(submission_id); // fallback: treat id as bounty_id
 
@@ -1042,13 +1089,12 @@ pub async fn get_submission_consensus(
     Path(submission_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // Aggregate verdict counts for analyses related to this submission
-    let bounty_id: Option<Uuid> = sqlx::query_scalar(
-        "SELECT bounty_id FROM bounty_submissions WHERE id = $1",
-    )
-    .bind(submission_id)
-    .fetch_optional(state.db.pool())
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let bounty_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT bounty_id FROM bounty_submissions WHERE id = $1")
+            .bind(submission_id)
+            .fetch_optional(state.db.pool())
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let bid = bounty_id.unwrap_or(submission_id);
 

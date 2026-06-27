@@ -1,17 +1,17 @@
 use axum::{
     http::{
         header::{
-            ACCEPT, AUTHORIZATION, CONTENT_TYPE, ORIGIN,
-            ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,
+            ACCEPT, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,
             ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
-            ACCESS_CONTROL_EXPOSE_HEADERS, ACCESS_CONTROL_MAX_AGE,
+            ACCESS_CONTROL_EXPOSE_HEADERS, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CONTENT_TYPE,
+            ORIGIN,
         },
         HeaderName, HeaderValue, Method, StatusCode,
     },
     response::{IntoResponse, Response},
 };
-use tower_http::cors::{Any, CorsLayer};
 use std::time::Duration;
+use tower_http::cors::{Any, CorsLayer};
 
 /// CORS configuration for different environments
 #[derive(Debug, Clone)]
@@ -35,7 +35,9 @@ impl CorsConfig {
                     .map(|s| s.trim().to_string())
                     .collect();
 
-                Self::Production { allowed_origins: origins }
+                Self::Production {
+                    allowed_origins: origins,
+                }
             }
             "staging" => Self::Staging,
             _ => Self::Development,
@@ -180,10 +182,7 @@ pub fn webhook_cors(allowed_origins: Vec<String>) -> CorsLayer {
                 .collect::<Vec<_>>(),
         )
         .allow_methods([Method::POST, Method::OPTIONS])
-        .allow_headers([
-            CONTENT_TYPE,
-            HeaderName::from_static("x-webhook-signature"),
-        ])
+        .allow_headers([CONTENT_TYPE, HeaderName::from_static("x-webhook-signature")])
         .allow_credentials(false)
         .max_age(Duration::from_secs(3600))
 }
@@ -203,7 +202,10 @@ mod tests {
     #[test]
     fn test_production_origins_parsing() {
         std::env::set_var("ENVIRONMENT", "production");
-        std::env::set_var("ALLOWED_ORIGINS", "https://example.com,https://api.example.com");
+        std::env::set_var(
+            "ALLOWED_ORIGINS",
+            "https://example.com,https://api.example.com",
+        );
 
         let config = CorsConfig::from_env();
         match config {

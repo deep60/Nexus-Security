@@ -1,42 +1,48 @@
+use anyhow::{anyhow, Result};
+use blake2::{Blake2b512, Digest as BlakeDigest};
+use md5::Md5;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use sha1::{Digest as Sha1Digest, Sha1};
+use sha2::{Digest, Sha256};
+use sha3::{Digest as Sha3Digest, Sha3_256};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
-use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
-use sha3::{Sha3_256, Digest as Sha3Digest};
-use md5::Md5;
-use sha1::{Sha1, Digest as Sha1Digest};
-use blake2::{Blake2b512, Digest as BlakeDigest};
-use tokio::time::{timeout, sleep, interval};
-use tokio::sync::{Semaphore, Mutex};
-use reqwest::Client;
-use anyhow::{Result, anyhow};
-use tracing::{info, warn, error, debug, instrument};
 use thiserror::Error;
+use tokio::sync::{Mutex, Semaphore};
+use tokio::time::{interval, sleep, timeout};
+use tracing::{debug, error, info, instrument, warn};
 
-use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, SeverityLevel, ThreatCategory, FileMetadata, AnalysisStatus, DetectionResult, EngineType};
+use crate::models::analysis_result::{
+    AnalysisResult, AnalysisStatus, DetectionResult, EngineType, FileMetadata, SeverityLevel,
+    ThreatCategory, ThreatVerdict,
+};
 
 /// Custom error types for hash analysis
 #[derive(Error, Debug)]
 pub enum HashAnalysisError {
     #[error("Invalid hash format for {hash_type}: {hash}")]
     InvalidHash { hash_type: String, hash: String },
-    
+
     #[error("API timeout for source: {api_source}")]
     ApiTimeout { api_source: String },
-    
+
     #[error("Rate limit exceeded for source: {api_source}")]
     RateLimitExceeded { api_source: String },
-    
+
     #[error("Database error: {message}")]
     DatabaseError { message: String },
-    
+
     #[error("Network error: {message}")]
     NetworkError { message: String },
-    
+
     #[error("API error from {api_source}: {status_code}")]
-    ApiError { api_source: String, status_code: u16 },
-    
+    ApiError {
+        api_source: String,
+        status_code: u16,
+    },
+
     #[error("Configuration error: {message}")]
     ConfigError { message: String },
 }
@@ -73,7 +79,7 @@ impl HashType {
             HashType::BLAKE2B => 128,
         }
     }
-    
+
     pub fn is_secure(&self) -> bool {
         match self {
             HashType::MD5 | HashType::SHA1 => false,
@@ -124,15 +130,15 @@ impl CircuitBreaker {
             timeout,
         }
     }
-    
+
     pub async fn is_available(&self) -> bool {
         let failure_count = *self.failure_count.lock().await;
         let last_failure = *self.last_failure_time.lock().await;
-        
+
         if failure_count < self.threshold {
             return true;
         }
-        
+
         if let Some(last_failure) = last_failure {
             if last_failure.elapsed() > self.timeout {
                 // Reset circuit breaker
@@ -141,15 +147,15 @@ impl CircuitBreaker {
                 return true;
             }
         }
-        
+
         false
     }
-    
+
     pub async fn record_success(&self) {
         *self.failure_count.lock().await = 0;
         *self.last_failure_time.lock().await = None;
     }
-    
+
     pub async fn record_failure(&self) {
         *self.failure_count.lock().await += 1;
         *self.last_failure_time.lock().await = Some(Instant::now());
@@ -172,7 +178,7 @@ impl RateLimiter {
             last_reset: Arc::new(Mutex::new(Instant::now())),
         }
     }
-    
+
     /// Acquire a rate-limit permit. The returned `OwnedSemaphorePermit` MUST be
     /// held by the caller for the duration of the API request so the semaphore
     /// slot stays occupied.
@@ -182,15 +188,22 @@ impl RateLimiter {
         if last_reset.elapsed() >= self.interval_duration {
             // Reset the semaphore by adding back all permits
             let available = self.semaphore.available_permits();
-            let total = self.semaphore.available_permits() + self.semaphore.try_acquire_many(u32::MAX).map(|p| p.num_permits()).unwrap_or(0);
+            let total = self.semaphore.available_permits()
+                + self
+                    .semaphore
+                    .try_acquire_many(u32::MAX)
+                    .map(|p| p.num_permits())
+                    .unwrap_or(0);
             self.semaphore.add_permits(total - available);
             *last_reset = Instant::now();
         }
         drop(last_reset);
-        
-        let permit = Arc::clone(&self.semaphore).acquire_owned().await
-            .map_err(|_| HashAnalysisError::RateLimitExceeded { 
-                api_source: "Rate Limiter".to_string() 
+
+        let permit = Arc::clone(&self.semaphore)
+            .acquire_owned()
+            .await
+            .map_err(|_| HashAnalysisError::RateLimitExceeded {
+                api_source: "Rate Limiter".to_string(),
             })?;
         Ok(permit)
     }
@@ -214,24 +227,24 @@ impl AnalysisMetrics {
         self.total_queries += 1;
         self.total_response_time_ms += response_time_ms;
         self.average_response_time_ms = self.total_response_time_ms / self.total_queries;
-        
+
         if cache_hit {
             self.cache_hits += 1;
         } else {
             self.cache_misses += 1;
         }
-        
+
         if success {
             self.successful_queries += 1;
         } else {
             self.failed_queries += 1;
         }
     }
-    
+
     pub fn record_api_failure(&mut self, source: &str) {
         *self.api_failures.entry(source.to_string()).or_insert(0) += 1;
     }
-    
+
     pub fn cache_hit_rate(&self) -> f64 {
         if self.total_queries == 0 {
             0.0
@@ -239,7 +252,7 @@ impl AnalysisMetrics {
             self.cache_hits as f64 / self.total_queries as f64
         }
     }
-    
+
     pub fn success_rate(&self) -> f64 {
         if self.total_queries == 0 {
             0.0
@@ -303,7 +316,7 @@ impl CachedReputation {
             ttl,
         }
     }
-    
+
     fn is_expired(&self) -> bool {
         self.cached_at.elapsed() > self.ttl
     }
@@ -373,31 +386,31 @@ impl HashAnalyzer {
                 message: "Timeout cannot be zero".to_string(),
             });
         }
-        
+
         let http_client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_seconds))
             .user_agent("Verdyx/2.0")
             .build()
-            .map_err(|e| HashAnalysisError::NetworkError { 
-                message: format!("Failed to create HTTP client: {}", e) 
+            .map_err(|e| HashAnalysisError::NetworkError {
+                message: format!("Failed to create HTTP client: {}", e),
             })?;
 
         let mut rate_limiters = HashMap::new();
         let mut circuit_breakers = HashMap::new();
-        
+
         // Setup rate limiters and circuit breakers for each source
         let sources = vec!["virustotal", "malwarebazaar", "hybrid_analysis"];
         for source in sources {
             rate_limiters.insert(
                 source.to_string(),
-                Arc::new(RateLimiter::new(config.rate_limit_per_minute))
+                Arc::new(RateLimiter::new(config.rate_limit_per_minute)),
             );
             circuit_breakers.insert(
                 source.to_string(),
                 Arc::new(CircuitBreaker::new(
                     config.circuit_breaker_threshold,
-                    Duration::from_secs(config.circuit_breaker_timeout_seconds)
-                ))
+                    Duration::from_secs(config.circuit_breaker_timeout_seconds),
+                )),
             );
         }
 
@@ -414,12 +427,18 @@ impl HashAnalyzer {
 
     /// Analyze a file by its hash values with enhanced error handling and retry logic
     #[instrument(skip(self, file_data))]
-    pub async fn analyze_hash(&self, hash_info: &HashInfo, file_data: Option<&[u8]>) -> Result<AnalysisResult, HashAnalysisError> {
+    pub async fn analyze_hash(
+        &self,
+        hash_info: &HashInfo,
+        file_data: Option<&[u8]>,
+    ) -> Result<AnalysisResult, HashAnalysisError> {
         let start_time = Instant::now();
         let _permit = self.semaphore.acquire().await.unwrap();
-        
-        info!("Starting enhanced hash analysis for {} hash: {}", 
-              hash_info.hash_type, hash_info.hash_value);
+
+        info!(
+            "Starting enhanced hash analysis for {} hash: {}",
+            hash_info.hash_type, hash_info.hash_value
+        );
 
         // Validate hash format
         self.validate_hash(&hash_info.hash_value, &hash_info.hash_type)?;
@@ -450,12 +469,15 @@ impl HashAnalyzer {
         // Query multiple threat intelligence sources with retry logic
         let mut reputations = Vec::new();
         let mut query_errors = Vec::new();
-        
+
         // Query VirusTotal with enhanced error handling
         if let Some(ref api_key) = self.config.virustotal_api_key {
-            match self.query_with_retry("virustotal", || {
-                self.query_virustotal(&hash_info.hash_value, api_key)
-            }).await {
+            match self
+                .query_with_retry("virustotal", || {
+                    self.query_virustotal(&hash_info.hash_value, api_key)
+                })
+                .await
+            {
                 Ok(rep) => reputations.push(rep),
                 Err(e) => {
                     warn!("VirusTotal query failed after retries: {}", e);
@@ -466,9 +488,12 @@ impl HashAnalyzer {
 
         // Query MalwareBazaar with circuit breaker
         if self.config.malwarebazaar_enabled {
-            match self.query_with_retry("malwarebazaar", || {
-                self.query_malwarebazaar(&hash_info.hash_value)
-            }).await {
+            match self
+                .query_with_retry("malwarebazaar", || {
+                    self.query_malwarebazaar(&hash_info.hash_value)
+                })
+                .await
+            {
                 Ok(rep) => reputations.push(rep),
                 Err(e) => {
                     warn!("MalwareBazaar query failed after retries: {}", e);
@@ -479,9 +504,12 @@ impl HashAnalyzer {
 
         // Query Hybrid Analysis if configured
         if let Some(ref api_key) = self.config.hybrid_analysis_api_key {
-            match self.query_with_retry("hybrid_analysis", || {
-                self.query_hybrid_analysis(&hash_info.hash_value, api_key)
-            }).await {
+            match self
+                .query_with_retry("hybrid_analysis", || {
+                    self.query_hybrid_analysis(&hash_info.hash_value, api_key)
+                })
+                .await
+            {
                 Ok(rep) => reputations.push(rep),
                 Err(e) => {
                     warn!("Hybrid Analysis query failed after retries: {}", e);
@@ -498,7 +526,8 @@ impl HashAnalyzer {
 
         // Cache successful results
         if self.config.local_cache_enabled && !reputations.is_empty() {
-            self.cache_reputations(&hash_info.hash_value, &reputations).await;
+            self.cache_reputations(&hash_info.hash_value, &reputations)
+                .await;
         }
 
         let success = !reputations.is_empty();
@@ -511,21 +540,21 @@ impl HashAnalyzer {
     /// Enhanced hash validation with better error reporting
     fn validate_hash(&self, hash: &str, hash_type: &HashType) -> Result<(), HashAnalysisError> {
         let expected_len = hash_type.expected_length();
-        
+
         if hash.len() != expected_len {
             return Err(HashAnalysisError::InvalidHash {
                 hash_type: hash_type.to_string(),
                 hash: hash.to_string(),
             });
         }
-        
+
         if !hash.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err(HashAnalysisError::InvalidHash {
                 hash_type: hash_type.to_string(),
                 hash: hash.to_string(),
             });
         }
-        
+
         Ok(())
     }
 
@@ -588,7 +617,11 @@ impl HashAnalyzer {
     }
 
     /// Query with retry logic and circuit breaker
-    async fn query_with_retry<F, Fut, T>(&self, source: &str, mut query_fn: F) -> Result<T, HashAnalysisError>
+    async fn query_with_retry<F, Fut, T>(
+        &self,
+        source: &str,
+        mut query_fn: F,
+    ) -> Result<T, HashAnalysisError>
     where
         F: FnMut() -> Fut,
         Fut: std::future::Future<Output = Result<T, HashAnalysisError>>,
@@ -614,7 +647,7 @@ impl HashAnalyzer {
                 }
                 Err(e) => {
                     warn!("Query attempt {} failed for {}: {}", attempt, source, e);
-                    
+
                     if attempt == self.config.retry_attempts {
                         circuit_breaker.record_failure().await;
                         if let mut metrics = self.metrics.lock().await {
@@ -622,10 +655,10 @@ impl HashAnalyzer {
                         }
                         return Err(e);
                     }
-                    
+
                     // Exponential backoff
                     let delay = Duration::from_secs(
-                        self.config.retry_delay_seconds * (2_u64.pow(attempt - 1))
+                        self.config.retry_delay_seconds * (2_u64.pow(attempt - 1)),
                     );
                     sleep(delay).await;
                 }
@@ -636,32 +669,40 @@ impl HashAnalyzer {
     }
 
     /// Enhanced VirusTotal query with better error handling
-    async fn query_virustotal(&self, hash: &str, api_key: &str) -> Result<HashReputation, HashAnalysisError> {
+    async fn query_virustotal(
+        &self,
+        hash: &str,
+        api_key: &str,
+    ) -> Result<HashReputation, HashAnalysisError> {
         let start_time = Instant::now();
         let url = format!("https://www.virustotal.com/api/v3/files/{}", hash);
-        
+
         let response = timeout(
             Duration::from_secs(self.config.timeout_seconds),
             self.http_client
                 .get(&url)
                 .header("x-apikey", api_key)
-                .send()
-        ).await
-        .map_err(|_| HashAnalysisError::ApiTimeout { 
-            api_source: "VirusTotal".to_string() 
+                .send(),
+        )
+        .await
+        .map_err(|_| HashAnalysisError::ApiTimeout {
+            api_source: "VirusTotal".to_string(),
         })?
-        .map_err(|e| HashAnalysisError::NetworkError { 
-            message: format!("VirusTotal request failed: {}", e) 
+        .map_err(|e| HashAnalysisError::NetworkError {
+            message: format!("VirusTotal request failed: {}", e),
         })?;
 
         let query_time = start_time.elapsed().as_millis() as u64;
 
         match response.status().as_u16() {
             200 => {
-                let vt_response: VirusTotalResponse = response.json().await
-                    .map_err(|e| HashAnalysisError::NetworkError {
-                        message: format!("Failed to parse VirusTotal response: {}", e)
-                    })?;
+                let vt_response: VirusTotalResponse =
+                    response
+                        .json()
+                        .await
+                        .map_err(|e| HashAnalysisError::NetworkError {
+                            message: format!("Failed to parse VirusTotal response: {}", e),
+                        })?;
                 Ok(self.parse_virustotal_response(vt_response, query_time))
             }
             404 => Ok(HashReputation {
@@ -676,21 +717,25 @@ impl HashAnalyzer {
                 metadata: HashMap::new(),
                 query_time_ms: query_time,
             }),
-            429 => Err(HashAnalysisError::RateLimitExceeded { 
-                api_source: "VirusTotal".to_string() 
+            429 => Err(HashAnalysisError::RateLimitExceeded {
+                api_source: "VirusTotal".to_string(),
             }),
-            status => Err(HashAnalysisError::ApiError { 
-                api_source: "VirusTotal".to_string(), 
-                status_code: status 
+            status => Err(HashAnalysisError::ApiError {
+                api_source: "VirusTotal".to_string(),
+                status_code: status,
             }),
         }
     }
 
     /// Enhanced VirusTotal response parsing
-    fn parse_virustotal_response(&self, response: VirusTotalResponse, query_time_ms: u64) -> HashReputation {
+    fn parse_virustotal_response(
+        &self,
+        response: VirusTotalResponse,
+        query_time_ms: u64,
+    ) -> HashReputation {
         let stats = &response.data.attributes.last_analysis_stats;
         let total_engines = stats.malicious + stats.suspicious + stats.undetected + stats.harmless;
-        
+
         // Enhanced verdict logic
         let verdict = if stats.malicious > 0 {
             ThreatVerdict::Malicious
@@ -708,7 +753,7 @@ impl HashAnalyzer {
         } else {
             let malicious_ratio = stats.malicious as f32 / total_engines as f32;
             let suspicious_ratio = stats.suspicious as f32 / total_engines as f32;
-            
+
             match verdict {
                 ThreatVerdict::Malicious => {
                     0.5 + (malicious_ratio * 0.5) // 0.5 to 1.0
@@ -717,38 +762,63 @@ impl HashAnalyzer {
                     0.3 + (suspicious_ratio * 0.4) // 0.3 to 0.7
                 }
                 ThreatVerdict::Benign => {
-                    let clean_ratio = (stats.harmless + stats.undetected) as f32 / total_engines as f32;
+                    let clean_ratio =
+                        (stats.harmless + stats.undetected) as f32 / total_engines as f32;
                     0.2 + (clean_ratio * 0.6) // 0.2 to 0.8
                 }
                 ThreatVerdict::Unknown => 0.1,
             }
         };
 
-        let detection_names: Vec<String> = response.data.attributes.last_analysis_results
+        let detection_names: Vec<String> = response
+            .data
+            .attributes
+            .last_analysis_results
             .unwrap_or_default()
             .values()
             .filter_map(|engine| engine.result.clone())
             .filter(|result| result != "None" && !result.is_empty())
             .collect();
 
-        let first_seen = response.data.attributes.first_submission_date
+        let first_seen = response
+            .data
+            .attributes
+            .first_submission_date
             .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
 
-        let last_seen = response.data.attributes.last_submission_date
+        let last_seen = response
+            .data
+            .attributes
+            .last_submission_date
             .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
 
         // Enhanced metadata
         let mut metadata = HashMap::new();
-        metadata.insert("total_engines".to_string(), serde_json::Value::Number(total_engines.into()));
-        metadata.insert("malicious_count".to_string(), serde_json::Value::Number(stats.malicious.into()));
-        metadata.insert("suspicious_count".to_string(), serde_json::Value::Number(stats.suspicious.into()));
-        
+        metadata.insert(
+            "total_engines".to_string(),
+            serde_json::Value::Number(total_engines.into()),
+        );
+        metadata.insert(
+            "malicious_count".to_string(),
+            serde_json::Value::Number(stats.malicious.into()),
+        );
+        metadata.insert(
+            "suspicious_count".to_string(),
+            serde_json::Value::Number(stats.suspicious.into()),
+        );
+
         if let Some(size) = response.data.attributes.size {
-            metadata.insert("file_size".to_string(), serde_json::Value::Number(size.into()));
+            metadata.insert(
+                "file_size".to_string(),
+                serde_json::Value::Number(size.into()),
+            );
         }
-        
+
         if let Some(type_desc) = response.data.attributes.type_description {
-            metadata.insert("file_type".to_string(), serde_json::Value::String(type_desc));
+            metadata.insert(
+                "file_type".to_string(),
+                serde_json::Value::String(type_desc),
+            );
         }
 
         HashReputation {
@@ -769,44 +839,48 @@ impl HashAnalyzer {
     async fn query_malwarebazaar(&self, hash: &str) -> Result<HashReputation, HashAnalysisError> {
         let start_time = Instant::now();
         let url = "https://mb-api.abuse.ch/api/v1/";
-        
-        let form_data = [
-            ("query", "get_info"),
-            ("hash", hash),
-        ];
+
+        let form_data = [("query", "get_info"), ("hash", hash)];
 
         let response = timeout(
             Duration::from_secs(self.config.timeout_seconds),
-            self.http_client
-                .post(url)
-                .form(&form_data)
-                .send()
-        ).await
-        .map_err(|_| HashAnalysisError::ApiTimeout { 
-            api_source: "MalwareBazaar".to_string() 
+            self.http_client.post(url).form(&form_data).send(),
+        )
+        .await
+        .map_err(|_| HashAnalysisError::ApiTimeout {
+            api_source: "MalwareBazaar".to_string(),
         })?
-        .map_err(|e| HashAnalysisError::NetworkError { 
-            message: format!("MalwareBazaar request failed: {}", e) 
+        .map_err(|e| HashAnalysisError::NetworkError {
+            message: format!("MalwareBazaar request failed: {}", e),
         })?;
 
         let query_time = start_time.elapsed().as_millis() as u64;
 
         if response.status().is_success() {
-            let json: serde_json::Value = response.json().await
-                .map_err(|e| HashAnalysisError::NetworkError {
-                    message: format!("Failed to parse MalwareBazaar response: {}", e)
-                })?;
-            
+            let json: serde_json::Value =
+                response
+                    .json()
+                    .await
+                    .map_err(|e| HashAnalysisError::NetworkError {
+                        message: format!("Failed to parse MalwareBazaar response: {}", e),
+                    })?;
+
             if json["query_status"] == "ok" {
                 // Hash found in MalwareBazaar - it's malicious
                 let mut metadata = HashMap::new();
                 if let Some(data_array) = json["data"].as_array() {
                     if let Some(data) = data_array.first() {
                         if let Some(family) = data["signature"].as_str() {
-                            metadata.insert("malware_family".to_string(), serde_json::Value::String(family.to_string()));
+                            metadata.insert(
+                                "malware_family".to_string(),
+                                serde_json::Value::String(family.to_string()),
+                            );
                         }
                         if let Some(reporter) = data["reporter"].as_str() {
-                            metadata.insert("reporter".to_string(), serde_json::Value::String(reporter.to_string()));
+                            metadata.insert(
+                                "reporter".to_string(),
+                                serde_json::Value::String(reporter.to_string()),
+                            );
                         }
                     }
                 }
@@ -821,18 +895,18 @@ impl HashAnalyzer {
                         .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                         .map(|dt| dt.with_timezone(&chrono::Utc)),
                     last_seen: None,
-                    detection_names: vec![
-                        json["data"][0]["signature"]
-                            .as_str()
-                            .unwrap_or("Unknown")
-                            .to_string()
-                    ],
+                    detection_names: vec![json["data"][0]["signature"]
+                        .as_str()
+                        .unwrap_or("Unknown")
+                        .to_string()],
                     threat_types: json["data"][0]["tags"]
                         .as_array()
-                        .map(|arr| arr.iter()
-                            .filter_map(|v| v.as_str())
-                            .map(|s| s.to_string())
-                            .collect::<Vec<_>>())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str())
+                                .map(|s| s.to_string())
+                                .collect::<Vec<_>>()
+                        })
                         .unwrap_or_default(),
                     metadata,
                     query_time_ms: query_time,
@@ -853,18 +927,22 @@ impl HashAnalyzer {
                 })
             }
         } else {
-            Err(HashAnalysisError::ApiError { 
-                api_source: "MalwareBazaar".to_string(), 
-                status_code: response.status().as_u16() 
+            Err(HashAnalysisError::ApiError {
+                api_source: "MalwareBazaar".to_string(),
+                status_code: response.status().as_u16(),
             })
         }
     }
 
     /// Query Hybrid Analysis (new threat intelligence source)
-    async fn query_hybrid_analysis(&self, hash: &str, api_key: &str) -> Result<HashReputation, HashAnalysisError> {
+    async fn query_hybrid_analysis(
+        &self,
+        hash: &str,
+        api_key: &str,
+    ) -> Result<HashReputation, HashAnalysisError> {
         let start_time = Instant::now();
         let url = format!("https://www.hybrid-analysis.com/api/v2/search/hash");
-        
+
         let form_data = [("hash", hash)];
 
         let response = timeout(
@@ -874,23 +952,27 @@ impl HashAnalyzer {
                 .header("api-key", api_key)
                 .header("User-Agent", "Falcon Sandbox")
                 .form(&form_data)
-                .send()
-        ).await
-        .map_err(|_| HashAnalysisError::ApiTimeout { 
-            api_source: "Hybrid Analysis".to_string() 
+                .send(),
+        )
+        .await
+        .map_err(|_| HashAnalysisError::ApiTimeout {
+            api_source: "Hybrid Analysis".to_string(),
         })?
-        .map_err(|e| HashAnalysisError::NetworkError { 
-            message: format!("Hybrid Analysis request failed: {}", e) 
+        .map_err(|e| HashAnalysisError::NetworkError {
+            message: format!("Hybrid Analysis request failed: {}", e),
         })?;
 
         let query_time = start_time.elapsed().as_millis() as u64;
 
         match response.status().as_u16() {
             200 => {
-                let json: serde_json::Value = response.json().await
-                    .map_err(|e| HashAnalysisError::NetworkError {
-                        message: format!("Failed to parse Hybrid Analysis response: {}", e)
-                    })?;
+                let json: serde_json::Value =
+                    response
+                        .json()
+                        .await
+                        .map_err(|e| HashAnalysisError::NetworkError {
+                            message: format!("Failed to parse Hybrid Analysis response: {}", e),
+                        })?;
 
                 if let Some(results) = json.as_array() {
                     if let Some(result) = results.first() {
@@ -910,7 +992,10 @@ impl HashAnalyzer {
 
                         let mut metadata = HashMap::new();
                         if let Some(threat_score) = result["threat_score"].as_u64() {
-                            metadata.insert("threat_score".to_string(), serde_json::Value::Number(threat_score.into()));
+                            metadata.insert(
+                                "threat_score".to_string(),
+                                serde_json::Value::Number(threat_score.into()),
+                            );
                         }
 
                         Ok(HashReputation {
@@ -925,10 +1010,12 @@ impl HashAnalyzer {
                             last_seen: None,
                             detection_names: result["av_detect"]
                                 .as_array()
-                                .map(|arr| arr.iter()
-                                    .filter_map(|v| v.as_str())
-                                    .map(|s| s.to_string())
-                                    .collect())
+                                .map(|arr| {
+                                    arr.iter()
+                                        .filter_map(|v| v.as_str())
+                                        .map(|s| s.to_string())
+                                        .collect()
+                                })
                                 .unwrap_or_default(),
                             threat_types: vec![],
                             metadata,
@@ -942,12 +1029,12 @@ impl HashAnalyzer {
                 }
             }
             404 => Ok(self.create_unknown_reputation("Hybrid Analysis", query_time)),
-            429 => Err(HashAnalysisError::RateLimitExceeded { 
-                api_source: "Hybrid Analysis".to_string() 
+            429 => Err(HashAnalysisError::RateLimitExceeded {
+                api_source: "Hybrid Analysis".to_string(),
             }),
-            status => Err(HashAnalysisError::ApiError { 
-                api_source: "Hybrid Analysis".to_string(), 
-                status_code: status 
+            status => Err(HashAnalysisError::ApiError {
+                api_source: "Hybrid Analysis".to_string(),
+                status_code: status,
             }),
         }
     }
@@ -955,9 +1042,9 @@ impl HashAnalyzer {
     /// Enhanced local database query with proper error handling
     async fn query_local_database(&self, hash: &str) -> Result<HashReputation, HashAnalysisError> {
         let start_time = Instant::now();
-        
+
         debug!("Querying local database for hash: {}", hash);
-        
+
         // Local threat intelligence database query. Requires a db_pool field on
         // HashAnalyzer and a `threat_intelligence` table with columns:
         //   hash TEXT, verdict TEXT, confidence FLOAT, first_seen TIMESTAMPTZ,
@@ -967,9 +1054,9 @@ impl HashAnalyzer {
             hash = hash,
             "Local threat DB not yet connected - returning Unknown"
         );
-        
+
         let query_time = start_time.elapsed().as_millis() as u64;
-        
+
         // Fallback implementation
         Ok(HashReputation {
             source: "Local Database".to_string(),
@@ -1018,12 +1105,17 @@ impl HashAnalyzer {
     async fn cache_reputations(&self, hash: &str, reputations: &[HashReputation]) {
         if let Ok(mut cache) = self.local_cache.write() {
             // Cache the reputation with the highest confidence
-            if let Some(best_reputation) = reputations.iter()
-                .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap_or(std::cmp::Ordering::Equal)) {
-                
+            if let Some(best_reputation) = reputations.iter().max_by(|a, b| {
+                a.confidence
+                    .partial_cmp(&b.confidence)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            }) {
                 let ttl = Duration::from_secs(self.config.cache_ttl_minutes * 60);
-                cache.insert(hash.to_string(), CachedReputation::new(best_reputation.clone(), ttl));
-                
+                cache.insert(
+                    hash.to_string(),
+                    CachedReputation::new(best_reputation.clone(), ttl),
+                );
+
                 // Cleanup expired entries periodically
                 if cache.len() % 100 == 0 {
                     cache.retain(|_, cached| !cached.is_expired());
@@ -1034,42 +1126,42 @@ impl HashAnalyzer {
 
     /// Enhanced analysis result creation with weighted confidence scoring
     fn create_enhanced_analysis_result(
-        &self, 
-        hash_info: &HashInfo, 
+        &self,
+        hash_info: &HashInfo,
         reputations: Vec<HashReputation>,
-        query_errors: Vec<(String, HashAnalysisError)>
+        query_errors: Vec<(String, HashAnalysisError)>,
     ) -> AnalysisResult {
-        use uuid::Uuid;
         use chrono::Utc;
-        
+        use uuid::Uuid;
+
         // Create enhanced file metadata
         let file_metadata = FileMetadata {
             filename: None,
             file_size: hash_info.file_size.unwrap_or(0),
             mime_type: "application/octet-stream".to_string(),
-            md5: if hash_info.hash_type == HashType::MD5 { 
-                hash_info.hash_value.clone() 
-            } else { 
-                String::new() 
+            md5: if hash_info.hash_type == HashType::MD5 {
+                hash_info.hash_value.clone()
+            } else {
+                String::new()
             },
-            sha1: if hash_info.hash_type == HashType::SHA1 { 
-                hash_info.hash_value.clone() 
-            } else { 
-                String::new() 
+            sha1: if hash_info.hash_type == HashType::SHA1 {
+                hash_info.hash_value.clone()
+            } else {
+                String::new()
             },
-            sha256: if hash_info.hash_type == HashType::SHA256 { 
-                hash_info.hash_value.clone() 
-            } else { 
-                String::new() 
+            sha256: if hash_info.hash_type == HashType::SHA256 {
+                hash_info.hash_value.clone()
+            } else {
+                String::new()
             },
             sha512: None,
             entropy: None,
             magic_bytes: None,
             executable_info: None,
         };
-        
+
         let mut result = AnalysisResult::new(Uuid::new_v4(), file_metadata);
-        
+
         if reputations.is_empty() {
             result.status = if query_errors.is_empty() {
                 AnalysisStatus::Completed
@@ -1077,13 +1169,14 @@ impl HashAnalyzer {
                 AnalysisStatus::Failed
             };
             result.completed_at = Some(Utc::now());
-            
+
             // Add error information if no reputations were obtained
             if !query_errors.is_empty() {
-                let error_messages: Vec<String> = query_errors.iter()
+                let error_messages: Vec<String> = query_errors
+                    .iter()
                     .map(|(source, error)| format!("{}: {}", source, error))
                     .collect();
-                
+
                 let detection = DetectionResult {
                     detection_id: Uuid::new_v4(),
                     engine_name: "Hash Analyzer".to_string(),
@@ -1100,19 +1193,18 @@ impl HashAnalyzer {
                 };
                 result.add_detection(detection);
             }
-            
+
             return result;
         }
 
         // Enhanced weighted confidence calculation
-        let total_weighted_confidence = reputations.iter()
+        let total_weighted_confidence = reputations
+            .iter()
             .map(|r| r.confidence * r.reliability_score)
             .sum::<f32>();
-        
-        let total_weight = reputations.iter()
-            .map(|r| r.reliability_score)
-            .sum::<f32>();
-            
+
+        let total_weight = reputations.iter().map(|r| r.reliability_score).sum::<f32>();
+
         let weighted_confidence = if total_weight > 0.0 {
             total_weighted_confidence / total_weight
         } else {
@@ -1120,30 +1212,34 @@ impl HashAnalyzer {
         };
 
         // Determine consensus verdict based on weighted votes
-        let malicious_weight: f32 = reputations.iter()
+        let malicious_weight: f32 = reputations
+            .iter()
             .filter(|r| r.verdict == ThreatVerdict::Malicious)
             .map(|r| r.reliability_score)
             .sum();
-            
-        let suspicious_weight: f32 = reputations.iter()
+
+        let suspicious_weight: f32 = reputations
+            .iter()
             .filter(|r| r.verdict == ThreatVerdict::Suspicious)
             .map(|r| r.reliability_score)
             .sum();
-            
-        let benign_weight: f32 = reputations.iter()
+
+        let benign_weight: f32 = reputations
+            .iter()
             .filter(|r| r.verdict == ThreatVerdict::Benign)
             .map(|r| r.reliability_score)
             .sum();
 
-        let consensus_verdict = if malicious_weight > suspicious_weight && malicious_weight > benign_weight {
-            ThreatVerdict::Malicious
-        } else if suspicious_weight > benign_weight {
-            ThreatVerdict::Suspicious
-        } else if benign_weight > 0.0 {
-            ThreatVerdict::Benign
-        } else {
-            ThreatVerdict::Unknown
-        };
+        let consensus_verdict =
+            if malicious_weight > suspicious_weight && malicious_weight > benign_weight {
+                ThreatVerdict::Malicious
+            } else if suspicious_weight > benign_weight {
+                ThreatVerdict::Suspicious
+            } else if benign_weight > 0.0 {
+                ThreatVerdict::Benign
+            } else {
+                ThreatVerdict::Unknown
+            };
 
         // Create detection results for each reputation source
         let total_sources = reputations.len();
@@ -1156,10 +1252,16 @@ impl HashAnalyzer {
             };
 
             let mut metadata = reputation.metadata.clone();
-            metadata.insert("reliability_score".to_string(), 
-                serde_json::Value::Number(serde_json::Number::from_f64(reputation.reliability_score as f64).unwrap()));
-            metadata.insert("query_time_ms".to_string(), 
-                serde_json::Value::Number(reputation.query_time_ms.into()));
+            metadata.insert(
+                "reliability_score".to_string(),
+                serde_json::Value::Number(
+                    serde_json::Number::from_f64(reputation.reliability_score as f64).unwrap(),
+                ),
+            );
+            metadata.insert(
+                "query_time_ms".to_string(),
+                serde_json::Value::Number(reputation.query_time_ms.into()),
+            );
 
             let detection = DetectionResult {
                 detection_id: Uuid::new_v4(),
@@ -1169,16 +1271,18 @@ impl HashAnalyzer {
                 verdict: reputation.verdict,
                 confidence: weighted_confidence,
                 severity,
-                categories: reputation.threat_types.iter().map(|s| {
-                    match s.as_str() {
+                categories: reputation
+                    .threat_types
+                    .iter()
+                    .map(|s| match s.as_str() {
                         "trojan" => ThreatCategory::Trojan,
                         "ransomware" => ThreatCategory::Ransomware,
                         "worm" => ThreatCategory::Worm,
                         "adware" => ThreatCategory::Adware,
                         "spyware" => ThreatCategory::Spyware,
                         _ => ThreatCategory::Other("Unknown".to_string()),
-                    }
-                }).collect(),
+                    })
+                    .collect(),
                 metadata,
                 detected_at: Utc::now(),
                 processing_time_ms: reputation.query_time_ms,
@@ -1204,29 +1308,54 @@ impl HashAnalyzer {
             categories: vec![],
             metadata: {
                 let mut meta = std::collections::HashMap::new();
-                meta.insert("total_sources".to_string(), serde_json::Value::Number(total_sources.into()));
-                meta.insert("malicious_weight".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(malicious_weight as f64).unwrap()));
-                meta.insert("suspicious_weight".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(suspicious_weight as f64).unwrap()));
-                meta.insert("benign_weight".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(benign_weight as f64).unwrap()));
+                meta.insert(
+                    "total_sources".to_string(),
+                    serde_json::Value::Number(total_sources.into()),
+                );
+                meta.insert(
+                    "malicious_weight".to_string(),
+                    serde_json::Value::Number(
+                        serde_json::Number::from_f64(malicious_weight as f64).unwrap(),
+                    ),
+                );
+                meta.insert(
+                    "suspicious_weight".to_string(),
+                    serde_json::Value::Number(
+                        serde_json::Number::from_f64(suspicious_weight as f64).unwrap(),
+                    ),
+                );
+                meta.insert(
+                    "benign_weight".to_string(),
+                    serde_json::Value::Number(
+                        serde_json::Number::from_f64(benign_weight as f64).unwrap(),
+                    ),
+                );
                 meta
             },
             detected_at: Utc::now(),
             processing_time_ms: 0, // aggregated during detection loop
-            error_message: if query_errors.is_empty() { 
-                None 
-            } else { 
-                Some(format!("Partial failures: {} sources failed", query_errors.len())) 
+            error_message: if query_errors.is_empty() {
+                None
+            } else {
+                Some(format!(
+                    "Partial failures: {} sources failed",
+                    query_errors.len()
+                ))
             },
         };
         result.add_detection(consensus_detection);
-        
+
         result.status = AnalysisStatus::Completed;
         result.completed_at = Some(Utc::now());
         result
     }
 
     /// Create basic analysis result (for backward compatibility)
-    fn create_analysis_result(&self, hash_info: &HashInfo, reputations: Vec<HashReputation>) -> AnalysisResult {
+    fn create_analysis_result(
+        &self,
+        hash_info: &HashInfo,
+        reputations: Vec<HashReputation>,
+    ) -> AnalysisResult {
         self.create_enhanced_analysis_result(hash_info, reputations, vec![])
     }
 
@@ -1251,78 +1380,134 @@ impl HashAnalyzer {
     /// Get comprehensive cache and performance statistics
     pub async fn get_comprehensive_stats(&self) -> HashMap<String, serde_json::Value> {
         let mut stats = HashMap::new();
-        
+
         // Cache statistics
         if let Ok(cache) = self.local_cache.read() {
-            stats.insert("total_cached".to_string(), serde_json::Value::Number(cache.len().into()));
-            
+            stats.insert(
+                "total_cached".to_string(),
+                serde_json::Value::Number(cache.len().into()),
+            );
+
             let expired_count = cache.values().filter(|cached| cached.is_expired()).count();
-            stats.insert("expired_cached".to_string(), serde_json::Value::Number(expired_count.into()));
-            
-            let malicious_cached = cache.values()
-                .filter(|cached| !cached.is_expired() && cached.reputation.verdict == ThreatVerdict::Malicious)
+            stats.insert(
+                "expired_cached".to_string(),
+                serde_json::Value::Number(expired_count.into()),
+            );
+
+            let malicious_cached = cache
+                .values()
+                .filter(|cached| {
+                    !cached.is_expired() && cached.reputation.verdict == ThreatVerdict::Malicious
+                })
                 .count();
-            stats.insert("malicious_cached".to_string(), serde_json::Value::Number(malicious_cached.into()));
+            stats.insert(
+                "malicious_cached".to_string(),
+                serde_json::Value::Number(malicious_cached.into()),
+            );
         }
-        
+
         // Performance metrics
         if let metrics = self.metrics.lock().await {
-            stats.insert("total_queries".to_string(), serde_json::Value::Number(metrics.total_queries.into()));
-            stats.insert("cache_hit_rate".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(metrics.cache_hit_rate()).unwrap()));
-            stats.insert("success_rate".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(metrics.success_rate()).unwrap()));
-            stats.insert("average_response_time_ms".to_string(), serde_json::Value::Number(metrics.average_response_time_ms.into()));
-            
+            stats.insert(
+                "total_queries".to_string(),
+                serde_json::Value::Number(metrics.total_queries.into()),
+            );
+            stats.insert(
+                "cache_hit_rate".to_string(),
+                serde_json::Value::Number(
+                    serde_json::Number::from_f64(metrics.cache_hit_rate()).unwrap(),
+                ),
+            );
+            stats.insert(
+                "success_rate".to_string(),
+                serde_json::Value::Number(
+                    serde_json::Number::from_f64(metrics.success_rate()).unwrap(),
+                ),
+            );
+            stats.insert(
+                "average_response_time_ms".to_string(),
+                serde_json::Value::Number(metrics.average_response_time_ms.into()),
+            );
+
             // API failure statistics
             for (source, failures) in &metrics.api_failures {
-                stats.insert(format!("{}_failures", source), serde_json::Value::Number((*failures).into()));
+                stats.insert(
+                    format!("{}_failures", source),
+                    serde_json::Value::Number((*failures).into()),
+                );
             }
         }
-        
+
         // Circuit breaker status
         for (source, circuit_breaker) in &self.circuit_breakers {
             let available = circuit_breaker.is_available().await;
-            stats.insert(format!("{}_circuit_breaker_open", source), serde_json::Value::Bool(!available));
+            stats.insert(
+                format!("{}_circuit_breaker_open", source),
+                serde_json::Value::Bool(!available),
+            );
         }
-        
+
         stats
     }
 
     /// Health check for the analyzer
-    pub async fn health_check(&self) -> Result<HashMap<String, serde_json::Value>, HashAnalysisError> {
+    pub async fn health_check(
+        &self,
+    ) -> Result<HashMap<String, serde_json::Value>, HashAnalysisError> {
         let mut health = HashMap::new();
-        
+
         // Check circuit breaker status
         let mut all_available = true;
         for (source, circuit_breaker) in &self.circuit_breakers {
             let available = circuit_breaker.is_available().await;
-            health.insert(format!("{}_available", source), serde_json::Value::Bool(available));
+            health.insert(
+                format!("{}_available", source),
+                serde_json::Value::Bool(available),
+            );
             all_available &= available;
         }
-        
-        health.insert("overall_health".to_string(), serde_json::Value::String(
-            if all_available { "healthy".to_string() } else { "degraded".to_string() }
-        ));
-        
+
+        health.insert(
+            "overall_health".to_string(),
+            serde_json::Value::String(if all_available {
+                "healthy".to_string()
+            } else {
+                "degraded".to_string()
+            }),
+        );
+
         // Add configuration status
-        health.insert("virustotal_configured".to_string(), serde_json::Value::Bool(self.config.virustotal_api_key.is_some()));
-        health.insert("hybrid_analysis_configured".to_string(), serde_json::Value::Bool(self.config.hybrid_analysis_api_key.is_some()));
-        health.insert("cache_enabled".to_string(), serde_json::Value::Bool(self.config.local_cache_enabled));
-        
+        health.insert(
+            "virustotal_configured".to_string(),
+            serde_json::Value::Bool(self.config.virustotal_api_key.is_some()),
+        );
+        health.insert(
+            "hybrid_analysis_configured".to_string(),
+            serde_json::Value::Bool(self.config.hybrid_analysis_api_key.is_some()),
+        );
+        health.insert(
+            "cache_enabled".to_string(),
+            serde_json::Value::Bool(self.config.local_cache_enabled),
+        );
+
         Ok(health)
     }
 
     /// Bulk hash analysis for processing multiple hashes efficiently
-    pub async fn analyze_bulk_hashes(&self, hash_infos: Vec<HashInfo>) -> Vec<Result<AnalysisResult, HashAnalysisError>> {
+    pub async fn analyze_bulk_hashes(
+        &self,
+        hash_infos: Vec<HashInfo>,
+    ) -> Vec<Result<AnalysisResult, HashAnalysisError>> {
         use futures::future::join_all;
-        
+
         info!("Starting bulk analysis for {} hashes", hash_infos.len());
-        
+
         // Process hashes concurrently with semaphore limiting
         let mut results = Vec::new();
         for hash_info in &hash_infos {
             results.push(self.analyze_hash(hash_info, None));
         }
-        
+
         join_all(results).await
     }
 
@@ -1331,9 +1516,12 @@ impl HashAnalyzer {
         let mut stats = HashMap::new();
         if let Ok(cache) = self.local_cache.read() {
             stats.insert("total_cached".to_string(), cache.len());
-            
-            let malicious_cached = cache.values()
-                .filter(|cached| !cached.is_expired() && cached.reputation.verdict == ThreatVerdict::Malicious)
+
+            let malicious_cached = cache
+                .values()
+                .filter(|cached| {
+                    !cached.is_expired() && cached.reputation.verdict == ThreatVerdict::Malicious
+                })
                 .count();
             stats.insert("malicious_cached".to_string(), malicious_cached);
         }
@@ -1350,16 +1538,29 @@ mod tests {
     async fn test_enhanced_hash_validation() {
         let config = HashAnalyzerConfig::default();
         let analyzer = HashAnalyzer::new(config).unwrap();
-        
+
         // Valid hashes
-        assert!(analyzer.validate_hash("d41d8cd98f00b204e9800998ecf8427e", &HashType::MD5).is_ok());
-        assert!(analyzer.validate_hash("da39a3ee5e6b4b0d3255bfef95601890afd80709", &HashType::SHA1).is_ok());
-        assert!(analyzer.validate_hash("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", &HashType::SHA256).is_ok());
-        
+        assert!(analyzer
+            .validate_hash("d41d8cd98f00b204e9800998ecf8427e", &HashType::MD5)
+            .is_ok());
+        assert!(analyzer
+            .validate_hash("da39a3ee5e6b4b0d3255bfef95601890afd80709", &HashType::SHA1)
+            .is_ok());
+        assert!(analyzer
+            .validate_hash(
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                &HashType::SHA256
+            )
+            .is_ok());
+
         // Invalid hashes
         assert!(analyzer.validate_hash("invalid", &HashType::MD5).is_err());
-        assert!(analyzer.validate_hash("too_short", &HashType::SHA256).is_err());
-        assert!(analyzer.validate_hash("d41d8cd98f00b204e9800998ecf8427g", &HashType::MD5).is_err()); // invalid char
+        assert!(analyzer
+            .validate_hash("too_short", &HashType::SHA256)
+            .is_err());
+        assert!(analyzer
+            .validate_hash("d41d8cd98f00b204e9800998ecf8427g", &HashType::MD5)
+            .is_err()); // invalid char
     }
 
     #[test]
@@ -1367,10 +1568,10 @@ mod tests {
         let config = HashAnalyzerConfig::default();
         let analyzer = HashAnalyzer::new(config).unwrap();
         let test_data = b"hello world";
-        
+
         let hashes = analyzer.generate_all_hashes(test_data);
         assert_eq!(hashes.len(), 5); // MD5, SHA1, SHA256, SHA3-256, BLAKE2B
-        
+
         // Check that we got all hash types
         let hash_types: Vec<HashType> = hashes.iter().map(|h| h.hash_type.clone()).collect();
         assert!(hash_types.contains(&HashType::MD5));
@@ -1378,23 +1579,32 @@ mod tests {
         assert!(hash_types.contains(&HashType::SHA256));
         assert!(hash_types.contains(&HashType::SHA3_256));
         assert!(hash_types.contains(&HashType::BLAKE2B));
-        
+
         // Verify known hash values
-        let md5_hash = hashes.iter().find(|h| h.hash_type == HashType::MD5).unwrap();
+        let md5_hash = hashes
+            .iter()
+            .find(|h| h.hash_type == HashType::MD5)
+            .unwrap();
         assert_eq!(md5_hash.hash_value, "5eb63bbbe01eeed093cb22bb8f5acdc3");
-        
-        let sha256_hash = hashes.iter().find(|h| h.hash_type == HashType::SHA256).unwrap();
-        assert_eq!(sha256_hash.hash_value, "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
+
+        let sha256_hash = hashes
+            .iter()
+            .find(|h| h.hash_type == HashType::SHA256)
+            .unwrap();
+        assert_eq!(
+            sha256_hash.hash_value,
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        );
     }
 
     #[tokio::test]
     async fn test_rate_limiter() {
         let rate_limiter = RateLimiter::new(2);
-        
+
         // Should allow first two requests
         assert!(rate_limiter.acquire().await.is_ok());
         assert!(rate_limiter.acquire().await.is_ok());
-        
+
         // Third request should be rate limited
         // Note: This test might be flaky depending on timing
         // In production, you'd want more sophisticated testing
@@ -1403,17 +1613,17 @@ mod tests {
     #[tokio::test]
     async fn test_circuit_breaker() {
         let circuit_breaker = CircuitBreaker::new(2, Duration::from_millis(100));
-        
+
         // Should be available initially
         assert!(circuit_breaker.is_available().await);
-        
+
         // Record failures
         circuit_breaker.record_failure().await;
         assert!(circuit_breaker.is_available().await);
-        
+
         circuit_breaker.record_failure().await;
         assert!(!circuit_breaker.is_available().await); // Should be open now
-        
+
         // Wait for timeout and check recovery
         tokio::time::sleep(Duration::from_millis(150)).await;
         assert!(circuit_breaker.is_available().await);
@@ -1426,7 +1636,7 @@ mod tests {
             ..Default::default()
         };
         let analyzer = HashAnalyzer::new(config).unwrap();
-        
+
         let test_reputation = HashReputation {
             source: "Test".to_string(),
             verdict: ThreatVerdict::Malicious,
@@ -1439,13 +1649,13 @@ mod tests {
             metadata: HashMap::new(),
             query_time_ms: 100,
         };
-        
+
         let hash = "test_hash";
         analyzer.cache_reputations(hash, &[test_reputation]).await;
-        
+
         // Should be available immediately
         assert!(analyzer.get_cached_reputation(hash).await.is_some());
-        
+
         // For testing TTL, you'd need to either mock time or use a very short TTL
         // This is a basic structure test
     }
@@ -1468,11 +1678,12 @@ mod tests {
             ..Default::default()
         };
         let analyzer = HashAnalyzer::new(config).unwrap();
-        
+
         let hashes = vec![
             HashInfo {
                 hash_type: HashType::SHA256,
-                hash_value: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
+                hash_value: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    .to_string(),
                 file_size: Some(0),
                 computed_at: chrono::Utc::now(),
             },
@@ -1483,9 +1694,9 @@ mod tests {
                 computed_at: chrono::Utc::now(),
             },
         ];
-        
+
         let results = analyzer.analyze_bulk_hashes(hashes).await;
-        
+
         assert_eq!(results.len(), 2);
         // Both should succeed even without external APIs (local database will return Unknown)
         assert!(results.iter().all(|r| r.is_ok()));
@@ -1495,14 +1706,14 @@ mod tests {
     async fn test_weighted_confidence_calculation() {
         let config = HashAnalyzerConfig::default();
         let analyzer = HashAnalyzer::new(config).unwrap();
-        
+
         let hash_info = HashInfo {
             hash_type: HashType::SHA256,
             hash_value: "test_hash".to_string(),
             file_size: Some(1000),
             computed_at: chrono::Utc::now(),
         };
-        
+
         let reputations = vec![
             HashReputation {
                 source: "HighReliability".to_string(),
@@ -1529,17 +1740,19 @@ mod tests {
                 query_time_ms: 150,
             },
         ];
-        
+
         let result = analyzer.create_enhanced_analysis_result(&hash_info, reputations, vec![]);
-        
+
         // Should have detections from both sources plus consensus
         assert!(result.detections.len() >= 2);
-        
+
         // Check that consensus detection exists
-        let consensus = result.detections.iter()
+        let consensus = result
+            .detections
+            .iter()
             .find(|d| d.engine_name == "Hash Analyzer Consensus");
         assert!(consensus.is_some());
-        
+
         let consensus = consensus.unwrap();
         // High reliability source should influence the consensus more
         assert_eq!(consensus.verdict, ThreatVerdict::Malicious);
@@ -1549,24 +1762,27 @@ mod tests {
     async fn test_health_check() {
         let config = HashAnalyzerConfig::default();
         let analyzer = HashAnalyzer::new(config).unwrap();
-        
+
         let health = analyzer.health_check().await.unwrap();
-        
+
         assert!(health.contains_key("overall_health"));
         assert!(health.contains_key("virustotal_configured"));
         assert!(health.contains_key("cache_enabled"));
-        
+
         // Should be healthy initially
-        assert_eq!(health["overall_health"], serde_json::Value::String("healthy".to_string()));
+        assert_eq!(
+            health["overall_health"],
+            serde_json::Value::String("healthy".to_string())
+        );
     }
 
     #[tokio::test]
     async fn test_comprehensive_stats() {
         let config = HashAnalyzerConfig::default();
         let analyzer = HashAnalyzer::new(config).unwrap();
-        
+
         let stats = analyzer.get_comprehensive_stats().await;
-        
+
         assert!(stats.contains_key("total_cached"));
         assert!(stats.contains_key("total_queries"));
         assert!(stats.contains_key("cache_hit_rate"));
@@ -1580,7 +1796,7 @@ mod tests {
             hash: "invalid".to_string(),
         };
         assert!(error.to_string().contains("Invalid hash format"));
-        
+
         let error = HashAnalysisError::ApiTimeout {
             api_source: "VirusTotal".to_string(),
         };
@@ -1602,10 +1818,10 @@ mod tests {
             timeout_seconds: 0, // Invalid
             ..Default::default()
         };
-        
+
         let result = HashAnalyzer::new(invalid_config);
         assert!(result.is_err());
-        
+
         if let Err(HashAnalysisError::ConfigError { message }) = result {
             assert!(message.contains("Timeout cannot be zero"));
         } else {

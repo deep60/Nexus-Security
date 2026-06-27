@@ -1,7 +1,7 @@
-use axum::{extract::State, response::Json, http::StatusCode};
+use crate::AppState;
+use axum::{extract::State, http::StatusCode, response::Json};
 use serde_json::{json, Value};
 use std::sync::Arc;
-use crate::AppState;
 
 pub async fn get_reputation_trends(
     State(_state): State<Arc<AppState>>,
@@ -15,8 +15,6 @@ pub async fn get_score_distribution(
     (StatusCode::OK, Json(json!({"distribution": []})))
 }
 
-pub async fn get_accuracy_stats(
-    State(_state): State<Arc<AppState>>,
-) -> (StatusCode, Json<Value>) {
+pub async fn get_accuracy_stats(State(_state): State<Arc<AppState>>) -> (StatusCode, Json<Value>) {
     (StatusCode::OK, Json(json!({"stats": {}})))
 }

@@ -10,22 +10,22 @@ pub type UserResult<T> = Result<T, UserError>;
 pub enum UserError {
     #[error("Validation error: {0}")]
     ValidationError(String),
-    
+
     #[error("Authentication failed: {0}")]
     AuthenticationError(String),
-    
+
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
-    
+
     #[error("User not found")]
     NotFound,
-    
+
     #[error("User already exists")]
     AlreadyExists,
-    
+
     #[error("Database error: {0}")]
     DatabaseError(String),
-    
+
     #[error("Invalid token")]
     InvalidToken,
 }
@@ -111,13 +111,13 @@ pub enum KycStatus {
 pub struct RegisterRequest {
     #[validate(length(min = 3, max = 50))]
     pub username: String,
-    
+
     #[validate(email)]
     pub email: String,
-    
+
     #[validate(length(min = 8))]
     pub password: String,
-    
+
     pub ethereum_address: Option<String>,
 }
 
@@ -125,9 +125,9 @@ pub struct RegisterRequest {
 pub struct LoginRequest {
     #[validate(email)]
     pub email: String,
-    
+
     pub password: String,
-    
+
     pub two_factor_code: Option<String>,
 }
 

@@ -21,7 +21,7 @@ pub mod websocket;
 
 #[derive(Error, Debug)]
 pub enum ApiError {
-     #[error("Authentication failed")]
+    #[error("Authentication failed")]
     Unauthorized,
     #[error("Resource not found")]
     NotFound,
@@ -74,7 +74,7 @@ pub struct ApiResponse<T> {
     pub message: Option<String>,
 }
 
-impl <T> ApiResponse<T> {
+impl<T> ApiResponse<T> {
     pub fn success(data: T) -> Self {
         Self {
             success: true,
@@ -129,7 +129,7 @@ pub struct PaginatedResponse<T> {
     pub total: u64,
     pub page: u32,
     pub limit: u32,
-    pub total_pages: u32, 
+    pub total_pages: u32,
 }
 
 impl<T> PaginatedResponse<T> {

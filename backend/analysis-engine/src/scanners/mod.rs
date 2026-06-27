@@ -1,3 +1,5 @@
+pub mod archive_scanner;
+pub mod email_scanner;
 /// Scanner modules for different artifact types
 ///
 /// This module provides specialized scanners for:
@@ -5,16 +7,13 @@
 /// - URLs (phishing detection, malicious links)
 /// - Emails (spam, phishing, malicious attachments)
 /// - Archives (zip, tar, rar, etc.)
-
 pub mod file_scanner;
 pub mod url_scanner;
-pub mod email_scanner;
-pub mod archive_scanner;
 
-pub use file_scanner::{FileScanner, FileScannerConfig, FileScanResult};
-pub use url_scanner::{UrlScanner, UrlScannerConfig, UrlScanResult};
-pub use email_scanner::{EmailScanner, EmailScannerConfig, EmailScanResult};
-pub use archive_scanner::{ArchiveScanner, ArchiveScannerConfig, ArchiveScanResult};
+pub use archive_scanner::{ArchiveScanResult, ArchiveScanner, ArchiveScannerConfig};
+pub use email_scanner::{EmailScanResult, EmailScanner, EmailScannerConfig};
+pub use file_scanner::{FileScanResult, FileScanner, FileScannerConfig};
+pub use url_scanner::{UrlScanResult, UrlScanner, UrlScannerConfig};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -143,20 +142,38 @@ impl ScanResult {
             return;
         }
 
-        let malicious_count = self.findings.iter()
-            .filter(|f| matches!(f.category, FindingCategory::Malware | FindingCategory::Ransomware | FindingCategory::Trojan))
+        let malicious_count = self
+            .findings
+            .iter()
+            .filter(|f| {
+                matches!(
+                    f.category,
+                    FindingCategory::Malware
+                        | FindingCategory::Ransomware
+                        | FindingCategory::Trojan
+                )
+            })
             .count();
 
-        let suspicious_count = self.findings.iter()
-            .filter(|f| matches!(f.category, FindingCategory::Suspicious | FindingCategory::PotentiallyUnwanted))
+        let suspicious_count = self
+            .findings
+            .iter()
+            .filter(|f| {
+                matches!(
+                    f.category,
+                    FindingCategory::Suspicious | FindingCategory::PotentiallyUnwanted
+                )
+            })
             .count();
 
         if malicious_count > 0 {
             self.verdict = ScanVerdict::Malicious;
-            self.confidence_score = (malicious_count as f32 / (self.findings.len() as f32)).min(1.0);
+            self.confidence_score =
+                (malicious_count as f32 / (self.findings.len() as f32)).min(1.0);
         } else if suspicious_count > 0 {
             self.verdict = ScanVerdict::Suspicious;
-            self.confidence_score = (suspicious_count as f32 / (self.findings.len() as f32)).min(1.0);
+            self.confidence_score =
+                (suspicious_count as f32 / (self.findings.len() as f32)).min(1.0);
         } else {
             self.verdict = ScanVerdict::Clean;
             self.confidence_score = 0.8;
@@ -188,7 +205,11 @@ pub trait Scanner {
         Self: Sized;
 
     /// Perform a scan
-    async fn scan(&self, data: &[u8], metadata: Option<HashMap<String, String>>) -> Result<Self::Result>;
+    async fn scan(
+        &self,
+        data: &[u8],
+        metadata: Option<HashMap<String, String>>,
+    ) -> Result<Self::Result>;
 
     /// Get scanner statistics
     fn get_stats(&self) -> HashMap<String, String>;

@@ -14,16 +14,16 @@ pub use uuid;
 pub enum VerdyxError {
     #[error("Database error: {0}")]
     Database(#[from] anyhow::Error),
-    
+
     #[error("Validation error: {0}")]
     Validation(String),
-    
+
     #[error("Authentication error: {0}")]
     Authentication(String),
-    
+
     #[error("Authorization error: {0}")]
     Authorization(String),
-    
+
     #[error("External service error: {0}")]
     ExternalService(String),
 }
@@ -31,5 +31,5 @@ pub enum VerdyxError {
 pub type Result<T> = std::result::Result<T, VerdyxError>;
 
 // Export modules
-pub mod types;
 pub mod messaging;
+pub mod types;

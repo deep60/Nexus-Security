@@ -22,7 +22,10 @@ pub struct ValidationResultModel {
 }
 
 impl ValidationResultModel {
-    pub async fn create(pool: &PgPool, result: &ValidationResultModel) -> Result<ValidationResultModel, sqlx::Error> {
+    pub async fn create(
+        pool: &PgPool,
+        result: &ValidationResultModel,
+    ) -> Result<ValidationResultModel, sqlx::Error> {
         let record = sqlx::query_as::<_, ValidationResultModel>(
             r#"
             INSERT INTO validation_results (
@@ -32,7 +35,7 @@ impl ValidationResultModel {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING *
-            "#
+            "#,
         )
         .bind(&result.id)
         .bind(&result.submission_id)
@@ -52,9 +55,12 @@ impl ValidationResultModel {
         Ok(record)
     }
 
-    pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<ValidationResultModel>, sqlx::Error> {
+    pub async fn find_by_id(
+        pool: &PgPool,
+        id: Uuid,
+    ) -> Result<Option<ValidationResultModel>, sqlx::Error> {
         let record = sqlx::query_as::<_, ValidationResultModel>(
-            "SELECT * FROM validation_results WHERE id = $1"
+            "SELECT * FROM validation_results WHERE id = $1",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -63,9 +69,12 @@ impl ValidationResultModel {
         Ok(record)
     }
 
-    pub async fn find_by_submission(pool: &PgPool, submission_id: Uuid) -> Result<Vec<ValidationResultModel>, sqlx::Error> {
+    pub async fn find_by_submission(
+        pool: &PgPool,
+        submission_id: Uuid,
+    ) -> Result<Vec<ValidationResultModel>, sqlx::Error> {
         let records = sqlx::query_as::<_, ValidationResultModel>(
-            "SELECT * FROM validation_results WHERE submission_id = $1 ORDER BY validated_at DESC"
+            "SELECT * FROM validation_results WHERE submission_id = $1 ORDER BY validated_at DESC",
         )
         .bind(submission_id)
         .fetch_all(pool)
@@ -74,7 +83,10 @@ impl ValidationResultModel {
         Ok(records)
     }
 
-    pub async fn find_latest_by_submission(pool: &PgPool, submission_id: Uuid) -> Result<Option<ValidationResultModel>, sqlx::Error> {
+    pub async fn find_latest_by_submission(
+        pool: &PgPool,
+        submission_id: Uuid,
+    ) -> Result<Option<ValidationResultModel>, sqlx::Error> {
         let record = sqlx::query_as::<_, ValidationResultModel>(
             "SELECT * FROM validation_results WHERE submission_id = $1 ORDER BY validated_at DESC LIMIT 1"
         )
@@ -109,7 +121,10 @@ impl ValidationResultModel {
             query.push_str(&format!(" AND quality_score >= {}", mq));
         }
 
-        query.push_str(&format!(" ORDER BY validated_at DESC LIMIT {} OFFSET {}", limit, offset));
+        query.push_str(&format!(
+            " ORDER BY validated_at DESC LIMIT {} OFFSET {}",
+            limit, offset
+        ));
 
         let records = sqlx::query_as::<_, ValidationResultModel>(&query)
             .fetch_all(pool)
@@ -132,25 +147,27 @@ impl ValidationResultModel {
             query.push_str(&format!(" AND validation_status = '{}'", s));
         }
 
-        let result: (i64,) = sqlx::query_as(&query)
-            .fetch_one(pool)
-            .await?;
+        let result: (i64,) = sqlx::query_as(&query).fetch_one(pool).await?;
 
         Ok(result.0)
     }
 
     pub async fn get_stats(pool: &PgPool) -> Result<ValidationStats, sqlx::Error> {
         let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM validation_results")
-            .fetch_one(pool).await?;
+            .fetch_one(pool)
+            .await?;
         let passed: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM validation_results WHERE validation_status IN ('Passed', 'PassedWithWarnings')"
         ).fetch_one(pool).await?;
         let failed: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM validation_results WHERE validation_status = 'Failed'"
-        ).fetch_one(pool).await?;
-        let avg_quality: (Option<f64>,) = sqlx::query_as(
-            "SELECT AVG(quality_score) FROM validation_results"
-        ).fetch_one(pool).await?;
+            "SELECT COUNT(*) FROM validation_results WHERE validation_status = 'Failed'",
+        )
+        .fetch_one(pool)
+        .await?;
+        let avg_quality: (Option<f64>,) =
+            sqlx::query_as("SELECT AVG(quality_score) FROM validation_results")
+                .fetch_one(pool)
+                .await?;
 
         Ok(ValidationStats {
             total_validations: total.0,

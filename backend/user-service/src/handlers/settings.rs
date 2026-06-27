@@ -123,7 +123,10 @@ pub async fn enable_2fa(
         claims.email, secret
     );
 
-    Ok(Json(Enable2FAResponse { secret, qr_code_url }))
+    Ok(Json(Enable2FAResponse {
+        secret,
+        qr_code_url,
+    }))
 }
 
 /// Verify and activate 2FA

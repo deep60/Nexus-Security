@@ -1,12 +1,12 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use redis::AsyncCommands;
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
+use uuid::Uuid;
 
-use crate::analyzers::{AnalysisEngine, FileAnalysisRequest, AnalysisOptions};
+use crate::analyzers::{AnalysisEngine, AnalysisOptions, FileAnalysisRequest};
 use crate::storage::S3Client;
 
 /// Redis queue key for analysis tasks
@@ -97,8 +97,8 @@ async fn pop_from_queue(redis_client: &redis::Client) -> Result<Option<Uuid>> {
 
     match result {
         Some((_key, value)) => {
-            let submission_id = Uuid::parse_str(&value)
-                .map_err(|e| anyhow!("Invalid UUID in queue: {}", e))?;
+            let submission_id =
+                Uuid::parse_str(&value).map_err(|e| anyhow!("Invalid UUID in queue: {}", e))?;
             Ok(Some(submission_id))
         }
         None => Ok(None), // Timeout
@@ -342,7 +342,10 @@ async fn store_analysis_results(
         .execute(db_pool)
         .await
         {
-            warn!("Failed to store detection result for submission {}: {}", submission_id, e);
+            warn!(
+                "Failed to store detection result for submission {}: {}",
+                submission_id, e
+            );
         }
     }
 

@@ -13,10 +13,10 @@ pub use publisher::*;
 pub trait MessageQueue: Send + Sync {
     /// Publish a message to a topic
     async fn publish(&self, topic: &str, message: &[u8]) -> Result<(), MessageError>;
-    
+
     /// Subscribe to a topic
     async fn subscribe(&self, topic: &str) -> Result<MessageSubscription, MessageError>;
-    
+
     /// Unsubscribe from a topic
     async fn unsubscribe(&self, subscription: MessageSubscription) -> Result<(), MessageError>;
 }
@@ -32,13 +32,13 @@ pub struct MessageSubscription {
 pub enum MessageError {
     #[error("Connection error: {0}")]
     Connection(String),
-    
+
     #[error("Serialization error: {0}")]
     Serialization(String),
-    
+
     #[error("Topic error: {0}")]
     Topic(String),
-    
+
     #[error("Subscription error: {0}")]
     Subscription(String),
 }

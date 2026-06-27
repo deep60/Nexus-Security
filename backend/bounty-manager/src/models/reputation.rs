@@ -20,7 +20,10 @@ pub struct ReputationModel {
 }
 
 impl ReputationModel {
-    pub async fn create(pool: &PgPool, reputation: &ReputationModel) -> Result<ReputationModel, sqlx::Error> {
+    pub async fn create(
+        pool: &PgPool,
+        reputation: &ReputationModel,
+    ) -> Result<ReputationModel, sqlx::Error> {
         let record = sqlx::query_as::<_, ReputationModel>(
             r#"
             INSERT INTO reputations (
@@ -30,7 +33,7 @@ impl ReputationModel {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
-            "#
+            "#,
         )
         .bind(&reputation.engine_id)
         .bind(reputation.reputation_score)
@@ -49,13 +52,15 @@ impl ReputationModel {
         Ok(record)
     }
 
-    pub async fn find_by_id(pool: &PgPool, engine_id: &str) -> Result<Option<ReputationModel>, sqlx::Error> {
-        let record = sqlx::query_as::<_, ReputationModel>(
-            "SELECT * FROM reputations WHERE engine_id = $1"
-        )
-        .bind(engine_id)
-        .fetch_optional(pool)
-        .await?;
+    pub async fn find_by_id(
+        pool: &PgPool,
+        engine_id: &str,
+    ) -> Result<Option<ReputationModel>, sqlx::Error> {
+        let record =
+            sqlx::query_as::<_, ReputationModel>("SELECT * FROM reputations WHERE engine_id = $1")
+                .bind(engine_id)
+                .fetch_optional(pool)
+                .await?;
 
         Ok(record)
     }
@@ -68,7 +73,7 @@ impl ReputationModel {
                 accuracy_rate = $4, average_confidence = $5, total_stake = $6,
                 rewards_earned = $7, penalties_incurred = $8, updated_at = $9
             WHERE engine_id = $10
-            "#
+            "#,
         )
         .bind(reputation.reputation_score)
         .bind(reputation.total_submissions)
@@ -86,9 +91,12 @@ impl ReputationModel {
         Ok(())
     }
 
-    pub async fn get_leaderboard(pool: &PgPool, limit: i64) -> Result<Vec<ReputationModel>, sqlx::Error> {
+    pub async fn get_leaderboard(
+        pool: &PgPool,
+        limit: i64,
+    ) -> Result<Vec<ReputationModel>, sqlx::Error> {
         let records = sqlx::query_as::<_, ReputationModel>(
-            "SELECT * FROM reputations ORDER BY reputation_score DESC LIMIT $1"
+            "SELECT * FROM reputations ORDER BY reputation_score DESC LIMIT $1",
         )
         .bind(limit)
         .fetch_all(pool)
@@ -97,7 +105,11 @@ impl ReputationModel {
         Ok(records)
     }
 
-    pub async fn increment_submission(pool: &PgPool, engine_id: &str, is_correct: bool) -> Result<(), sqlx::Error> {
+    pub async fn increment_submission(
+        pool: &PgPool,
+        engine_id: &str,
+        is_correct: bool,
+    ) -> Result<(), sqlx::Error> {
         if is_correct {
             sqlx::query(
                 r#"

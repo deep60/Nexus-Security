@@ -88,7 +88,7 @@ pub async fn get_leaderboard(
 
     let rows = sqlx::query_as::<_, LeaderboardRow>(
         "SELECT id, username, reputation_score FROM users WHERE is_active = true
-         ORDER BY reputation_score DESC LIMIT $1 OFFSET $2"
+         ORDER BY reputation_score DESC LIMIT $1 OFFSET $2",
     )
     .bind(limit as i64)
     .bind(offset as i64)
@@ -125,7 +125,7 @@ pub async fn get_top_analysts(
 ) -> Result<Json<Vec<LeaderboardEntry>>, StatusCode> {
     let rows = sqlx::query_as::<_, LeaderboardRow>(
         "SELECT id, username, reputation_score FROM users WHERE is_active = true
-         ORDER BY reputation_score DESC LIMIT 10"
+         ORDER BY reputation_score DESC LIMIT 10",
     )
     .fetch_all(state.db.pool())
     .await
@@ -154,7 +154,7 @@ pub async fn get_user_reputation(
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<UserReputation>, StatusCode> {
     let user = sqlx::query_as::<_, LeaderboardRow>(
-        "SELECT id, username, reputation_score FROM users WHERE id = $1"
+        "SELECT id, username, reputation_score FROM users WHERE id = $1",
     )
     .bind(user_id)
     .fetch_optional(state.db.pool())
@@ -167,7 +167,7 @@ pub async fn get_user_reputation(
 
     // Calculate rank
     let rank: Option<i64> = sqlx::query_scalar(
-        "SELECT COUNT(*) + 1 FROM users WHERE reputation_score > $1 AND is_active = true"
+        "SELECT COUNT(*) + 1 FROM users WHERE reputation_score > $1 AND is_active = true",
     )
     .bind(user.reputation_score)
     .fetch_optional(state.db.pool())
@@ -193,30 +193,27 @@ pub async fn get_reputation_history(
     let offset = (page.saturating_sub(1)) * limit;
 
     // Get current score
-    let current_score: i32 = sqlx::query_scalar(
-        "SELECT reputation_score FROM users WHERE id = $1"
-    )
-    .bind(user_id)
-    .fetch_optional(state.db.pool())
-    .await
-    .map_err(|e| {
-        tracing::error!("DB error: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?
-    .unwrap_or(0);
+    let current_score: i32 = sqlx::query_scalar("SELECT reputation_score FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_optional(state.db.pool())
+        .await
+        .map_err(|e| {
+            tracing::error!("DB error: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .unwrap_or(0);
 
-    let total: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM reputation_history WHERE user_id = $1"
-    )
-    .bind(user_id)
-    .fetch_one(state.db.pool())
-    .await
-    .unwrap_or(0);
+    let total: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM reputation_history WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_one(state.db.pool())
+            .await
+            .unwrap_or(0);
 
     let entries = sqlx::query_as::<_, ReputationHistoryEntry>(
         "SELECT id, event_type, score_change::float8, new_score::float8, reason, created_at
          FROM reputation_history WHERE user_id = $1
-         ORDER BY created_at DESC LIMIT $2 OFFSET $3"
+         ORDER BY created_at DESC LIMIT $2 OFFSET $3",
     )
     .bind(user_id)
     .bind(limit as i64)
@@ -256,7 +253,8 @@ pub async fn claim_badge(
     claims: crate::middleware::auth::Claims,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    let badge_id = payload.get("badge_id")
+    let badge_id = payload
+        .get("badge_id")
         .and_then(|v| v.as_str())
         .ok_or(StatusCode::BAD_REQUEST)?;
 
@@ -285,7 +283,7 @@ pub async fn claim_badge(
     } else {
         // Count completed analyses for this user
         let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM analyses WHERE analyst_id = $1 AND status = 'completed'"
+            "SELECT COUNT(*) FROM analyses WHERE analyst_id = $1 AND status = 'completed'",
         )
         .bind(claims.sub)
         .fetch_one(state.db.pool())
@@ -323,4 +321,3 @@ pub async fn claim_badge(
         "message": format!("Badge '{}' claimed successfully!", badge_name)
     })))
 }
-

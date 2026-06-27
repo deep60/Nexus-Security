@@ -1,6 +1,6 @@
 use axum::{
     middleware,
-    routing::{get, post, put, delete},
+    routing::{delete, get, post, put},
     Router,
 };
 
@@ -108,7 +108,10 @@ fn analysis_routes() -> Router<AppState> {
         .route("/:analysis_id", get(analysis::get_analysis))
         .route("/:analysis_id/details", get(analysis::get_analysis_details))
         .route("/stats", get(analysis::get_analysis_stats))
-        .route("/by-bounty/:bounty_id", get(analysis::get_analyses_by_bounty))
+        .route(
+            "/by-bounty/:bounty_id",
+            get(analysis::get_analyses_by_bounty),
+        )
         .route("/by-hash/:file_hash", get(analysis::get_analyses_by_hash))
         .route("/submit", post(analysis::submit_analysis))
         .route("/:analysis_id/dispute", post(analysis::dispute_analysis))
@@ -156,10 +159,22 @@ fn submission_routes() -> Router<AppState> {
         .route("/", post(submission::create_submission))
         .route("/file", post(submission::create_file_submission))
         .route("/:submission_id/vote", post(submission::vote_on_submission))
-        .route("/:submission_id/verify", post(submission::verify_submission))
-        .route("/:submission_id/start-analysis", post(submission::start_analysis))
-        .route("/:submission_id/analyses", get(submission::get_submission_analyses))
-        .route("/:submission_id/consensus", get(submission::get_submission_consensus))
+        .route(
+            "/:submission_id/verify",
+            post(submission::verify_submission),
+        )
+        .route(
+            "/:submission_id/start-analysis",
+            post(submission::start_analysis),
+        )
+        .route(
+            "/:submission_id/analyses",
+            get(submission::get_submission_analyses),
+        )
+        .route(
+            "/:submission_id/consensus",
+            get(submission::get_submission_consensus),
+        )
         .route("/my-submissions", get(submission::get_my_submissions))
 }
 
@@ -177,7 +192,9 @@ fn webhook_routes() -> Router<AppState> {
         .route("/:webhook_id", put(webhook::update_webhook))
         .route("/:webhook_id", delete(webhook::delete_webhook))
         .route("/:webhook_id/test", post(webhook::test_webhook))
-        .route("/:webhook_id/deliveries", get(webhook::get_webhook_deliveries))
+        .route(
+            "/:webhook_id/deliveries",
+            get(webhook::get_webhook_deliveries),
+        )
         .route("/events", get(webhook::list_available_events))
 }
-

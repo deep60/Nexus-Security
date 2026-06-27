@@ -234,7 +234,10 @@ impl EventBus {
         {
             let mut stats = self.stats.write().await;
             stats.total_published += 1;
-            *stats.events_by_type.entry(event_type_str.clone()).or_insert(0) += 1;
+            *stats
+                .events_by_type
+                .entry(event_type_str.clone())
+                .or_insert(0) += 1;
         }
 
         // Publish to local broadcast channel
@@ -261,12 +264,10 @@ impl EventBus {
         let mut channels = self.local_channels.write().await;
 
         // Get or create channel for this event type
-        let sender = channels
-            .entry(event.event_type.clone())
-            .or_insert_with(|| {
-                let (tx, _) = broadcast::channel(self.config.channel_buffer_size);
-                tx
-            });
+        let sender = channels.entry(event.event_type.clone()).or_insert_with(|| {
+            let (tx, _) = broadcast::channel(self.config.channel_buffer_size);
+            tx
+        });
 
         // Send event
         match sender.send(event.clone()) {
@@ -279,7 +280,10 @@ impl EventBus {
                 Ok(())
             }
             Err(e) => {
-                warn!("No local subscribers for event type: {}", event.event_type.as_str());
+                warn!(
+                    "No local subscribers for event type: {}",
+                    event.event_type.as_str()
+                );
                 Ok(()) // Not an error if no subscribers
             }
         }
@@ -288,8 +292,7 @@ impl EventBus {
     /// Publish event to Redis pub/sub
     async fn publish_redis(&self, event: &Event) -> Result<()> {
         let channel = event.event_type.redis_channel();
-        let serialized = serde_json::to_string(event)
-            .context("Failed to serialize event")?;
+        let serialized = serde_json::to_string(event).context("Failed to serialize event")?;
 
         let mut redis = self.redis.write().await;
         let _: () = redis
@@ -307,8 +310,8 @@ impl EventBus {
         let key = format!("event_history:{}:{}", event.event_type.as_str(), event.id);
         let ttl = self.config.history_retention_hours * 3600;
 
-        let serialized = serde_json::to_string(event)
-            .context("Failed to serialize event for history")?;
+        let serialized =
+            serde_json::to_string(event).context("Failed to serialize event for history")?;
 
         let mut redis = self.redis.write().await;
         let _: () = redis
@@ -331,17 +334,18 @@ impl EventBus {
 
     /// Subscribe to events of a specific type
     pub async fn subscribe(&self, event_type: EventType) -> Result<EventSubscription> {
-        debug!("Creating subscription for event type: {}", event_type.as_str());
+        debug!(
+            "Creating subscription for event type: {}",
+            event_type.as_str()
+        );
 
         let mut channels = self.local_channels.write().await;
 
         // Get or create channel for this event type
-        let sender = channels
-            .entry(event_type.clone())
-            .or_insert_with(|| {
-                let (tx, _) = broadcast::channel(self.config.channel_buffer_size);
-                tx
-            });
+        let sender = channels.entry(event_type.clone()).or_insert_with(|| {
+            let (tx, _) = broadcast::channel(self.config.channel_buffer_size);
+            tx
+        });
 
         let receiver = sender.subscribe();
 
@@ -375,7 +379,8 @@ impl EventBus {
         for event_id in event_ids {
             let key = format!("event_history:{}:{}", event_type.as_str(), event_id);
 
-            if let Ok(Some(serialized)) = redis.connection_pool.get::<_, Option<String>>(&key).await {
+            if let Ok(Some(serialized)) = redis.connection_pool.get::<_, Option<String>>(&key).await
+            {
                 if let Ok(event) = serde_json::from_str::<Event>(&serialized) {
                     events.push(event);
                 }
@@ -398,8 +403,7 @@ impl EventBus {
 
         match serialized {
             Some(data) => {
-                let event = serde_json::from_str(&data)
-                    .context("Failed to deserialize event")?;
+                let event = serde_json::from_str(&data).context("Failed to deserialize event")?;
                 Ok(Some(event))
             }
             None => Ok(None),
@@ -419,11 +423,7 @@ impl EventBus {
     }
 
     /// Emit a simple event with minimal data
-    pub async fn emit(
-        &self,
-        event_type: EventType,
-        data: serde_json::Value,
-    ) -> Result<Uuid> {
+    pub async fn emit(&self, event_type: EventType, data: serde_json::Value) -> Result<Uuid> {
         let event = Event::new(event_type, data);
         let event_id = event.id;
         self.publish(event).await?;
@@ -444,9 +444,14 @@ impl EventBus {
     }
 
     /// Clean up old event history
-    pub async fn cleanup_event_history(&self, event_type: EventType, older_than_hours: u64) -> Result<u64> {
+    pub async fn cleanup_event_history(
+        &self,
+        event_type: EventType,
+        older_than_hours: u64,
+    ) -> Result<u64> {
         let history_index = format!("event_history_index:{}", event_type.as_str());
-        let cutoff_timestamp = (Utc::now() - chrono::Duration::hours(older_than_hours as i64)).timestamp() as f64;
+        let cutoff_timestamp =
+            (Utc::now() - chrono::Duration::hours(older_than_hours as i64)).timestamp() as f64;
 
         let mut redis = self.redis.write().await;
 
@@ -459,7 +464,11 @@ impl EventBus {
             .await
             .context("Failed to cleanup event history")?;
 
-        info!("Cleaned up {} old events for type: {}", removed, event_type.as_str());
+        info!(
+            "Cleaned up {} old events for type: {}",
+            removed,
+            event_type.as_str()
+        );
         Ok(removed)
     }
 }

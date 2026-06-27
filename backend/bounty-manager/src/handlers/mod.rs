@@ -4,104 +4,67 @@ pub mod bounty_crud;
 
 // Re-export all public types and functions from bounty_handler
 pub use bounty_crud::{
-    // Core types
-    Bounty,
-    ArtifactType,
-    ArtifactData,
-    BountyStatus,
-    SubmissionSummary,
-    ThreatVerdict,
-    BountyManagerState,
-    
-    // Request/Response DTOs
-    CreateBountyRequest,
-    UpdateBountyRequest,
-    BountyFilters,
-    BountyListResponse,
-    BountyStatsResponse,
-    CurrencyStats,
-    SubmissionRequest,
-    SubmissionResponse,
-    AnalysisData,
-    
+    cancel_bounty,
     // Handler functions
     create_bounty,
     get_bounty,
-    list_bounties,
-    update_bounty,
-    cancel_bounty,
     get_bounty_stats,
+    list_bounties,
     submit_to_bounty,
+    update_bounty,
+    AnalysisData,
+
+    ArtifactData,
+    ArtifactType,
+    // Core types
+    Bounty,
+    BountyFilters,
+    BountyListResponse,
+    BountyManagerState,
+
+    BountyStatsResponse,
+    BountyStatus,
+    // Request/Response DTOs
+    CreateBountyRequest,
+    CurrencyStats,
+    SubmissionRequest,
+    SubmissionResponse,
+    SubmissionSummary,
+    ThreatVerdict,
+    UpdateBountyRequest,
 };
 // Additional essential handlers
-pub mod submission;
+pub mod dispute;
 pub mod payout;
 pub mod reputation_handler;
-pub mod dispute;
+pub mod submission;
 pub mod validation;
 
 // Re-export from additional handlers
 pub use submission::{
-    Submission,
-    SubmissionStatus,
-    AnalysisDetails,
-    submit_analysis,
-    get_submission,
-    list_submissions_for_bounty,
-    update_submission_status,
+    get_submission, list_submissions_for_bounty, submit_analysis, update_submission_status,
+    AnalysisDetails, Submission, SubmissionStatus,
 };
 
 pub use payout::{
-    PayoutInfo,
-    PayoutStatus,
-    RewardDistribution,
-    process_bounty_completion,
-    distribute_rewards,
-    handle_stake_slashing,
-    get_payout_history,
+    distribute_rewards, get_payout_history, handle_stake_slashing, process_bounty_completion,
+    PayoutInfo, PayoutStatus, RewardDistribution,
 };
 
 pub use reputation_handler::{
-    EngineReputation,
-    ReputationTier,
-    ThreatCategory,
-    ReputationUpdateRequest,
-    ReputationLeaderboard,
-    ReputationHistory,
-    PerformanceMetrics,
-    update_reputation,
-    get_engine_reputation,
-    get_leaderboard,
-    get_reputation_history,
-    apply_reputation_decay,
-    register_engine,
+    apply_reputation_decay, get_engine_reputation, get_leaderboard, get_reputation_history,
+    register_engine, update_reputation, EngineReputation, PerformanceMetrics, ReputationHistory,
+    ReputationLeaderboard, ReputationTier, ReputationUpdateRequest, ThreatCategory,
 };
 
 pub use dispute::{
-    Dispute,
+    create_dispute, get_dispute, get_dispute_stats, list_disputes, resolve_dispute, update_dispute,
+    vote_on_dispute, withdraw_dispute, Dispute, DisputeResolution, DisputeSeverity, DisputeStatus,
     DisputeType,
-    DisputeStatus,
-    DisputeSeverity,
-    DisputeResolution,
-    create_dispute,
-    get_dispute,
-    list_disputes,
-    update_dispute,
-    resolve_dispute,
-    vote_on_dispute,
-    withdraw_dispute,
-    get_dispute_stats,
 };
 
 pub use validation::{
-    ValidationResult,
-    ValidationStatus,
-    ValidationCheckType,
-    QualityMetrics,
-    validate_submission,
-    get_validation_result,
-    list_validations,
-    bulk_validate_submissions,
-    get_validation_stats,
-    revalidate_submission,
+    bulk_validate_submissions, get_validation_result, get_validation_stats, list_validations,
+    revalidate_submission, validate_submission, QualityMetrics, ValidationCheckType,
+    ValidationResult, ValidationStatus,
 };

@@ -15,7 +15,7 @@ use crate::models::{UserError, UserResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,        // User ID
+    pub sub: String, // User ID
     pub email: String,
     pub username: String,
     pub is_admin: bool,
@@ -114,8 +114,9 @@ impl AuthService {
             token_type: "refresh".to_string(),
         };
 
-        encode(&Header::default(), &claims, &self.encoding_key)
-            .map_err(|e| UserError::AuthenticationError(format!("Failed to generate refresh token: {}", e)))
+        encode(&Header::default(), &claims, &self.encoding_key).map_err(|e| {
+            UserError::AuthenticationError(format!("Failed to generate refresh token: {}", e))
+        })
     }
 
     /// Validate and decode a token
@@ -220,7 +221,9 @@ mod tests {
 
         let hash = auth_service.hash_password(password).unwrap();
         assert!(auth_service.verify_password(password, &hash).unwrap());
-        assert!(!auth_service.verify_password("WrongPassword", &hash).unwrap());
+        assert!(!auth_service
+            .verify_password("WrongPassword", &hash)
+            .unwrap());
     }
 
     #[test]

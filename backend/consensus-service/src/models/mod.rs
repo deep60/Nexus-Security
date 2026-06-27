@@ -10,16 +10,16 @@ pub type ConsensusResult<T> = Result<T, ConsensusError>;
 pub enum ConsensusError {
     #[error("Validation error: {0}")]
     ValidationError(String),
-    
+
     #[error("Database error: {0}")]
     DatabaseError(String),
-    
+
     #[error("Not found: {0}")]
     NotFound(String),
-    
+
     #[error("Insufficient submissions: need {required}, got {actual}")]
     InsufficientSubmissions { required: usize, actual: usize },
-    
+
     #[error("Consensus failed: {0}")]
     ConsensusFailed(String),
 }

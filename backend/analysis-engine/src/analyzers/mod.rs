@@ -1,46 +1,47 @@
-use std::collections::HashMap;
-use anyhow::{Result, anyhow};
-use tracing::{info, warn, error, debug};
-use serde::{Deserialize, Serialize};
-use tokio::time::{timeout, Duration};
+use anyhow::{anyhow, Result};
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use tokio::time::{timeout, Duration};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 // Re-export all analyzer modules
-pub mod hash_analyzer;
-pub mod static_analyzer;
 pub mod dynamic_analyzer;
+pub mod hash_analyzer;
 pub mod heuristic_engine;
 pub mod signature_matcher;
+pub mod static_analyzer;
 
-#[cfg(feature = "yara-engine")]
-pub mod yara_engine;
 #[cfg(feature = "clamav")]
 pub mod clamav_analyzer;
+#[cfg(feature = "yara-engine")]
+pub mod yara_engine;
 
 // Re-export commonly used types
 pub use hash_analyzer::{HashAnalyzer, HashAnalyzerConfig, HashInfo, HashType};
-pub use static_analyzer::{StaticAnalyzer, StaticAnalyzerConfig, FileType, PEAnalysis, StringAnalysis, EntropyAnalysis};
 pub use heuristic_engine::{HeuristicEngine, HeuristicMatch, HeuristicSeverity};
 pub use signature_matcher::{
-    SignatureMatcher, SignatureMatcherConfig, SignatureMatch, ThreatSeverity as SignatureSeverity,
+    SignatureMatch, SignatureMatcher, SignatureMatcherConfig, ThreatSeverity as SignatureSeverity,
+};
+pub use static_analyzer::{
+    EntropyAnalysis, FileType, PEAnalysis, StaticAnalyzer, StaticAnalyzerConfig, StringAnalysis,
 };
 
-
-#[cfg(feature = "yara-engine")]
-pub use yara_engine::{YaraEngine, YaraEngineConfig, YaraMatch, YaraRule, YaraEngineError};
 #[cfg(feature = "clamav")]
 pub use clamav_analyzer::{ClamAvAnalyzer, ClamAvAnalyzerConfig};
+#[cfg(feature = "yara-engine")]
+pub use yara_engine::{YaraEngine, YaraEngineConfig, YaraEngineError, YaraMatch, YaraRule};
 
 // ── Stubs when native features are disabled ──────────────────────
 
 #[cfg(not(feature = "yara-engine"))]
 pub mod yara_stub {
+    use crate::models::analysis_result::DetectionResult;
     use anyhow::Result;
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
     use std::path::PathBuf;
-    use crate::models::analysis_result::DetectionResult;
 
     #[derive(Debug, Clone)]
     pub struct YaraEngineConfig {
@@ -49,22 +50,39 @@ pub mod yara_stub {
     }
     impl Default for YaraEngineConfig {
         fn default() -> Self {
-            Self { rules_directory: PathBuf::from("./rules"), max_matches: 100 }
+            Self {
+                rules_directory: PathBuf::from("./rules"),
+                max_matches: 100,
+            }
         }
     }
 
     pub struct YaraEngine;
     impl YaraEngine {
-        pub fn new(_config: YaraEngineConfig) -> Result<Self> { Ok(Self) }
-        pub async fn analyze_file_data(&self, _data: &[u8], _filename: &str) -> Result<DetectionResult> {
-            Err(anyhow::anyhow!("YARA engine not compiled (enable 'yara-engine' feature)"))
+        pub fn new(_config: YaraEngineConfig) -> Result<Self> {
+            Ok(Self)
         }
-        pub fn get_stats(&self) -> HashMap<String, String> { HashMap::new() }
-        pub fn reload_rules(&mut self) -> Result<()> { Ok(()) }
+        pub async fn analyze_file_data(
+            &self,
+            _data: &[u8],
+            _filename: &str,
+        ) -> Result<DetectionResult> {
+            Err(anyhow::anyhow!(
+                "YARA engine not compiled (enable 'yara-engine' feature)"
+            ))
+        }
+        pub fn get_stats(&self) -> HashMap<String, String> {
+            HashMap::new()
+        }
+        pub fn reload_rules(&mut self) -> Result<()> {
+            Ok(())
+        }
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct YaraMatch { pub rule: String }
+    pub struct YaraMatch {
+        pub rule: String,
+    }
     #[derive(Debug, Clone)]
     pub struct YaraRule;
     #[derive(Debug, thiserror::Error)]
@@ -76,8 +94,8 @@ pub use yara_stub::*;
 
 #[cfg(not(feature = "clamav"))]
 pub mod clamav_stub {
-    use anyhow::Result;
     use crate::models::analysis_result::DetectionResult;
+    use anyhow::Result;
 
     #[derive(Debug, Clone)]
     pub struct ClamAvAnalyzerConfig {
@@ -87,22 +105,35 @@ pub mod clamav_stub {
     }
     impl Default for ClamAvAnalyzerConfig {
         fn default() -> Self {
-            Self { host: "localhost".into(), port: 3310, enabled: false }
+            Self {
+                host: "localhost".into(),
+                port: 3310,
+                enabled: false,
+            }
         }
     }
 
-    pub struct ClamAvAnalyzer { _config: ClamAvAnalyzerConfig }
+    pub struct ClamAvAnalyzer {
+        _config: ClamAvAnalyzerConfig,
+    }
     impl ClamAvAnalyzer {
-        pub fn new(config: ClamAvAnalyzerConfig) -> Self { Self { _config: config } }
+        pub fn new(config: ClamAvAnalyzerConfig) -> Self {
+            Self { _config: config }
+        }
         pub async fn scan_file(&self, _data: &[u8], _filename: &str) -> Result<DetectionResult> {
-            Err(anyhow::anyhow!("ClamAV not compiled (enable 'clamav' feature)"))
+            Err(anyhow::anyhow!(
+                "ClamAV not compiled (enable 'clamav' feature)"
+            ))
         }
     }
 }
 #[cfg(not(feature = "clamav"))]
 pub use clamav_stub::*;
 
-use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, ConfidenceLevel, DetectionResult, FileMetadata, AnalysisStatus, EngineType, SeverityLevel, ThreatCategory};
+use crate::models::analysis_result::{
+    AnalysisResult, AnalysisStatus, ConfidenceLevel, DetectionResult, EngineType, FileMetadata,
+    SeverityLevel, ThreatCategory, ThreatVerdict,
+};
 
 /// Configuration for the combined analysis engine
 #[derive(Debug, Clone)]
@@ -219,20 +250,32 @@ impl AnalysisEngine {
     /// Perform comprehensive analysis on a file
     pub async fn analyze_file(&mut self, request: FileAnalysisRequest) -> Result<AnalysisResult> {
         let start_time = std::time::Instant::now();
-        
-        info!("Starting comprehensive analysis for file: {}", request.filename);
+
+        info!(
+            "Starting comprehensive analysis for file: {}",
+            request.filename
+        );
         debug!("File size: {} bytes", request.file_data.len());
 
         // Run analysis with timeout
         let analysis_result = timeout(
             Duration::from_secs(self.config.analysis_timeout_seconds),
-            self.perform_analysis(&request)
-        ).await
-        .map_err(|_| anyhow!("Analysis timeout after {} seconds", self.config.analysis_timeout_seconds))??;
+            self.perform_analysis(&request),
+        )
+        .await
+        .map_err(|_| {
+            anyhow!(
+                "Analysis timeout after {} seconds",
+                self.config.analysis_timeout_seconds
+            )
+        })??;
 
         let total_time = start_time.elapsed().as_millis() as u64;
-        
-        info!("Analysis completed in {}ms for file: {}", total_time, request.filename);
+
+        info!(
+            "Analysis completed in {}ms for file: {}",
+            total_time, request.filename
+        );
 
         Ok(analysis_result)
     }
@@ -256,15 +299,14 @@ impl AnalysisEngine {
             let heuristic_future = self.run_heuristic_analysis(request);
             let signature_future = self.run_signature_analysis(request);
 
-            let (hash_res, static_res, yara_res, clamav_res, heuristic_res, signature_res) =
-                tokio::join!(
-                    hash_future,
-                    static_future,
-                    yara_future,
-                    clamav_future,
-                    heuristic_future,
-                    signature_future
-                );
+            let (hash_res, static_res, yara_res, clamav_res, heuristic_res, signature_res) = tokio::join!(
+                hash_future,
+                static_future,
+                yara_future,
+                clamav_future,
+                heuristic_future,
+                signature_future
+            );
 
             // Collect results and errors
             match hash_res {
@@ -346,10 +388,13 @@ impl AnalysisEngine {
         Ok(result)
     }
 
-    async fn run_hash_analysis(&self, request: &FileAnalysisRequest) -> Result<Vec<DetectionResult>> {
+    async fn run_hash_analysis(
+        &self,
+        request: &FileAnalysisRequest,
+    ) -> Result<Vec<DetectionResult>> {
         if request.analysis_options.enable_hash_analysis {
             let sha256_hash = {
-                use sha2::{Sha256, Digest};
+                use sha2::{Digest, Sha256};
                 let mut hasher = Sha256::new();
                 hasher.update(&request.file_data);
                 format!("{:x}", hasher.finalize())
@@ -360,7 +405,10 @@ impl AnalysisEngine {
                 file_size: Some(request.file_data.len() as u64),
                 computed_at: chrono::Utc::now(),
             };
-            let analysis_result = self.hash_analyzer.analyze_hash(&hash_info, Some(&request.file_data)).await
+            let analysis_result = self
+                .hash_analyzer
+                .analyze_hash(&hash_info, Some(&request.file_data))
+                .await
                 .map_err(|e| anyhow!("Hash analysis error: {}", e))?;
             Ok(analysis_result.detections)
         } else {
@@ -370,7 +418,9 @@ impl AnalysisEngine {
 
     async fn run_static_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
         if request.analysis_options.enable_static_analysis {
-            self.static_analyzer.analyze(&request.file_data, Some(&request.filename)).await
+            self.static_analyzer
+                .analyze(&request.file_data, Some(&request.filename))
+                .await
         } else {
             Err(anyhow!("Static analysis disabled"))
         }
@@ -378,7 +428,9 @@ impl AnalysisEngine {
 
     async fn run_yara_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
         if request.analysis_options.enable_yara_analysis {
-            self.yara_engine.analyze_file_data(&request.file_data, &request.filename).await
+            self.yara_engine
+                .analyze_file_data(&request.file_data, &request.filename)
+                .await
         } else {
             Err(anyhow!("Yara analysis disabled"))
         }
@@ -386,13 +438,18 @@ impl AnalysisEngine {
 
     async fn run_clamav_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
         if request.analysis_options.enable_clamav_analysis {
-            self.clamav_analyzer.scan_file(&request.file_data, &request.filename).await
+            self.clamav_analyzer
+                .scan_file(&request.file_data, &request.filename)
+                .await
         } else {
             Err(anyhow!("ClamAV analysis disabled"))
         }
     }
 
-    async fn run_heuristic_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
+    async fn run_heuristic_analysis(
+        &self,
+        request: &FileAnalysisRequest,
+    ) -> Result<DetectionResult> {
         if !request.analysis_options.enable_heuristic_analysis {
             return Err(anyhow!("Heuristic analysis disabled"));
         }
@@ -432,7 +489,10 @@ impl AnalysisEngine {
         })
     }
 
-    async fn run_signature_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
+    async fn run_signature_analysis(
+        &self,
+        request: &FileAnalysisRequest,
+    ) -> Result<DetectionResult> {
         if !request.analysis_options.enable_signature_analysis {
             return Err(anyhow!("Signature analysis disabled"));
         }
@@ -443,10 +503,7 @@ impl AnalysisEngine {
             .match_bytes(&request.file_data)
             .await
             .map_err(|e| anyhow!("Signature matching error: {}", e))?;
-        let confidence = matches
-            .iter()
-            .map(|m| m.confidence)
-            .fold(0.0_f32, f32::max);
+        let confidence = matches.iter().map(|m| m.confidence).fold(0.0_f32, f32::max);
 
         Ok(DetectionResult {
             detection_id: Uuid::new_v4(),
@@ -520,7 +577,7 @@ impl AnalysisEngine {
     /// Get statistics about the analysis engine
     pub async fn get_stats(&self) -> HashMap<String, String> {
         let mut stats = HashMap::new();
-        
+
         // Combine stats from all analyzers
         let hash_stats = self.hash_analyzer.get_cache_stats().await;
         for (key, value) in hash_stats {
@@ -533,9 +590,18 @@ impl AnalysisEngine {
         }
 
         // Add engine-level stats
-        stats.insert("parallel_analysis".to_string(), self.config.enable_parallel_analysis.to_string());
-        stats.insert("analysis_timeout".to_string(), self.config.analysis_timeout_seconds.to_string());
-        stats.insert("require_all_analyzers".to_string(), self.config.require_all_analyzers.to_string());
+        stats.insert(
+            "parallel_analysis".to_string(),
+            self.config.enable_parallel_analysis.to_string(),
+        );
+        stats.insert(
+            "analysis_timeout".to_string(),
+            self.config.analysis_timeout_seconds.to_string(),
+        );
+        stats.insert(
+            "require_all_analyzers".to_string(),
+            self.config.require_all_analyzers.to_string(),
+        );
 
         stats
     }
@@ -548,7 +614,8 @@ impl AnalysisEngine {
 
     /// Reload YARA rules
     pub fn reload_yara_rules(&mut self) -> Result<()> {
-        self.yara_engine.reload_rules()
+        self.yara_engine
+            .reload_rules()
             .map_err(|e| anyhow!("Failed to reload YARA rules: {}", e))
     }
 }
@@ -568,9 +635,7 @@ mod tests {
             enable_heuristic_analysis: true,
             enable_signature_analysis: true,
             priority: AnalysisPriority::High,
-            custom_metadata: HashMap::from([
-                ("source".to_string(), "unit_test".to_string()),
-            ]),
+            custom_metadata: HashMap::from([("source".to_string(), "unit_test".to_string())]),
         };
 
         assert!(!options.enable_hash_analysis);

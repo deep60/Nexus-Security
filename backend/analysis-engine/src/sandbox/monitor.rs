@@ -6,7 +6,6 @@
 /// - Process creation and termination
 /// - Registry modifications (Windows)
 /// - System calls
-
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -20,9 +19,9 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::analyzers::dynamic_analyzer::{
-    DynamicBehavior, FileOperation, FileOperationType, MonitoringConfig, NetworkOperation,
-    ProcessOperation, ProcessOperationType, RegistryOperation, RegistryOperationType,
-    Screenshot, SystemCall, ConnectionState, NetworkCapture,
+    ConnectionState, DynamicBehavior, FileOperation, FileOperationType, MonitoringConfig,
+    NetworkCapture, NetworkOperation, ProcessOperation, ProcessOperationType, RegistryOperation,
+    RegistryOperationType, Screenshot, SystemCall,
 };
 
 /// Monitor handle for tracking active monitoring sessions
@@ -122,10 +121,7 @@ impl Monitor {
 
             // File system monitoring
             if config.monitor_file_system {
-                let fs_task = Self::monitor_file_system(
-                    sandbox_id.clone(),
-                    behavior_data.clone(),
-                );
+                let fs_task = Self::monitor_file_system(sandbox_id.clone(), behavior_data.clone());
                 tasks.push(tokio::spawn(fs_task));
             }
 
@@ -141,28 +137,20 @@ impl Monitor {
 
             // Process monitoring
             if config.monitor_processes {
-                let proc_task = Self::monitor_processes(
-                    sandbox_id.clone(),
-                    behavior_data.clone(),
-                );
+                let proc_task = Self::monitor_processes(sandbox_id.clone(), behavior_data.clone());
                 tasks.push(tokio::spawn(proc_task));
             }
 
             // Registry monitoring (Windows only)
             if config.monitor_registry {
-                let reg_task = Self::monitor_registry(
-                    sandbox_id.clone(),
-                    behavior_data.clone(),
-                );
+                let reg_task = Self::monitor_registry(sandbox_id.clone(), behavior_data.clone());
                 tasks.push(tokio::spawn(reg_task));
             }
 
             // Screenshot capture
             if config.capture_screenshots {
-                let screenshot_task = Self::capture_screenshots(
-                    sandbox_id.clone(),
-                    behavior_data.clone(),
-                );
+                let screenshot_task =
+                    Self::capture_screenshots(sandbox_id.clone(), behavior_data.clone());
                 tasks.push(tokio::spawn(screenshot_task));
             }
 
@@ -286,12 +274,7 @@ impl Monitor {
 
         // Monitor network connections using netstat
         let netstat_output = Command::new("docker")
-            .args([
-                "exec",
-                &sandbox_id,
-                "netstat",
-                "-tunaep",
-            ])
+            .args(["exec", &sandbox_id, "netstat", "-tunaep"])
             .output()
             .await;
 
@@ -421,10 +404,7 @@ impl Monitor {
     }
 
     /// Parse process list from ps output
-    async fn parse_process_list(
-        ps_output: &str,
-        behavior_data: &Arc<Mutex<BehaviorCollector>>,
-    ) {
+    async fn parse_process_list(ps_output: &str, behavior_data: &Arc<Mutex<BehaviorCollector>>) {
         let mut collector = behavior_data.lock().await;
 
         for line in ps_output.lines().skip(1) {

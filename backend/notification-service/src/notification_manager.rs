@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::channels::{EmailChannel, PushChannel, WebhookChannel, WebSocketChannel};
+use crate::channels::{EmailChannel, PushChannel, WebSocketChannel, WebhookChannel};
 use crate::config::Config;
 use crate::models::{NotificationChannel, NotificationPreferences};
 use shared::messaging::event_types::NotificationPayload;
@@ -55,7 +55,9 @@ impl NotificationManager {
         // Send through each enabled channel
         for channel in &payload.channels {
             match channel {
-                shared::messaging::event_types::NotificationChannel::Email if prefs.email_enabled => {
+                shared::messaging::event_types::NotificationChannel::Email
+                    if prefs.email_enabled =>
+                {
                     if let Some(email) = &prefs.email_address {
                         let _ = self.email_channel.send(payload, email).await;
                     }
@@ -66,13 +68,20 @@ impl NotificationManager {
                         let _ = self.push_channel.send(payload, &recipient).await;
                     }
                 }
-                shared::messaging::event_types::NotificationChannel::Webhook if prefs.webhook_enabled => {
+                shared::messaging::event_types::NotificationChannel::Webhook
+                    if prefs.webhook_enabled =>
+                {
                     for url in &prefs.webhook_urls {
                         let _ = self.webhook_channel.send(payload, url).await;
                     }
                 }
-                shared::messaging::event_types::NotificationChannel::WebSocket if prefs.websocket_enabled => {
-                    let _ = self.websocket_channel.send(payload, &payload.user_id.to_string()).await;
+                shared::messaging::event_types::NotificationChannel::WebSocket
+                    if prefs.websocket_enabled =>
+                {
+                    let _ = self
+                        .websocket_channel
+                        .send(payload, &payload.user_id.to_string())
+                        .await;
                 }
                 _ => {}
             }
@@ -89,7 +98,7 @@ impl NotificationManager {
                    webhook_enabled, webhook_url, websocket_enabled
             FROM notification_preferences
             WHERE user_id = $1
-            "#
+            "#,
         )
         .bind(user_id)
         .fetch_optional(&self.db_pool)
@@ -126,10 +135,7 @@ impl NotificationManager {
         info!("Starting Redis Pub/Sub event listener...");
 
         // Channels we're interested in for email notifications
-        let channels = vec![
-            "events:user_registered",
-            "events:payment_processed",
-        ];
+        let channels = vec!["events:user_registered", "events:payment_processed"];
 
         // Get a new Redis connection for Pub/Sub (must be dedicated)
         let redis_client = redis::Client::open(self.config.redis.url.clone())?;
@@ -175,7 +181,10 @@ impl NotificationManager {
     }
 
     async fn process_event(&self, channel: &str, payload: &str) -> Result<()> {
-        use shared::messaging::event_types::{VerdyxEvent, UserRegisteredEvent, PaymentProcessedEvent, NotificationChannel, NotificationPriority, NotificationPayload};
+        use shared::messaging::event_types::{
+            NotificationChannel, NotificationPayload, NotificationPriority, PaymentProcessedEvent,
+            UserRegisteredEvent, VerdyxEvent,
+        };
 
         // Deserialize the event based on channel
         let event: VerdyxEvent = match channel {
@@ -242,7 +251,7 @@ impl NotificationManager {
                 WHERE status = 'failed'
                 ORDER BY created_at ASC
                 LIMIT 50
-                "#
+                "#,
             )
             .fetch_all(&self.db_pool)
             .await
@@ -286,7 +295,10 @@ impl NotificationManager {
                             }
                         }
                         Err(e) => {
-                            error!("Cannot deserialize payload for notification {}: {}", record_id, e);
+                            error!(
+                                "Cannot deserialize payload for notification {}: {}",
+                                record_id, e
+                            );
                         }
                     }
                 }

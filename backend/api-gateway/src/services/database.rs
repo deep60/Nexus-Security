@@ -122,7 +122,9 @@ impl DatabaseService {
     ) -> Result<Bounty> {
         let now = Utc::now();
         let bounty_id = Uuid::new_v4();
-        let deadline = request.deadline_hours.map(|h| now + chrono::Duration::hours(h as i64));
+        let deadline = request
+            .deadline_hours
+            .map(|h| now + chrono::Duration::hours(h as i64));
         let min_stake = request.min_stake_amount.unwrap_or_else(|| "0".to_string());
         let consensus = request.consensus_threshold.unwrap_or(0.60);
         let priority = request.priority_level.unwrap_or(1);
@@ -191,13 +193,12 @@ impl DatabaseService {
 
     /// Look up the on-chain bounty ID for a given DB bounty UUID.
     pub async fn get_bounty_on_chain_id(&self, bounty_id: Uuid) -> Result<Option<i64>> {
-        let row: Option<(Option<i64>,)> = sqlx::query_as(
-            "SELECT on_chain_id FROM bounties WHERE id = $1"
-        )
-        .bind(bounty_id)
-        .fetch_optional(&self.pool)
-        .await
-        .context("Failed to fetch bounty on_chain_id")?;
+        let row: Option<(Option<i64>,)> =
+            sqlx::query_as("SELECT on_chain_id FROM bounties WHERE id = $1")
+                .bind(bounty_id)
+                .fetch_optional(&self.pool)
+                .await
+                .context("Failed to fetch bounty on_chain_id")?;
 
         Ok(row.and_then(|r| r.0))
     }
@@ -218,13 +219,12 @@ impl DatabaseService {
     }
 
     pub async fn get_submission_file_hash(&self, submission_id: Uuid) -> Result<Option<String>> {
-        let row: Option<(Option<String>,)> = sqlx::query_as(
-            "SELECT file_hash FROM submissions WHERE id = $1"
-        )
-        .bind(submission_id)
-        .fetch_optional(&self.pool)
-        .await
-        .context("Failed to fetch submission file hash")?;
+        let row: Option<(Option<String>,)> =
+            sqlx::query_as("SELECT file_hash FROM submissions WHERE id = $1")
+                .bind(submission_id)
+                .fetch_optional(&self.pool)
+                .await
+                .context("Failed to fetch submission file hash")?;
 
         Ok(row.and_then(|(hash,)| hash))
     }
@@ -460,7 +460,11 @@ impl DatabaseService {
         &self,
         submission: &crate::models::bounty::BountySubmission,
     ) -> Result<()> {
-        let mut tx = self.pool.begin().await.context("Failed to begin transaction")?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .context("Failed to begin transaction")?;
 
         sqlx::query(
             r#"
@@ -497,7 +501,9 @@ impl DatabaseService {
         .await
         .context("Failed to insert extended_submission")?;
 
-        tx.commit().await.context("Failed to commit submission transaction")?;
+        tx.commit()
+            .await
+            .context("Failed to commit submission transaction")?;
         Ok(())
     }
 
@@ -526,7 +532,10 @@ impl DatabaseService {
         };
 
         // Count query
-        let count_sql = format!("SELECT COUNT(*) as cnt FROM bounty_submissions bs {}", where_clause);
+        let count_sql = format!(
+            "SELECT COUNT(*) as cnt FROM bounty_submissions bs {}",
+            where_clause
+        );
         let total: (i64,) = {
             let mut q = sqlx::query_as(&count_sql);
             if let Some(ref bounty_id) = filters.bounty_id {
@@ -535,7 +544,9 @@ impl DatabaseService {
             if let Some(ref verdict) = filters.verdict {
                 q = q.bind(verdict);
             }
-            q.fetch_one(&self.pool).await.context("Failed to count submissions")?
+            q.fetch_one(&self.pool)
+                .await
+                .context("Failed to count submissions")?
         };
 
         // Data query
@@ -551,7 +562,9 @@ impl DatabaseService {
             if let Some(ref verdict) = filters.verdict {
                 q = q.bind(verdict);
             }
-            q.fetch_all(&self.pool).await.context("Failed to fetch submissions")?
+            q.fetch_all(&self.pool)
+                .await
+                .context("Failed to fetch submissions")?
         };
 
         Ok((submissions, total.0 as u32))
@@ -650,14 +663,12 @@ impl DatabaseService {
         }
 
         if let Some(ref details) = updates.technical_details {
-            sqlx::query(
-                "UPDATE bounty_submissions SET details = $1 WHERE id = $2"
-            )
-            .bind(details)
-            .bind(submission_id)
-            .execute(&self.pool)
-            .await
-            .context("Failed to update technical_details")?;
+            sqlx::query("UPDATE bounty_submissions SET details = $1 WHERE id = $2")
+                .bind(details)
+                .bind(submission_id)
+                .execute(&self.pool)
+                .await
+                .context("Failed to update technical_details")?;
         }
 
         if let Some(ref sigs) = updates.additional_signatures {

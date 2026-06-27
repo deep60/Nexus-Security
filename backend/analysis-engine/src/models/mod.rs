@@ -5,8 +5,8 @@ pub mod analysis_result;
 
 // Re-export commonly used types
 pub use analysis_result::{
-    AnalysisResult, AnalysisStatus, DetectionResult, ThreatVerdict, ConfidenceLevel, EngineType, 
-    SeverityLevel, ThreatCategory, FileMetadata, ExecutableInfo,
+    AnalysisResult, AnalysisStatus, ConfidenceLevel, DetectionResult, EngineType, ExecutableInfo,
+    FileMetadata, SeverityLevel, ThreatCategory, ThreatVerdict,
 };
 
 /// Base configuration for all analysis engines
@@ -43,7 +43,7 @@ pub struct AnalysisRequest {
     pub request_id: uuid::Uuid,
     pub artifact_type: String, // "file", "url", "hash", etc.
     pub artifact_data: String, // File path, URL, or hash value
-    pub priority: u8,         // 0 (low) to 100 (high)
+    pub priority: u8,          // 0 (low) to 100 (high)
     pub metadata: HashMap<String, String>,
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }

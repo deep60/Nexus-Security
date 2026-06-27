@@ -1,9 +1,9 @@
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 use tokio::fs;
 use tracing::{debug, info};
-use regex::Regex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeuristicMatch {
@@ -69,7 +69,7 @@ impl HeuristicEngine {
             max_file_size: 50 * 1024 * 1024, // 50MB
             timeout_seconds: 30,
         };
-        
+
         engine.load_default_rules();
         engine
     }
@@ -80,7 +80,7 @@ impl HeuristicEngine {
             max_file_size,
             timeout_seconds,
         };
-        
+
         engine.load_default_rules();
         engine
     }
@@ -88,22 +88,22 @@ impl HeuristicEngine {
     fn load_default_rules(&mut self) {
         // Malware-related heuristics
         self.add_malware_rules();
-        
+
         // Exploit-related heuristics
         self.add_exploit_rules();
-        
+
         // Suspicious network activity
         self.add_network_rules();
-        
+
         // Obfuscation detection
         self.add_obfuscation_rules();
-        
+
         // Cryptocurrency mining detection
         self.add_cryptominer_rules();
-        
+
         // Ransomware indicators
         self.add_ransomware_rules();
-        
+
         // Information stealing patterns
         self.add_stealer_rules();
     }
@@ -190,7 +190,10 @@ impl HeuristicEngine {
             id: "HEUR_201".to_string(),
             name: "C2 Communication Pattern".to_string(),
             description: "Detects patterns indicative of C2 server communication".to_string(),
-            pattern: Regex::new(r"(?i)(POST.*admin\.php|GET.*gate\.php|User-Agent:\s*(Mozilla/4\.0|curl))").unwrap(),
+            pattern: Regex::new(
+                r"(?i)(POST.*admin\.php|GET.*gate\.php|User-Agent:\s*(Mozilla/4\.0|curl))",
+            )
+            .unwrap(),
             severity: HeuristicSeverity::High,
             confidence: 0.7,
             file_types: vec!["*".to_string()],
@@ -266,7 +269,8 @@ impl HeuristicEngine {
             id: "HEUR_401".to_string(),
             name: "Cryptocurrency Mining Pool".to_string(),
             description: "Detects connections to cryptocurrency mining pools".to_string(),
-            pattern: Regex::new(r"(?i)(stratum\+tcp://|pool\..*\..*:.*|.*\.nicehash\.com)").unwrap(),
+            pattern: Regex::new(r"(?i)(stratum\+tcp://|pool\..*\..*:.*|.*\.nicehash\.com)")
+                .unwrap(),
             severity: HeuristicSeverity::High,
             confidence: 0.9,
             file_types: vec!["*".to_string()],
@@ -277,7 +281,8 @@ impl HeuristicEngine {
         self.rules.push(HeuristicRule {
             id: "HEUR_402".to_string(),
             name: "Mining Software Pattern".to_string(),
-            description: "Detects patterns indicative of cryptocurrency mining software".to_string(),
+            description: "Detects patterns indicative of cryptocurrency mining software"
+                .to_string(),
             pattern: Regex::new(r"(?i)(xmrig|cpuminer|ethminer|claymore)").unwrap(),
             severity: HeuristicSeverity::High,
             confidence: 0.85,
@@ -292,7 +297,8 @@ impl HeuristicEngine {
             id: "HEUR_501".to_string(),
             name: "File Encryption Pattern".to_string(),
             description: "Detects patterns indicative of file encryption (ransomware)".to_string(),
-            pattern: Regex::new(r"(?i)(\.encrypted|\.locked|\.crypto|YOUR_FILES_ARE_ENCRYPTED)").unwrap(),
+            pattern: Regex::new(r"(?i)(\.encrypted|\.locked|\.crypto|YOUR_FILES_ARE_ENCRYPTED)")
+                .unwrap(),
             severity: HeuristicSeverity::Critical,
             confidence: 0.9,
             file_types: vec!["*".to_string()],
@@ -304,7 +310,8 @@ impl HeuristicEngine {
             id: "HEUR_502".to_string(),
             name: "Bitcoin Payment Demand".to_string(),
             description: "Detects bitcoin addresses and payment demands".to_string(),
-            pattern: Regex::new(r"(?i)([13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-z0-9]{39,59})").unwrap(),
+            pattern: Regex::new(r"(?i)([13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-z0-9]{39,59})")
+                .unwrap(),
             severity: HeuristicSeverity::High,
             confidence: 0.8,
             file_types: vec!["*".to_string()],
@@ -318,7 +325,10 @@ impl HeuristicEngine {
             id: "HEUR_601".to_string(),
             name: "Credential Stealer Pattern".to_string(),
             description: "Detects patterns indicative of credential stealing".to_string(),
-            pattern: Regex::new(r"(?i)(passwords?|login|credential|keylog|\\Cookies\\|\\History\\)").unwrap(),
+            pattern: Regex::new(
+                r"(?i)(passwords?|login|credential|keylog|\\Cookies\\|\\History\\)",
+            )
+            .unwrap(),
             severity: HeuristicSeverity::High,
             confidence: 0.6,
             file_types: vec!["*".to_string()],
@@ -330,7 +340,8 @@ impl HeuristicEngine {
             id: "HEUR_602".to_string(),
             name: "Browser Data Theft".to_string(),
             description: "Detects attempts to steal browser data".to_string(),
-            pattern: Regex::new(r"(?i)(Chrome\\User Data|Firefox\\Profiles|Opera\\|Safari\\)").unwrap(),
+            pattern: Regex::new(r"(?i)(Chrome\\User Data|Firefox\\Profiles|Opera\\|Safari\\)")
+                .unwrap(),
             severity: HeuristicSeverity::High,
             confidence: 0.75,
             file_types: vec!["*".to_string()],
@@ -338,20 +349,27 @@ impl HeuristicEngine {
         });
     }
 
-    pub async fn analyze_file(&self, file_path: &Path) -> Result<Vec<HeuristicMatch>, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn analyze_file(
+        &self,
+        file_path: &Path,
+    ) -> Result<Vec<HeuristicMatch>, Box<dyn std::error::Error + Send + Sync>> {
         let metadata = fs::metadata(file_path).await?;
-        
+
         if metadata.len() as usize > self.max_file_size {
             return Err(format!("File too large: {} bytes", metadata.len()).into());
         }
 
         let content = fs::read(file_path).await?;
         let content_str = String::from_utf8_lossy(&content);
-        
+
         self.analyze_content(&content_str, file_path).await
     }
 
-    pub async fn analyze_content(&self, content: &str, file_path: &Path) -> Result<Vec<HeuristicMatch>, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn analyze_content(
+        &self,
+        content: &str,
+        file_path: &Path,
+    ) -> Result<Vec<HeuristicMatch>, Box<dyn std::error::Error + Send + Sync>> {
         let mut matches = Vec::new();
         let file_ext = file_path
             .extension()
@@ -361,15 +379,14 @@ impl HeuristicEngine {
 
         for rule in &self.rules {
             // Check if rule applies to this file type
-            if !rule.file_types.contains(&"*".to_string()) && 
-               !rule.file_types.contains(&file_ext) {
+            if !rule.file_types.contains(&"*".to_string()) && !rule.file_types.contains(&file_ext) {
                 continue;
             }
 
             // Apply the rule
             for mat in rule.pattern.find_iter(content) {
                 let mut context = HashMap::new();
-                
+
                 // Extract context if available
                 if let Some(extractor) = rule.context_extractor {
                     context = extractor(content, mat.start());
@@ -391,7 +408,10 @@ impl HeuristicEngine {
             }
         }
 
-        info!("Heuristic analysis complete: {} matches found", matches.len());
+        info!(
+            "Heuristic analysis complete: {} matches found",
+            matches.len()
+        );
         Ok(matches)
     }
 
@@ -406,7 +426,7 @@ impl HeuristicEngine {
             .sum();
 
         let max_possible_score = matches.len() as f32 * 10.0; // Max severity * max confidence
-        
+
         (total_weighted_score / max_possible_score) * 100.0
     }
 }
@@ -424,165 +444,180 @@ impl HeuristicEngine {
 // Context extraction functions
 fn extract_api_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     // Extract surrounding context (100 chars before and after)
     let start = offset.saturating_sub(100);
     let end = std::cmp::min(offset + 100, content.len());
     let surrounding = &content[start..end];
-    
+
     context.insert("surrounding_context".to_string(), surrounding.to_string());
     context.insert("api_sequence".to_string(), "detected".to_string());
-    
+
     context
 }
 
 fn extract_registry_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     // Look for registry key patterns
     let start = offset.saturating_sub(50);
     let end = std::cmp::min(offset + 200, content.len());
     let surrounding = &content[start..end];
-    
+
     context.insert("registry_location".to_string(), surrounding.to_string());
-    context.insert("persistence_method".to_string(), "registry_run_key".to_string());
-    
+    context.insert(
+        "persistence_method".to_string(),
+        "registry_run_key".to_string(),
+    );
+
     context
 }
 
 fn extract_exploit_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     let start = offset.saturating_sub(20);
     let end = std::cmp::min(offset + 100, content.len());
     let pattern = &content[start..end];
-    
-    context.insert("exploit_pattern".to_string(), format!("{:?}", pattern.as_bytes()));
+
+    context.insert(
+        "exploit_pattern".to_string(),
+        format!("{:?}", pattern.as_bytes()),
+    );
     context.insert("pattern_type".to_string(), "buffer_overflow".to_string());
-    
+
     context
 }
 
 fn extract_shellcode_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     let start = offset.saturating_sub(10);
     let end = std::cmp::min(offset + 50, content.len());
     let shellcode = &content[start..end];
-    
-    context.insert("shellcode_bytes".to_string(), format!("{:?}", shellcode.as_bytes()));
-    
+
+    context.insert(
+        "shellcode_bytes".to_string(),
+        format!("{:?}", shellcode.as_bytes()),
+    );
+
     context
 }
 
 fn extract_network_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     let start = offset.saturating_sub(50);
     let end = std::cmp::min(offset + 200, content.len());
     let network_data = &content[start..end];
-    
-    context.insert("network_communication".to_string(), network_data.to_string());
+
+    context.insert(
+        "network_communication".to_string(),
+        network_data.to_string(),
+    );
     context.insert("communication_type".to_string(), "c2_pattern".to_string());
-    
+
     context
 }
 
 fn extract_domain_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     let start = offset.saturating_sub(30);
     let end = std::cmp::min(offset + 100, content.len());
     let domain_context = &content[start..end];
-    
+
     context.insert("domain_context".to_string(), domain_context.to_string());
-    
+
     context
 }
 
 fn extract_base64_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     let start = offset;
     let end = std::cmp::min(offset + 200, content.len());
     let b64_content = &content[start..end];
-    
-    context.insert("encoded_preview".to_string(), b64_content.trim().to_string());
+
+    context.insert(
+        "encoded_preview".to_string(),
+        b64_content.trim().to_string(),
+    );
     context.insert("encoded_length".to_string(), b64_content.len().to_string());
-    
+
     context
 }
 
 fn extract_string_obfuscation_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     let start = offset;
     let end = std::cmp::min(offset + 100, content.len());
     let obfuscated = &content[start..end];
-    
+
     context.insert("obfuscated_string".to_string(), obfuscated.to_string());
     context.insert("obfuscation_type".to_string(), "hex_escape".to_string());
-    
+
     context
 }
 
 fn extract_mining_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     let start = offset.saturating_sub(30);
     let end = std::cmp::min(offset + 100, content.len());
     let mining_data = &content[start..end];
-    
+
     context.insert("mining_pool".to_string(), mining_data.to_string());
-    
+
     context
 }
 
 fn extract_ransomware_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     let start = offset.saturating_sub(50);
     let end = std::cmp::min(offset + 200, content.len());
     let ransom_context = &content[start..end];
-    
+
     context.insert("ransom_message".to_string(), ransom_context.to_string());
-    
+
     context
 }
 
 fn extract_bitcoin_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     let start = offset.saturating_sub(50);
     let end = std::cmp::min(offset + 100, content.len());
     let payment_context = &content[start..end];
-    
+
     context.insert("payment_demand".to_string(), payment_context.to_string());
-    
+
     context
 }
 
 fn extract_stealer_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     let start = offset.saturating_sub(50);
     let end = std::cmp::min(offset + 150, content.len());
     let stealer_context = &content[start..end];
-    
+
     context.insert("credential_target".to_string(), stealer_context.to_string());
-    
+
     context
 }
 
 fn extract_browser_context(content: &str, offset: usize) -> HashMap<String, String> {
     let mut context = HashMap::new();
-    
+
     let start = offset.saturating_sub(30);
     let end = std::cmp::min(offset + 100, content.len());
     let browser_path = &content[start..end];
-    
+
     context.insert("browser_data_path".to_string(), browser_path.to_string());
-    
+
     context
 }
 
@@ -604,13 +639,16 @@ mod tests {
     async fn test_malware_detection() {
         let engine = HeuristicEngine::new();
         let malicious_content = "CreateProcess WriteProcessMemory VirtualAllocEx";
-        
+
         let mut temp_file = NamedTempFile::new().unwrap();
-        temp_file.write_all(malicious_content.as_bytes()).await.unwrap();
-        
+        temp_file
+            .write_all(malicious_content.as_bytes())
+            .await
+            .unwrap();
+
         let matches = engine.analyze_file(temp_file.path()).await.unwrap();
         assert!(!matches.is_empty());
-        
+
         let risk_score = engine.calculate_risk_score(&matches);
         assert!(risk_score > 0.0);
     }
@@ -618,11 +656,15 @@ mod tests {
     #[tokio::test]
     async fn test_registry_persistence_detection() {
         let engine = HeuristicEngine::new();
-        let registry_content = "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
-        
-        let matches = engine.analyze_content(registry_content, Path::new("test.txt")).await.unwrap();
+        let registry_content =
+            "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+
+        let matches = engine
+            .analyze_content(registry_content, Path::new("test.txt"))
+            .await
+            .unwrap();
         assert!(!matches.is_empty());
-        
+
         let registry_match = matches.iter().find(|m| m.rule_id == "HEUR_002");
         assert!(registry_match.is_some());
     }
@@ -631,13 +673,16 @@ mod tests {
     async fn test_ransomware_detection() {
         let engine = HeuristicEngine::new();
         let ransomware_content = "YOUR_FILES_ARE_ENCRYPTED.txt";
-        
-        let matches = engine.analyze_content(ransomware_content, Path::new("test.txt")).await.unwrap();
+
+        let matches = engine
+            .analyze_content(ransomware_content, Path::new("test.txt"))
+            .await
+            .unwrap();
         assert!(!matches.is_empty());
-        
+
         let ransomware_match = matches.iter().find(|m| m.rule_id == "HEUR_501");
         assert!(ransomware_match.is_some());
-        
+
         if let Some(mat) = ransomware_match {
             assert!(matches![mat.severity, HeuristicSeverity::Critical]);
         }
@@ -647,10 +692,13 @@ mod tests {
     async fn test_bitcoin_address_detection() {
         let engine = HeuristicEngine::new();
         let bitcoin_content = "Send payment to: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
-        
-        let matches = engine.analyze_content(bitcoin_content, Path::new("test.txt")).await.unwrap();
+
+        let matches = engine
+            .analyze_content(bitcoin_content, Path::new("test.txt"))
+            .await
+            .unwrap();
         assert!(!matches.is_empty());
-        
+
         let bitcoin_match = matches.iter().find(|m| m.rule_id == "HEUR_502");
         assert!(bitcoin_match.is_some());
     }
@@ -659,13 +707,16 @@ mod tests {
     async fn test_cryptominer_detection() {
         let engine = HeuristicEngine::new();
         let miner_content = "stratum+tcp://xmr-usa-east1.nanopool.org:14433";
-        
-        let matches = engine.analyze_content(miner_content, Path::new("test.exe")).await.unwrap();
+
+        let matches = engine
+            .analyze_content(miner_content, Path::new("test.exe"))
+            .await
+            .unwrap();
         assert!(!matches.is_empty());
-        
+
         let miner_match = matches.iter().find(|m| m.rule_id == "HEUR_401");
         assert!(miner_match.is_some());
-        
+
         if let Some(mat) = miner_match {
             assert!(matches![mat.severity, HeuristicSeverity::High]);
         }
@@ -675,10 +726,13 @@ mod tests {
     async fn test_base64_obfuscation_detection() {
         let engine = HeuristicEngine::new();
         let b64_content = "VGhpcyBpcyBhIHRlc3Qgc3RyaW5nIGZvciBiYXNlNjQgZGV0ZWN0aW9uIHRoYXQgaXMgbG9uZyBlbm91Z2ggdG8gdHJpZ2dlciB0aGUgaGV1cmlzdGljIHJ1bGU=";
-        
-        let matches = engine.analyze_content(b64_content, Path::new("test.txt")).await.unwrap();
+
+        let matches = engine
+            .analyze_content(b64_content, Path::new("test.txt"))
+            .await
+            .unwrap();
         assert!(!matches.is_empty());
-        
+
         let b64_match = matches.iter().find(|m| m.rule_id == "HEUR_301");
         assert!(b64_match.is_some());
     }
@@ -686,7 +740,7 @@ mod tests {
     #[tokio::test]
     async fn test_risk_score_calculation() {
         let engine = HeuristicEngine::new();
-        
+
         let matches = vec![
             HeuristicMatch {
                 rule_id: "TEST_001".to_string(),
@@ -709,7 +763,7 @@ mod tests {
                 offset: None,
             },
         ];
-        
+
         let risk_score = engine.calculate_risk_score(&matches);
         assert!(risk_score > 0.0);
         assert!(risk_score <= 100.0);
@@ -718,14 +772,20 @@ mod tests {
     #[tokio::test]
     async fn test_file_type_filtering() {
         let engine = HeuristicEngine::new();
-        
+
         // Test with .exe file - should match executable rules
         let exe_content = "CreateProcess WriteProcessMemory";
-        let exe_matches = engine.analyze_content(exe_content, Path::new("test.exe")).await.unwrap();
-        
+        let exe_matches = engine
+            .analyze_content(exe_content, Path::new("test.exe"))
+            .await
+            .unwrap();
+
         // Test with .txt file - should not match executable-specific rules
-        let txt_matches = engine.analyze_content(exe_content, Path::new("test.txt")).await.unwrap();
-        
+        let txt_matches = engine
+            .analyze_content(exe_content, Path::new("test.txt"))
+            .await
+            .unwrap();
+
         // .exe should have more matches due to executable-specific rules
         assert!(exe_matches.len() >= txt_matches.len());
     }
@@ -734,10 +794,13 @@ mod tests {
     async fn test_clean_file() {
         let engine = HeuristicEngine::new();
         let clean_content = "This is a perfectly normal text file with no suspicious content.";
-        
-        let matches = engine.analyze_content(clean_content, Path::new("clean.txt")).await.unwrap();
+
+        let matches = engine
+            .analyze_content(clean_content, Path::new("clean.txt"))
+            .await
+            .unwrap();
         let risk_score = engine.calculate_risk_score(&matches);
-        
+
         // Clean files should have low or zero risk scores
         assert!(risk_score < 10.0);
     }
@@ -746,9 +809,12 @@ mod tests {
     async fn test_context_extraction() {
         let engine = HeuristicEngine::new();
         let content_with_context = "Before context CreateProcess WriteProcessMemory After context";
-        
-        let matches = engine.analyze_content(content_with_context, Path::new("test.exe")).await.unwrap();
-        
+
+        let matches = engine
+            .analyze_content(content_with_context, Path::new("test.exe"))
+            .await
+            .unwrap();
+
         if let Some(api_match) = matches.iter().find(|m| m.rule_id == "HEUR_001") {
             assert!(api_match.context.contains_key("surrounding_context"));
             assert!(api_match.context.contains_key("api_sequence"));
@@ -765,12 +831,15 @@ mod tests {
             YOUR_FILES_ARE_ENCRYPTED
             1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
         "#;
-        
-        let matches = engine.analyze_content(multi_threat_content, Path::new("malware.exe")).await.unwrap();
-        
+
+        let matches = engine
+            .analyze_content(multi_threat_content, Path::new("malware.exe"))
+            .await
+            .unwrap();
+
         // Should detect multiple different threat types
         assert!(matches.len() >= 5);
-        
+
         // Verify we have matches from different categories
         let rule_ids: Vec<&String> = matches.iter().map(|m| &m.rule_id).collect();
         assert!(rule_ids.contains(&&"HEUR_001".to_string())); // Malware API
@@ -778,7 +847,7 @@ mod tests {
         assert!(rule_ids.contains(&&"HEUR_401".to_string())); // Mining pool
         assert!(rule_ids.contains(&&"HEUR_501".to_string())); // Ransomware
         assert!(rule_ids.contains(&&"HEUR_502".to_string())); // Bitcoin address
-        
+
         let risk_score = engine.calculate_risk_score(&matches);
         assert!(risk_score > 50.0); // Should be considered high risk
     }

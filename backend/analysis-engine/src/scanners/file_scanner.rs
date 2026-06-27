@@ -6,7 +6,6 @@
 /// - Entropy calculation
 /// - Embedded resource extraction
 /// - Signature-based detection
-
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -299,7 +298,10 @@ impl FileScanner {
         }
 
         // Check for text content
-        if data.iter().take(512).all(|&b| b.is_ascii() || b == b'\n' || b == b'\r' || b == b'\t')
+        if data
+            .iter()
+            .take(512)
+            .all(|&b| b.is_ascii() || b == b'\n' || b == b'\r' || b == b'\t')
         {
             return FileType::Text;
         }
@@ -314,7 +316,10 @@ impl FileScanner {
         metadata: &Option<HashMap<String, String>>,
     ) -> FileInfo {
         let magic_bytes = if data.len() >= 4 {
-            format!("{:02X}{:02X}{:02X}{:02X}", data[0], data[1], data[2], data[3])
+            format!(
+                "{:02X}{:02X}{:02X}{:02X}",
+                data[0], data[1], data[2], data[3]
+            )
         } else {
             "Unknown".to_string()
         };

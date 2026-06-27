@@ -2,7 +2,6 @@
 ///
 /// This module handles Docker container lifecycle management for secure execution
 /// of potentially malicious samples in isolated environments.
-
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -11,11 +10,9 @@ use tokio::process::Command;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use crate::analyzers::dynamic_analyzer::{
-    DynamicAnalyzerConfig, NetworkConfig, ResourceLimits,
-};
+use crate::analyzers::dynamic_analyzer::{DynamicAnalyzerConfig, NetworkConfig, ResourceLimits};
 
-use super::{SandboxConfig, SandboxEnvironment, SandboxStatus, OsType, ResourceUsage};
+use super::{OsType, ResourceUsage, SandboxConfig, SandboxEnvironment, SandboxStatus};
 
 /// Manages Docker containers for sandbox execution
 pub struct Container {
@@ -177,9 +174,7 @@ impl Container {
         }
 
         // Add the image and command
-        cmd.arg(&config.image)
-            .arg("sleep")
-            .arg("infinity"); // Keep container running
+        cmd.arg(&config.image).arg("sleep").arg("infinity"); // Keep container running
 
         debug!("Docker create command: {:?}", cmd);
 
@@ -205,7 +200,8 @@ impl Container {
             status: "running".to_string(),
         };
 
-        self.active_containers.insert(actual_container_id.clone(), info);
+        self.active_containers
+            .insert(actual_container_id.clone(), info);
 
         info!("Container created and started: {}", actual_container_id);
 
@@ -421,7 +417,10 @@ CMD ["/bin/bash"]
 
     /// Execute a command in the sandbox container
     pub async fn execute_command(&self, container_id: &str, command: &str) -> Result<String> {
-        debug!("Executing command in container {}: {}", container_id, command);
+        debug!(
+            "Executing command in container {}: {}",
+            container_id, command
+        );
 
         let output = Command::new("docker")
             .args(["exec", container_id, "bash", "-c", command])
@@ -442,7 +441,13 @@ CMD ["/bin/bash"]
     /// Get resource usage statistics for a container
     pub async fn get_resource_usage(&self, container_id: &str) -> Result<ResourceUsage> {
         let output = Command::new("docker")
-            .args(["stats", "--no-stream", "--format", "{{json .}}", container_id])
+            .args([
+                "stats",
+                "--no-stream",
+                "--format",
+                "{{json .}}",
+                container_id,
+            ])
             .output()
             .await
             .context("Failed to get container stats")?;
@@ -452,8 +457,8 @@ CMD ["/bin/bash"]
         }
 
         let stats_json = String::from_utf8_lossy(&output.stdout);
-        let stats: serde_json::Value = serde_json::from_str(&stats_json)
-            .unwrap_or_else(|_| serde_json::json!({}));
+        let stats: serde_json::Value =
+            serde_json::from_str(&stats_json).unwrap_or_else(|_| serde_json::json!({}));
 
         Ok(ResourceUsage {
             cpu_percent: stats["CPUPerc"]
@@ -543,7 +548,10 @@ impl Drop for Container {
         // Attempt to cleanup containers on drop
         // This is best-effort and may not complete
         if !self.active_containers.is_empty() {
-            warn!("Container manager dropped with {} active containers", self.active_containers.len());
+            warn!(
+                "Container manager dropped with {} active containers",
+                self.active_containers.len()
+            );
         }
     }
 }

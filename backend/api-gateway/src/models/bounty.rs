@@ -32,20 +32,20 @@ pub struct Bounty {
     pub submission_id: Uuid,
     pub title: String,
     pub description: Option<String>,
-    pub reward_amount: String,            // DECIMAL(20,8) → String for precision
-    pub min_stake_amount: String,         // DECIMAL(20,8)
+    pub reward_amount: String,    // DECIMAL(20,8) → String for precision
+    pub min_stake_amount: String, // DECIMAL(20,8)
     pub max_participants: Option<i32>,
     pub deadline: Option<DateTime<Utc>>,
-    pub bounty_status: String,            // 'active','completed','expired','cancelled'
+    pub bounty_status: String, // 'active','completed','expired','cancelled'
     pub requires_verification: bool,
-    pub priority_level: i32,              // 1–5
+    pub priority_level: i32, // 1–5
     pub blockchain_tx_hash: Option<String>,
     pub smart_contract_address: Option<String>,
-    pub total_staked: String,             // DECIMAL(20,8)
+    pub total_staked: String, // DECIMAL(20,8)
     pub participant_count: i32,
-    pub consensus_threshold: String,      // DECIMAL(3,2)
-    pub on_chain_id: Option<i64>,         // from migration 003
-    pub token_address: Option<String>,    // from migration 005
+    pub consensus_threshold: String,   // DECIMAL(3,2)
+    pub on_chain_id: Option<i64>,      // from migration 003
+    pub token_address: Option<String>, // from migration 005
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,

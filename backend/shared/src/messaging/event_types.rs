@@ -1,11 +1,10 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use crate::types::common::{
-    UserId, BountyId, SubmissionId, EngineId, ThreatVerdict,
-    TokenAmount, TransactionHash
+    BountyId, EngineId, SubmissionId, ThreatVerdict, TokenAmount, TransactionHash, UserId,
 };
 
 /// Core event types for the Verdyx platform

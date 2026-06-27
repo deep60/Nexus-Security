@@ -1,12 +1,12 @@
 // backend/bounty-manager/src/workers/consensus_worker.rs
 
+use crate::models::bounty::BountyModel;
+use crate::models::submission::SubmissionModel;
+use crate::services::consensus::{ConsensusService, SubmissionData};
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::time::{interval, Duration};
 use tracing::{error, info};
-use crate::services::consensus::{ConsensusService, SubmissionData};
-use crate::models::submission::SubmissionModel;
-use crate::models::bounty::BountyModel;
 use uuid::Uuid;
 
 pub struct ConsensusWorker {
@@ -31,7 +31,7 @@ impl ConsensusWorker {
 
         loop {
             ticker.tick().await;
-            
+
             if let Err(e) = self.process_pending_bounties().await {
                 error!("Error processing bounties for consensus: {}", e);
             }
@@ -70,12 +70,13 @@ impl ConsensusWorker {
         // Convert to submission data
         let mut submission_data: Vec<SubmissionData> = Vec::with_capacity(submissions.len());
         for s in submissions.iter() {
-            let reputation_score = crate::models::ReputationModel::find_by_id(&self.db, &s.engine_id)
-                .await
-                .ok()
-                .flatten()
-                .map(|r| r.reputation_score)
-                .unwrap_or(1.0);
+            let reputation_score =
+                crate::models::ReputationModel::find_by_id(&self.db, &s.engine_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|r| r.reputation_score)
+                    .unwrap_or(1.0);
 
             submission_data.push(SubmissionData {
                 submission_id: s.id,
@@ -87,7 +88,9 @@ impl ConsensusWorker {
         }
 
         // Calculate consensus
-        let consensus_result = self.consensus_service.calculate_consensus(bounty_id, submission_data);
+        let consensus_result = self
+            .consensus_service
+            .calculate_consensus(bounty_id, submission_data);
 
         if consensus_result.consensus_reached {
             info!(

@@ -39,7 +39,10 @@ pub struct DisputeVoteModel {
 }
 
 impl DisputeModel {
-    pub async fn create(pool: &PgPool, dispute: &DisputeModel) -> Result<DisputeModel, sqlx::Error> {
+    pub async fn create(
+        pool: &PgPool,
+        dispute: &DisputeModel,
+    ) -> Result<DisputeModel, sqlx::Error> {
         let record = sqlx::query_as::<_, DisputeModel>(
             r#"
             INSERT INTO disputes (
@@ -49,7 +52,7 @@ impl DisputeModel {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             RETURNING *
-            "#
+            "#,
         )
         .bind(&dispute.id)
         .bind(&dispute.bounty_id)
@@ -76,19 +79,20 @@ impl DisputeModel {
     }
 
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<DisputeModel>, sqlx::Error> {
-        let record = sqlx::query_as::<_, DisputeModel>(
-            "SELECT * FROM disputes WHERE id = $1"
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
+        let record = sqlx::query_as::<_, DisputeModel>("SELECT * FROM disputes WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
 
         Ok(record)
     }
 
-    pub async fn find_by_bounty(pool: &PgPool, bounty_id: Uuid) -> Result<Vec<DisputeModel>, sqlx::Error> {
+    pub async fn find_by_bounty(
+        pool: &PgPool,
+        bounty_id: Uuid,
+    ) -> Result<Vec<DisputeModel>, sqlx::Error> {
         let records = sqlx::query_as::<_, DisputeModel>(
-            "SELECT * FROM disputes WHERE bounty_id = $1 ORDER BY created_at DESC"
+            "SELECT * FROM disputes WHERE bounty_id = $1 ORDER BY created_at DESC",
         )
         .bind(bounty_id)
         .fetch_all(pool)
@@ -97,9 +101,12 @@ impl DisputeModel {
         Ok(records)
     }
 
-    pub async fn find_by_disputer(pool: &PgPool, disputer_id: &str) -> Result<Vec<DisputeModel>, sqlx::Error> {
+    pub async fn find_by_disputer(
+        pool: &PgPool,
+        disputer_id: &str,
+    ) -> Result<Vec<DisputeModel>, sqlx::Error> {
         let records = sqlx::query_as::<_, DisputeModel>(
-            "SELECT * FROM disputes WHERE disputer_id = $1 ORDER BY created_at DESC"
+            "SELECT * FROM disputes WHERE disputer_id = $1 ORDER BY created_at DESC",
         )
         .bind(disputer_id)
         .fetch_all(pool)
@@ -124,7 +131,10 @@ impl DisputeModel {
             query.push_str(&format!(" AND bounty_id = '{}'", bid));
         }
 
-        query.push_str(&format!(" ORDER BY created_at DESC LIMIT {} OFFSET {}", limit, offset));
+        query.push_str(&format!(
+            " ORDER BY created_at DESC LIMIT {} OFFSET {}",
+            limit, offset
+        ));
 
         let records = sqlx::query_as::<_, DisputeModel>(&query)
             .fetch_all(pool)
@@ -134,14 +144,12 @@ impl DisputeModel {
     }
 
     pub async fn update_status(pool: &PgPool, id: Uuid, status: &str) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "UPDATE disputes SET status = $1, updated_at = $2 WHERE id = $3"
-        )
-        .bind(status)
-        .bind(Utc::now())
-        .bind(id)
-        .execute(pool)
-        .await?;
+        sqlx::query("UPDATE disputes SET status = $1, updated_at = $2 WHERE id = $3")
+            .bind(status)
+            .bind(Utc::now())
+            .bind(id)
+            .execute(pool)
+            .await?;
 
         Ok(())
     }
@@ -159,7 +167,7 @@ impl DisputeModel {
                 status = 'Resolved', resolution = $1, resolution_details = $2,
                 resolver_id = $3, resolved_at = $4, updated_at = $4
             WHERE id = $5
-            "#
+            "#,
         )
         .bind(resolution)
         .bind(resolution_details)
@@ -179,9 +187,7 @@ impl DisputeModel {
             query.push_str(&format!(" AND status = '{}'", s));
         }
 
-        let result: (i64,) = sqlx::query_as(&query)
-            .fetch_one(pool)
-            .await?;
+        let result: (i64,) = sqlx::query_as(&query).fetch_one(pool).await?;
 
         Ok(result.0)
     }
@@ -206,15 +212,25 @@ impl DisputeModel {
     /// Get dispute statistics
     pub async fn get_stats(pool: &PgPool) -> Result<DisputeStats, sqlx::Error> {
         let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM disputes")
-            .fetch_one(pool).await?;
-        let open: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM disputes WHERE status IN ('Open', 'UnderReview', 'Voting')")
-            .fetch_one(pool).await?;
-        let resolved: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM disputes WHERE status = 'Resolved'")
-            .fetch_one(pool).await?;
-        let upheld: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM disputes WHERE resolution = 'DisputeUpheld'")
-            .fetch_one(pool).await?;
-        let rejected: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM disputes WHERE resolution = 'DisputeRejected'")
-            .fetch_one(pool).await?;
+            .fetch_one(pool)
+            .await?;
+        let open: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM disputes WHERE status IN ('Open', 'UnderReview', 'Voting')",
+        )
+        .fetch_one(pool)
+        .await?;
+        let resolved: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM disputes WHERE status = 'Resolved'")
+                .fetch_one(pool)
+                .await?;
+        let upheld: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM disputes WHERE resolution = 'DisputeUpheld'")
+                .fetch_one(pool)
+                .await?;
+        let rejected: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM disputes WHERE resolution = 'DisputeRejected'")
+                .fetch_one(pool)
+                .await?;
         let avg_resolution: (Option<f64>,) = sqlx::query_as(
             "SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600.0) FROM disputes WHERE resolved_at IS NOT NULL"
         ).fetch_one(pool).await?;
@@ -231,7 +247,10 @@ impl DisputeModel {
 }
 
 impl DisputeVoteModel {
-    pub async fn create(pool: &PgPool, vote: &DisputeVoteModel) -> Result<DisputeVoteModel, sqlx::Error> {
+    pub async fn create(
+        pool: &PgPool,
+        vote: &DisputeVoteModel,
+    ) -> Result<DisputeVoteModel, sqlx::Error> {
         let record = sqlx::query_as::<_, DisputeVoteModel>(
             r#"
             INSERT INTO dispute_votes (id, dispute_id, voter_id, vote, voting_power, rationale, created_at)
@@ -252,9 +271,13 @@ impl DisputeVoteModel {
         Ok(record)
     }
 
-    pub async fn has_voted(pool: &PgPool, dispute_id: Uuid, voter_id: &str) -> Result<bool, sqlx::Error> {
+    pub async fn has_voted(
+        pool: &PgPool,
+        dispute_id: Uuid,
+        voter_id: &str,
+    ) -> Result<bool, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM dispute_votes WHERE dispute_id = $1 AND voter_id = $2"
+            "SELECT COUNT(*) FROM dispute_votes WHERE dispute_id = $1 AND voter_id = $2",
         )
         .bind(dispute_id)
         .bind(voter_id)
@@ -264,7 +287,10 @@ impl DisputeVoteModel {
         Ok(result.0 > 0)
     }
 
-    pub async fn get_vote_tallies(pool: &PgPool, dispute_id: Uuid) -> Result<(f32, f32), sqlx::Error> {
+    pub async fn get_vote_tallies(
+        pool: &PgPool,
+        dispute_id: Uuid,
+    ) -> Result<(f32, f32), sqlx::Error> {
         let uphold: (Option<f64>,) = sqlx::query_as(
             "SELECT COALESCE(SUM(voting_power), 0) FROM dispute_votes WHERE dispute_id = $1 AND vote = 'Uphold'"
         )
@@ -279,7 +305,10 @@ impl DisputeVoteModel {
         .fetch_one(pool)
         .await?;
 
-        Ok((uphold.0.unwrap_or(0.0) as f32, reject.0.unwrap_or(0.0) as f32))
+        Ok((
+            uphold.0.unwrap_or(0.0) as f32,
+            reject.0.unwrap_or(0.0) as f32,
+        ))
     }
 }
 

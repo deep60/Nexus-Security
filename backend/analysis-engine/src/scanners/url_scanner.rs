@@ -7,13 +7,12 @@
 /// - Malicious link detection
 /// - Safe browsing integration
 /// - Certificate validation
-
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
-use uuid::Uuid;
 use url::Url;
+use uuid::Uuid;
 
 use super::{
     ArtifactType, Finding, FindingCategory, ScanResult, ScanVerdict, Scanner, ScannerConfig,
@@ -179,8 +178,8 @@ impl Scanner for UrlScanner {
         let start_time = std::time::Instant::now();
 
         // Convert data to URL string
-        let url_string = String::from_utf8(data.to_vec())
-            .map_err(|_| anyhow!("Invalid UTF-8 in URL"))?;
+        let url_string =
+            String::from_utf8(data.to_vec()).map_err(|_| anyhow!("Invalid UTF-8 in URL"))?;
         let url_string = url_string.trim();
 
         info!("Starting URL scan for: {}", url_string);
@@ -188,8 +187,7 @@ impl Scanner for UrlScanner {
         let mut base_result = ScanResult::new(ArtifactType::Url);
 
         // Parse URL
-        let parsed = Url::parse(url_string)
-            .map_err(|e| anyhow!("Invalid URL format: {}", e))?;
+        let parsed = Url::parse(url_string).map_err(|e| anyhow!("Invalid URL format: {}", e))?;
 
         // Gather URL information
         let url_info = self.analyze_url(&parsed);
@@ -214,7 +212,10 @@ impl Scanner for UrlScanner {
                 finding_id: Uuid::new_v4(),
                 category: FindingCategory::Malware,
                 title: "Domain on blocklist".to_string(),
-                description: format!("Domain {} is on known malicious blocklist", domain_reputation.domain),
+                description: format!(
+                    "Domain {} is on known malicious blocklist",
+                    domain_reputation.domain
+                ),
                 severity: ThreatLevel::Critical,
                 evidence: vec![format!("Blocklist match: {}", domain_reputation.domain)],
                 recommendation: Some("Block access immediately".to_string()),
@@ -264,10 +265,12 @@ impl Scanner for UrlScanner {
 
         // Check redirect chain
         let redirect_chain = if self.config.check_redirect_chain {
-            self.check_redirect_chain(&url_string).await.unwrap_or_else(|e| {
-                warn!("Failed to check redirect chain: {}", e);
-                vec![url_string.to_string()]
-            })
+            self.check_redirect_chain(&url_string)
+                .await
+                .unwrap_or_else(|e| {
+                    warn!("Failed to check redirect chain: {}", e);
+                    vec![url_string.to_string()]
+                })
         } else {
             vec![url_string.to_string()]
         };
@@ -280,7 +283,9 @@ impl Scanner for UrlScanner {
                 description: format!("URL redirects {} times", redirect_chain.len() - 1),
                 severity: ThreatLevel::Low,
                 evidence: redirect_chain.clone(),
-                recommendation: Some("Review redirect chain for malicious destinations".to_string()),
+                recommendation: Some(
+                    "Review redirect chain for malicious destinations".to_string(),
+                ),
             });
         }
 
@@ -336,7 +341,10 @@ impl Scanner for UrlScanner {
                     finding_id: Uuid::new_v4(),
                     category: FindingCategory::Suspicious,
                     title: "Suspicious scripts detected".to_string(),
-                    description: format!("{} suspicious scripts found", content.suspicious_scripts.len()),
+                    description: format!(
+                        "{} suspicious scripts found",
+                        content.suspicious_scripts.len()
+                    ),
                     severity: ThreatLevel::Medium,
                     evidence: content.suspicious_scripts.clone(),
                     recommendation: Some("Review page source for malicious code".to_string()),
@@ -365,10 +373,22 @@ impl Scanner for UrlScanner {
 
     fn get_stats(&self) -> HashMap<String, String> {
         let mut stats = HashMap::new();
-        stats.insert("scanner_name".to_string(), self.config.base.scanner_name.clone());
-        stats.insert("blocklist_domains".to_string(), self.blocklist_domains.len().to_string());
-        stats.insert("suspicious_tlds".to_string(), self.suspicious_tlds.len().to_string());
-        stats.insert("trusted_domains".to_string(), self.trusted_domains.len().to_string());
+        stats.insert(
+            "scanner_name".to_string(),
+            self.config.base.scanner_name.clone(),
+        );
+        stats.insert(
+            "blocklist_domains".to_string(),
+            self.blocklist_domains.len().to_string(),
+        );
+        stats.insert(
+            "suspicious_tlds".to_string(),
+            self.suspicious_tlds.len().to_string(),
+        );
+        stats.insert(
+            "trusted_domains".to_string(),
+            self.trusted_domains.len().to_string(),
+        );
         stats
     }
 
@@ -382,7 +402,10 @@ impl UrlScanner {
     fn analyze_url(&self, parsed: &Url) -> UrlInfo {
         let domain = parsed.host_str().unwrap_or("").to_string();
 
-        let is_shortened = self.url_shortener_domains.iter().any(|d| domain.contains(d));
+        let is_shortened = self
+            .url_shortener_domains
+            .iter()
+            .any(|d| domain.contains(d));
         let is_ip_based = domain.parse::<std::net::IpAddr>().is_ok();
         let has_suspicious_tld = self.suspicious_tlds.iter().any(|tld| domain.ends_with(tld));
 
@@ -428,7 +451,7 @@ impl UrlScanner {
 
         DomainReputation {
             domain: domain.to_string(),
-            age_days: None, // Would query WHOIS in production
+            age_days: None,             // Would query WHOIS in production
             is_newly_registered: false, // Would check WHOIS registration date
             is_on_blocklist,
             reputation_score,
@@ -490,9 +513,21 @@ impl UrlScanner {
         }
 
         // Check for brand impersonation (simplified)
-        let brands = ["paypal", "amazon", "google", "microsoft", "apple", "facebook"];
+        let brands = [
+            "paypal",
+            "amazon",
+            "google",
+            "microsoft",
+            "apple",
+            "facebook",
+        ];
         for brand in &brands {
-            if url_lower.contains(brand) && !url_info.parsed_url.domain.ends_with(&format!("{}.com", brand)) {
+            if url_lower.contains(brand)
+                && !url_info
+                    .parsed_url
+                    .domain
+                    .ends_with(&format!("{}.com", brand))
+            {
                 indicators.push(PhishingIndicator {
                     indicator_type: PhishingIndicatorType::BrandImpersonation,
                     description: format!("Possible {} brand impersonation", brand),
@@ -558,8 +593,10 @@ impl UrlScanner {
         let html = response.text().await?;
         let html_lower = html.to_lowercase();
 
-        let has_login_form = html_lower.contains("<form") && (html_lower.contains("login") || html_lower.contains("signin"));
-        let has_password_field = html_lower.contains(r#"type="password""#) || html_lower.contains("type='password'");
+        let has_login_form = html_lower.contains("<form")
+            && (html_lower.contains("login") || html_lower.contains("signin"));
+        let has_password_field =
+            html_lower.contains(r#"type="password""#) || html_lower.contains("type='password'");
 
         let external_links_count = html.matches("href=").count();
 
@@ -674,7 +711,10 @@ mod tests {
         assert!(result.is_ok());
 
         let scan_result = result.unwrap();
-        assert_eq!(scan_result.domain_reputation.category, DomainCategory::Malicious);
+        assert_eq!(
+            scan_result.domain_reputation.category,
+            DomainCategory::Malicious
+        );
     }
 
     #[tokio::test]
@@ -711,6 +751,8 @@ mod tests {
 
         assert!(!indicators.is_empty());
         // Should detect suspicious TLD, keywords, and brand impersonation
-        assert!(indicators.iter().any(|i| matches!(i.indicator_type, PhishingIndicatorType::SuspiciousTld)));
+        assert!(indicators
+            .iter()
+            .any(|i| matches!(i.indicator_type, PhishingIndicatorType::SuspiciousTld)));
     }
 }

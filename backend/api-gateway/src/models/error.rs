@@ -134,19 +134,15 @@ impl ApiError {
 
     fn error_details(&self) -> Option<serde_json::Value> {
         match self {
-            ApiError::InsufficientReputation { required, actual } => {
-                Some(json!({
-                    "required_reputation": required,
-                    "actual_reputation": actual,
-                    "deficit": required - actual,
-                }))
-            }
-            ApiError::StakeTooLow { minimum, provided } => {
-                Some(json!({
-                    "minimum_stake": minimum,
-                    "provided_stake": provided,
-                }))
-            }
+            ApiError::InsufficientReputation { required, actual } => Some(json!({
+                "required_reputation": required,
+                "actual_reputation": actual,
+                "deficit": required - actual,
+            })),
+            ApiError::StakeTooLow { minimum, provided } => Some(json!({
+                "minimum_stake": minimum,
+                "provided_stake": provided,
+            })),
             _ => None,
         }
     }
@@ -258,7 +254,8 @@ impl ValidationErrorBuilder {
             Ok(())
         } else {
             Err(ApiError::Validation(
-                serde_json::to_string(&self.errors).unwrap_or_else(|_| "Validation failed".to_string())
+                serde_json::to_string(&self.errors)
+                    .unwrap_or_else(|_| "Validation failed".to_string()),
             ))
         }
     }

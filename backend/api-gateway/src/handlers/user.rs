@@ -182,16 +182,15 @@ pub async fn get_user_stats(
         });
 
     // Query bounty and reward stats
-    let bounties_created: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM bounties WHERE creator_id = $1"
-    )
-    .bind(claims.sub)
-    .fetch_one(state.db.pool())
-    .await
-    .unwrap_or((0,));
+    let bounties_created: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM bounties WHERE creator_id = $1")
+            .bind(claims.sub)
+            .fetch_one(state.db.pool())
+            .await
+            .unwrap_or((0,));
 
     let bounties_participated: (i64,) = sqlx::query_as(
-        "SELECT COUNT(DISTINCT bounty_id) FROM bounty_submissions WHERE engine_id = $1::text"
+        "SELECT COUNT(DISTINCT bounty_id) FROM bounty_submissions WHERE engine_id = $1::text",
     )
     .bind(claims.sub.to_string())
     .fetch_one(state.db.pool())
@@ -229,7 +228,7 @@ pub async fn get_user_stats(
         )
         SELECT COUNT(*) FROM ranked
         WHERE grp = (SELECT grp FROM ranked LIMIT 1)
-        "#
+        "#,
     )
     .bind(claims.sub.to_string())
     .fetch_one(state.db.pool())
@@ -270,7 +269,7 @@ pub async fn get_user_activity(
         FROM analysis_results
         ORDER BY created_at DESC
         LIMIT $1 OFFSET $2
-        "#
+        "#,
     )
     .bind(limit as i64)
     .bind(offset)

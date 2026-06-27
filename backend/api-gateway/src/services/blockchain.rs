@@ -5,25 +5,25 @@
 //! - Reputation system updates
 //! - Transaction monitoring
 
-use std::sync::Arc;
-use std::collections::HashMap;
-use std::time::Duration;
-use anyhow::{Result, Context};
-use serde::{Deserialize, Serialize};
-use tokio::sync::{RwLock, Mutex};
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 use ethers::{
-    providers::{Provider, Http, Middleware, ProviderError},
-    types::{Address, U256, H256, TransactionRequest, Transaction, TransactionReceipt},
+    abi::{Abi, Token}, //(Abi - Application Binary Interface)
     contract::{Contract, ContractError},
-    abi::{Abi, Token},                      //(Abi - Application Binary Interface)
+    middleware::SignerMiddleware,
+    providers::{Http, Middleware, Provider, ProviderError},
     signers::{LocalWallet, Signer},
-    middleware::SignerMiddleware, 
+    types::{Address, Transaction, TransactionReceipt, TransactionRequest, H256, U256},
 };
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::{Mutex, RwLock};
+use uuid::Uuid;
 
-use crate::models::{TransactionStatus, ReputationScore, ThreatSeverity};
 use crate::config;
+use crate::models::{ReputationScore, ThreatSeverity, TransactionStatus};
 
 /// Blockchain client wrapper
 type BlockchainClient = SignerMiddleware<Provider<Http>, LocalWallet>;
@@ -70,21 +70,21 @@ pub enum TransactionType {
 /// Bounty creation parameters (matches BountyManager.createBounty ABI)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateBountyParams {
-    pub artifact_hash: String,     // IPFS hash of the artifact
-    pub artifact_type: String,     // "file", "url", etc.
-    pub reward_amount: U256,       // Token reward amount
-    pub deadline: U256,            // Unix timestamp deadline
-    pub description: String,       // Bounty description
+    pub artifact_hash: String, // IPFS hash of the artifact
+    pub artifact_type: String, // "file", "url", etc.
+    pub reward_amount: U256,   // Token reward amount
+    pub deadline: U256,        // Unix timestamp deadline
+    pub description: String,   // Bounty description
 }
 
 /// Analysis submission parameters (matches BountyManager.submitAnalysis ABI)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SubmitAnalysisParams {
-    pub bounty_id: U256,           // On-chain bounty ID
-    pub verdict: u8,               // ThreatVerdict enum: 0=Pending, 1=Benign, 2=Malicious, 3=Suspicious
-    pub confidence: U256,          // Confidence 0-100
-    pub stake_amount: U256,        // Tokens to stake (ERC20 transferFrom, not msg.value)
-    pub analysis_hash: String,     // IPFS hash of detailed analysis
+    pub bounty_id: U256,       // On-chain bounty ID
+    pub verdict: u8,           // ThreatVerdict enum: 0=Pending, 1=Benign, 2=Malicious, 3=Suspicious
+    pub confidence: U256,      // Confidence 0-100
+    pub stake_amount: U256,    // Tokens to stake (ERC20 transferFrom, not msg.value)
+    pub analysis_hash: String, // IPFS hash of detailed analysis
 }
 
 /// Blockchain transaction result
@@ -107,8 +107,8 @@ pub struct BountyOnChain {
     pub reward_amount: U256,
     pub deadline: U256,
     pub description: String,
-    pub status: u8,                // BountyStatus enum: 0=Active, 1=InReview, 2=Completed, 3=Cancelled, 4=Disputed
-    pub consensus_verdict: u8,     // ThreatVerdict enum
+    pub status: u8, // BountyStatus enum: 0=Active, 1=InReview, 2=Completed, 3=Cancelled, 4=Disputed
+    pub consensus_verdict: u8, // ThreatVerdict enum
     pub total_staked: U256,
     pub analysis_count: U256,
     pub created_at: U256,
@@ -123,7 +123,9 @@ impl BlockchainService {
             .interval(Duration::from_millis(1000));
 
         // Setup wallet
-        let wallet = config.private_key.parse::<LocalWallet>()
+        let wallet = config
+            .private_key
+            .parse::<LocalWallet>()
             .context("Invalid private key")?
             .with_chain_id(config.chain_id);
 
@@ -132,7 +134,9 @@ impl BlockchainService {
 
         // Get current nonce
         let address = client.address();
-        let nonce = client.get_transaction_count(address, None).await
+        let nonce = client
+            .get_transaction_count(address, None)
+            .await
             .context("Failed to get transaction count")?;
 
         // Load contract ABIs and create instances
@@ -155,13 +159,22 @@ impl BlockchainService {
         // In a real implementation, you would load the ABIs from files or embedded resources
         // For now, we'll create placeholder contract instances
 
-        let bounty_manager_address: Address = config.contracts.bounty_manager.parse()
+        let bounty_manager_address: Address = config
+            .contracts
+            .bounty_manager
+            .parse()
             .context("Invalid bounty manager address")?;
 
-        let threat_token_address: Address = config.contracts.threat_token.parse()
+        let threat_token_address: Address = config
+            .contracts
+            .threat_token
+            .parse()
             .context("Invalid threat token address")?;
 
-        let reputation_system_address: Address = config.contracts.reputation_system.parse()
+        let reputation_system_address: Address = config
+            .contracts
+            .reputation_system
+            .parse()
             .context("Invalid reputation system address")?;
 
         // Load ABIs (in practice, these would come from JSON files)
@@ -175,11 +188,8 @@ impl BlockchainService {
             Arc::clone(client),
         );
 
-        let threat_token = Contract::new(
-            threat_token_address,
-            threat_token_abi,
-            Arc::clone(client),
-        );
+        let threat_token =
+            Contract::new(threat_token_address, threat_token_abi, Arc::clone(client));
 
         let reputation_system = Contract::new(
             reputation_system_address,
@@ -198,28 +208,31 @@ impl BlockchainService {
     /// ABI: createBounty(string artifactHash, string artifactType, uint256 rewardAmount, uint256 deadline, string description) returns (uint256)
     /// Returns (tx_hash, on_chain_bounty_id) — the on-chain ID is the contract's incremental bountyCounter
     pub async fn create_bounty(&self, params: CreateBountyParams) -> Result<(H256, U256)> {
-        let tx = self.contracts.bounty_manager
-            .method::<_, U256>("createBounty", (
-                params.artifact_hash,
-                params.artifact_type,
-                params.reward_amount,
-                params.deadline,
-                params.description,
-            ))?
+        let tx = self
+            .contracts
+            .bounty_manager
+            .method::<_, U256>(
+                "createBounty",
+                (
+                    params.artifact_hash,
+                    params.artifact_type,
+                    params.reward_amount,
+                    params.deadline,
+                    params.description,
+                ),
+            )?
             .gas(self.config.gas_limit)
             .gas_price(self.config.gas_price_gwei * 1_000_000_000);
 
-        let pending_tx = tx.send().await
+        let pending_tx = tx
+            .send()
+            .await
             .context("Failed to send create bounty transaction")?;
 
         let tx_hash = pending_tx.tx_hash();
-        
-        self.track_pending_transaction(
-            tx_hash,
-            TransactionType::CreateBounty,
-            None,
-            None,
-        ).await;
+
+        self.track_pending_transaction(tx_hash, TransactionType::CreateBounty, None, None)
+            .await;
 
         // Wait for receipt and parse BountyCreated event to get the on-chain bounty ID.
         // BountyCreated(uint256 indexed bountyId, address indexed creator, string artifactHash, uint256 reward, uint256 deadline)
@@ -234,10 +247,16 @@ impl BlockchainService {
         let bounty_created_sig = H256::from(ethers::utils::keccak256(
             "BountyCreated(uint256,address,string,uint256,uint256)",
         ));
-        let bounty_manager_addr: Address = self.config.contracts.bounty_manager.parse()
+        let bounty_manager_addr: Address = self
+            .config
+            .contracts
+            .bounty_manager
+            .parse()
             .unwrap_or_default();
 
-        let on_chain_id = receipt.logs.iter()
+        let on_chain_id = receipt
+            .logs
+            .iter()
             .find_map(|log| {
                 // Must originate from the bounty manager contract
                 if log.address != bounty_manager_addr {
@@ -255,7 +274,11 @@ impl BlockchainService {
                 U256::zero()
             });
 
-        tracing::info!("Created bounty tx: {:?}, on_chain_id: {}", tx_hash, on_chain_id);
+        tracing::info!(
+            "Created bounty tx: {:?}, on_chain_id: {}",
+            tx_hash,
+            on_chain_id
+        );
         Ok((tx_hash, on_chain_id))
     }
 
@@ -263,28 +286,31 @@ impl BlockchainService {
     /// ABI: submitAnalysis(uint256 bountyId, uint8 verdict, uint256 confidence, uint256 stakeAmount, string analysisHash)
     /// Note: The contract uses ERC20 transferFrom for staking, NOT msg.value
     pub async fn submit_analysis(&self, params: SubmitAnalysisParams) -> Result<H256> {
-        let tx = self.contracts.bounty_manager
-            .method::<_, ()>("submitAnalysis", (
-                params.bounty_id,
-                params.verdict,
-                params.confidence,
-                params.stake_amount,
-                params.analysis_hash,
-            ))?
+        let tx = self
+            .contracts
+            .bounty_manager
+            .method::<_, ()>(
+                "submitAnalysis",
+                (
+                    params.bounty_id,
+                    params.verdict,
+                    params.confidence,
+                    params.stake_amount,
+                    params.analysis_hash,
+                ),
+            )?
             .gas(self.config.gas_limit)
             .gas_price(self.config.gas_price_gwei * 1_000_000_000);
 
-        let pending_tx = tx.send().await
+        let pending_tx = tx
+            .send()
+            .await
             .context("Failed to send submit analysis transaction")?;
 
         let tx_hash = pending_tx.tx_hash();
-        
-        self.track_pending_transaction(
-            tx_hash,
-            TransactionType::SubmitAnalysis,
-            None,
-            None,
-        ).await;
+
+        self.track_pending_transaction(tx_hash, TransactionType::SubmitAnalysis, None, None)
+            .await;
 
         tracing::info!("Submitted analysis transaction: {:?}", tx_hash);
         Ok(tx_hash)
@@ -292,25 +318,28 @@ impl BlockchainService {
 
     /// Stake tokens for analysis submission (approve BountyManager to spend tokens)
     pub async fn stake_tokens(&self, amount: U256, user_id: Uuid) -> Result<H256> {
-        let tx = self.contracts.threat_token
-            .method::<_, bool>("approve", (
-                self.config.contracts.bounty_manager.parse::<Address>()?,
-                amount,
-            ))?
+        let tx = self
+            .contracts
+            .threat_token
+            .method::<_, bool>(
+                "approve",
+                (
+                    self.config.contracts.bounty_manager.parse::<Address>()?,
+                    amount,
+                ),
+            )?
             .gas(self.config.gas_limit)
             .gas_price(self.config.gas_price_gwei * 1_000_000_000);
 
-        let pending_tx = tx.send().await
+        let pending_tx = tx
+            .send()
+            .await
             .context("Failed to send stake tokens transaction")?;
 
         let tx_hash = pending_tx.tx_hash();
-        
-        self.track_pending_transaction(
-            tx_hash,
-            TransactionType::StakeTokens,
-            Some(user_id),
-            None,
-        ).await;
+
+        self.track_pending_transaction(tx_hash, TransactionType::StakeTokens, Some(user_id), None)
+            .await;
 
         tracing::info!("Staked tokens transaction: {:?}", tx_hash);
         Ok(tx_hash)
@@ -320,22 +349,27 @@ impl BlockchainService {
     /// ABI: resolveBounty(uint256 bountyId)
     /// Note: There is no "claimReward" in the contract — rewards are distributed automatically when bounty resolves
     pub async fn resolve_bounty(&self, bounty_id: U256) -> Result<H256> {
-        let tx = self.contracts.bounty_manager
+        let tx = self
+            .contracts
+            .bounty_manager
             .method::<_, ()>("resolveBounty", (bounty_id,))?
             .gas(self.config.gas_limit)
             .gas_price(self.config.gas_price_gwei * 1_000_000_000);
 
-        let pending_tx = tx.send().await
+        let pending_tx = tx
+            .send()
+            .await
             .context("Failed to send resolve bounty transaction")?;
 
         let tx_hash = pending_tx.tx_hash();
-        
+
         self.track_pending_transaction(
             tx_hash,
             TransactionType::ClaimReward, // Reusing enum for now
             None,
             None,
-        ).await;
+        )
+        .await;
 
         tracing::info!("Resolved bounty transaction: {:?}", tx_hash);
         Ok(tx_hash)
@@ -344,22 +378,22 @@ impl BlockchainService {
     /// Update user reputation on blockchain
     /// ABI: updateReputation(address engine, bool success)
     pub async fn update_reputation(&self, user_address: Address, success: bool) -> Result<H256> {
-        let tx = self.contracts.reputation_system
+        let tx = self
+            .contracts
+            .reputation_system
             .method::<_, ()>("updateReputation", (user_address, success))?
             .gas(self.config.gas_limit)
             .gas_price(self.config.gas_price_gwei * 1_000_000_000);
 
-        let pending_tx = tx.send().await
+        let pending_tx = tx
+            .send()
+            .await
             .context("Failed to send update reputation transaction")?;
 
         let tx_hash = pending_tx.tx_hash();
-        
-        self.track_pending_transaction(
-            tx_hash,
-            TransactionType::UpdateReputation,
-            None,
-            None,
-        ).await;
+
+        self.track_pending_transaction(tx_hash, TransactionType::UpdateReputation, None, None)
+            .await;
 
         tracing::info!("Updated reputation transaction: {:?}", tx_hash);
         Ok(tx_hash)
@@ -370,8 +404,21 @@ impl BlockchainService {
     /// Returns full Bounty struct as a tuple of 12 values
     pub async fn get_bounty(&self, bounty_id: U256) -> Result<BountyOnChain> {
         let result: (
-            U256, Address, String, String, U256, U256, String, u8, u8, U256, U256, U256
-        ) = self.contracts.bounty_manager
+            U256,
+            Address,
+            String,
+            String,
+            U256,
+            U256,
+            String,
+            u8,
+            u8,
+            U256,
+            U256,
+            U256,
+        ) = self
+            .contracts
+            .bounty_manager
             .method("getBounty", (bounty_id,))?
             .call()
             .await
@@ -395,7 +442,9 @@ impl BlockchainService {
 
     /// Get user's token balance
     pub async fn get_token_balance(&self, user_address: Address) -> Result<U256> {
-        let balance: U256 = self.contracts.threat_token
+        let balance: U256 = self
+            .contracts
+            .threat_token
             .method("balanceOf", (user_address,))?
             .call()
             .await
@@ -407,7 +456,9 @@ impl BlockchainService {
     /// Get user's reputation score from blockchain
     /// ABI: getReputation(address engine) returns (uint256)
     pub async fn get_reputation_score(&self, user_address: Address) -> Result<U256> {
-        let reputation: U256 = self.contracts.reputation_system
+        let reputation: U256 = self
+            .contracts
+            .reputation_system
             .method("getReputation", (user_address,))?
             .call()
             .await
@@ -420,10 +471,11 @@ impl BlockchainService {
     pub async fn get_transaction_status(&self, tx_hash: H256) -> Result<TransactionResult> {
         let receipt = self.client.get_transaction_receipt(tx_hash).await?;
         let current_block = self.client.get_block_number().await?;
-        
+
         match receipt {
             Some(receipt) => {
-                let confirmations = current_block.saturating_sub(receipt.block_number.unwrap_or_default());
+                let confirmations =
+                    current_block.saturating_sub(receipt.block_number.unwrap_or_default());
                 let status = if receipt.status == Some(1.into()) {
                     if confirmations >= self.config.confirmation_blocks.into() {
                         TransactionStatus::Confirmed
@@ -462,15 +514,25 @@ impl BlockchainService {
                 Ok(result) => {
                     match result.status {
                         TransactionStatus::Confirmed | TransactionStatus::Failed => {
-                            tracing::info!("Transaction {} completed with status: {:?}", hash, result.status);
+                            tracing::info!(
+                                "Transaction {} completed with status: {:?}",
+                                hash,
+                                result.status
+                            );
                             completed_hashes.push(*hash);
                         }
                         TransactionStatus::Pending => {
                             // Check if transaction is too old and needs retry
                             let age = Utc::now().signed_duration_since(pending_tx.created_at);
-                            if age.num_minutes() > 10 && pending_tx.retry_count < self.config.retry_attempts {
+                            if age.num_minutes() > 10
+                                && pending_tx.retry_count < self.config.retry_attempts
+                            {
                                 pending_tx.retry_count += 1;
-                                tracing::warn!("Transaction {} is taking too long, retry count: {}", hash, pending_tx.retry_count);
+                                tracing::warn!(
+                                    "Transaction {} is taking too long, retry count: {}",
+                                    hash,
+                                    pending_tx.retry_count
+                                );
                             }
                         }
                     }
@@ -539,28 +601,27 @@ impl BlockchainService {
 impl BlockchainService {
     /// Calculate gas price based on network conditions
     pub async fn estimate_gas_price(&self) -> Result<U256> {
-        let gas_price = self.client.get_gas_price().await
+        let gas_price = self
+            .client
+            .get_gas_price()
+            .await
             .context("Failed to get gas price")?;
-        
+
         // Add 10% buffer
         Ok(gas_price * 110 / 100)
     }
 
     /// Validate Ethereum address
     pub fn validate_address(address: &str) -> Result<Address> {
-        address.parse::<Address>()
+        address
+            .parse::<Address>()
             .context("Invalid Ethereum address format")
     }
 
     /// Health check for blockchain service
     /// Pings the RPC endpoint with a 5-second timeout to verify connectivity
     pub async fn health_check(&self) -> bool {
-        match tokio::time::timeout(
-            Duration::from_secs(5),
-            self.client.get_block_number(),
-        )
-        .await
-        {
+        match tokio::time::timeout(Duration::from_secs(5), self.client.get_block_number()).await {
             Ok(Ok(_)) => true,
             Ok(Err(e)) => {
                 tracing::warn!("Blockchain health check failed: {}", e);

@@ -74,26 +74,22 @@ impl BountyModel {
 
     /// Find a bounty by ID
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<BountyModel>, sqlx::Error> {
-        let record = sqlx::query_as::<_, BountyModel>(
-            "SELECT * FROM bounties WHERE id = $1"
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
+        let record = sqlx::query_as::<_, BountyModel>("SELECT * FROM bounties WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
 
         Ok(record)
     }
 
     /// Update bounty status
     pub async fn update_status(pool: &PgPool, id: Uuid, status: &str) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "UPDATE bounties SET status = $1, updated_at = $2 WHERE id = $3"
-        )
-        .bind(status)
-        .bind(Utc::now())
-        .bind(id)
-        .execute(pool)
-        .await?;
+        sqlx::query("UPDATE bounties SET status = $1, updated_at = $2 WHERE id = $3")
+            .bind(status)
+            .bind(Utc::now())
+            .bind(id)
+            .execute(pool)
+            .await?;
 
         Ok(())
     }
@@ -173,9 +169,12 @@ impl BountyModel {
     }
 
     /// Get bounties by creator
-    pub async fn find_by_creator(pool: &PgPool, creator: &str) -> Result<Vec<BountyModel>, sqlx::Error> {
+    pub async fn find_by_creator(
+        pool: &PgPool,
+        creator: &str,
+    ) -> Result<Vec<BountyModel>, sqlx::Error> {
         let records = sqlx::query_as::<_, BountyModel>(
-            "SELECT * FROM bounties WHERE creator = $1 ORDER BY created_at DESC"
+            "SELECT * FROM bounties WHERE creator = $1 ORDER BY created_at DESC",
         )
         .bind(creator)
         .fetch_all(pool)

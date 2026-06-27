@@ -175,7 +175,11 @@ pub struct CreateBountyRequest {
     #[validate(length(min = 5, max = 200, message = "Title must be 5-200 characters"))]
     pub title: String,
 
-    #[validate(length(min = 20, max = 5000, message = "Description must be 20-5000 characters"))]
+    #[validate(length(
+        min = 20,
+        max = 5000,
+        message = "Description must be 20-5000 characters"
+    ))]
     pub description: String,
 
     pub bounty_type: String,
@@ -403,10 +407,7 @@ mod tests {
 
     #[test]
     fn test_pagination_offset() {
-        let params = PaginationParams {
-            page: 3,
-            limit: 20,
-        };
+        let params = PaginationParams { page: 3, limit: 20 };
         assert_eq!(params.offset(), 40);
     }
 

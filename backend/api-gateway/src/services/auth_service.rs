@@ -59,8 +59,8 @@ impl AuthService {
     pub fn new(jwt_secret: String) -> Self {
         Self {
             jwt_secret,
-            access_token_expiry_hours: 24,      // 24 hours for access tokens
-            refresh_token_expiry_days: 30,      // 30 days for refresh tokens
+            access_token_expiry_hours: 24, // 24 hours for access tokens
+            refresh_token_expiry_days: 30, // 30 days for refresh tokens
         }
     }
 
@@ -89,11 +89,7 @@ impl AuthService {
 
     /// Generate JWT access token
     pub fn generate_access_token(&self, user: &User) -> Result<String> {
-        let role = if user.is_engine {
-            "engine"
-        } else {
-            "user"
-        };
+        let role = if user.is_engine { "engine" } else { "user" };
 
         let claims = Claims::new(
             user.id,
@@ -104,12 +100,15 @@ impl AuthService {
 
         let encoding_key = EncodingKey::from_secret(self.jwt_secret.as_bytes());
 
-        encode(&Header::default(), &claims, &encoding_key)
-            .context("Failed to encode JWT token")
+        encode(&Header::default(), &claims, &encoding_key).context("Failed to encode JWT token")
     }
 
     /// Generate refresh token
-    pub fn generate_refresh_token(&self, user_id: Uuid, device_info: Option<String>) -> RefreshToken {
+    pub fn generate_refresh_token(
+        &self,
+        user_id: Uuid,
+        device_info: Option<String>,
+    ) -> RefreshToken {
         let token = Uuid::new_v4().to_string();
         let expires_at = Utc::now() + Duration::days(self.refresh_token_expiry_days);
 
@@ -138,7 +137,11 @@ impl AuthService {
     }
 
     /// Create complete authentication response
-    pub fn create_auth_response(&self, user: &User, device_info: Option<String>) -> Result<AuthResponse> {
+    pub fn create_auth_response(
+        &self,
+        user: &User,
+        device_info: Option<String>,
+    ) -> Result<AuthResponse> {
         let access_token = self.generate_access_token(user)?;
         let refresh_token = self.generate_refresh_token(user.id, device_info);
 
@@ -163,7 +166,11 @@ impl AuthService {
     }
 
     /// Generate email verification token
-    pub fn generate_email_verification_token(&self, user_id: Uuid, email: String) -> EmailVerificationToken {
+    pub fn generate_email_verification_token(
+        &self,
+        user_id: Uuid,
+        email: String,
+    ) -> EmailVerificationToken {
         let token = Uuid::new_v4().to_string();
         let expires_at = Utc::now() + Duration::days(7); // 7 days
 
@@ -188,7 +195,9 @@ impl AuthService {
     /// Validate password strength
     pub fn validate_password_strength(&self, password: &str) -> Result<()> {
         if password.len() < 8 {
-            return Err(anyhow::anyhow!("Password must be at least 8 characters long"));
+            return Err(anyhow::anyhow!(
+                "Password must be at least 8 characters long"
+            ));
         }
 
         let has_uppercase = password.chars().any(|c| c.is_uppercase());
@@ -197,11 +206,15 @@ impl AuthService {
         let has_special = password.chars().any(|c| !c.is_alphanumeric());
 
         if !has_uppercase {
-            return Err(anyhow::anyhow!("Password must contain at least one uppercase letter"));
+            return Err(anyhow::anyhow!(
+                "Password must contain at least one uppercase letter"
+            ));
         }
 
         if !has_lowercase {
-            return Err(anyhow::anyhow!("Password must contain at least one lowercase letter"));
+            return Err(anyhow::anyhow!(
+                "Password must contain at least one lowercase letter"
+            ));
         }
 
         if !has_digit {
@@ -209,7 +222,9 @@ impl AuthService {
         }
 
         if !has_special {
-            return Err(anyhow::anyhow!("Password must contain at least one special character"));
+            return Err(anyhow::anyhow!(
+                "Password must contain at least one special character"
+            ));
         }
 
         Ok(())
@@ -246,7 +261,9 @@ mod tests {
 
         let hash = auth_service.hash_password(password).unwrap();
         assert!(auth_service.verify_password(password, &hash).unwrap());
-        assert!(!auth_service.verify_password("WrongPassword", &hash).unwrap());
+        assert!(!auth_service
+            .verify_password("WrongPassword", &hash)
+            .unwrap());
     }
 
     #[test]
@@ -254,22 +271,32 @@ mod tests {
         let auth_service = AuthService::new("test_secret_key".to_string());
 
         // Valid password
-        assert!(auth_service.validate_password_strength("SecurePass123!").is_ok());
+        assert!(auth_service
+            .validate_password_strength("SecurePass123!")
+            .is_ok());
 
         // Too short
         assert!(auth_service.validate_password_strength("Short1!").is_err());
 
         // No uppercase
-        assert!(auth_service.validate_password_strength("password123!").is_err());
+        assert!(auth_service
+            .validate_password_strength("password123!")
+            .is_err());
 
         // No lowercase
-        assert!(auth_service.validate_password_strength("PASSWORD123!").is_err());
+        assert!(auth_service
+            .validate_password_strength("PASSWORD123!")
+            .is_err());
 
         // No digit
-        assert!(auth_service.validate_password_strength("SecurePass!").is_err());
+        assert!(auth_service
+            .validate_password_strength("SecurePass!")
+            .is_err());
 
         // No special char
-        assert!(auth_service.validate_password_strength("SecurePass123").is_err());
+        assert!(auth_service
+            .validate_password_strength("SecurePass123")
+            .is_err());
     }
 
     #[test]

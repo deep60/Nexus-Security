@@ -274,14 +274,23 @@ impl DynamicAnalyzer {
     }
 
     /// Analyze a file dynamically in a sandbox environment
-    pub async fn analyze_file(&mut self, file_path: &Path, job: &ScanJob) -> Result<DynamicAnalysisResult> {
+    pub async fn analyze_file(
+        &mut self,
+        file_path: &Path,
+        job: &ScanJob,
+    ) -> Result<DynamicAnalysisResult> {
         let analysis_id = Uuid::new_v4();
         let start_time = Instant::now();
 
-        info!("Starting dynamic analysis for job {}: {:?}", job.id, file_path);
+        info!(
+            "Starting dynamic analysis for job {}: {:?}",
+            job.id, file_path
+        );
 
         // Create isolated sandbox environment
-        let sandbox_id = self.create_sandbox(analysis_id).await
+        let sandbox_id = self
+            .create_sandbox(analysis_id)
+            .await
             .context("Failed to create sandbox environment")?;
 
         let mut analysis_result = DynamicAnalysisResult {
@@ -294,20 +303,33 @@ impl DynamicAnalyzer {
             error_message: None,
         };
 
-        match self.execute_dynamic_analysis(&sandbox_id, file_path, &analysis_id).await {
+        match self
+            .execute_dynamic_analysis(&sandbox_id, file_path, &analysis_id)
+            .await
+        {
             Ok(behavior) => {
                 // Analyze behaviors for threats
                 let threat_indicators = self.analyze_behavior(&behavior).await?;
-                
+
                 // Generate comprehensive report
-                let report = self.report_generator.generate_dynamic_report(&behavior, &threat_indicators).await?;
-                
+                let report = self
+                    .report_generator
+                    .generate_dynamic_report(&behavior, &threat_indicators)
+                    .await?;
+
                 analysis_result.verdict = self.determine_verdict(&threat_indicators);
-                analysis_result.confidence_score = self.calculate_confidence(&behavior, &threat_indicators);
+                analysis_result.confidence_score =
+                    self.calculate_confidence(&behavior, &threat_indicators);
                 analysis_result.threat_indicators = threat_indicators.into_generic_indicators();
-                analysis_result.metadata.insert("dynamic_report".to_string(), serde_json::to_value(report)?);
-                analysis_result.metadata.insert("execution_time_ms".to_string(), 
-                    serde_json::Value::Number(serde_json::Number::from(start_time.elapsed().as_millis() as u64)));
+                analysis_result
+                    .metadata
+                    .insert("dynamic_report".to_string(), serde_json::to_value(report)?);
+                analysis_result.metadata.insert(
+                    "execution_time_ms".to_string(),
+                    serde_json::Value::Number(serde_json::Number::from(
+                        start_time.elapsed().as_millis() as u64,
+                    )),
+                );
             }
             Err(e) => {
                 error!("Dynamic analysis failed for job {}: {}", job.id, e);
@@ -327,16 +349,23 @@ impl DynamicAnalyzer {
     /// Create an isolated sandbox environment
     async fn create_sandbox(&mut self, analysis_id: Uuid) -> Result<String> {
         debug!("Creating sandbox for analysis {}", analysis_id);
-        
+
         let sandbox_config = self.container_manager.create_sandbox_config(&self.config)?;
-        let sandbox_id = self.container_manager.create_container(sandbox_config).await
+        let sandbox_id = self
+            .container_manager
+            .create_container(sandbox_config)
+            .await
             .context("Failed to create container")?;
 
         // Apply resource limits
-        self.container_manager.apply_resource_limits(&sandbox_id, &self.config.resource_limits).await?;
-        
+        self.container_manager
+            .apply_resource_limits(&sandbox_id, &self.config.resource_limits)
+            .await?;
+
         // Configure network isolation
-        self.container_manager.configure_network(&sandbox_id, &self.config.network_config).await?;
+        self.container_manager
+            .configure_network(&sandbox_id, &self.config.network_config)
+            .await?;
 
         Ok(sandbox_id)
     }
@@ -351,16 +380,23 @@ impl DynamicAnalyzer {
         debug!("Executing dynamic analysis in sandbox {}", sandbox_id);
 
         // Copy file to sandbox
-        let sandbox_file_path = self.container_manager.copy_file_to_sandbox(sandbox_id, file_path).await?;
+        let sandbox_file_path = self
+            .container_manager
+            .copy_file_to_sandbox(sandbox_id, file_path)
+            .await?;
 
         // Start monitoring
-        let monitor_handle = self.monitor.start_monitoring(sandbox_id, analysis_id).await?;
+        let monitor_handle = self
+            .monitor
+            .start_monitoring(sandbox_id, analysis_id)
+            .await?;
 
         // Execute the file with timeout
         let execution_result = timeout(
             self.config.max_execution_time,
-            self.execute_file_in_sandbox(sandbox_id, &sandbox_file_path)
-        ).await;
+            self.execute_file_in_sandbox(sandbox_id, &sandbox_file_path),
+        )
+        .await;
 
         match execution_result {
             Ok(Ok(_)) => {
@@ -370,19 +406,26 @@ impl DynamicAnalyzer {
                 warn!("File execution failed: {}", e);
             }
             Err(_) => {
-                warn!("File execution timed out after {:?}", self.config.max_execution_time);
+                warn!(
+                    "File execution timed out after {:?}",
+                    self.config.max_execution_time
+                );
             }
         }
 
         // Stop monitoring and collect results
-        let behavior = self.monitor.stop_monitoring_and_collect(monitor_handle).await?;
+        let behavior = self
+            .monitor
+            .stop_monitoring_and_collect(monitor_handle)
+            .await?;
 
         Ok(behavior)
     }
 
     /// Execute a file within the sandbox
     async fn execute_file_in_sandbox(&self, sandbox_id: &str, file_path: &Path) -> Result<()> {
-        let file_extension = file_path.extension()
+        let file_extension = file_path
+            .extension()
             .and_then(|ext| ext.to_str())
             .unwrap_or("");
 
@@ -415,7 +458,8 @@ impl DynamicAnalyzer {
 
         debug!("Executing command in sandbox: {}", execution_command);
 
-        let output = self.container_manager
+        let output = self
+            .container_manager
             .execute_command(sandbox_id, &execution_command)
             .await
             .context("Failed to execute file in sandbox")?;
@@ -426,7 +470,10 @@ impl DynamicAnalyzer {
     }
 
     /// Analyze observed behavior for threat indicators
-    async fn analyze_behavior(&self, behavior: &DynamicBehavior) -> Result<DynamicThreatIndicators> {
+    async fn analyze_behavior(
+        &self,
+        behavior: &DynamicBehavior,
+    ) -> Result<DynamicThreatIndicators> {
         debug!("Analyzing dynamic behavior for threats");
 
         let mut indicators = DynamicThreatIndicators {
@@ -442,52 +489,59 @@ impl DynamicAnalyzer {
         // Analyze network operations
         for net_op in &behavior.network_operations {
             if self.is_suspicious_network_operation(net_op) {
-                indicators.malicious_network_connections.push(
-                    format!("{}:{} -> {}:{}", 
-                        net_op.source_ip, net_op.source_port,
-                        net_op.destination_ip, net_op.destination_port)
-                );
+                indicators.malicious_network_connections.push(format!(
+                    "{}:{} -> {}:{}",
+                    net_op.source_ip,
+                    net_op.source_port,
+                    net_op.destination_ip,
+                    net_op.destination_port
+                ));
             }
         }
 
         // Analyze file operations
         for file_op in &behavior.file_operations {
             if self.is_suspicious_file_operation(file_op) {
-                indicators.suspicious_file_operations.push(
-                    format!("{:?}: {}", file_op.operation_type, file_op.source_path.display())
-                );
+                indicators.suspicious_file_operations.push(format!(
+                    "{:?}: {}",
+                    file_op.operation_type,
+                    file_op.source_path.display()
+                ));
             }
         }
 
         // Analyze process operations
         for proc_op in &behavior.process_operations {
             if self.is_suspicious_process_operation(proc_op) {
-                indicators.malicious_processes.push(
-                    format!("{} (PID: {}): {}", proc_op.process_name, proc_op.process_id, proc_op.command_line)
-                );
+                indicators.malicious_processes.push(format!(
+                    "{} (PID: {}): {}",
+                    proc_op.process_name, proc_op.process_id, proc_op.command_line
+                ));
             }
         }
 
         // Analyze registry operations
         for reg_op in &behavior.registry_operations {
             if self.is_suspicious_registry_operation(reg_op) {
-                indicators.registry_modifications.push(
-                    format!("{:?}: {}", reg_op.operation_type, reg_op.key_path)
-                );
+                indicators
+                    .registry_modifications
+                    .push(format!("{:?}: {}", reg_op.operation_type, reg_op.key_path));
             }
 
             if self.is_persistence_mechanism(reg_op) {
-                indicators.persistence_mechanisms.push(
-                    format!("Registry persistence: {}", reg_op.key_path)
-                );
+                indicators
+                    .persistence_mechanisms
+                    .push(format!("Registry persistence: {}", reg_op.key_path));
             }
         }
 
         // Check for evasion techniques
-        self.detect_evasion_techniques(behavior, &mut indicators).await?;
+        self.detect_evasion_techniques(behavior, &mut indicators)
+            .await?;
 
         // Check for data exfiltration
-        self.detect_data_exfiltration(behavior, &mut indicators).await?;
+        self.detect_data_exfiltration(behavior, &mut indicators)
+            .await?;
 
         Ok(indicators)
     }
@@ -519,12 +573,19 @@ impl DynamicAnalyzer {
 
         // Check for operations in sensitive directories
         let sensitive_dirs = [
-            "system32", "windows", "program files", "appdata", "temp", "startup"
+            "system32",
+            "windows",
+            "program files",
+            "appdata",
+            "temp",
+            "startup",
         ];
 
         if sensitive_dirs.iter().any(|&dir| path_str.contains(dir)) {
             match file_op.operation_type {
-                FileOperationType::Create | FileOperationType::Modify | FileOperationType::Delete => true,
+                FileOperationType::Create
+                | FileOperationType::Modify
+                | FileOperationType::Delete => true,
                 _ => false,
             }
         } else {
@@ -538,15 +599,28 @@ impl DynamicAnalyzer {
 
         // Check for suspicious commands
         let suspicious_commands = [
-            "powershell", "cmd", "wmic", "reg", "sc", "net", "taskkill", "schtasks"
+            "powershell",
+            "cmd",
+            "wmic",
+            "reg",
+            "sc",
+            "net",
+            "taskkill",
+            "schtasks",
         ];
 
-        if suspicious_commands.iter().any(|&cmd| cmd_lower.contains(cmd)) {
+        if suspicious_commands
+            .iter()
+            .any(|&cmd| cmd_lower.contains(cmd))
+        {
             return true;
         }
 
         // Check for process injection/hollowing
-        matches!(proc_op.operation_type, ProcessOperationType::Inject | ProcessOperationType::Hollow)
+        matches!(
+            proc_op.operation_type,
+            ProcessOperationType::Inject | ProcessOperationType::Hollow
+        )
     }
 
     /// Check if a registry operation is suspicious
@@ -587,8 +661,11 @@ impl DynamicAnalyzer {
             if syscall.call_name.contains("sleep") || syscall.call_name.contains("delay") {
                 if let Some(param) = syscall.parameters.get("duration") {
                     if let Ok(duration) = param.parse::<u64>() {
-                        if duration > 10000 { // 10+ seconds
-                            indicators.evasion_techniques.push("Long sleep detected".to_string());
+                        if duration > 10000 {
+                            // 10+ seconds
+                            indicators
+                                .evasion_techniques
+                                .push("Long sleep detected".to_string());
                         }
                     }
                 }
@@ -598,12 +675,15 @@ impl DynamicAnalyzer {
         // Check for sandbox detection attempts
         for file_op in &behavior.file_operations {
             let path_str = file_op.source_path.to_string_lossy().to_lowercase();
-            let sandbox_indicators = [
-                "vmware", "virtualbox", "qemu", "xen", "vbox", "vmtools"
-            ];
+            let sandbox_indicators = ["vmware", "virtualbox", "qemu", "xen", "vbox", "vmtools"];
 
-            if sandbox_indicators.iter().any(|&indicator| path_str.contains(indicator)) {
-                indicators.evasion_techniques.push("Sandbox detection attempt".to_string());
+            if sandbox_indicators
+                .iter()
+                .any(|&indicator| path_str.contains(indicator))
+            {
+                indicators
+                    .evasion_techniques
+                    .push("Sandbox detection attempt".to_string());
             }
         }
 
@@ -618,26 +698,36 @@ impl DynamicAnalyzer {
     ) -> Result<()> {
         // Check for large outbound data transfers
         for net_op in &behavior.network_operations {
-            if net_op.bytes_sent > 1_000_000 { // 1MB+
-                indicators.data_exfiltration_attempts.push(
-                    format!("Large data transfer: {} bytes to {}:{}", 
-                        net_op.bytes_sent, net_op.destination_ip, net_op.destination_port)
-                );
+            if net_op.bytes_sent > 1_000_000 {
+                // 1MB+
+                indicators.data_exfiltration_attempts.push(format!(
+                    "Large data transfer: {} bytes to {}:{}",
+                    net_op.bytes_sent, net_op.destination_ip, net_op.destination_port
+                ));
             }
         }
 
         // Check for access to sensitive files
         let sensitive_files = [
-            "passwords", "credentials", "keystore", "wallet", "private", "secret"
+            "passwords",
+            "credentials",
+            "keystore",
+            "wallet",
+            "private",
+            "secret",
         ];
 
         for file_op in &behavior.file_operations {
             let path_str = file_op.source_path.to_string_lossy().to_lowercase();
-            
-            if sensitive_files.iter().any(|&pattern| path_str.contains(pattern)) {
-                indicators.data_exfiltration_attempts.push(
-                    format!("Access to sensitive file: {}", file_op.source_path.display())
-                );
+
+            if sensitive_files
+                .iter()
+                .any(|&pattern| path_str.contains(pattern))
+            {
+                indicators.data_exfiltration_attempts.push(format!(
+                    "Access to sensitive file: {}",
+                    file_op.source_path.display()
+                ));
             }
         }
 
@@ -669,9 +759,13 @@ impl DynamicAnalyzer {
     }
 
     /// Calculate confidence score based on behavior analysis
-    fn calculate_confidence(&self, behavior: &DynamicBehavior, indicators: &DynamicThreatIndicators) -> f32 {
+    fn calculate_confidence(
+        &self,
+        behavior: &DynamicBehavior,
+        indicators: &DynamicThreatIndicators,
+    ) -> f32 {
         let base_confidence = 0.7; // Base confidence for dynamic analysis
-        
+
         let indicator_count = indicators.malicious_network_connections.len()
             + indicators.suspicious_file_operations.len()
             + indicators.malicious_processes.len()
@@ -680,11 +774,13 @@ impl DynamicAnalyzer {
             + indicators.evasion_techniques.len()
             + indicators.data_exfiltration_attempts.len();
 
-        let behavior_richness = (behavior.file_operations.len() 
-            + behavior.network_operations.len() 
-            + behavior.process_operations.len()) as f32 / 100.0;
+        let behavior_richness = (behavior.file_operations.len()
+            + behavior.network_operations.len()
+            + behavior.process_operations.len()) as f32
+            / 100.0;
 
-        let confidence = base_confidence + (indicator_count as f32 * 0.05) + behavior_richness.min(0.2);
+        let confidence =
+            base_confidence + (indicator_count as f32 * 0.05) + behavior_richness.min(0.2);
         confidence.min(1.0)
     }
 
@@ -804,7 +900,7 @@ mod tests {
     #[test]
     fn test_suspicious_network_operation_detection() {
         let analyzer = DynamicAnalyzer::new(DynamicAnalyzerConfig::default()).unwrap();
-        
+
         let suspicious_op = NetworkOperation {
             protocol: "TCP".to_string(),
             source_ip: "192.168.1.100".to_string(),
@@ -834,7 +930,11 @@ mod tests {
 
         let generic_indicators = indicators.into_generic_indicators();
         assert_eq!(generic_indicators.len(), 7);
-        assert!(generic_indicators.iter().any(|i| i.indicator_type == "network_connection"));
-        assert!(generic_indicators.iter().any(|i| i.indicator_type == "persistence"));
+        assert!(generic_indicators
+            .iter()
+            .any(|i| i.indicator_type == "network_connection"));
+        assert!(generic_indicators
+            .iter()
+            .any(|i| i.indicator_type == "persistence"));
     }
 }

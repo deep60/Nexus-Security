@@ -1,7 +1,7 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use redis::AsyncCommands;
 use serde::Serialize;
-use tracing::{info, error};
+use tracing::{error, info};
 
 use super::event_types::VerdyxEvent;
 
@@ -32,7 +32,8 @@ impl EventPublisher {
         let payload = serde_json::to_string(event)
             .map_err(|e| anyhow!("Failed to serialize event: {}", e))?;
 
-        let mut conn = self.redis_client
+        let mut conn = self
+            .redis_client
             .get_multiplexed_async_connection()
             .await
             .map_err(|e| anyhow!("Failed to connect to Redis: {}", e))?;
@@ -53,7 +54,8 @@ impl EventPublisher {
 
         let event_count = events.len();
 
-        let mut conn = self.redis_client
+        let mut conn = self
+            .redis_client
             .get_multiplexed_async_connection()
             .await
             .map_err(|e| anyhow!("Failed to connect to Redis: {}", e))?;

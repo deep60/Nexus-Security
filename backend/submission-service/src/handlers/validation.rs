@@ -4,7 +4,10 @@ const MAX_FILE_SIZE: usize = 100 * 1024 * 1024; // 100 MB
 
 pub fn validate_file_size(size: usize) -> Result<(), String> {
     if size > MAX_FILE_SIZE {
-        return Err(format!("File size {} exceeds maximum {}", size, MAX_FILE_SIZE));
+        return Err(format!(
+            "File size {} exceeds maximum {}",
+            size, MAX_FILE_SIZE
+        ));
     }
     Ok(())
 }

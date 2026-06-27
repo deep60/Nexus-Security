@@ -462,8 +462,8 @@ impl AppConfig {
         }
 
         // Blockchain configuration
-        if let Ok(rpc_url) = std::env::var("BLOCKCHAIN_RPC_URL")
-            .or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
+        if let Ok(rpc_url) =
+            std::env::var("BLOCKCHAIN_RPC_URL").or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
         {
             config.blockchain.rpc_url = rpc_url;
         }
@@ -522,9 +522,7 @@ impl AppConfig {
         if let Ok(url) = std::env::var("BOUNTY_MANAGER_URL") {
             config.services.bounty_manager_url = url;
         }
-        if let Ok(path) = std::env::var("UPLOAD_PATH")
-            .or_else(|_| std::env::var("UPLOAD_DIR"))
-        {
+        if let Ok(path) = std::env::var("UPLOAD_PATH").or_else(|_| std::env::var("UPLOAD_DIR")) {
             config.services.upload_path = path;
         }
 
@@ -632,9 +630,7 @@ impl AppConfig {
             self.security.cors.allowed_origins =
                 origins.split(',').map(|s| s.trim().to_string()).collect();
         }
-        if let Ok(path) = std::env::var("UPLOAD_PATH")
-            .or_else(|_| std::env::var("UPLOAD_DIR"))
-        {
+        if let Ok(path) = std::env::var("UPLOAD_PATH").or_else(|_| std::env::var("UPLOAD_DIR")) {
             self.services.upload_path = path;
         }
         if let Ok(url) = std::env::var("ANALYSIS_ENGINE_URL") {
@@ -643,8 +639,8 @@ impl AppConfig {
         if let Ok(url) = std::env::var("BOUNTY_MANAGER_URL") {
             self.services.bounty_manager_url = url;
         }
-        if let Ok(rpc_url) = std::env::var("BLOCKCHAIN_RPC_URL")
-            .or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
+        if let Ok(rpc_url) =
+            std::env::var("BLOCKCHAIN_RPC_URL").or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
         {
             self.blockchain.rpc_url = rpc_url;
         }

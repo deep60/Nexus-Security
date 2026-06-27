@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use tracing::{error, info, warn};
 
 use crate::models::{NotificationChannel, NotificationError, NotificationResult};
-use shared::messaging::event_types::{VerdyxEvent, NotificationPayload};
+use shared::messaging::event_types::{NotificationPayload, VerdyxEvent};
 
 /// Email notification channel implementation
 pub struct EmailChannel {
@@ -48,40 +48,64 @@ impl EmailChannel {
     /// Register email templates
     fn register_templates(engine: &mut handlebars::Handlebars) -> Result<(), NotificationError> {
         // Welcome email template
-        engine.register_template_string(
-            "user_registered",
-            include_str!("../templates/email/user_registered.hbs"),
-        ).map_err(|e| NotificationError::TemplateError(format!("Failed to register template: {}", e)))?;
+        engine
+            .register_template_string(
+                "user_registered",
+                include_str!("../templates/email/user_registered.hbs"),
+            )
+            .map_err(|e| {
+                NotificationError::TemplateError(format!("Failed to register template: {}", e))
+            })?;
 
         // Bounty created template
-        engine.register_template_string(
-            "bounty_created",
-            include_str!("../templates/email/bounty_created.hbs"),
-        ).map_err(|e| NotificationError::TemplateError(format!("Failed to register template: {}", e)))?;
+        engine
+            .register_template_string(
+                "bounty_created",
+                include_str!("../templates/email/bounty_created.hbs"),
+            )
+            .map_err(|e| {
+                NotificationError::TemplateError(format!("Failed to register template: {}", e))
+            })?;
 
         // Submission received template
-        engine.register_template_string(
-            "submission_received",
-            include_str!("../templates/email/submission_received.hbs"),
-        ).map_err(|e| NotificationError::TemplateError(format!("Failed to register template: {}", e)))?;
+        engine
+            .register_template_string(
+                "submission_received",
+                include_str!("../templates/email/submission_received.hbs"),
+            )
+            .map_err(|e| {
+                NotificationError::TemplateError(format!("Failed to register template: {}", e))
+            })?;
 
         // Payment processed template
-        engine.register_template_string(
-            "payment_processed",
-            include_str!("../templates/email/payment_processed.hbs"),
-        ).map_err(|e| NotificationError::TemplateError(format!("Failed to register template: {}", e)))?;
+        engine
+            .register_template_string(
+                "payment_processed",
+                include_str!("../templates/email/payment_processed.hbs"),
+            )
+            .map_err(|e| {
+                NotificationError::TemplateError(format!("Failed to register template: {}", e))
+            })?;
 
         // Reputation updated template
-        engine.register_template_string(
-            "reputation_updated",
-            include_str!("../templates/email/reputation_updated.hbs"),
-        ).map_err(|e| NotificationError::TemplateError(format!("Failed to register template: {}", e)))?;
+        engine
+            .register_template_string(
+                "reputation_updated",
+                include_str!("../templates/email/reputation_updated.hbs"),
+            )
+            .map_err(|e| {
+                NotificationError::TemplateError(format!("Failed to register template: {}", e))
+            })?;
 
         // Generic notification template
-        engine.register_template_string(
-            "generic_notification",
-            include_str!("../templates/email/generic_notification.hbs"),
-        ).map_err(|e| NotificationError::TemplateError(format!("Failed to register template: {}", e)))?;
+        engine
+            .register_template_string(
+                "generic_notification",
+                include_str!("../templates/email/generic_notification.hbs"),
+            )
+            .map_err(|e| {
+                NotificationError::TemplateError(format!("Failed to register template: {}", e))
+            })?;
 
         Ok(())
     }
@@ -103,32 +127,68 @@ impl EmailChannel {
         let mut data = HashMap::new();
 
         data.insert("title".to_string(), serde_json::json!(event.get_title()));
-        data.insert("description".to_string(), serde_json::json!(event.get_description()));
+        data.insert(
+            "description".to_string(),
+            serde_json::json!(event.get_description()),
+        );
 
         match event {
             VerdyxEvent::BountyCreated(e) => {
-                data.insert("bounty_id".to_string(), serde_json::json!(e.bounty_id.to_string()));
+                data.insert(
+                    "bounty_id".to_string(),
+                    serde_json::json!(e.bounty_id.to_string()),
+                );
                 data.insert("bounty_title".to_string(), serde_json::json!(e.title));
-                data.insert("reward_amount".to_string(), serde_json::json!(e.reward_amount.to_string()));
-                data.insert("stake_requirement".to_string(), serde_json::json!(e.stake_requirement.to_string()));
-                data.insert("expires_at".to_string(), serde_json::json!(e.expires_at.to_rfc3339()));
+                data.insert(
+                    "reward_amount".to_string(),
+                    serde_json::json!(e.reward_amount.to_string()),
+                );
+                data.insert(
+                    "stake_requirement".to_string(),
+                    serde_json::json!(e.stake_requirement.to_string()),
+                );
+                data.insert(
+                    "expires_at".to_string(),
+                    serde_json::json!(e.expires_at.to_rfc3339()),
+                );
                 data.insert("tags".to_string(), serde_json::json!(e.tags));
             }
             VerdyxEvent::SubmissionReceived(e) => {
-                data.insert("submission_id".to_string(), serde_json::json!(e.submission_id.to_string()));
-                data.insert("bounty_id".to_string(), serde_json::json!(e.bounty_id.to_string()));
-                data.insert("verdict".to_string(), serde_json::json!(format!("{:?}", e.verdict)));
-                data.insert("confidence_score".to_string(), serde_json::json!(format!("{:.2}%", e.confidence_score * 100.0)));
+                data.insert(
+                    "submission_id".to_string(),
+                    serde_json::json!(e.submission_id.to_string()),
+                );
+                data.insert(
+                    "bounty_id".to_string(),
+                    serde_json::json!(e.bounty_id.to_string()),
+                );
+                data.insert(
+                    "verdict".to_string(),
+                    serde_json::json!(format!("{:?}", e.verdict)),
+                );
+                data.insert(
+                    "confidence_score".to_string(),
+                    serde_json::json!(format!("{:.2}%", e.confidence_score * 100.0)),
+                );
             }
             VerdyxEvent::PaymentProcessed(e) => {
-                data.insert("amount".to_string(), serde_json::json!(e.amount.to_string()));
+                data.insert(
+                    "amount".to_string(),
+                    serde_json::json!(e.amount.to_string()),
+                );
                 data.insert("tx_hash".to_string(), serde_json::json!(e.tx_hash));
-                data.insert("bounty_id".to_string(), serde_json::json!(e.bounty_id.to_string()));
+                data.insert(
+                    "bounty_id".to_string(),
+                    serde_json::json!(e.bounty_id.to_string()),
+                );
             }
             VerdyxEvent::ReputationUpdated(e) => {
                 data.insert("old_score".to_string(), serde_json::json!(e.old_score));
                 data.insert("new_score".to_string(), serde_json::json!(e.new_score));
-                data.insert("change_reason".to_string(), serde_json::json!(e.change_reason));
+                data.insert(
+                    "change_reason".to_string(),
+                    serde_json::json!(e.change_reason),
+                );
             }
             VerdyxEvent::UserRegistered(e) => {
                 data.insert("username".to_string(), serde_json::json!(e.username));
@@ -140,16 +200,15 @@ impl EmailChannel {
     }
 
     /// Render email HTML content
-    fn render_email_html(
-        &self,
-        event: &VerdyxEvent,
-    ) -> Result<String, NotificationError> {
+    fn render_email_html(&self, event: &VerdyxEvent) -> Result<String, NotificationError> {
         let template_name = Self::get_template_name(event);
         let template_data = Self::build_template_data(event);
 
         self.template_engine
             .render(template_name, &template_data)
-            .map_err(|e| NotificationError::TemplateError(format!("Failed to render template: {}", e)))
+            .map_err(|e| {
+                NotificationError::TemplateError(format!("Failed to render template: {}", e))
+            })
     }
 
     /// Create plain text version from HTML
@@ -180,11 +239,7 @@ impl EmailChannel {
 
 #[async_trait]
 impl NotificationChannel for EmailChannel {
-    async fn send(
-        &self,
-        payload: &NotificationPayload,
-        recipient: &str,
-    ) -> NotificationResult<()> {
+    async fn send(&self, payload: &NotificationPayload, recipient: &str) -> NotificationResult<()> {
         info!(
             "Sending email notification to {} for event: {}",
             recipient,
@@ -231,10 +286,7 @@ impl NotificationChannel for EmailChannel {
             }
             Err(e) => {
                 error!("Failed to send email to {}: {}", recipient, e);
-                Err(NotificationError::SendError(format!(
-                    "SMTP error: {}",
-                    e
-                )))
+                Err(NotificationError::SendError(format!("SMTP error: {}", e)))
             }
         }
     }
@@ -281,9 +333,9 @@ impl Default for EmailConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
     use shared::messaging::event_types::UserRegisteredEvent;
     use uuid::Uuid;
-    use chrono::Utc;
 
     #[test]
     fn test_html_to_text() {

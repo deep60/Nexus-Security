@@ -16,11 +16,7 @@ use std::{
 };
 use tokio::{net::TcpListener, sync::RwLock};
 use tower::ServiceBuilder;
-use tower_http::{
-    cors::CorsLayer,
-    limit::RequestBodyLimitLayer,
-    trace::TraceLayer,
-};
+use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -90,7 +86,7 @@ async fn auth_middleware(
                     .await
                     .ok()
                     .flatten();
-                
+
                 if is_blacklisted.is_some() {
                     warn!("Attempted use of blacklisted token");
                     return Err(StatusCode::UNAUTHORIZED);
@@ -151,9 +147,6 @@ async fn logging_middleware(request: axum::extract::Request, next: Next) -> Resp
     );
     response
 }
-
-
-
 
 // Initialize services
 async fn initialize_services(
@@ -221,10 +214,7 @@ async fn main() -> Result<()> {
         .compact()
         .init();
 
-    info!(
-        "Starting Verdyx API Gateway v{}",
-        env!("CARGO_PKG_VERSION")
-    );
+    info!("Starting Verdyx API Gateway v{}", env!("CARGO_PKG_VERSION"));
 
     // Load configuration
     let config = load_config()?;
@@ -247,7 +237,12 @@ async fn main() -> Result<()> {
     };
 
     // Create CORS layer from config
-    let allowed_origins: Vec<_> = state.config.security.cors.allowed_origins.iter()
+    let allowed_origins: Vec<_> = state
+        .config
+        .security
+        .cors
+        .allowed_origins
+        .iter()
         .filter_map(|origin| origin.parse::<axum::http::HeaderValue>().ok())
         .collect();
 

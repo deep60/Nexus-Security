@@ -91,8 +91,7 @@ impl ReputationService {
             .min(self.config.reputation.max_score);
 
         let new_correct = current.correct_submissions + if update.was_correct { 1 } else { 0 };
-        let new_incorrect =
-            current.incorrect_submissions + if update.was_correct { 0 } else { 1 };
+        let new_incorrect = current.incorrect_submissions + if update.was_correct { 0 } else { 1 };
         let new_total = current.total_submissions + 1;
         let new_streak = if update.was_correct {
             current.current_streak + 1

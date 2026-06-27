@@ -39,7 +39,10 @@ impl NotificationService {
     }
 
     /// Send a notification to a user
-    pub async fn send_notification(&self, notification: Notification) -> Result<(), NotificationError> {
+    pub async fn send_notification(
+        &self,
+        notification: Notification,
+    ) -> Result<(), NotificationError> {
         // Notification delivery is currently log-only. Production would dispatch
         // to email, WebSocket, or push notification providers here.
         tracing::info!(

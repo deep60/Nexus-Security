@@ -1,12 +1,12 @@
 use async_trait::async_trait;
-use reqwest::{Client, header};
+use chrono::{DateTime, Utc};
+use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::{error, info, warn};
-use chrono::{DateTime, Utc};
 
 use crate::models::{NotificationChannel, NotificationError, NotificationResult};
-use shared::messaging::event_types::{VerdyxEvent, NotificationPayload};
+use shared::messaging::event_types::{NotificationPayload, VerdyxEvent};
 
 /// Webhook notification channel implementation
 /// Sends HTTP POST requests to registered webhook URLs
@@ -122,8 +122,9 @@ impl WebhookChannel {
         url: &str,
         payload: &WebhookPayload,
     ) -> NotificationResult<WebhookResponse> {
-        let payload_json = serde_json::to_string(payload)
-            .map_err(|e| NotificationError::SerializationError(format!("Failed to serialize payload: {}", e)))?;
+        let payload_json = serde_json::to_string(payload).map_err(|e| {
+            NotificationError::SerializationError(format!("Failed to serialize payload: {}", e))
+        })?;
 
         let mut request = self
             .http_client
@@ -139,17 +140,13 @@ impl WebhookChannel {
         }
 
         let start_time = Utc::now();
-        let response = request
-            .body(payload_json)
-            .send()
-            .await
-            .map_err(|e| NotificationError::SendError(format!("Webhook request failed: {}", e)))?;
+        let response =
+            request.body(payload_json).send().await.map_err(|e| {
+                NotificationError::SendError(format!("Webhook request failed: {}", e))
+            })?;
 
         let status_code = response.status().as_u16();
-        let response_body = response
-            .text()
-            .await
-            .unwrap_or_else(|_| String::new());
+        let response_body = response.text().await.unwrap_or_else(|_| String::new());
 
         let delivery_time_ms = (Utc::now() - start_time).num_milliseconds() as u64;
 
@@ -214,11 +211,7 @@ impl WebhookChannel {
 
 #[async_trait]
 impl NotificationChannel for WebhookChannel {
-    async fn send(
-        &self,
-        payload: &NotificationPayload,
-        recipient: &str,
-    ) -> NotificationResult<()> {
+    async fn send(&self, payload: &NotificationPayload, recipient: &str) -> NotificationResult<()> {
         info!(
             "Sending webhook notification to {} for event: {}",
             recipient,
@@ -311,9 +304,9 @@ pub struct WebhookRegistration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
     use chrono::Utc;
     use shared::messaging::event_types::{BountyCreatedEvent, NotificationPriority};
+    use uuid::Uuid;
 
     #[test]
     fn test_validate_url() {
@@ -362,7 +355,13 @@ mod tests {
     async fn test_validate_recipient() {
         let channel = WebhookChannel::new(None);
 
-        assert!(channel.validate_recipient("https://example.com/webhook").await.is_ok());
-        assert!(channel.validate_recipient("https://localhost/webhook").await.is_err());
+        assert!(channel
+            .validate_recipient("https://example.com/webhook")
+            .await
+            .is_ok());
+        assert!(channel
+            .validate_recipient("https://localhost/webhook")
+            .await
+            .is_err());
     }
 }

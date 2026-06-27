@@ -80,9 +80,7 @@ pub struct ConnectWalletRequest {
 /// Get wallet balance
 ///
 /// GET /api/v1/wallet/balance
-pub async fn get_balance(
-    State(state): State<AppState>,
-) -> Result<Json<WalletBalance>, StatusCode> {
+pub async fn get_balance(State(state): State<AppState>) -> Result<Json<WalletBalance>, StatusCode> {
     // Get the user's wallet address from JWT claims
     // For now, return a structured response; the frontend must provide the address
     // In production, extract from authenticated session
@@ -152,20 +150,25 @@ pub async fn connect_wallet(
     Json(payload): Json<ConnectWalletRequest>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // Verify signature: recover address from message + signature
-    let signature = payload.signature.parse::<ethers::types::Signature>()
+    let signature = payload
+        .signature
+        .parse::<ethers::types::Signature>()
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    let recovered = signature.recover(payload.message.as_str())
-        .map_err(|e| {
-            tracing::warn!("Signature recovery failed: {}", e);
-            StatusCode::BAD_REQUEST
-        })?;
+    let recovered = signature.recover(payload.message.as_str()).map_err(|e| {
+        tracing::warn!("Signature recovery failed: {}", e);
+        StatusCode::BAD_REQUEST
+    })?;
 
     let recovered_addr = format!("{:?}", recovered);
 
     // Check recovered address matches claimed address (case-insensitive)
     if recovered_addr.to_lowercase() != payload.address.to_lowercase() {
-        tracing::warn!("Signature mismatch: recovered={}, claimed={}", recovered_addr, payload.address);
+        tracing::warn!(
+            "Signature mismatch: recovered={}, claimed={}",
+            recovered_addr,
+            payload.address
+        );
         return Err(StatusCode::UNAUTHORIZED);
     }
 

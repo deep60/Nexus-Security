@@ -1,9 +1,13 @@
-use axum::{extract::{State, Path}, response::Json, http::StatusCode};
+use crate::models::*;
+use crate::AppState;
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::Json,
+};
 use serde_json::{json, Value};
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::AppState;
-use crate::models::*;
 
 /// Map a ConsensusError to an HTTP status + JSON body.
 fn err_response(e: ConsensusError) -> (StatusCode, Json<Value>) {

@@ -192,7 +192,7 @@ pub async fn api_key_middleware(
     }
 
     // Hash the API key and look it up in the database
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     let key_hash = format!("{:x}", Sha256::digest(api_key.as_bytes()));
 
     let row: Option<(Uuid, String, String)> = sqlx::query_as(

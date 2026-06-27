@@ -7,7 +7,6 @@
 /// - Password-protected archive detection
 /// - Suspicious file detection
 /// - Extraction and analysis of contents
-
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -221,7 +220,10 @@ impl Scanner for ArchiveScanner {
                     severity: ThreatLevel::Critical,
                     evidence: vec![
                         format!("Compressed: {} bytes", archive_info.total_compressed_size),
-                        format!("Uncompressed: {} bytes", archive_info.total_uncompressed_size),
+                        format!(
+                            "Uncompressed: {} bytes",
+                            archive_info.total_uncompressed_size
+                        ),
                     ],
                 });
 
@@ -249,7 +251,10 @@ impl Scanner for ArchiveScanner {
                     finding_id: Uuid::new_v4(),
                     category: FindingCategory::Suspicious,
                     title: "Excessive archive nesting".to_string(),
-                    description: format!("{} levels of nested archives", archive_info.nesting_level),
+                    description: format!(
+                        "{} levels of nested archives",
+                        archive_info.nesting_level
+                    ),
                     severity: ThreatLevel::High,
                     evidence: vec![format!("Levels: {}", archive_info.nesting_level)],
                     recommendation: Some("Possible archive bomb".to_string()),
@@ -277,7 +282,9 @@ impl Scanner for ArchiveScanner {
             }
 
             // Check extracted size
-            if archive_info.total_uncompressed_size > self.config.max_extraction_size_mb * 1024 * 1024 {
+            if archive_info.total_uncompressed_size
+                > self.config.max_extraction_size_mb * 1024 * 1024
+            {
                 bomb_indicators.push(BombIndicator {
                     indicator_type: BombType::ExcessiveSize,
                     description: format!(
@@ -330,7 +337,10 @@ impl Scanner for ArchiveScanner {
                 .and_then(|e| e.to_str())
                 .unwrap_or("");
 
-            if self.suspicious_extensions.contains(&extension.to_lowercase()) {
+            if self
+                .suspicious_extensions
+                .contains(&extension.to_lowercase())
+            {
                 if !suspicious_files.contains(&file.filename) {
                     suspicious_files.push(file.filename.clone());
                 }
@@ -394,9 +404,18 @@ impl Scanner for ArchiveScanner {
 
     fn get_stats(&self) -> HashMap<String, String> {
         let mut stats = HashMap::new();
-        stats.insert("scanner_name".to_string(), self.config.base.scanner_name.clone());
-        stats.insert("max_nesting".to_string(), self.config.max_nesting_level.to_string());
-        stats.insert("compression_threshold".to_string(), self.config.compression_ratio_threshold.to_string());
+        stats.insert(
+            "scanner_name".to_string(),
+            self.config.base.scanner_name.clone(),
+        );
+        stats.insert(
+            "max_nesting".to_string(),
+            self.config.max_nesting_level.to_string(),
+        );
+        stats.insert(
+            "compression_threshold".to_string(),
+            self.config.compression_ratio_threshold.to_string(),
+        );
         stats
     }
 
@@ -441,8 +460,8 @@ impl ArchiveScanner {
     /// Scan ZIP archive
     fn scan_zip(&self, data: &[u8]) -> Result<(ArchiveInfo, Vec<ArchiveFileInfo>)> {
         let cursor = Cursor::new(data);
-        let mut archive = ZipArchive::new(cursor)
-            .map_err(|e| anyhow!("Failed to read ZIP archive: {}", e))?;
+        let mut archive =
+            ZipArchive::new(cursor).map_err(|e| anyhow!("Failed to read ZIP archive: {}", e))?;
 
         let mut files = Vec::new();
         let mut total_compressed = 0u64;
@@ -451,7 +470,8 @@ impl ArchiveScanner {
         let mut has_nested_archives = false;
 
         for i in 0..archive.len() {
-            let file = archive.by_index(i)
+            let file = archive
+                .by_index(i)
                 .map_err(|e| anyhow!("Failed to read file {}: {}", i, e))?;
 
             let filename = file.name().to_string();
@@ -614,7 +634,10 @@ mod tests {
 
         // Unknown
         let unknown_data = b"TEST";
-        assert_eq!(scanner.detect_archive_type(unknown_data), ArchiveType::Unknown);
+        assert_eq!(
+            scanner.detect_archive_type(unknown_data),
+            ArchiveType::Unknown
+        );
     }
 
     #[tokio::test]

@@ -1,16 +1,16 @@
-use sha2::{Digest, Sha256};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use chrono::{Duration, Utc};
+use hex;
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use ring::{
+    pbkdf2,
     rand::{SecureRandom, SystemRandom},
     signature::{self, Ed25519KeyPair, KeyPair},
-    pbkdf2,
 };
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use hex;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::num::NonZeroU32;
 use thiserror::Error;
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use chrono::{Duration, Utc};
 use uuid::Uuid;
 
 #[derive(Error, Debug)]
@@ -72,7 +72,7 @@ impl HashUtils {
 
     /// Generate SHA-1 hash of data
     pub fn sha1(data: &[u8]) -> String {
-        use sha1::{Sha1, Digest};
+        use sha1::{Digest, Sha1};
         let mut hasher = Sha1::new();
         hasher.update(data);
         hex::encode(hasher.finalize())
@@ -101,15 +101,15 @@ impl SignatureUtils {
     /// Generate a new Ed25519 key pair
     pub fn generate_keypair() -> CryptoResult<KeyPairInfo> {
         let rng = SystemRandom::new();
-        let keypair_doc = Ed25519KeyPair::generate_pkcs8(&rng)
-            .map_err(|_| CryptoError::KeyGenerationFailed)?;
-        
+        let keypair_doc =
+            Ed25519KeyPair::generate_pkcs8(&rng).map_err(|_| CryptoError::KeyGenerationFailed)?;
+
         let keypair = Ed25519KeyPair::from_pkcs8(keypair_doc.as_ref())
             .map_err(|_| CryptoError::KeyGenerationFailed)?;
-            
+
         let public_key = BASE64.encode(keypair.public_key().as_ref());
         let private_key = BASE64.encode(keypair_doc.as_ref());
-        
+
         Ok(KeyPairInfo {
             public_key,
             private_key,
@@ -118,12 +118,13 @@ impl SignatureUtils {
 
     /// Sign a message with a private key
     pub fn sign_message(private_key_b64: &str, message: &[u8]) -> CryptoResult<String> {
-        let private_key_bytes = BASE64.decode(private_key_b64)
+        let private_key_bytes = BASE64
+            .decode(private_key_b64)
             .map_err(|_| CryptoError::InvalidKeyFormat)?;
-        
+
         let keypair = Ed25519KeyPair::from_pkcs8(&private_key_bytes)
             .map_err(|_| CryptoError::InvalidKeyFormat)?;
-        
+
         let signature = keypair.sign(message);
         Ok(BASE64.encode(signature.as_ref()))
     }
@@ -134,17 +135,16 @@ impl SignatureUtils {
         message: &[u8],
         signature_b64: &str,
     ) -> CryptoResult<bool> {
-        let public_key_bytes = BASE64.decode(public_key_b64)
+        let public_key_bytes = BASE64
+            .decode(public_key_b64)
             .map_err(|_| CryptoError::InvalidKeyFormat)?;
-        
-        let signature_bytes = BASE64.decode(signature_b64)
+
+        let signature_bytes = BASE64
+            .decode(signature_b64)
             .map_err(|_| CryptoError::InvalidSignature)?;
-        
-        let public_key = signature::UnparsedPublicKey::new(
-            &signature::ED25519,
-            &public_key_bytes,
-        );
-        
+
+        let public_key = signature::UnparsedPublicKey::new(&signature::ED25519, &public_key_bytes);
+
         match public_key.verify(message, &signature_bytes) {
             Ok(()) => Ok(true),
             Err(_) => Ok(false),
@@ -158,13 +158,14 @@ impl SignatureUtils {
     ) -> CryptoResult<SignatureInfo> {
         let message_bytes = message.as_bytes();
         let signature = Self::sign_message(private_key_b64, message_bytes)?;
-        
-        let keypair_bytes = BASE64.decode(private_key_b64)
+
+        let keypair_bytes = BASE64
+            .decode(private_key_b64)
             .map_err(|_| CryptoError::InvalidKeyFormat)?;
         let keypair = Ed25519KeyPair::from_pkcs8(&keypair_bytes)
             .map_err(|_| CryptoError::InvalidKeyFormat)?;
         let public_key = BASE64.encode(keypair.public_key().as_ref());
-        
+
         Ok(SignatureInfo {
             signature,
             public_key,
@@ -194,7 +195,7 @@ impl SecretUtils {
     pub fn hash_password(password: &str, salt: &[u8]) -> CryptoResult<Vec<u8>> {
         let mut hash = vec![0u8; Self::KEY_LENGTH];
         let rounds = NonZeroU32::new(Self::PBKDF2_ROUNDS).unwrap();
-        
+
         pbkdf2::derive(
             pbkdf2::PBKDF2_HMAC_SHA256,
             rounds,
@@ -202,7 +203,7 @@ impl SecretUtils {
             password.as_bytes(),
             &mut hash,
         );
-        
+
         Ok(hash)
     }
 
@@ -212,7 +213,7 @@ impl SecretUtils {
             Ok(hash) => hash,
             Err(_) => return false,
         };
-        
+
         // Constant-time comparison to prevent timing attacks
         use ring::constant_time;
         constant_time::verify_slices_are_equal(&computed_hash, expected_hash).is_ok()
@@ -242,12 +243,12 @@ impl BlockchainUtils {
         if !address.starts_with("0x") {
             return false;
         }
-        
+
         let addr_without_prefix = &address[2..];
         if addr_without_prefix.len() != 40 {
             return false;
         }
-        
+
         addr_without_prefix.chars().all(|c| c.is_ascii_hexdigit())
     }
 
@@ -256,11 +257,11 @@ impl BlockchainUtils {
         if !Self::is_valid_ethereum_address(address) {
             return Err(CryptoError::InvalidHashFormat);
         }
-        
+
         let addr_lower = address[2..].to_lowercase();
         let hash = Self::keccak256(addr_lower.as_bytes());
         let hash_hex = hex::encode(hash);
-        
+
         let mut checksum = String::from("0x");
         for (i, c) in addr_lower.chars().enumerate() {
             if c.is_ascii_digit() {
@@ -274,13 +275,13 @@ impl BlockchainUtils {
                 }
             }
         }
-        
+
         Ok(checksum)
     }
 
     /// Keccak256 hash (used by Ethereum)
     pub fn keccak256(data: &[u8]) -> Vec<u8> {
-        use sha3::{Keccak256, Digest};
+        use sha3::{Digest, Keccak256};
         let mut hasher = Keccak256::new();
         hasher.update(data);
         hasher.finalize().to_vec()
@@ -328,19 +329,19 @@ impl CryptoUtils {
     pub fn bytes_to_human_readable(bytes: u64) -> String {
         const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
         const THRESHOLD: f64 = 1024.0;
-        
+
         if bytes == 0 {
             return "0 B".to_string();
         }
-        
+
         let mut size = bytes as f64;
         let mut unit_index = 0;
-        
+
         while size >= THRESHOLD && unit_index < UNITS.len() - 1 {
             size /= THRESHOLD;
             unit_index += 1;
         }
-        
+
         if unit_index == 0 {
             format!("{} {}", bytes, UNITS[unit_index])
         } else {
@@ -352,9 +353,9 @@ impl CryptoUtils {
 // JWT Claims structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JwtClaims {
-    pub sub: String,    // Subject (user ID)
-    pub exp: usize,     // Expiration time
-    pub iat: usize,     // Issued at
+    pub sub: String, // Subject (user ID)
+    pub exp: usize,  // Expiration time
+    pub iat: usize,  // Issued at
     pub user_id: String,
     pub wallet_address: Option<String>,
 }
@@ -363,7 +364,7 @@ pub struct JwtClaims {
 pub fn validate_jwt(token: &str, secret: &str) -> CryptoResult<JwtClaims> {
     let key = DecodingKey::from_secret(secret.as_ref());
     let validation = Validation::default();
-    
+
     match decode::<JwtClaims>(token, &key, &validation) {
         Ok(token_data) => Ok(token_data.claims),
         Err(_) => Err(CryptoError::InvalidSignature),
@@ -371,10 +372,14 @@ pub fn validate_jwt(token: &str, secret: &str) -> CryptoResult<JwtClaims> {
 }
 
 /// Generate JWT token
-pub fn generate_jwt(user_id: &str, wallet_address: Option<String>, secret: &str) -> CryptoResult<String> {
+pub fn generate_jwt(
+    user_id: &str,
+    wallet_address: Option<String>,
+    secret: &str,
+) -> CryptoResult<String> {
     let now = Utc::now();
     let exp = now + Duration::hours(24); // Token expires in 24 hours
-    
+
     let claims = JwtClaims {
         sub: user_id.to_string(),
         exp: exp.timestamp() as usize,
@@ -382,7 +387,7 @@ pub fn generate_jwt(user_id: &str, wallet_address: Option<String>, secret: &str)
         user_id: user_id.to_string(),
         wallet_address,
     };
-    
+
     let key = EncodingKey::from_secret(secret.as_ref());
     match encode(&Header::default(), &claims, &key) {
         Ok(token) => Ok(token),
@@ -402,14 +407,12 @@ pub fn calculate_file_hash(data: &[u8]) -> String {
 
 /// Hash password using bcrypt
 pub fn hash_password(password: &str) -> CryptoResult<String> {
-    bcrypt::hash(password, bcrypt::DEFAULT_COST)
-        .map_err(|_| CryptoError::EncryptionFailed)
+    bcrypt::hash(password, bcrypt::DEFAULT_COST).map_err(|_| CryptoError::EncryptionFailed)
 }
 
 /// Verify password using bcrypt
 pub fn verify_password(password: &str, hash: &str) -> CryptoResult<bool> {
-    bcrypt::verify(password, hash)
-        .map_err(|_| CryptoError::DecryptionFailed)
+    bcrypt::verify(password, hash).map_err(|_| CryptoError::DecryptionFailed)
 }
 
 #[cfg(test)]
@@ -436,18 +439,19 @@ mod tests {
         let keypair = SignatureUtils::generate_keypair().unwrap();
         let message = b"Test message";
         let signature = SignatureUtils::sign_message(&keypair.private_key, message).unwrap();
-        let is_valid = SignatureUtils::verify_signature(
-            &keypair.public_key,
-            message,
-            &signature,
-        ).unwrap();
+        let is_valid =
+            SignatureUtils::verify_signature(&keypair.public_key, message, &signature).unwrap();
         assert!(is_valid);
     }
 
     #[test]
     fn test_ethereum_address_validation() {
-        assert!(BlockchainUtils::is_valid_ethereum_address("0x742d35Cc6435C2cb62fb0CF4cE385FA4d8457B5a"));
-        assert!(!BlockchainUtils::is_valid_ethereum_address("invalid_address"));
+        assert!(BlockchainUtils::is_valid_ethereum_address(
+            "0x742d35Cc6435C2cb62fb0CF4cE385FA4d8457B5a"
+        ));
+        assert!(!BlockchainUtils::is_valid_ethereum_address(
+            "invalid_address"
+        ));
         assert!(!BlockchainUtils::is_valid_ethereum_address("0x123")); // Too short
     }
 
@@ -456,16 +460,20 @@ mod tests {
         let password = "secure_password_123";
         let salt = SecretUtils::generate_salt().unwrap();
         let hash = SecretUtils::hash_password(password, &salt).unwrap();
-        
+
         assert!(SecretUtils::verify_password(password, &salt, &hash));
-        assert!(!SecretUtils::verify_password("wrong_password", &salt, &hash));
+        assert!(!SecretUtils::verify_password(
+            "wrong_password",
+            &salt,
+            &hash
+        ));
     }
 
     #[test]
     fn test_multi_hash() {
         let data = b"Verdyx test data";
         let hashes = HashUtils::multi_hash(data);
-        
+
         assert_eq!(hashes.sha256.len(), 64);
         assert_eq!(hashes.md5.len(), 32);
         assert_eq!(hashes.sha1.len(), 40);

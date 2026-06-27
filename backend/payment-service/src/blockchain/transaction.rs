@@ -55,10 +55,7 @@ impl TransactionBuilder {
     }
 }
 
-pub async fn send_transaction(
-    provider: &Provider<Ws>,
-    tx: TransactionRequest,
-) -> Result<H256> {
+pub async fn send_transaction(provider: &Provider<Ws>, tx: TransactionRequest) -> Result<H256> {
     info!("Sending transaction...");
     let pending_tx = provider.send_transaction(tx, None).await?;
     Ok(pending_tx.tx_hash())
@@ -70,7 +67,7 @@ pub async fn wait_for_confirmation(
     _confirmations: usize,
 ) -> Result<TransactionReceipt> {
     info!("Waiting for confirmation of tx {}", tx_hash);
-    
+
     let receipt = provider
         .get_transaction_receipt(tx_hash)
         .await?

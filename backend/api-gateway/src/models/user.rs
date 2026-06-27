@@ -114,7 +114,7 @@ impl User {
         wallet_address: Option<String>,
     ) -> Self {
         let now = Utc::now();
-        
+
         Self {
             id: Uuid::new_v4(),
             username,
@@ -137,7 +137,8 @@ impl User {
 
     pub fn to_response(&self) -> UserResponse {
         let success_rate = if self.successful_analyses + self.failed_analyses > 0 {
-            self.successful_analyses as f64 / (self.successful_analyses + self.failed_analyses) as f64
+            self.successful_analyses as f64
+                / (self.successful_analyses + self.failed_analyses) as f64
         } else {
             0.0
         };
@@ -172,7 +173,7 @@ impl User {
             self.failed_analyses += 1;
             self.reputation_score = (self.reputation_score - 5).max(0); // Penalty for incorrect analysis
         }
-        
+
         self.total_stakes += stake_amount;
         self.updated_at = Utc::now();
     }
@@ -252,10 +253,7 @@ impl User {
             .await
     }
 
-    pub async fn create(
-        pool: &sqlx::PgPool,
-        user: &User,
-    ) -> Result<User, sqlx::Error> {
+    pub async fn create(pool: &sqlx::PgPool, user: &User) -> Result<User, sqlx::Error> {
         sqlx::query_as::<_, User>(
             r#"
             INSERT INTO users (
@@ -265,7 +263,7 @@ impl User {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             RETURNING *
-            "#
+            "#,
         )
         .bind(user.id)
         .bind(&user.username)
@@ -286,10 +284,7 @@ impl User {
         .await
     }
 
-    pub async fn update(
-        pool: &sqlx::PgPool,
-        user: &User,
-    ) -> Result<User, sqlx::Error> {
+    pub async fn update(pool: &sqlx::PgPool, user: &User) -> Result<User, sqlx::Error> {
         sqlx::query_as::<_, User>(
             r#"
             UPDATE users SET
@@ -309,7 +304,7 @@ impl User {
                 last_login = $15
             WHERE id = $1
             RETURNING *
-            "#
+            "#,
         )
         .bind(user.id)
         .bind(&user.username)
@@ -341,7 +336,7 @@ impl User {
             WHERE is_active = true
             ORDER BY reputation_score DESC, successful_analyses DESC
             LIMIT $1 OFFSET $2
-            "#
+            "#,
         )
         .bind(limit)
         .bind(offset)

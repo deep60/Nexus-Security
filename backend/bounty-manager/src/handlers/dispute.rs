@@ -1,19 +1,21 @@
 // backend/bounty-manager/src/handlers/dispute.rs
 
+use super::bounty_crud::PaginationParams;
+use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
+use crate::models::{
+    BountyModel, DisputeModel, DisputeVoteModel, ReputationModel, SubmissionModel,
+};
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
     Extension,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use shared::types::ApiResponse;
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use shared::types::ApiResponse;
-use super::bounty_crud::PaginationParams;
-use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
-use crate::models::{BountyModel, SubmissionModel, DisputeModel, DisputeVoteModel, ReputationModel};
 
 /// Represents a dispute raised against a submission or bounty outcome
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,7 +23,7 @@ pub struct Dispute {
     pub id: Uuid,
     pub bounty_id: Uuid,
     pub submission_id: Option<Uuid>, // If disputing a specific submission
-    pub disputer_id: String, // Engine or user ID raising the dispute
+    pub disputer_id: String,         // Engine or user ID raising the dispute
     pub dispute_type: DisputeType,
     pub reason: String,
     pub evidence: Vec<Evidence>,
@@ -40,34 +42,34 @@ pub struct Dispute {
 /// Types of disputes that can be raised
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DisputeType {
-    IncorrectVerdict,      // Challenging the consensus verdict
-    InvalidSubmission,      // Submission doesn't meet quality standards
-    BountyManipulation,    // Suspicious activity in bounty
-    StakeSlashingAppeal,   // Appealing a stake slashing decision
-    PayoutDispute,         // Disagreement over reward distribution
-    ConsensusFailure,      // Claiming consensus mechanism failed
-    MaliciousAnalysis,     // Accusing submission of being malicious/fake
+    IncorrectVerdict,    // Challenging the consensus verdict
+    InvalidSubmission,   // Submission doesn't meet quality standards
+    BountyManipulation,  // Suspicious activity in bounty
+    StakeSlashingAppeal, // Appealing a stake slashing decision
+    PayoutDispute,       // Disagreement over reward distribution
+    ConsensusFailure,    // Claiming consensus mechanism failed
+    MaliciousAnalysis,   // Accusing submission of being malicious/fake
 }
 
 /// Status of the dispute resolution process
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DisputeStatus {
-    Open,              // Recently filed, awaiting review
-    UnderReview,       // Being investigated by arbitrators
-    VotingPhase,       // Community/DAO voting on outcome
-    Resolved,          // Decision has been made
-    Rejected,          // Dispute deemed invalid
-    Escalated,         // Escalated to higher authority/DAO
-    Withdrawn,         // Disputer withdrew the dispute
+    Open,        // Recently filed, awaiting review
+    UnderReview, // Being investigated by arbitrators
+    VotingPhase, // Community/DAO voting on outcome
+    Resolved,    // Decision has been made
+    Rejected,    // Dispute deemed invalid
+    Escalated,   // Escalated to higher authority/DAO
+    Withdrawn,   // Disputer withdrew the dispute
 }
 
 /// Severity level of the dispute
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DisputeSeverity {
-    Low,       // Minor disagreement
-    Medium,    // Significant issue
-    High,      // Major problem affecting bounty
-    Critical,  // Systemic issue or fraud detected
+    Low,      // Minor disagreement
+    Medium,   // Significant issue
+    High,     // Major problem affecting bounty
+    Critical, // Systemic issue or fraud detected
 }
 
 /// Evidence supporting the dispute
@@ -82,8 +84,8 @@ pub struct Evidence {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EvidenceType {
-    TechnicalAnalysis,  // Re-analysis results
-    Screenshot,         // Visual proof
+    TechnicalAnalysis, // Re-analysis results
+    Screenshot,        // Visual proof
     Log,               // System/analysis logs
     ExpertOpinion,     // Third-party expert review
     BlockchainData,    // On-chain evidence
@@ -111,9 +113,9 @@ pub struct DisputeVote {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum VoteChoice {
-    ApproveDispute,    // Dispute is valid
-    RejectDispute,     // Dispute is invalid
-    Neutral,           // Abstain
+    ApproveDispute, // Dispute is valid
+    RejectDispute,  // Dispute is invalid
+    Neutral,        // Abstain
 }
 
 /// Resolution of the dispute
@@ -128,10 +130,10 @@ pub struct DisputeResolution {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ResolutionDecision {
-    DisputeUpheld,      // Dispute was valid
-    DisputeRejected,    // Dispute was invalid
-    PartialResolution,  // Partially agreed with dispute
-    NeedsMoreEvidence,  // Insufficient information
+    DisputeUpheld,     // Dispute was valid
+    DisputeRejected,   // Dispute was invalid
+    PartialResolution, // Partially agreed with dispute
+    NeedsMoreEvidence, // Insufficient information
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -240,13 +242,13 @@ fn is_valid_status_transition(from: &DisputeStatus, to: &DisputeStatus) -> bool 
     matches!(
         (from, to),
         (DisputeStatus::Open, DisputeStatus::UnderReview)
-        | (DisputeStatus::Open, DisputeStatus::Rejected)
-        | (DisputeStatus::Open, DisputeStatus::Withdrawn)
-        | (DisputeStatus::UnderReview, DisputeStatus::VotingPhase)
-        | (DisputeStatus::UnderReview, DisputeStatus::Resolved)
-        | (DisputeStatus::UnderReview, DisputeStatus::Escalated)
-        | (DisputeStatus::VotingPhase, DisputeStatus::Resolved)
-        | (DisputeStatus::Escalated, DisputeStatus::Resolved)
+            | (DisputeStatus::Open, DisputeStatus::Rejected)
+            | (DisputeStatus::Open, DisputeStatus::Withdrawn)
+            | (DisputeStatus::UnderReview, DisputeStatus::VotingPhase)
+            | (DisputeStatus::UnderReview, DisputeStatus::Resolved)
+            | (DisputeStatus::UnderReview, DisputeStatus::Escalated)
+            | (DisputeStatus::VotingPhase, DisputeStatus::Resolved)
+            | (DisputeStatus::Escalated, DisputeStatus::Resolved)
     )
 }
 
@@ -297,7 +299,9 @@ pub async fn create_dispute(
     if req.stake_amount < bounty.min_stake as u64 {
         tracing::warn!(
             "Dispute stake {} below bounty minimum {} for disputer {}",
-            req.stake_amount, bounty.min_stake, disputer_id
+            req.stake_amount,
+            bounty.min_stake,
+            disputer_id
         );
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -311,14 +315,22 @@ pub async fn create_dispute(
         })?;
 
     if already_disputed {
-        tracing::warn!("Disputer {} already has an active dispute for bounty {}", disputer_id, req.bounty_id);
+        tracing::warn!(
+            "Disputer {} already has an active dispute for bounty {}",
+            disputer_id,
+            req.bounty_id
+        );
         return Err(StatusCode::CONFLICT);
     }
 
     // Verify dispute is raised within allowed timeframe (bounty must not be too old)
     let max_dispute_age = chrono::Duration::days(30);
     if bounty.updated_at + max_dispute_age < Utc::now() {
-        tracing::warn!("Bounty {} is too old to dispute (updated {})", req.bounty_id, bounty.updated_at);
+        tracing::warn!(
+            "Bounty {} is too old to dispute (updated {})",
+            req.bounty_id,
+            bounty.updated_at
+        );
         return Err(StatusCode::BAD_REQUEST);
     }
 
@@ -326,17 +338,23 @@ pub async fn create_dispute(
     let now = Utc::now();
 
     // Convert evidence submissions to evidence
-    let evidence: Vec<Evidence> = req.evidence.into_iter().map(|e| Evidence {
-        evidence_type: e.evidence_type,
-        description: e.description,
-        data: e.data,
-        submitted_by: disputer_id.clone(),
-        submitted_at: now,
-    }).collect();
+    let evidence: Vec<Evidence> = req
+        .evidence
+        .into_iter()
+        .map(|e| Evidence {
+            evidence_type: e.evidence_type,
+            description: e.description,
+            data: e.data,
+            submitted_by: disputer_id.clone(),
+            submitted_at: now,
+        })
+        .collect();
 
     // Determine severity based on dispute type
     let severity = match req.dispute_type {
-        DisputeType::BountyManipulation | DisputeType::MaliciousAnalysis => DisputeSeverity::Critical,
+        DisputeType::BountyManipulation | DisputeType::MaliciousAnalysis => {
+            DisputeSeverity::Critical
+        }
         DisputeType::IncorrectVerdict | DisputeType::ConsensusFailure => DisputeSeverity::High,
         DisputeType::PayoutDispute | DisputeType::StakeSlashingAppeal => DisputeSeverity::Medium,
         DisputeType::InvalidSubmission => DisputeSeverity::Low,
@@ -361,7 +379,10 @@ pub async fn create_dispute(
         resolved_at: None,
         created_at: now,
         updated_at: now,
-        metadata: req.metadata.as_ref().map(|m| serde_json::to_value(m).unwrap_or_default()),
+        metadata: req
+            .metadata
+            .as_ref()
+            .map(|m| serde_json::to_value(m).unwrap_or_default()),
     };
 
     DisputeModel::create(&state.db, &db_dispute)
@@ -499,7 +520,12 @@ pub async fn update_dispute(
 
     // Check user has permission to update (disputer or admin)
     if dispute.disputer_id != user_id {
-        tracing::warn!("User {} attempted to update dispute {} owned by {}", user_id, dispute_id, dispute.disputer_id);
+        tracing::warn!(
+            "User {} attempted to update dispute {} owned by {}",
+            user_id,
+            dispute_id,
+            dispute.disputer_id
+        );
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -509,7 +535,9 @@ pub async fn update_dispute(
         if !is_valid_status_transition(&dispute.status, &new_status) {
             tracing::warn!(
                 "Invalid status transition from {:?} to {:?} for dispute {}",
-                dispute.status, new_status, dispute_id
+                dispute.status,
+                new_status,
+                dispute_id
             );
             return Err(StatusCode::BAD_REQUEST);
         }
@@ -572,20 +600,26 @@ pub async fn resolve_dispute(
 
     // Validate dispute is in a resolvable state
     if dispute.status == DisputeStatus::Resolved || dispute.status == DisputeStatus::Withdrawn {
-        tracing::warn!("Dispute {} is already {:?}, cannot resolve", dispute_id, dispute.status);
+        tracing::warn!(
+            "Dispute {} is already {:?}, cannot resolve",
+            dispute_id,
+            dispute.status
+        );
         return Err(StatusCode::BAD_REQUEST);
     }
 
     let now = Utc::now();
 
-    let actions: Vec<ResolutionAction> = req.actions_taken.into_iter().map(|desc| {
-        ResolutionAction {
+    let actions: Vec<ResolutionAction> = req
+        .actions_taken
+        .into_iter()
+        .map(|desc| ResolutionAction {
             action_type: "manual_action".to_string(),
             description: desc,
             executed_at: now,
             transaction_hash: None,
-        }
-    }).collect();
+        })
+        .collect();
 
     let resolution = DisputeResolution {
         decision: req.decision.clone(),
@@ -607,7 +641,11 @@ pub async fn resolve_dispute(
         &state.db,
         dispute_id,
         &resolution_str,
-        &dispute.resolution.as_ref().map(|r| r.reasoning.clone()).unwrap_or_default(),
+        &dispute
+            .resolution
+            .as_ref()
+            .map(|r| r.reasoning.clone())
+            .unwrap_or_default(),
         &resolver_id,
     )
     .await
@@ -625,7 +663,9 @@ pub async fn resolve_dispute(
 
     // Update related bounty/submission states if dispute was upheld
     if req.decision == ResolutionDecision::DisputeUpheld {
-        if let Err(e) = BountyModel::update_status(&state.db, dispute.bounty_id, "UnderReview").await {
+        if let Err(e) =
+            BountyModel::update_status(&state.db, dispute.bounty_id, "UnderReview").await
+        {
             tracing::error!("Failed to update bounty status after dispute upheld: {}", e);
         }
     }
@@ -663,13 +703,21 @@ pub async fn vote_on_dispute(
 
     // Verify dispute is in voting phase
     if dispute.status != DisputeStatus::VotingPhase {
-        tracing::warn!("Dispute {} is not in voting phase (status: {:?})", dispute_id, dispute.status);
+        tracing::warn!(
+            "Dispute {} is not in voting phase (status: {:?})",
+            dispute_id,
+            dispute.status
+        );
         return Err(StatusCode::BAD_REQUEST);
     }
 
     // Prevent the disputer from voting on their own dispute (conflict of interest)
     if dispute.disputer_id == voter_id {
-        tracing::warn!("Disputer {} cannot vote on their own dispute {}", voter_id, dispute_id);
+        tracing::warn!(
+            "Disputer {} cannot vote on their own dispute {}",
+            voter_id,
+            dispute_id
+        );
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -677,7 +725,11 @@ pub async fn vote_on_dispute(
     if let Some(sub_id) = dispute.submission_id {
         if let Ok(Some(sub)) = SubmissionModel::find_by_id(&state.db, sub_id).await {
             if sub.engine_id == voter_id {
-                tracing::warn!("Submission owner {} cannot vote on dispute {} against their submission", voter_id, dispute_id);
+                tracing::warn!(
+                    "Submission owner {} cannot vote on dispute {} against their submission",
+                    voter_id,
+                    dispute_id
+                );
                 return Err(StatusCode::FORBIDDEN);
             }
         }
@@ -761,7 +813,10 @@ pub async fn vote_on_dispute(
             &state.db,
             dispute_id,
             decision,
-            &format!("Auto-resolved by voting: uphold={:.1}, reject={:.1}", uphold_power, reject_power),
+            &format!(
+                "Auto-resolved by voting: uphold={:.1}, reject={:.1}",
+                uphold_power, reject_power
+            ),
             "system_auto_resolve",
         )
         .await
@@ -810,7 +865,11 @@ pub async fn withdraw_dispute(
 
     // Validate dispute can be withdrawn (not already resolved or withdrawn)
     if dispute.status == DisputeStatus::Resolved || dispute.status == DisputeStatus::Withdrawn {
-        tracing::warn!("Dispute {} cannot be withdrawn (status: {:?})", dispute_id, dispute.status);
+        tracing::warn!(
+            "Dispute {} cannot be withdrawn (status: {:?})",
+            dispute_id,
+            dispute.status
+        );
         return Err(StatusCode::BAD_REQUEST);
     }
 
@@ -842,12 +901,10 @@ pub async fn get_dispute_stats(
     State(state): State<BountyManagerState>,
 ) -> Result<Json<ApiResponse<DisputeStatsResponse>>, StatusCode> {
     // Fetch real statistics from database
-    let db_stats = DisputeModel::get_stats(&state.db)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to fetch dispute stats: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let db_stats = DisputeModel::get_stats(&state.db).await.map_err(|e| {
+        tracing::error!("Failed to fetch dispute stats: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let upheld_rate = if db_stats.resolved_disputes > 0 {
         db_stats.upheld_disputes as f32 / db_stats.resolved_disputes as f32
@@ -903,7 +960,8 @@ fn db_dispute_to_handler_dispute(db: DisputeModel) -> Dispute {
         _ => DisputeSeverity::Medium,
     };
 
-    let evidence: Vec<Evidence> = db.evidence
+    let evidence: Vec<Evidence> = db
+        .evidence
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default();
 
@@ -923,7 +981,8 @@ fn db_dispute_to_handler_dispute(db: DisputeModel) -> Dispute {
         }
     });
 
-    let metadata: HashMap<String, String> = db.metadata
+    let metadata: HashMap<String, String> = db
+        .metadata
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default();
 

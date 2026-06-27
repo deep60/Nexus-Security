@@ -1,12 +1,12 @@
+use anyhow::{Context, Result};
+use hex;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
-use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
 use tokio::fs;
 use tracing::{debug, info, warn};
-use sha2::{Sha256, Digest};
-use hex;
 
 /// Signature types supported by the matcher
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -31,7 +31,6 @@ pub struct SignatureMatch {
     pub matched_data: Option<String>,
     pub description: String,
     pub metadata: HashMap<String, String>,
-
 }
 
 /// Threat severity levels
@@ -110,14 +109,18 @@ impl SignatureMatcher {
     /// Create a new signature matcher instance
     pub async fn new(config: SignatureMatcherConfig) -> Result<Self> {
         info!("Initializing signature matcher with config: {:?}", config);
-        
+
         let signatures = Self::load_signatures(&config.signatures_dir)
             .await
             .context("Failed to load signatures")?;
-        
+
         let signature_count: usize = signatures.values().map(|v| v.len()).sum();
-        info!("Loaded {} signatures across {} types", signature_count, signatures.len());
-        
+        info!(
+            "Loaded {} signatures across {} types",
+            signature_count,
+            signatures.len()
+        );
+
         Ok(Self {
             config,
             signatures: Arc::new(signatures),
@@ -128,7 +131,7 @@ impl SignatureMatcher {
     /// Load signatures from directory
     async fn load_signatures(dir: &str) -> Result<HashMap<SignatureType, Vec<Signature>>> {
         let path = Path::new(dir);
-        
+
         if !path.exists() {
             warn!("Signatures directory does not exist: {}", dir);
             return Ok(HashMap::new());
@@ -139,7 +142,7 @@ impl SignatureMatcher {
 
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            
+
             if path.extension().and_then(|s| s.to_str()) == Some("json") {
                 match Self::load_signature_file(&path).await {
                     Ok(sigs) => {
@@ -176,13 +179,16 @@ impl SignatureMatcher {
         // Check file size
         let metadata = fs::metadata(file_path).await?;
         if metadata.len() > self.config.max_file_size as u64 {
-            warn!("File too large for signature matching: {} bytes", metadata.len());
+            warn!(
+                "File too large for signature matching: {} bytes",
+                metadata.len()
+            );
             return Ok(Vec::new());
         }
 
         // Read file content
         let content = fs::read(file_path).await?;
-        
+
         // Perform matching
         self.match_bytes(&content).await
     }
@@ -193,7 +199,7 @@ impl SignatureMatcher {
 
         // Check hash cache first
         let file_hash = self.calculate_sha256(content);
-        
+
         if self.config.enable_caching {
             let cache = self.hash_cache.read().await;
             if let Some(cached_matches) = cache.get(&file_hash) {
@@ -226,7 +232,10 @@ impl SignatureMatcher {
 
         // Limit matches
         if matches.len() > self.config.max_matches_per_file {
-            warn!("Too many matches, truncating to {}", self.config.max_matches_per_file);
+            warn!(
+                "Too many matches, truncating to {}",
+                self.config.max_matches_per_file
+            );
             matches.truncate(self.config.max_matches_per_file);
         }
 
@@ -241,9 +250,13 @@ impl SignatureMatcher {
     }
 
     /// Match hash-based signatures
-    fn match_hash_signatures(&self, content: &[u8], signatures: &[Signature]) -> Vec<SignatureMatch> {
+    fn match_hash_signatures(
+        &self,
+        content: &[u8],
+        signatures: &[Signature],
+    ) -> Vec<SignatureMatch> {
         let mut matches = Vec::new();
-        
+
         let sha256 = self.calculate_sha256(content);
         let md5 = self.calculate_md5(content);
         let sha1 = self.calculate_sha1(content);
@@ -251,10 +264,9 @@ impl SignatureMatcher {
         for sig in signatures {
             for pattern in &sig.patterns {
                 if pattern.pattern_type == PatternType::Hash {
-                    let hash_match = pattern.value == sha256 
-                        || pattern.value == md5 
-                        || pattern.value == sha1;
-                    
+                    let hash_match =
+                        pattern.value == sha256 || pattern.value == md5 || pattern.value == sha1;
+
                     if hash_match {
                         matches.push(SignatureMatch {
                             signature_id: sig.id.clone(),
@@ -278,17 +290,22 @@ impl SignatureMatcher {
     }
 
     /// Match binary pattern signatures
-    fn match_binary_patterns(&self, content: &[u8], signatures: &[Signature]) -> Result<Vec<SignatureMatch>> {
+    fn match_binary_patterns(
+        &self,
+        content: &[u8],
+        signatures: &[Signature],
+    ) -> Result<Vec<SignatureMatch>> {
         let mut matches = Vec::new();
 
         for sig in signatures {
             for pattern in &sig.patterns {
                 if let PatternType::Hex = pattern.pattern_type {
                     let hex_pattern = Self::parse_hex_pattern(&pattern.value)?;
-                    
-                    if let Some(offset) = Self::find_pattern(content, &hex_pattern, pattern.offset) {
+
+                    if let Some(offset) = Self::find_pattern(content, &hex_pattern, pattern.offset)
+                    {
                         let confidence = if pattern.wildcard { 0.8 } else { 0.95 };
-                        
+
                         matches.push(SignatureMatch {
                             signature_id: sig.id.clone(),
                             signature_name: sig.name.clone(),
@@ -311,7 +328,11 @@ impl SignatureMatcher {
     }
 
     /// Match string pattern signatures
-    fn match_string_patterns(&self, content: &[u8], signatures: &[Signature]) -> Result<Vec<SignatureMatch>> {
+    fn match_string_patterns(
+        &self,
+        content: &[u8],
+        signatures: &[Signature],
+    ) -> Result<Vec<SignatureMatch>> {
         let mut matches = Vec::new();
         let text = String::from_utf8_lossy(content);
 
@@ -341,9 +362,13 @@ impl SignatureMatcher {
     }
 
     /// Match section hash signatures for PE files
-    fn match_section_hashes(&self, content: &[u8], signatures: &[Signature]) -> Result<Vec<SignatureMatch>> {
+    fn match_section_hashes(
+        &self,
+        content: &[u8],
+        signatures: &[Signature],
+    ) -> Result<Vec<SignatureMatch>> {
         let mut matches = Vec::new();
-        
+
         // Extract PE sections and calculate hashes
         if let Ok(sections) = self.extract_pe_sections(content) {
             for sig in signatures {
@@ -362,7 +387,12 @@ impl SignatureMatcher {
     }
 
     /// Helper to create signature match
-    fn create_match(&self, sig: &Signature, pattern: &SignaturePattern, offset: Option<usize>) -> SignatureMatch {
+    fn create_match(
+        &self,
+        sig: &Signature,
+        pattern: &SignaturePattern,
+        offset: Option<usize>,
+    ) -> SignatureMatch {
         SignatureMatch {
             signature_id: sig.id.clone(),
             signature_name: sig.name.clone(),
@@ -386,7 +416,7 @@ impl SignatureMatcher {
     /// Find pattern in content
     fn find_pattern(content: &[u8], pattern: &[u8], offset: Option<usize>) -> Option<usize> {
         let start = offset.unwrap_or(0);
-        
+
         if start >= content.len() {
             return None;
         }
@@ -425,7 +455,7 @@ impl SignatureMatcher {
 
     /// Calculate SHA1 hash
     fn calculate_sha1(&self, content: &[u8]) -> String {
-        use sha1::{Sha1, Digest};
+        use sha1::{Digest, Sha1};
         let mut hasher = Sha1::new();
         hasher.update(content);
         hex::encode(hasher.finalize())
@@ -436,28 +466,28 @@ impl SignatureMatcher {
         info!("Reloading signatures");
         let signatures = Self::load_signatures(&self.config.signatures_dir).await?;
         self.signatures = Arc::new(signatures);
-        
+
         // Clear cache
         self.hash_cache.write().await.clear();
-        
+
         Ok(())
     }
 
     /// Get signature statistics
     pub async fn get_statistics(&self) -> SignatureStatistics {
         let mut stats = SignatureStatistics::default();
-        
+
         for (sig_type, sigs) in self.signatures.iter() {
             stats.total_signatures += sigs.len();
             stats.by_type.insert(sig_type.clone(), sigs.len());
-            
+
             for sig in sigs {
                 *stats.by_severity.entry(sig.severity.clone()).or_insert(0) += 1;
             }
         }
 
         stats.cache_size = self.hash_cache.read().await.len();
-        
+
         stats
     }
 }
@@ -494,7 +524,7 @@ mod tests {
     fn test_pattern_matching() {
         let content = b"MZ\x90\x00\x03\x00\x00\x00";
         let pattern = vec![0x4D, 0x5A, 0x90, 0x00];
-        
+
         let result = SignatureMatcher::find_pattern(content, &pattern, None);
         assert_eq!(result, Some(0));
     }

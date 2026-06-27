@@ -34,7 +34,8 @@ pub async fn submit_kyc(
 
     Ok(Json(SubmitKycResponse {
         kyc_id,
-        message: "KYC verification submitted successfully. Please upload required documents.".to_string(),
+        message: "KYC verification submitted successfully. Please upload required documents."
+            .to_string(),
     }))
 }
 

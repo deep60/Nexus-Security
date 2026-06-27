@@ -124,7 +124,9 @@ impl IntoResponse for AuthError {
             AuthError::InvalidFormat => (StatusCode::UNAUTHORIZED, "Invalid authorization format"),
             AuthError::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid or expired token"),
             AuthError::InvalidTokenType => (StatusCode::UNAUTHORIZED, "Invalid token type"),
-            AuthError::InsufficientPermissions => (StatusCode::FORBIDDEN, "Insufficient permissions"),
+            AuthError::InsufficientPermissions => {
+                (StatusCode::FORBIDDEN, "Insufficient permissions")
+            }
         };
 
         let body = Json(json!({

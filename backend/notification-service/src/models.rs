@@ -1,8 +1,8 @@
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use shared::messaging::event_types::{NotificationPayload, NotificationPriority};
 
@@ -38,11 +38,7 @@ pub enum NotificationError {
 #[async_trait]
 pub trait NotificationChannel: Send + Sync {
     /// Send a notification through this channel
-    async fn send(
-        &self,
-        payload: &NotificationPayload,
-        recipient: &str,
-    ) -> NotificationResult<()>;
+    async fn send(&self, payload: &NotificationPayload, recipient: &str) -> NotificationResult<()>;
 
     /// Get the channel type identifier
     fn channel_type(&self) -> &'static str;

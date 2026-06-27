@@ -103,10 +103,7 @@ pub async fn logging_middleware(
 }
 
 /// Request ID injection middleware
-pub async fn request_id_middleware(
-    mut request: Request<Body>,
-    next: Next,
-) -> Response {
+pub async fn request_id_middleware(mut request: Request<Body>, next: Next) -> Response {
     // Get or generate request ID
     let request_id = request
         .headers()
@@ -116,7 +113,9 @@ pub async fn request_id_middleware(
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
     // Insert request ID into request extensions
-    request.extensions_mut().insert(RequestId(request_id.clone()));
+    request
+        .extensions_mut()
+        .insert(RequestId(request_id.clone()));
 
     // Process request
     let mut response = next.run(request).await;
@@ -156,12 +155,7 @@ pub fn log_security_event(
 }
 
 /// Log authentication attempts
-pub fn log_auth_attempt(
-    success: bool,
-    email: &str,
-    ip_address: &str,
-    reason: Option<&str>,
-) {
+pub fn log_auth_attempt(success: bool, email: &str, ip_address: &str, reason: Option<&str>) {
     if success {
         info!(
             email = %email,
@@ -179,11 +173,7 @@ pub fn log_auth_attempt(
 }
 
 /// Log API key usage
-pub fn log_api_key_usage(
-    api_key_id: &str,
-    endpoint: &str,
-    ip_address: &str,
-) {
+pub fn log_api_key_usage(api_key_id: &str, endpoint: &str, ip_address: &str) {
     info!(
         api_key_id = %api_key_id,
         endpoint = %endpoint,
@@ -193,12 +183,7 @@ pub fn log_api_key_usage(
 }
 
 /// Log rate limit violations
-pub fn log_rate_limit_exceeded(
-    identifier: &str,
-    endpoint: &str,
-    limit: u32,
-    ip_address: &str,
-) {
+pub fn log_rate_limit_exceeded(identifier: &str, endpoint: &str, limit: u32, ip_address: &str) {
     warn!(
         identifier = %identifier,
         endpoint = %endpoint,
@@ -227,12 +212,7 @@ pub fn log_blockchain_transaction(
 }
 
 /// Log bounty lifecycle events
-pub fn log_bounty_event(
-    event_type: &str,
-    bounty_id: Uuid,
-    user_id: Uuid,
-    details: Option<&str>,
-) {
+pub fn log_bounty_event(event_type: &str, bounty_id: Uuid, user_id: Uuid, details: Option<&str>) {
     info!(
         event_type = %event_type,
         bounty_id = %bounty_id,
@@ -277,12 +257,7 @@ pub fn log_consensus_reached(
 }
 
 /// Log database errors with context
-pub fn log_database_error(
-    operation: &str,
-    table: &str,
-    error: &str,
-    request_id: Option<&str>,
-) {
+pub fn log_database_error(operation: &str, table: &str, error: &str, request_id: Option<&str>) {
     error!(
         operation = %operation,
         table = %table,
@@ -293,12 +268,7 @@ pub fn log_database_error(
 }
 
 /// Log external API calls
-pub fn log_external_api_call(
-    service: &str,
-    endpoint: &str,
-    status: u16,
-    duration_ms: u64,
-) {
+pub fn log_external_api_call(service: &str, endpoint: &str, status: u16, duration_ms: u64) {
     if status >= 200 && status < 300 {
         info!(
             service = %service,

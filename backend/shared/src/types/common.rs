@@ -1,7 +1,7 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 // Core identifier types
 pub type UserId = Uuid;
@@ -430,7 +430,7 @@ impl ThreatVerdict {
             _ => Err(format!("Invalid threat verdict: {}", s)),
         }
     }
-    
+
     pub fn to_string(&self) -> String {
         match self {
             ThreatVerdict::Malicious => "malicious".to_string(),
@@ -462,13 +462,13 @@ impl AnalysisTarget {
 pub enum CommonError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
-    
+
     #[error("Validation failed: {0}")]
     ValidationFailed(String),
-    
+
     #[error("Serialization error: {0}")]
     SerializationError(String),
-    
+
     #[error("Parsing error: {0}")]
     ParseError(String),
 }

@@ -19,10 +19,7 @@ use tracing::{error, info};
 use crate::AppState;
 
 /// Accept a WebSocket upgrade and proxy all frames to the notification-service.
-pub async fn ws_proxy(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> Response {
+pub async fn ws_proxy(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
     let notification_ws_url = build_ws_url(&state.config.services.notification_service_url);
     ws.on_upgrade(move |socket| proxy_ws(socket, notification_ws_url))
 }
@@ -42,7 +39,10 @@ async fn proxy_ws(client_socket: WebSocket, upstream_url: String) {
     let upstream = match connect_async(&upstream_url).await {
         Ok((stream, _)) => stream,
         Err(e) => {
-            error!("Failed to connect to notification-service at {}: {}", upstream_url, e);
+            error!(
+                "Failed to connect to notification-service at {}: {}",
+                upstream_url, e
+            );
             return;
         }
     };
@@ -89,10 +89,16 @@ fn axum_to_tungstenite(msg: Message) -> tokio_tungstenite::tungstenite::Message 
         Message::Binary(b) => TM::Binary(b),
         Message::Ping(p) => TM::Ping(p),
         Message::Pong(p) => TM::Pong(p),
-        Message::Close(c) => TM::Close(c.map(|f| tokio_tungstenite::tungstenite::protocol::CloseFrame {
-            code: tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode::from(f.code),
-            reason: f.reason,
-        })),
+        Message::Close(c) => {
+            TM::Close(
+                c.map(|f| tokio_tungstenite::tungstenite::protocol::CloseFrame {
+                    code: tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode::from(
+                        f.code,
+                    ),
+                    reason: f.reason,
+                }),
+            )
+        }
     }
 }
 

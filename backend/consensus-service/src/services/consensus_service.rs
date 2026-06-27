@@ -189,10 +189,7 @@ impl ConsensusService {
     }
 
     /// Read a previously stored consensus result for a bounty.
-    pub async fn get_stored(
-        &self,
-        bounty_id: Uuid,
-    ) -> ConsensusResult<Option<ConsensusResponse>> {
+    pub async fn get_stored(&self, bounty_id: Uuid) -> ConsensusResult<Option<ConsensusResponse>> {
         let row = sqlx::query_as::<_, ResultRow>(
             r#"
             SELECT bounty_id, final_verdict, confidence, total_submissions,

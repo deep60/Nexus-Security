@@ -1,18 +1,18 @@
+use crate::models::{BountyModel, SubmissionModel};
+use crate::services::reputation::ReputationService;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
     Extension,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use shared::types::ApiResponse;
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use shared::types::ApiResponse;
-use crate::models::{BountyModel, SubmissionModel};
-use crate::services::reputation::ReputationService;
 
 // Common types
 #[derive(Debug, Deserialize)]
@@ -55,8 +55,8 @@ pub enum ArtifactType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtifactData {
-    pub hash: Option<String>,    // File hash
-    pub url: Option<String>,     // URL to analyze
+    pub hash: Option<String>, // File hash
+    pub url: Option<String>,  // URL to analyze
     pub file_name: Option<String>,
     pub file_size: Option<u64>,
     pub mime_type: Option<String>,
@@ -211,7 +211,10 @@ pub async fn create_bounty(
     }
 
     // Validate currency (alphanumeric, 3-10 chars)
-    if req.currency.len() < 3 || req.currency.len() > 10 || !req.currency.chars().all(|c| c.is_alphanumeric()) {
+    if req.currency.len() < 3
+        || req.currency.len() > 10
+        || !req.currency.chars().all(|c| c.is_alphanumeric())
+    {
         return Err(StatusCode::BAD_REQUEST);
     }
 
@@ -338,7 +341,10 @@ pub async fn list_bounties(
             StatusCode::INTERNAL_SERVER_ERROR
         })? as usize;
 
-    let bounties: Vec<Bounty> = db_bounties.into_iter().map(db_bounty_to_handler_bounty).collect();
+    let bounties: Vec<Bounty> = db_bounties
+        .into_iter()
+        .map(db_bounty_to_handler_bounty)
+        .collect();
     let has_more = (page as usize * per_page as usize) < total_count;
 
     let response_data = BountyListResponse {
@@ -387,10 +393,14 @@ pub async fn update_bounty(
     let title = req.title.as_deref().unwrap_or(&db_bounty.title);
     let description = req.description.as_deref().unwrap_or(&db_bounty.description);
     let deadline = req.deadline.unwrap_or(db_bounty.deadline);
-    let status = req.status.as_ref()
+    let status = req
+        .status
+        .as_ref()
         .map(|s| format!("{:?}", s))
         .unwrap_or(db_bounty.status.clone());
-    let metadata = req.metadata.as_ref()
+    let metadata = req
+        .metadata
+        .as_ref()
         .map(|m| serde_json::to_value(m).unwrap_or_default())
         .or(db_bounty.metadata.clone());
 
@@ -430,7 +440,9 @@ pub async fn update_bounty(
         })?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    Ok(Json(ApiResponse::success(db_bounty_to_handler_bounty(updated))))
+    Ok(Json(ApiResponse::success(db_bounty_to_handler_bounty(
+        updated,
+    ))))
 }
 
 pub async fn cancel_bounty(
@@ -469,12 +481,16 @@ pub async fn get_bounty_stats(
     State(state): State<BountyManagerState>,
 ) -> Result<Json<ApiResponse<BountyStatsResponse>>, StatusCode> {
     let total_bounties = BountyModel::count(&state.db, None).await.unwrap_or(0) as u64;
-    let active_bounties = BountyModel::count(&state.db, Some("Active")).await.unwrap_or(0) as u64;
-    let completed_bounties = BountyModel::count(&state.db, Some("Completed")).await.unwrap_or(0) as u64;
+    let active_bounties = BountyModel::count(&state.db, Some("Active"))
+        .await
+        .unwrap_or(0) as u64;
+    let completed_bounties = BountyModel::count(&state.db, Some("Completed"))
+        .await
+        .unwrap_or(0) as u64;
 
     // Aggregate reward stats
     let reward_row: (Option<i64>,) = sqlx::query_as(
-        "SELECT COALESCE(SUM(reward_amount), 0) FROM bounties WHERE status = 'Completed'"
+        "SELECT COALESCE(SUM(reward_amount), 0) FROM bounties WHERE status = 'Completed'",
     )
     .fetch_one(&state.db)
     .await
@@ -553,7 +569,8 @@ pub async fn submit_to_bounty(
     let submission_id = Uuid::new_v4();
     let now = Utc::now();
 
-    let analysis_json = submission.analysis_data
+    let analysis_json = submission
+        .analysis_data
         .as_ref()
         .map(|a| serde_json::to_value(a).unwrap_or_default())
         .unwrap_or(serde_json::json!({}));
@@ -637,7 +654,8 @@ fn db_bounty_to_handler_bounty(db: BountyModel) -> Bounty {
         _ => BountyStatus::Active,
     };
 
-    let metadata: HashMap<String, String> = db.metadata
+    let metadata: HashMap<String, String> = db
+        .metadata
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default();
 

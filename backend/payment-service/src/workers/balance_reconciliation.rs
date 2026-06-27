@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::sync::Arc;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 use crate::services::payment_service::PaymentService;
 
@@ -15,7 +15,7 @@ pub async fn start(service: Arc<PaymentService>) -> Result<()> {
 
         // Query tracked wallets from DB
         let wallets = sqlx::query_scalar::<_, String>(
-            "SELECT DISTINCT address FROM wallet_balances WHERE tracked = true LIMIT 100"
+            "SELECT DISTINCT address FROM wallet_balances WHERE tracked = true LIMIT 100",
         )
         .fetch_all(service.db_pool())
         .await;
@@ -28,7 +28,7 @@ pub async fn start(service: Arc<PaymentService>) -> Result<()> {
                         Ok(on_chain) => {
                             // Get DB-recorded balance
                             let db_balance = sqlx::query_scalar::<_, String>(
-                                "SELECT balance FROM wallet_balances WHERE address = $1"
+                                "SELECT balance FROM wallet_balances WHERE address = $1",
                             )
                             .bind(&address)
                             .fetch_optional(service.db_pool())
@@ -37,7 +37,8 @@ pub async fn start(service: Arc<PaymentService>) -> Result<()> {
                             .flatten()
                             .unwrap_or_else(|| "0".to_string());
 
-                            let db_amount = ethers::types::U256::from_dec_str(&db_balance).unwrap_or_default();
+                            let db_amount =
+                                ethers::types::U256::from_dec_str(&db_balance).unwrap_or_default();
 
                             if on_chain != db_amount {
                                 warn!(

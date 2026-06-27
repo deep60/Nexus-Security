@@ -32,7 +32,11 @@ pub struct SubmissionData {
 }
 
 impl ConsensusService {
-    pub fn new(min_submissions: u32, consensus_threshold: f32, enable_weighted_voting: bool) -> Self {
+    pub fn new(
+        min_submissions: u32,
+        consensus_threshold: f32,
+        enable_weighted_voting: bool,
+    ) -> Self {
         Self {
             min_submissions,
             consensus_threshold,
@@ -41,7 +45,11 @@ impl ConsensusService {
     }
 
     /// Calculate consensus from submissions for a specific bounty.
-    pub fn calculate_consensus(&self, bounty_id: Uuid, submissions: Vec<SubmissionData>) -> ConsensusResult {
+    pub fn calculate_consensus(
+        &self,
+        bounty_id: Uuid,
+        submissions: Vec<SubmissionData>,
+    ) -> ConsensusResult {
         let total_submissions = submissions.len() as u32;
 
         // Count verdict distribution
@@ -49,15 +57,19 @@ impl ConsensusService {
         let mut verdict_weights: HashMap<String, f32> = HashMap::new();
 
         for submission in &submissions {
-            *verdict_distribution.entry(submission.verdict.clone()).or_insert(0) += 1;
+            *verdict_distribution
+                .entry(submission.verdict.clone())
+                .or_insert(0) += 1;
 
             if self.enable_weighted_voting {
                 // Weight by stake and reputation
-                let weight = (submission.stake_amount as f32 / 1000.0) 
-                    * submission.reputation_score 
+                let weight = (submission.stake_amount as f32 / 1000.0)
+                    * submission.reputation_score
                     * submission.confidence;
-                
-                *verdict_weights.entry(submission.verdict.clone()).or_insert(0.0) += weight;
+
+                *verdict_weights
+                    .entry(submission.verdict.clone())
+                    .or_insert(0.0) += weight;
             }
         }
 
@@ -114,7 +126,7 @@ impl ConsensusService {
         total: u32,
     ) -> (String, bool) {
         let total_weight: f32 = weights.values().sum();
-        
+
         let (verdict, weight) = weights
             .iter()
             .max_by(|(_, w1), (_, w2)| w1.partial_cmp(w2).unwrap())
@@ -175,7 +187,7 @@ mod tests {
     #[test]
     fn test_simple_consensus() {
         let service = ConsensusService::new(3, 0.75, false);
-        
+
         let submissions = vec![
             SubmissionData {
                 submission_id: Uuid::new_v4(),

@@ -1,18 +1,18 @@
 // backend/bounty-manager/src/services/blockchain.rs
 
+use anyhow::{Context, Result};
+use ethers::{
+    abi::Abi,
+    contract::Contract,
+    middleware::SignerMiddleware,
+    providers::{Http, Middleware, Provider},
+    signers::{LocalWallet, Signer},
+    types::{Address, H256, U256},
+};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use anyhow::{Result, Context};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use ethers::{
-    providers::{Provider, Http, Middleware},
-    types::{Address, U256, H256},
-    contract::Contract,
-    abi::Abi,
-    signers::{LocalWallet, Signer},
-    middleware::SignerMiddleware,
-};
 
 type BlockchainClient = SignerMiddleware<Provider<Http>, LocalWallet>;
 
@@ -123,17 +123,21 @@ impl BlockchainService {
 
         // Approve BountyManager to spend tokens
         let bm_address = self.bounty_manager.address();
-        let tx = self.threat_token
+        let tx = self
+            .threat_token
             .method::<_, bool>("approve", (bm_address, amount_u256))
             .map_err(|e| BlockchainError::ContractError(e.to_string()))?;
 
-        let pending_tx = tx.send().await
+        let pending_tx = tx
+            .send()
+            .await
             .map_err(|e| BlockchainError::TransactionFailed(e.to_string()))?;
 
         let tx_hash = pending_tx.tx_hash();
 
         // Wait for receipt
-        let receipt = pending_tx.await
+        let receipt = pending_tx
+            .await
             .map_err(|e| BlockchainError::TransactionFailed(e.to_string()))?;
 
         let block_number = receipt.and_then(|r| r.block_number.map(|n| n.as_u64()));
@@ -161,16 +165,20 @@ impl BlockchainService {
 
         let amount_u256 = U256::from(amount);
 
-        let tx = self.threat_token
+        let tx = self
+            .threat_token
             .method::<_, bool>("transfer", (to, amount_u256))
             .map_err(|e| BlockchainError::ContractError(e.to_string()))?;
 
-        let pending_tx = tx.send().await
+        let pending_tx = tx
+            .send()
+            .await
             .map_err(|e| BlockchainError::TransactionFailed(e.to_string()))?;
 
         let tx_hash = pending_tx.tx_hash();
 
-        let receipt = pending_tx.await
+        let receipt = pending_tx
+            .await
             .map_err(|e| BlockchainError::TransactionFailed(e.to_string()))?;
 
         let block_number = receipt.and_then(|r| r.block_number.map(|n| n.as_u64()));
@@ -190,7 +198,8 @@ impl BlockchainService {
             .parse()
             .map_err(|_| BlockchainError::ContractError("Invalid transaction hash".to_string()))?;
 
-        let receipt = self.client
+        let receipt = self
+            .client
             .get_transaction_receipt(hash)
             .await
             .map_err(|e| BlockchainError::ConnectionError(e.to_string()))?;
@@ -202,12 +211,16 @@ impl BlockchainService {
     }
 
     /// Get transaction status from chain
-    pub async fn get_transaction_status(&self, tx_hash: &str) -> Result<TransactionStatus, BlockchainError> {
+    pub async fn get_transaction_status(
+        &self,
+        tx_hash: &str,
+    ) -> Result<TransactionStatus, BlockchainError> {
         let hash: H256 = tx_hash
             .parse()
             .map_err(|_| BlockchainError::ContractError("Invalid transaction hash".to_string()))?;
 
-        let receipt = self.client
+        let receipt = self
+            .client
             .get_transaction_receipt(hash)
             .await
             .map_err(|e| BlockchainError::ConnectionError(e.to_string()))?;
@@ -230,7 +243,8 @@ impl BlockchainService {
             .parse()
             .map_err(|_| BlockchainError::InvalidAddress(address.to_string()))?;
 
-        let balance: U256 = self.threat_token
+        let balance: U256 = self
+            .threat_token
             .method("balanceOf", (addr,))
             .map_err(|e| BlockchainError::ContractError(e.to_string()))?
             .call()
@@ -247,10 +261,7 @@ impl BlockchainService {
 
     /// Health check — verifies RPC connectivity
     pub async fn health_check(&self) -> bool {
-        match tokio::time::timeout(
-            Duration::from_secs(5),
-            self.client.get_block_number(),
-        ).await {
+        match tokio::time::timeout(Duration::from_secs(5), self.client.get_block_number()).await {
             Ok(Ok(_)) => true,
             _ => false,
         }

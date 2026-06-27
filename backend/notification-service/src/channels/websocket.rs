@@ -3,13 +3,13 @@ use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use crate::models::{NotificationChannel, NotificationError, NotificationResult};
-use shared::messaging::event_types::{VerdyxEvent, NotificationPayload};
+use shared::messaging::event_types::{NotificationPayload, VerdyxEvent};
 
 /// WebSocket notification channel implementation
 /// Maintains active WebSocket connections and broadcasts notifications to connected clients
@@ -27,11 +27,7 @@ impl WebSocketChannel {
     }
 
     /// Register a new WebSocket connection for a user
-    pub async fn register_connection(
-        &self,
-        user_id: Uuid,
-        connection: WebSocketConnection,
-    ) {
+    pub async fn register_connection(&self, user_id: Uuid, connection: WebSocketConnection) {
         let mut connections = self.connections.write().await;
         connections
             .entry(user_id)
@@ -194,11 +190,7 @@ impl Default for WebSocketChannel {
 
 #[async_trait]
 impl NotificationChannel for WebSocketChannel {
-    async fn send(
-        &self,
-        payload: &NotificationPayload,
-        recipient: &str,
-    ) -> NotificationResult<()> {
+    async fn send(&self, payload: &NotificationPayload, recipient: &str) -> NotificationResult<()> {
         // Parse user_id from recipient
         let user_id = Uuid::parse_str(recipient)
             .map_err(|e| NotificationError::ValidationError(format!("Invalid user ID: {}", e)))?;
@@ -294,9 +286,13 @@ pub struct WebSocketMessage {
 #[serde(tag = "type", content = "data")]
 pub enum WebSocketControlMessage {
     /// Ping message to keep connection alive
-    Ping { timestamp: chrono::DateTime<chrono::Utc> },
+    Ping {
+        timestamp: chrono::DateTime<chrono::Utc>,
+    },
     /// Pong response
-    Pong { timestamp: chrono::DateTime<chrono::Utc> },
+    Pong {
+        timestamp: chrono::DateTime<chrono::Utc>,
+    },
     /// Subscribe to specific event types
     Subscribe { events: Vec<String> },
     /// Unsubscribe from event types

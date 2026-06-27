@@ -10,8 +10,12 @@ use uuid::Uuid;
 use crate::AppState;
 
 fn parse_uuid(s: &str) -> Result<Uuid, (StatusCode, Json<Value>)> {
-    Uuid::parse_str(s)
-        .map_err(|_| (StatusCode::BAD_REQUEST, Json(json!({ "error": "invalid id" }))))
+    Uuid::parse_str(s).map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid id" })),
+        )
+    })
 }
 
 /// Force a fresh consensus calculation for a bounty (admin-triggered).

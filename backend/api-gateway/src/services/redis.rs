@@ -479,7 +479,10 @@ impl RedisService {
             .await
             .context("Failed to queue analysis")?;
 
-        info!("Queued analysis: {} with priority: {}", analysis_id, priority);
+        info!(
+            "Queued analysis: {} with priority: {}",
+            analysis_id, priority
+        );
         Ok(())
     }
 
@@ -513,8 +516,8 @@ impl RedisService {
         file_info: &crate::handlers::submission::FileInfo,
     ) -> Result<()> {
         let key = format!("file_info:{}", file_hash);
-        let serialized = serde_json::to_string(file_info)
-            .context("Failed to serialize file info")?;
+        let serialized =
+            serde_json::to_string(file_info).context("Failed to serialize file info")?;
 
         let mut conn = self.connection_pool.clone();
         let _: () = conn
@@ -542,8 +545,7 @@ impl RedisService {
         match cached {
             Some(data) => {
                 let file_info: crate::handlers::submission::FileInfo =
-                    serde_json::from_str(&data)
-                        .context("Failed to deserialize file info")?;
+                    serde_json::from_str(&data).context("Failed to deserialize file info")?;
                 Ok(Some(file_info))
             }
             None => Ok(None),
@@ -557,8 +559,8 @@ impl RedisService {
         submission: &crate::handlers::submission::SubmissionResponse,
     ) -> Result<()> {
         let key = format!("submission:{}", submission_id);
-        let serialized = serde_json::to_string(submission)
-            .context("Failed to serialize submission")?;
+        let serialized =
+            serde_json::to_string(submission).context("Failed to serialize submission")?;
 
         let mut conn = self.connection_pool.clone();
         let _: () = conn
@@ -577,8 +579,8 @@ impl RedisService {
         submission: &crate::handlers::submission::DetailedSubmissionResponse,
     ) -> Result<()> {
         let key = format!("submission:detailed:{}", submission_id);
-        let serialized = serde_json::to_string(submission)
-            .context("Failed to serialize detailed submission")?;
+        let serialized =
+            serde_json::to_string(submission).context("Failed to serialize detailed submission")?;
 
         let mut conn = self.connection_pool.clone();
         let _: () = conn
@@ -606,8 +608,7 @@ impl RedisService {
         match cached {
             Some(data) => {
                 let submission: crate::handlers::submission::SubmissionResponse =
-                    serde_json::from_str(&data)
-                        .context("Failed to deserialize submission")?;
+                    serde_json::from_str(&data).context("Failed to deserialize submission")?;
                 Ok(Some(submission))
             }
             None => Ok(None),
@@ -667,7 +668,12 @@ impl RedisService {
     }
 
     /// Set a raw string value with TTL (in seconds)
-    pub async fn set_raw_with_ttl(&self, key: String, value: String, ttl_seconds: u64) -> Result<()> {
+    pub async fn set_raw_with_ttl(
+        &self,
+        key: String,
+        value: String,
+        ttl_seconds: u64,
+    ) -> Result<()> {
         let mut conn = self.connection_pool.clone();
         let _: () = conn
             .set_ex(&key, value, ttl_seconds)

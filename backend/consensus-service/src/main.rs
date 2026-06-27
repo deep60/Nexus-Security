@@ -12,10 +12,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-use tower_http::{
-    cors::CorsLayer,
-    trace::TraceLayer,
-};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{info, warn};
 
 use crate::config::Config;
@@ -57,14 +54,8 @@ async fn main() -> Result<()> {
     info!("Redis connection established");
 
     // Initialize consensus service
-    let consensus_service = Arc::new(
-        ConsensusService::new(
-            config.clone(),
-            db_pool.clone(),
-            redis_conn.clone(),
-        )
-        .await?,
-    );
+    let consensus_service =
+        Arc::new(ConsensusService::new(config.clone(), db_pool.clone(), redis_conn.clone()).await?);
     info!("Consensus service initialized");
 
     // Start background workers
@@ -98,7 +89,7 @@ async fn main() -> Result<()> {
         .split(',')
         .filter_map(|origin| origin.trim().parse::<axum::http::HeaderValue>().ok())
         .collect();
-    
+
     let cors = CorsLayer::new()
         .allow_origin(allowed_origins)
         .allow_methods([
@@ -120,21 +111,57 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .route("/health", get(handlers::health::health_check))
         // Consensus endpoints
-        .route("/api/v1/consensus/bounty/:bounty_id", get(handlers::consensus::get_bounty_consensus))
-        .route("/api/v1/consensus/bounty/:bounty_id/calculate", post(handlers::consensus::calculate_consensus))
-        .route("/api/v1/consensus/submission/:submission_id", get(handlers::consensus::get_submission_consensus))
-        .route("/api/v1/consensus/stats/:bounty_id", get(handlers::consensus::get_consensus_stats))
+        .route(
+            "/api/v1/consensus/bounty/:bounty_id",
+            get(handlers::consensus::get_bounty_consensus),
+        )
+        .route(
+            "/api/v1/consensus/bounty/:bounty_id/calculate",
+            post(handlers::consensus::calculate_consensus),
+        )
+        .route(
+            "/api/v1/consensus/submission/:submission_id",
+            get(handlers::consensus::get_submission_consensus),
+        )
+        .route(
+            "/api/v1/consensus/stats/:bounty_id",
+            get(handlers::consensus::get_consensus_stats),
+        )
         // Dispute endpoints
-        .route("/api/v1/disputes/create", post(handlers::dispute::create_dispute))
-        .route("/api/v1/disputes/:dispute_id", get(handlers::dispute::get_dispute))
-        .route("/api/v1/disputes/:dispute_id/resolve", post(handlers::dispute::resolve_dispute))
-        .route("/api/v1/disputes/bounty/:bounty_id", get(handlers::dispute::get_bounty_disputes))
+        .route(
+            "/api/v1/disputes/create",
+            post(handlers::dispute::create_dispute),
+        )
+        .route(
+            "/api/v1/disputes/:dispute_id",
+            get(handlers::dispute::get_dispute),
+        )
+        .route(
+            "/api/v1/disputes/:dispute_id/resolve",
+            post(handlers::dispute::resolve_dispute),
+        )
+        .route(
+            "/api/v1/disputes/bounty/:bounty_id",
+            get(handlers::dispute::get_bounty_disputes),
+        )
         // Validation endpoints
-        .route("/api/v1/validation/submission/:submission_id", post(handlers::validation::validate_submission))
-        .route("/api/v1/validation/batch", post(handlers::validation::batch_validate))
+        .route(
+            "/api/v1/validation/submission/:submission_id",
+            post(handlers::validation::validate_submission),
+        )
+        .route(
+            "/api/v1/validation/batch",
+            post(handlers::validation::batch_validate),
+        )
         // Admin endpoints
-        .route("/api/v1/admin/consensus/recalculate/:bounty_id", post(handlers::admin::recalculate_consensus))
-        .route("/api/v1/admin/consensus/override/:bounty_id", post(handlers::admin::override_consensus))
+        .route(
+            "/api/v1/admin/consensus/recalculate/:bounty_id",
+            post(handlers::admin::recalculate_consensus),
+        )
+        .route(
+            "/api/v1/admin/consensus/override/:bounty_id",
+            post(handlers::admin::override_consensus),
+        )
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);

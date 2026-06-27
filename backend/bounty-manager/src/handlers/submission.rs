@@ -1,19 +1,19 @@
 // backend/bounty-manager/src/handlers/submission_handler.rs
 
+use super::bounty_crud::PaginationParams;
+use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
+use crate::models::SubmissionModel;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
     Extension,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use shared::types::ApiResponse;
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use shared::types::ApiResponse;
-use super::bounty_crud::PaginationParams;
-use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
-use crate::models::SubmissionModel;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Submission {
@@ -34,20 +34,20 @@ pub struct Submission {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EngineType {
-    Human,      // Security expert
-    Automated,  // AI/ML engine
-    Hybrid,     // Combination
+    Human,     // Security expert
+    Automated, // AI/ML engine
+    Hybrid,    // Combination
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SubmissionStatus {
-    Pending,     // Awaiting blockchain confirmation
-    Active,      // Stake confirmed, participating in consensus
-    Correct,     // Matched final consensus
-    Incorrect,   // Did not match consensus
-    Invalid,     // Failed validation checks
-    Slashed,     // Stake was slashed for incorrect analysis
-    Rewarded,    // Received reward for correct analysis
+    Pending,   // Awaiting blockchain confirmation
+    Active,    // Stake confirmed, participating in consensus
+    Correct,   // Matched final consensus
+    Incorrect, // Did not match consensus
+    Invalid,   // Failed validation checks
+    Slashed,   // Stake was slashed for incorrect analysis
+    Rewarded,  // Received reward for correct analysis
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -172,7 +172,7 @@ pub struct ConsensusData {
     pub confidence_level: f32,
     pub total_submissions: u32,
     pub verdict_breakdown: HashMap<String, u32>, // verdict -> count
-    pub weighted_score: f32, // Weighted by reputation and stake
+    pub weighted_score: f32,                     // Weighted by reputation and stake
 }
 
 // Handler implementations
@@ -204,7 +204,11 @@ pub async fn submit_analysis(
         })?;
 
     if bounty.status != "Active" {
-        tracing::warn!("Bounty {} is not active (status: {})", bounty_id, bounty.status);
+        tracing::warn!(
+            "Bounty {} is not active (status: {})",
+            bounty_id,
+            bounty.status
+        );
         return Err(StatusCode::CONFLICT);
     }
 
@@ -221,8 +225,15 @@ pub async fn submit_analysis(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    if existing_submissions.iter().any(|s| s.engine_id == engine_id) {
-        tracing::warn!("Engine {} already submitted to bounty {}", engine_id, bounty_id);
+    if existing_submissions
+        .iter()
+        .any(|s| s.engine_id == engine_id)
+    {
+        tracing::warn!(
+            "Engine {} already submitted to bounty {}",
+            engine_id,
+            bounty_id
+        );
         return Err(StatusCode::CONFLICT);
     }
 
@@ -230,20 +241,25 @@ pub async fn submit_analysis(
     if req.stake_amount < bounty.min_stake as u64 {
         tracing::warn!(
             "Stake amount {} below minimum {} for bounty {}",
-            req.stake_amount, bounty.min_stake, bounty_id
+            req.stake_amount,
+            bounty.min_stake,
+            bounty_id
         );
         return Err(StatusCode::BAD_REQUEST);
     }
 
     // Check engine reputation requirements (engines with very low reputation are rejected)
-    let min_reputation = state.reputation_service
+    let min_reputation = state
+        .reputation_service
         .calculate_minimum_stake(&engine_id)
         .await;
     if let Ok(required_stake) = min_reputation {
         if req.stake_amount < required_stake {
             tracing::warn!(
                 "Engine {} reputation requires minimum stake of {}, got {}",
-                engine_id, required_stake, req.stake_amount
+                engine_id,
+                required_stake,
+                req.stake_amount
             );
             return Err(StatusCode::BAD_REQUEST);
         }
@@ -402,7 +418,10 @@ pub async fn update_submission_status(
     if db_sub.engine_id != caller_id && bounty.creator != caller_id {
         tracing::warn!(
             "Caller {} denied status update on submission {} (owner: {}, bounty creator: {})",
-            caller_id, submission_id, db_sub.engine_id, bounty.creator
+            caller_id,
+            submission_id,
+            db_sub.engine_id,
+            bounty.creator
         );
         return Err(StatusCode::FORBIDDEN);
     }
@@ -421,7 +440,9 @@ pub async fn update_submission_status(
     if !is_valid_submission_transition(&current_status, &status) {
         tracing::warn!(
             "Invalid submission status transition from {:?} to {:?} for {}",
-            current_status, status, submission_id
+            current_status,
+            status,
+            submission_id
         );
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -455,17 +476,20 @@ fn is_valid_submission_transition(from: &SubmissionStatus, to: &SubmissionStatus
     matches!(
         (from, to),
         (SubmissionStatus::Pending, SubmissionStatus::Active)
-        | (SubmissionStatus::Pending, SubmissionStatus::Invalid)
-        | (SubmissionStatus::Active, SubmissionStatus::Correct)
-        | (SubmissionStatus::Active, SubmissionStatus::Incorrect)
-        | (SubmissionStatus::Active, SubmissionStatus::Invalid)
-        | (SubmissionStatus::Incorrect, SubmissionStatus::Slashed)
-        | (SubmissionStatus::Correct, SubmissionStatus::Rewarded)
+            | (SubmissionStatus::Pending, SubmissionStatus::Invalid)
+            | (SubmissionStatus::Active, SubmissionStatus::Correct)
+            | (SubmissionStatus::Active, SubmissionStatus::Incorrect)
+            | (SubmissionStatus::Active, SubmissionStatus::Invalid)
+            | (SubmissionStatus::Incorrect, SubmissionStatus::Slashed)
+            | (SubmissionStatus::Correct, SubmissionStatus::Rewarded)
     )
 }
 
 // Conversion helper: SubmissionModel (DB) -> Submission (handler DTO)
-fn db_submission_to_handler_submission(db: SubmissionModel, details: AnalysisDetails) -> Submission {
+fn db_submission_to_handler_submission(
+    db: SubmissionModel,
+    details: AnalysisDetails,
+) -> Submission {
     let engine_type = match db.engine_type.as_str() {
         "Human" => EngineType::Human,
         "Hybrid" => EngineType::Hybrid,
