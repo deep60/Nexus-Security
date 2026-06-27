@@ -9,25 +9,25 @@ export function ArchitectureDiagram() {
       id: "api",
       title: "Submission API & Gateway",
       description: "gRPC & REST endpoints. Handles rate limiting, authentication, and file ingestion.",
-      color: "text-blue-500",
-      bgHover: "hover:bg-blue-500/10",
-      borderHover: "hover:border-blue-500/50",
+      color: "text-primary",
+      bgHover: "hover:bg-primary/10",
+      borderHover: "hover:border-primary/50",
     },
     {
       id: "orchestrator",
       title: "Distributed Scanner Nodes",
       description: "Parallel execution across YARA, ClamAV, and ML engines (ONNX). Fully containerized and scalable.",
-      color: "text-emerald-500",
-      bgHover: "hover:bg-emerald-500/10",
-      borderHover: "hover:border-emerald-500/50",
+      color: "text-accent",
+      bgHover: "hover:bg-accent/10",
+      borderHover: "hover:border-accent/50",
     },
     {
       id: "consensus",
       title: "Consensus Engine",
       description: "Aggregates results using a weighted algorithm to eliminate false positives. Optionally logs to blockchain.",
-      color: "text-purple-500",
-      bgHover: "hover:bg-purple-500/10",
-      borderHover: "hover:border-purple-500/50",
+      color: "text-[hsl(var(--chart-3))]",
+      bgHover: "hover:bg-[hsl(var(--chart-3))]/10",
+      borderHover: "hover:border-[hsl(var(--chart-3))]/50",
     },
   ];
 
@@ -127,11 +127,11 @@ export function ArchitectureDiagram() {
               ${activeLayer === layer.id ? layer.bgHover + " " + layer.borderHover + " transform scale-[1.02]" : "hover:border-border/80"}
             `}
           >
-            <h3 className={`font-mono text-xl font-bold mb-2 flex items-center gap-2 ${activeLayer === layer.id ? layer.color : "text-slate-200"}`}>
-              <span className={`w-2 h-2 rounded-full ${activeLayer === layer.id ? "bg-current animate-pulse" : "bg-slate-600"}`} />
+            <h3 className={`font-mono text-xl font-bold mb-2 flex items-center gap-2 ${activeLayer === layer.id ? layer.color : "text-foreground/90"}`}>
+              <span className={`w-2 h-2 rounded-full ${activeLayer === layer.id ? "bg-current animate-pulse" : "bg-muted-foreground/50"}`} />
               {layer.title}
             </h3>
-            <p className="text-slate-400 font-sans leading-relaxed">
+            <p className="text-muted-foreground leading-relaxed">
               {layer.description}
             </p>
           </Card>

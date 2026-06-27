@@ -121,9 +121,9 @@ export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return <FileCheck className="h-4 w-4 text-green-500" />;
+        return <FileCheck className="h-4 w-4 text-success" />;
       case 'analyzing':
-        return <Activity className="h-4 w-4 text-yellow-500 animate-pulse" />;
+        return <Activity className="h-4 w-4 text-warning animate-pulse" />;
       default:
         return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
@@ -196,7 +196,7 @@ export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) 
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{user?.reputationScore || "0"}</div>
-            <div className="flex items-center gap-1 text-xs text-green-500 mt-1">
+            <div className="flex items-center gap-1 text-xs text-success mt-1">
               <TrendingUp className="h-3 w-3" />
               <span>+5.2% this week</span>
             </div>
@@ -367,7 +367,7 @@ export function UserAnalyticsDashboard({ userId }: UserAnalyticsDashboardProps) 
               <div className="text-center">
                 <div className="text-6xl font-bold text-primary mb-2">#12</div>
                 <p className="text-sm text-muted-foreground">Out of 1,247 users</p>
-                <div className="flex items-center justify-center gap-1 text-sm text-green-500 mt-2">
+                <div className="flex items-center justify-center gap-1 text-sm text-success mt-2">
                   <TrendingUp className="h-4 w-4" />
                   <span>+3 positions this week</span>
                 </div>

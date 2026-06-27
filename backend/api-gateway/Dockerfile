@@ -21,8 +21,11 @@ RUN cargo build --release --bin api-gateway
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates libssl3 libpq5 && rm -rf /var/lib/apt/lists/*
 RUN useradd -m -u 1000 app
+WORKDIR /app
 COPY --from=builder /app/target/release/api-gateway /usr/local/bin/app
-RUN chown -R app:app /usr/local/bin/app
+# Contract ABIs are read at runtime relative to the working directory.
+COPY --from=builder /app/api-gateway/abis ./abis
+RUN chown -R app:app /usr/local/bin/app /app
 USER app
 EXPOSE 8080
 CMD ["/usr/local/bin/app"]

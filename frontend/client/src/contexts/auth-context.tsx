@@ -2,8 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { useToast } from "@/hooks/use-toast";
 import { 
   setAuthCookies, 
-  clearAuthCookies, 
-  getUserFromCookie 
+  clearAuthCookies 
 } from "@/lib/cookie-auth";
 
 interface User {

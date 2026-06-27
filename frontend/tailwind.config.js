@@ -40,6 +40,18 @@ module.exports = {
   				DEFAULT: 'hsl(var(--destructive))',
   				foreground: 'hsl(var(--destructive-foreground))'
   			},
+  			success: {
+  				DEFAULT: 'hsl(var(--success))',
+  				foreground: 'hsl(var(--success-foreground))'
+  			},
+  			warning: {
+  				DEFAULT: 'hsl(var(--warning))',
+  				foreground: 'hsl(var(--warning-foreground))'
+  			},
+  			surface: {
+  				DEFAULT: 'hsl(var(--surface))',
+  				foreground: 'hsl(var(--surface-foreground))'
+  			},
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
@@ -63,13 +75,27 @@ module.exports = {
   		},
   		fontFamily: {
   			sans: [
-  				'var(--font-sans)'
+  				'Inter',
+  				'system-ui',
+  				'-apple-system',
+  				'Segoe UI',
+  				'sans-serif'
+  			],
+  			display: [
+  				'Syne',
+  				'Inter',
+  				'system-ui',
+  				'sans-serif'
   			],
   			serif: [
-  				'var(--font-serif)'
+  				'Georgia',
+  				'serif'
   			],
   			mono: [
-  				'var(--font-mono)'
+  				'JetBrains Mono',
+  				'ui-monospace',
+  				'SFMono-Regular',
+  				'monospace'
   			]
   		},
   		keyframes: {

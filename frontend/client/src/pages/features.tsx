@@ -1,4 +1,5 @@
 import { Navigation } from "@/components/navigation";
+import { Footer } from "@/components/footer";
 import { Terminal, Shield, Zap, Cpu, Database, Network } from "lucide-react";
 import { SEO } from "@/components/seo";
 
@@ -43,7 +44,7 @@ export default function Features() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-300 font-sans selection:bg-blue-500/30">
+    <div className="min-h-screen bg-background text-muted-foreground font-sans selection:bg-primary/30">
       <SEO 
         title="Features & Capabilities" 
         description="Technical capabilities of the Verdyx engine. API-first, verifiable, multi-engine threat detection."
@@ -53,26 +54,26 @@ export default function Features() {
       <main className="pt-32 pb-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20 max-w-3xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold font-sans text-white tracking-tight mb-6">
+            <h1 className="text-4xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-6">
               Technical Capabilities
             </h1>
-            <p className="text-lg md:text-xl text-slate-400 leading-relaxed font-sans">
+            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
               Built for speed, accuracy, and transparency. Designed to integrate seamlessly into modern security operations.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, idx) => (
-              <div key={idx} className="group relative bg-slate-900/30 border border-slate-800/60 rounded-xl overflow-hidden hover:border-blue-500/50 transition-colors">
+              <div key={idx} className="group relative bg-card/40 border border-border/60 rounded-xl overflow-hidden hover:border-primary/50 transition-colors">
                 <div className="p-8">
-                  <feature.icon className="w-8 h-8 text-blue-400 mb-6 group-hover:scale-110 transition-transform" />
-                  <h3 className="text-xl font-bold text-white mb-3 font-sans">{feature.title}</h3>
-                  <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                  <feature.icon className="w-8 h-8 text-primary mb-6 group-hover:scale-110 transition-transform" />
+                  <h3 className="text-xl font-bold text-foreground mb-3">{feature.title}</h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed mb-6">
                     {feature.description}
                   </p>
                 </div>
-                <div className="bg-slate-950 border-t border-slate-800/60 p-4">
-                  <pre className="text-xs font-mono text-emerald-400/80 overflow-x-auto whitespace-pre-wrap">
+                <div className="surface-panel border-x-0 border-b-0 border-t p-4">
+                  <pre className="text-xs font-mono text-accent/90 overflow-x-auto whitespace-pre-wrap">
                     <code>{feature.code}</code>
                   </pre>
                 </div>
@@ -82,12 +83,7 @@ export default function Features() {
         </div>
       </main>
 
-      <footer className="border-t border-slate-800 py-12 bg-slate-950 mt-12">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col items-center">
-          <div className="text-slate-500 font-mono text-sm mb-4 bg-slate-900 px-4 py-1 rounded-full border border-slate-800">verdyx // features</div>
-          <p className="text-slate-600 text-xs">© 2026 Verdyx. Developer First.</p>
-        </div>
-      </footer>
+      <Footer tag="features" />
     </div>
   );
 }

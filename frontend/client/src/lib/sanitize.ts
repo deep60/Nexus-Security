@@ -23,7 +23,7 @@ export function sanitizeHtml(dirty: string): string {
 export function sanitizeFilename(filename: string): string {
   // Remove path separators and null bytes
   let sanitized = filename
-    .replace(/[\/\\]/g, '_')
+    .replace(/[/\\]/g, '_')
     .replace(/\0/g, '')
     .trim();
   

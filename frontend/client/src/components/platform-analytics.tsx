@@ -131,7 +131,7 @@ export function PlatformAnalytics() {
             <div className="text-2xl font-bold">
               {threatTrends[threatTrends.length - 1].total}
             </div>
-            <div className="flex items-center gap-1 text-xs text-green-500 mt-1">
+            <div className="flex items-center gap-1 text-xs text-success mt-1">
               <TrendingUp className="h-3 w-3" />
               <span>+12.3% from last week</span>
             </div>
@@ -171,7 +171,7 @@ export function PlatformAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.avgResponseTime || "24.7s"}</div>
-            <div className="flex items-center gap-1 text-xs text-green-500 mt-1">
+            <div className="flex items-center gap-1 text-xs text-success mt-1">
               <TrendingUp className="h-3 w-3" />
               <span>15% faster this month</span>
             </div>
@@ -194,16 +194,16 @@ export function PlatformAnalytics() {
               <AreaChart data={threatTrends}>
                 <defs>
                   <linearGradient id="maliciousGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="suspiciousGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#eab308" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="hsl(var(--warning))" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="hsl(var(--warning))" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="cleanGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -231,7 +231,7 @@ export function PlatformAnalytics() {
                   type="monotone"
                   dataKey="malicious"
                   stackId="1"
-                  stroke="#ef4444"
+                  stroke="hsl(var(--destructive))"
                   fill="url(#maliciousGradient)"
                   name="Malicious"
                 />
@@ -239,7 +239,7 @@ export function PlatformAnalytics() {
                   type="monotone"
                   dataKey="suspicious"
                   stackId="1"
-                  stroke="#eab308"
+                  stroke="hsl(var(--warning))"
                   fill="url(#suspiciousGradient)"
                   name="Suspicious"
                 />
@@ -247,7 +247,7 @@ export function PlatformAnalytics() {
                   type="monotone"
                   dataKey="clean"
                   stackId="1"
-                  stroke="#22c55e"
+                  stroke="hsl(var(--accent))"
                   fill="url(#cleanGradient)"
                   name="Clean"
                 />

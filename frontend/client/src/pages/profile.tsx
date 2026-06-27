@@ -88,7 +88,7 @@ export default function Profile() {
                       <CheckCircle2 className="w-4 h-4 mr-2" />
                       Completed
                     </span>
-                    <span className="font-semibold text-green-500">{completedAnalyses}</span>
+                    <span className="font-semibold text-success">{completedAnalyses}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground flex items-center">
@@ -190,7 +190,7 @@ export default function Profile() {
                     <Separator />
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Account Status</span>
-                      <Badge variant="outline" className="border-green-500 text-green-500">
+                      <Badge variant="outline" className="border-success text-success">
                         Active
                       </Badge>
                     </div>

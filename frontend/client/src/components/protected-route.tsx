@@ -14,7 +14,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      setLocation("/login");
+      // Preserve where the user was headed so we can return after login.
+      const redirect = encodeURIComponent(window.location.pathname + window.location.search);
+      setLocation(`/login?redirect=${redirect}`);
     }
   }, [isAuthenticated, isLoading, setLocation]);
 

@@ -1,4 +1,4 @@
-import { Component, ReactNode, ErrorInfo } from 'react';
+import React, { Component, ReactNode, ErrorInfo } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
@@ -57,25 +57,25 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-          <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-lg p-8 text-center">
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <div className="max-w-md w-full bg-card border border-border rounded-lg p-8 text-center">
             <div className="flex justify-center mb-6">
-              <div className="h-16 w-16 rounded-full bg-red-500/10 flex items-center justify-center">
-                <AlertTriangle className="h-8 w-8 text-red-500" />
+              <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="h-8 w-8 text-destructive" />
               </div>
             </div>
             
-            <h1 className="text-2xl font-bold text-white mb-2">
+            <h1 className="text-2xl font-bold text-foreground mb-2">
               Something went wrong
             </h1>
             
-            <p className="text-slate-400 mb-6">
+            <p className="text-muted-foreground mb-6">
               An unexpected error occurred. Please try again or contact support if the problem persists.
             </p>
             
             {this.state.error && (
-              <div className="bg-slate-800 rounded p-3 mb-6 text-left">
-                <p className="text-xs text-slate-500 font-mono">
+              <div className="bg-surface rounded p-3 mb-6 text-left">
+                <p className="text-xs text-muted-foreground font-mono break-words">
                   {this.state.error.message}
                 </p>
               </div>
@@ -102,7 +102,7 @@ export class ErrorBoundary extends Component<Props, State> {
               
               <Button 
                 onClick={this.handleGoHome}
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                className="flex-1"
               >
                 <Home className="mr-2 h-4 w-4" />
                 Go Home
@@ -122,13 +122,10 @@ export class ErrorBoundary extends Component<Props, State> {
  */
 export function useErrorHandler() {
   const [, setError] = React.useState<Error | null>(null);
-  
+
   return (error: Error) => {
     setError(error);
     // Throw to trigger ErrorBoundary
     throw error;
   };
 }
-
-// Need to import React for the hook
-import React from 'react';

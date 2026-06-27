@@ -122,9 +122,9 @@ export default function AnalysisDetails() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        return <CheckCircle2 className="h-5 w-5 text-success" />;
       case "analyzing":
-        return <Clock className="h-5 w-5 text-yellow-500 animate-spin" />;
+        return <Clock className="h-5 w-5 text-warning animate-spin" />;
       case "pending":
         return <Clock className="h-5 w-5 text-muted-foreground" />;
       default:
@@ -260,7 +260,7 @@ export default function AnalysisDetails() {
                   <div className="text-sm text-muted-foreground">Suspicious Votes</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-green-500">{consensus.cleanVotes}</div>
+                  <div className="text-3xl font-bold text-success">{consensus.cleanVotes}</div>
                   <div className="text-sm text-muted-foreground">Clean Votes</div>
                 </div>
               </div>
@@ -392,7 +392,7 @@ export default function AnalysisDetails() {
                   </div>
                   {submission.status !== "pending" && (
                     <div className="flex items-center gap-4">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full" />
+                      <div className="w-2 h-2 bg-warning rounded-full" />
                       <div>
                         <div className="font-semibold">Analysis Started</div>
                         <div className="text-sm text-muted-foreground">Engines assigned</div>
@@ -401,7 +401,7 @@ export default function AnalysisDetails() {
                   )}
                   {submission.status === "completed" && (
                     <div className="flex items-center gap-4">
-                      <div className="w-2 h-2 bg-green-500 rounded-full" />
+                      <div className="w-2 h-2 bg-success rounded-full" />
                       <div>
                         <div className="font-semibold">Analysis Completed</div>
                         <div className="text-sm text-muted-foreground">

@@ -8,8 +8,19 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// IMPORTANT: do NOT parse the body for proxied /api requests. The BFF forwards
+// these raw to the Rust gateway; if express.json() consumes the stream first,
+// proxied POST/PUT requests hang and the connection drops. Body parsers are
+// scoped to non-/api routes only.
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) return next();
+  express.json()(req, res, next);
+});
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) return next();
+  express.urlencoded({ extended: false })(req, res, next);
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

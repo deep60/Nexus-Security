@@ -20,9 +20,9 @@ export function ConsensusVisualization({ consensus }: ConsensusVisualizationProp
 
   // Data for pie chart
   const pieData = [
-    { name: "Malicious", value: maliciousVotes, color: "#ef4444" },
-    { name: "Clean", value: cleanVotes, color: "#22c55e" },
-    { name: "Suspicious", value: suspiciousVotes, color: "#eab308" },
+    { name: "Malicious", value: maliciousVotes, color: "hsl(var(--destructive))" },
+    { name: "Clean", value: cleanVotes, color: "hsl(var(--accent))" },
+    { name: "Suspicious", value: suspiciousVotes, color: "hsl(var(--warning))" },
   ].filter(item => item.value > 0);
 
   const getVerdictIcon = (verdict: string) => {
@@ -30,9 +30,9 @@ export function ConsensusVisualization({ consensus }: ConsensusVisualizationProp
       case "malicious":
         return <XCircle className="h-8 w-8 text-destructive" />;
       case "clean":
-        return <CheckCircle2 className="h-8 w-8 text-green-500" />;
+        return <CheckCircle2 className="h-8 w-8 text-success" />;
       case "suspicious":
-        return <AlertTriangle className="h-8 w-8 text-yellow-500" />;
+        return <AlertTriangle className="h-8 w-8 text-warning" />;
       default:
         return null;
     }
@@ -186,7 +186,7 @@ export function ConsensusVisualization({ consensus }: ConsensusVisualizationProp
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  <AlertTriangle className="h-4 w-4 text-warning" />
                   <span className="text-sm font-medium">Suspicious</span>
                 </div>
                 <span className="text-sm font-bold">{suspiciousVotes} / {totalEngines}</span>
@@ -204,7 +204,7 @@ export function ConsensusVisualization({ consensus }: ConsensusVisualizationProp
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <CheckCircle2 className="h-4 w-4 text-success" />
                   <span className="text-sm font-medium">Clean</span>
                 </div>
                 <span className="text-sm font-bold">{cleanVotes} / {totalEngines}</span>

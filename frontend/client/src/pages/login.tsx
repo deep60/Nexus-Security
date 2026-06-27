@@ -18,6 +18,13 @@ export default function Login() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  // Return the user to where they were headed before being redirected to login.
+  const getRedirectTarget = () => {
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get("redirect");
+    return redirect ? decodeURIComponent(redirect) : "/dashboard";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -25,7 +32,7 @@ export default function Login() {
 
     try {
       await login(identifier, password);
-      setLocation("/dashboard");
+      setLocation(getRedirectTarget());
     } catch (_err) {
       setError("Invalid credentials. Please try again.");
     } finally {
@@ -36,7 +43,7 @@ export default function Login() {
   const handleWalletConnect = async () => {
     try {
       await connectWallet();
-      setLocation("/dashboard");
+      setLocation(getRedirectTarget());
     } catch (_err) {
       setError("Failed to connect wallet. Please try again.");
     }
@@ -50,7 +57,7 @@ export default function Login() {
       <Card className="w-full max-w-md glassmorphism border-primary/20 relative z-10">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <div className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+            <div className="text-3xl font-bold font-display text-gradient-brand">
               VERDYX
             </div>
           </div>

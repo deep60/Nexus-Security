@@ -69,7 +69,7 @@ export function ExportReport({ submissionId, fileName, consensus, analyses = [] 
         title: "Export Successful",
         description: (
           <div className="flex items-center gap-2">
-            <FileJson className="h-4 w-4 text-green-500 flex-shrink-0" />
+            <FileJson className="h-4 w-4 text-success flex-shrink-0" />
             <span>Report exported as JSON</span>
           </div>
         ),
@@ -127,7 +127,7 @@ export function ExportReport({ submissionId, fileName, consensus, analyses = [] 
         title: "Export Successful",
         description: (
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-green-500 flex-shrink-0" />
+            <FileText className="h-4 w-4 text-success flex-shrink-0" />
             <span>Report exported as Markdown</span>
           </div>
         ),
@@ -168,7 +168,7 @@ export function ExportReport({ submissionId, fileName, consensus, analyses = [] 
         title: "Export Successful",
         description: (
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-green-500 flex-shrink-0" />
+            <FileText className="h-4 w-4 text-success flex-shrink-0" />
             <span>Analysis data exported as CSV</span>
           </div>
         ),
@@ -189,7 +189,7 @@ export function ExportReport({ submissionId, fileName, consensus, analyses = [] 
         title: "Link Copied!",
         description: (
           <div className="flex items-center gap-2">
-            <Share2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+            <Share2 className="h-4 w-4 text-success flex-shrink-0" />
             <span>Share link copied to clipboard</span>
           </div>
         ),

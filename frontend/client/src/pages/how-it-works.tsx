@@ -1,10 +1,11 @@
 import { Navigation } from "@/components/navigation";
 import { ArchitectureDiagram } from "@/components/diagrams/ArchitectureDiagram";
+import { Footer } from "@/components/footer";
 import { SEO } from "@/components/seo";
 
 export default function HowItWorks() {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-300 font-sans selection:bg-blue-500/30">
+    <div className="min-h-screen bg-background text-muted-foreground font-sans selection:bg-primary/30">
       <SEO 
         title="How It Works" 
         description="A transparent, verifiable pipeline replacing the legacy black-box heuristics of traditional antivirus."
@@ -14,45 +15,44 @@ export default function HowItWorks() {
       <main className="pt-32 pb-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-16">
-            <h1 className="text-4xl md:text-5xl font-bold font-sans text-white tracking-tight mb-6">
+            <h1 className="text-4xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-6">
               How Verdyx Works
             </h1>
-            <p className="text-lg md:text-xl text-slate-400 leading-relaxed font-sans">
-              A transparent, verifiable pipeline replacing the legacy black-box heuristics of traditional antivirus exactly.
+            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
+              A transparent, verifiable pipeline replacing the legacy black-box heuristics of traditional antivirus.
             </p>
           </div>
 
-          <div className="prose prose-invert prose-slate max-w-none">
-            <div className="my-16">
-              <ArchitectureDiagram />
-            </div>
+          <div className="my-16">
+            <ArchitectureDiagram />
+          </div>
 
-            <div className="space-y-16">
-              <section className="border-t border-slate-800 pt-8">
-                <h2 className="text-2xl font-bold text-white mb-4">1. Submission API Layer</h2>
-                <p className="text-slate-400 mb-6">
-                  Telemetry and files enter the system via high-throughput gRPC and REST endpoints. The gateway handles authentication, JWT validation securely, and payload deduplication securely. No file is executed at this layer.
-                </p>
-                <div className="bg-slate-900 border border-slate-800 rounded-md p-4 overflow-x-auto">
-                  <pre className="text-sm font-mono text-emerald-400">
-                    <code>
+          <div className="space-y-16">
+            <section className="border-t border-border pt-8">
+              <h2 className="text-2xl font-bold text-foreground mb-4">1. Submission API Layer</h2>
+              <p className="text-muted-foreground mb-6">
+                Telemetry and files enter the system via high-throughput gRPC and REST endpoints. The gateway handles authentication, JWT validation, and payload deduplication. No file is executed at this layer.
+              </p>
+              <div className="surface-panel rounded-md p-4 overflow-x-auto">
+                <pre className="text-sm font-mono text-accent">
+                  <code>
 {`curl -X POST https://api.verdyx.com/v1/analyze \\
   -H "Authorization: Bearer $VERDYX_TOKEN" \\
   -F "file=@payload.bin" \\
   -F "engines=yara,clamav"`}
-                    </code>
-                  </pre>
-                </div>
-              </section>
+                  </code>
+                </pre>
+              </div>
+            </section>
 
-              <section className="border-t border-slate-800 pt-8">
-                <h2 className="text-2xl font-bold text-white mb-4">2. Distributed Analysis Nodes</h2>
-                <p className="text-slate-400 mb-6">
-                  The orchestrator dispatches the payload to multiple isolated worker nodes. Each node runs a specific engine tightly sandboxed. Customers can deploy private nodes to run proprietary YARA rules without exposing them to the public network.
-                </p>
-                <div className="bg-slate-900 border border-slate-800 rounded-md p-4 overflow-x-auto">
-                  <pre className="text-sm font-mono text-blue-400">
-                    <code>
+            <section className="border-t border-border pt-8">
+              <h2 className="text-2xl font-bold text-foreground mb-4">2. Distributed Analysis Nodes</h2>
+              <p className="text-muted-foreground mb-6">
+                The orchestrator dispatches the payload to multiple isolated worker nodes. Each node runs a specific engine in a tightly sandboxed environment. Customers can deploy private nodes to run proprietary YARA rules without exposing them to the public network.
+              </p>
+              <div className="surface-panel rounded-md p-4 overflow-x-auto">
+                <pre className="text-sm font-mono text-primary">
+                  <code>
 {`# Docker Compose example for private node
 services:
   verdyx-worker:
@@ -62,31 +62,25 @@ services:
       - PRIVATE_RULES_DIR=/rules
     volumes:
       - ./my-rules:/rules:ro`}
-                    </code>
-                  </pre>
-                </div>
-              </section>
+                  </code>
+                </pre>
+              </div>
+            </section>
 
-              <section className="border-t border-slate-800 pt-8">
-                <h2 className="text-2xl font-bold text-white mb-4">3. Consensus & Aggregation</h2>
-                <p className="text-slate-400 mb-6">
-                  Results from all nodes are collected asynchronously. The consensus engine applies a weighted algorithm to the signals. For example, a generic ClamAV hit might contribute 20% to the confidence score, while a highly specific YARA rule match contributes 80%. 
-                </p>
-                <p className="text-slate-400">
-                  If the final confidence score exceeds the threshold, the payload is flagged. The entire cryptographic proof of the analysis is verifiable.
-                </p>
-              </section>
-            </div>
+            <section className="border-t border-border pt-8">
+              <h2 className="text-2xl font-bold text-foreground mb-4">3. Consensus &amp; Aggregation</h2>
+              <p className="text-muted-foreground mb-6">
+                Results from all nodes are collected asynchronously. The consensus engine applies a weighted algorithm to the signals. For example, a generic ClamAV hit might contribute 20% to the confidence score, while a highly specific YARA rule match contributes 80%.
+              </p>
+              <p className="text-muted-foreground">
+                If the final confidence score exceeds the threshold, the payload is flagged. The entire cryptographic proof of the analysis is verifiable.
+              </p>
+            </section>
           </div>
         </div>
       </main>
 
-      <footer className="border-t border-slate-800 py-12 bg-slate-950 mt-20">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col items-center">
-          <div className="text-slate-500 font-mono text-sm mb-4 bg-slate-900 px-4 py-1 rounded-full border border-slate-800">verdyx // docs</div>
-          <p className="text-slate-600 text-xs">© 2026 Verdyx. Developer First.</p>
-        </div>
-      </footer>
+      <Footer tag="docs" />
     </div>
   );
 }

@@ -38,7 +38,7 @@ export function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" data-testid="link-home">
-            <div className="flex items-center space-x-2 text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+            <div className="flex items-center space-x-2 text-2xl font-bold font-display text-gradient-brand">
               <Shield className="h-8 w-8 text-primary" />
               <span>VERDYX</span>
             </div>
@@ -64,7 +64,7 @@ export function Navigation() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                     <Avatar className="h-10 w-10 border-2 border-primary">
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-secondary">
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground">
                         {userInitials}
                       </AvatarFallback>
                     </Avatar>
@@ -127,7 +127,7 @@ export function Navigation() {
                 {isAuthenticated && user && (
                   <div className="flex items-center gap-3 pb-4 border-b border-border">
                     <Avatar className="h-12 w-12 border-2 border-primary">
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-secondary">
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground">
                         {userInitials}
                       </AvatarFallback>
                     </Avatar>

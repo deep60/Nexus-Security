@@ -1,157 +1,178 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, CheckCircle, AlertTriangle, RotateCw, FileText, Link as LinkIcon } from "lucide-react";
+import { Activity, CheckCircle, AlertTriangle, RotateCw, FileText, Link as LinkIcon, ShieldCheck, Inbox } from "lucide-react";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/error-state";
+import { StatCard } from "@/components/stat-card";
 import type { ApiSubmission, ApiStats } from "@/lib/api-types";
 
-export function AnalysisDashboard() {
-  const { data: submissions = [], refetch } = useQuery<ApiSubmission[]>({
-    queryKey: ["/api/submissions"],
-  });
+const statusMeta: Record<string, { label: string; icon: typeof Activity; className: string; dot: string }> = {
+  analyzing: { label: "Analyzing", icon: RotateCw, className: "text-primary", dot: "bg-primary" },
+  completed: { label: "Completed", icon: CheckCircle, className: "text-accent", dot: "bg-accent" },
+  pending: { label: "Pending", icon: Activity, className: "text-warning", dot: "bg-warning" },
+  failed: { label: "Failed", icon: AlertTriangle, className: "text-destructive", dot: "bg-destructive" },
+};
 
-  const { data: stats } = useQuery<ApiStats>({
+function getMeta(status: string) {
+  return statusMeta[status] ?? statusMeta.failed;
+}
+
+/** KPI row — four uniform cards for a balanced, symmetrical header. */
+export function DashboardStats() {
+  const { data: stats, isLoading, isError } = useQuery<ApiStats>({
     queryKey: ["/api/analysis/stats"],
   });
 
-  useWebSocket((message) => {
-    if (message.type === 'analysis_updated' || message.type === 'analysis_completed' || message.type === 'new_submission') {
-      refetch();
-    }
-  });
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "analyzing":
-        return <RotateCw className="w-4 h-4 text-primary animate-spin" />;
-      case "completed":
-        return <CheckCircle className="w-4 h-4 text-accent" />;
-      case "pending":
-        return <Activity className="w-4 h-4 text-secondary" />;
-      default:
-        return <AlertTriangle className="w-4 h-4 text-destructive" />;
-    }
-  };
-
-  const getFileIcon = (submissionType: string) => {
-    return submissionType === "url" ? <LinkIcon className="w-6 h-6" /> : <FileText className="w-6 h-6" />;
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "analyzing":
-        return "border-primary/20 bg-primary/5";
-      case "completed":
-        return "border-accent/20 bg-accent/5";
-      case "pending":
-        return "border-secondary/20 bg-secondary/5";
-      default:
-        return "border-destructive/20 bg-destructive/5";
-    }
-  };
+  const cards = [
+    {
+      label: "Total Submissions",
+      value: Number(stats?.totalSubmissions ?? 0).toLocaleString(),
+      icon: Inbox,
+      accent: "primary" as const,
+      hint: "All-time files analyzed",
+    },
+    {
+      label: "Active Analyses",
+      value: Number(stats?.activeAnalyses ?? stats?.analyzingCount ?? 0),
+      icon: Activity,
+      accent: "accent" as const,
+      hint: "Currently in progress",
+    },
+    {
+      label: "Completed Today",
+      value: Number(stats?.completedToday ?? stats?.completedAnalyses ?? 0),
+      icon: ShieldCheck,
+      accent: "primary" as const,
+      hint: "Reports finalized today",
+    },
+    {
+      label: "Threats Detected",
+      value: Math.floor(Number(stats?.threatsDetected ?? 0)),
+      icon: AlertTriangle,
+      accent: "destructive" as const,
+      hint: "Malicious files found",
+    },
+  ];
 
   return (
-    <div className="space-y-8">
-      {/* Stats Grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        <Card className="glassmorphism border-accent/20">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-accent">Active Analysis</h3>
-              <div className="w-3 h-3 bg-accent rounded-full animate-pulse" />
-            </div>
-            <div className="text-2xl font-bold mb-2" data-testid="text-active-analyses">
-              {Number(stats?.activeAnalyses ?? 0)}
-            </div>
-            <div className="text-sm text-muted-foreground">Files being analyzed</div>
-            <div className="scanning-animation h-1 w-full mt-4 rounded-full" />
-          </CardContent>
-        </Card>
-
-        <Card className="glassmorphism border-primary/20">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-primary">Completed Today</h3>
-              <CheckCircle className="w-5 h-5 text-primary" />
-            </div>
-            <div className="text-2xl font-bold mb-2" data-testid="text-completed-today">
-              {Number(stats?.completedToday ?? 0)}
-            </div>
-            <div className="text-sm text-muted-foreground">Analyses completed</div>
-          </CardContent>
-        </Card>
-
-        <Card className="glassmorphism border-destructive/20">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-destructive">Threats Detected</h3>
-              <AlertTriangle className="w-5 h-5 text-destructive" />
-            </div>
-            <div className="text-2xl font-bold mb-2" data-testid="text-threats-detected">
-              {Math.floor(Number(stats?.threatsDetected ?? 0))}
-            </div>
-            <div className="text-sm text-muted-foreground">Malicious files found</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Analysis Results */}
-      <Card className="glassmorphism neon-border">
-        <CardContent className="p-6">
-          <h3 className="text-xl font-semibold mb-6">Recent Analysis Results</h3>
-          <div className="space-y-4">
-            {submissions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground" data-testid="text-no-submissions">
-                No submissions yet. Submit a file to get started!
-              </div>
-            ) : (
-              submissions.slice(0, 5).map((submission) => (
-                <div
-                  key={submission.id}
-                  className={`flex items-center justify-between p-4 bg-card rounded-lg border ${getStatusColor(submission.status ?? "")}`}
-                  data-testid={`analysis-result-${submission.id}`}
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center">
-                      {getFileIcon(submission.submissionType ?? "")}
-                    </div>
-                    <div>
-                      <div className="font-semibold" data-testid={`filename-${submission.id}`}>
-                        {submission.filename}
-                      </div>
-                      <div className="text-sm text-muted-foreground font-mono">
-                        SHA256: {(submission.fileHash ?? "").substring(0, 12)}...
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="flex items-center space-x-2 mb-1">
-                      {getStatusIcon(submission.status ?? "")}
-                      <span className="text-sm font-medium capitalize" data-testid={`status-${submission.id}`}>
-                        {submission.status}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {submission.status === "completed" ? "Analysis complete" : "In progress"}
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">
-                      {submission.bountyAmount} ETH
-                    </Badge>
-                    {submission.priority && (
-                      <Badge variant="outline" className="bg-secondary/20 text-secondary border-secondary/30">
-                        Priority
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {cards.map((c) => (
+        <StatCard
+          key={c.label}
+          label={c.label}
+          value={isError ? "—" : c.value}
+          icon={c.icon}
+          accent={c.accent}
+          hint={c.hint}
+          loading={isLoading}
+        />
+      ))}
     </div>
   );
 }
 
+/** Recent analysis results list with loading/error/empty states. */
+export function RecentAnalyses() {
+  const {
+    data: submissions = [],
+    refetch,
+    isLoading,
+    isError,
+  } = useQuery<ApiSubmission[]>({
+    queryKey: ["/api/submissions"],
+  });
+
+  useWebSocket((message) => {
+    if (
+      message.type === "analysis_updated" ||
+      message.type === "analysis_completed" ||
+      message.type === "new_submission"
+    ) {
+      refetch();
+    }
+  });
+
+  return (
+    <Card className="glassmorphism h-full">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-lg font-semibold">Recent Analysis Results</CardTitle>
+        <Badge variant="outline" className="font-mono text-xs">
+          {submissions.length} total
+        </Badge>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {isError ? (
+            <ErrorState
+              title="Failed to load submissions"
+              message="Could not fetch recent analysis results. Please try again."
+              onRetry={refetch}
+            />
+          ) : isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 rounded-lg border border-border/50 p-4">
+                <Skeleton className="h-11 w-11 rounded-lg" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+                <Skeleton className="h-6 w-16" />
+              </div>
+            ))
+          ) : submissions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <Inbox className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="font-medium">No submissions yet</p>
+              <p className="text-sm text-muted-foreground">Submit a file to see results here.</p>
+            </div>
+          ) : (
+            submissions.slice(0, 6).map((submission) => {
+              const meta = getMeta(submission.status ?? "");
+              const StatusIcon = meta.icon;
+              return (
+                <div
+                  key={submission.id}
+                  className="flex items-center gap-4 rounded-lg border border-border/50 bg-card/40 p-4 transition-colors hover:border-border"
+                  data-testid={`analysis-result-${submission.id}`}
+                >
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    {submission.submissionType === "url" ? (
+                      <LinkIcon className="h-5 w-5" />
+                    ) : (
+                      <FileText className="h-5 w-5" />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium" data-testid={`filename-${submission.id}`}>
+                      {submission.filename || submission.fileName || "Untitled"}
+                    </div>
+                    <div className="truncate font-mono text-xs text-muted-foreground">
+                      SHA256: {(submission.fileHash ?? "—").substring(0, 16)}
+                      {submission.fileHash ? "…" : ""}
+                    </div>
+                  </div>
+
+                  <div className="hidden items-center gap-1.5 sm:flex">
+                    <StatusIcon
+                      className={`h-4 w-4 ${meta.className} ${submission.status === "analyzing" ? "animate-spin" : ""}`}
+                    />
+                    <span className={`text-sm font-medium ${meta.className}`}>{meta.label}</span>
+                  </div>
+
+                  <Badge variant="outline" className="shrink-0 border-primary/30 bg-primary/10 font-mono text-primary">
+                    {submission.bountyAmount ?? 0} ETH
+                  </Badge>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

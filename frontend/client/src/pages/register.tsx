@@ -79,7 +79,7 @@ export default function Register() {
       <Card className="w-full max-w-md glassmorphism border-primary/20 relative z-10">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <div className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+            <div className="text-3xl font-bold font-display text-gradient-brand">
               VERDYX
             </div>
           </div>

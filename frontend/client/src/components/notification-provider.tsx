@@ -37,7 +37,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
             title: "Analysis Started",
             description: (
               <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 text-blue-500 animate-pulse flex-shrink-0" />
+                <Activity className="h-4 w-4 text-primary animate-pulse flex-shrink-0" />
                 <span>Security engines are now analyzing your submission</span>
               </div>
             ),
@@ -67,10 +67,10 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
           const _isSuspicious = consensus.finalVerdict.toLowerCase() === "suspicious";
 
           const verdictIcon = isClean
-            ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+            ? <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
             : isMalicious
             ? <XCircle className="h-5 w-5 text-destructive flex-shrink-0" />
-            : <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />;
+            : <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0" />;
 
           toast({
             title: "Analysis Complete!",
@@ -80,9 +80,9 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
                 <div className="space-y-2">
                   <p className="font-semibold">
                     Verdict: <span className={
-                      isClean ? "text-green-500" :
+                      isClean ? "text-success" :
                       isMalicious ? "text-destructive" :
-                      "text-yellow-500"
+                      "text-warning"
                     }>
                       {consensus.finalVerdict}
                     </span>
@@ -109,7 +109,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
             title: "Bounty Claimed!",
             description: (
               <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0" />
+                <TrendingUp className="h-4 w-4 text-success flex-shrink-0" />
                 <span>You earned {message.data.amount} ETH for your analysis</span>
               </div>
             ),
@@ -122,7 +122,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
               title: "Reputation Increased!",
               description: (
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <TrendingUp className="h-4 w-4 text-success flex-shrink-0" />
                   <span>+{message.data.change} reputation points</span>
                 </div>
               ),
@@ -164,9 +164,9 @@ function getVerdictIcon(verdict: string | null) {
     case "malicious":
       return <XCircle className="h-5 w-5 text-destructive" />;
     case "clean":
-      return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+      return <CheckCircle2 className="h-5 w-5 text-success" />;
     case "suspicious":
-      return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
+      return <AlertTriangle className="h-5 w-5 text-warning" />;
     default:
       return <Activity className="h-5 w-5 text-muted-foreground" />;
   }
