@@ -35,11 +35,10 @@ export default function HowItWorks() {
               </p>
               <div className="surface-panel rounded-md p-4 overflow-x-auto">
                 <pre className="text-sm font-mono text-accent">
-                  <code>
-{`curl -X POST https://api.verdyx.com/v1/analyze \\
-  -H "Authorization: Bearer $VERDYX_TOKEN" \\
-  -F "file=@payload.bin" \\
-  -F "engines=yara,clamav"`}
+                  <code>{`curl -X POST https://api.verdyx.com/v1/analyze \\ 
+                  -H "Authorization: Bearer $VERDYX_TOKEN" \\
+                  -F "file=@payload.bin" \\
+                  -F "engines=yara,clamav"`}
                   </code>
                 </pre>
               </div>

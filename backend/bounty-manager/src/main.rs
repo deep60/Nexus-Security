@@ -249,48 +249,48 @@ fn create_router(state: bounty_crud::BountyManagerState) -> Router {
         // Bounty management routes
         .route("/bounties", post(bounty_crud::create_bounty))
         .route("/bounties", get(bounty_crud::list_bounties))
-        .route("/bounties/:id", get(bounty_crud::get_bounty))
-        .route("/bounties/:id", put(bounty_crud::update_bounty))
-        .route("/bounties/:id/cancel", post(bounty_crud::cancel_bounty))
+        .route("/bounties/{id}", get(bounty_crud::get_bounty))
+        .route("/bounties/{id}", put(bounty_crud::update_bounty))
+        .route("/bounties/{id}/cancel", post(bounty_crud::cancel_bounty))
 
         // Stats route
         .route("/bounties/stats", get(bounty_crud::get_bounty_stats))
 
         // Submission routes
-        .route("/bounties/:id/submit", post(handlers::submit_analysis))
-        .route("/bounties/:id/submissions", get(handlers::list_submissions_for_bounty))
-        .route("/submissions/:id", get(handlers::get_submission))
-        .route("/submissions/:id/status", put(handlers::update_submission_status))
+        .route("/bounties/{id}/submit", post(handlers::submit_analysis))
+        .route("/bounties/{id}/submissions", get(handlers::list_submissions_for_bounty))
+        .route("/submissions/{id}", get(handlers::get_submission))
+        .route("/submissions/{id}/status", put(handlers::update_submission_status))
 
         // Payout routes
-        .route("/bounties/:id/payout", post(handlers::process_bounty_completion))
-        .route("/payouts/:id/distribute", post(handlers::distribute_rewards))
-        .route("/payouts/:id/slash", post(handlers::handle_stake_slashing))
+        .route("/bounties/{id}/payout", post(handlers::process_bounty_completion))
+        .route("/payouts/{id}/distribute", post(handlers::distribute_rewards))
+        .route("/payouts/{id}/slash", post(handlers::handle_stake_slashing))
         .route("/payouts/history", get(handlers::get_payout_history))
 
         // Dispute routes
         .route("/disputes", post(handlers::create_dispute))
         .route("/disputes", get(handlers::list_disputes))
-        .route("/disputes/:id", get(handlers::get_dispute))
-        .route("/disputes/:id", put(handlers::update_dispute))
-        .route("/disputes/:id/resolve", post(handlers::resolve_dispute))
-        .route("/disputes/:id/vote", post(handlers::vote_on_dispute))
-        .route("/disputes/:id/withdraw", post(handlers::withdraw_dispute))
+        .route("/disputes/{id}", get(handlers::get_dispute))
+        .route("/disputes/{id}", put(handlers::update_dispute))
+        .route("/disputes/{id}/resolve", post(handlers::resolve_dispute))
+        .route("/disputes/{id}/vote", post(handlers::vote_on_dispute))
+        .route("/disputes/{id}/withdraw", post(handlers::withdraw_dispute))
         .route("/disputes/stats", get(handlers::get_dispute_stats))
 
         // Validation routes
-        .route("/submissions/:id/validate", post(handlers::validate_submission))
-        .route("/submissions/:id/validation", get(handlers::get_validation_result))
+        .route("/submissions/{id}/validate", post(handlers::validate_submission))
+        .route("/submissions/{id}/validation", get(handlers::get_validation_result))
         .route("/validations", get(handlers::list_validations))
         .route("/validations/bulk", post(handlers::bulk_validate_submissions))
         .route("/validations/stats", get(handlers::get_validation_stats))
-        .route("/submissions/:id/revalidate", post(handlers::revalidate_submission))
+        .route("/submissions/{id}/revalidate", post(handlers::revalidate_submission))
 
         // Reputation routes
-        .route("/reputation/:id", get(handlers::get_engine_reputation))
-        .route("/reputation/:id", put(handlers::update_reputation))
+        .route("/reputation/{id}", get(handlers::get_engine_reputation))
+        .route("/reputation/{id}", put(handlers::update_reputation))
         .route("/reputation/leaderboard", get(handlers::get_leaderboard))
-        .route("/reputation/:id/history", get(handlers::get_reputation_history))
+        .route("/reputation/{id}/history", get(handlers::get_reputation_history))
         .route("/reputation/decay", post(handlers::apply_reputation_decay))
         .route("/engines/register", post(handlers::register_engine))
         // State management
