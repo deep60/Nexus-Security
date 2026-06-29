@@ -26,7 +26,9 @@ impl ReputationScorer {
         // Apply streak bonus
         if update.was_correct && current_reputation.current_streak > 0 {
             let streak_multiplier = 1.0 + (current_reputation.current_streak as f64 * 0.1);
-            base_change = (base_change as f64 * streak_multiplier.min(self.config.streak_bonus_multiplier)) as i32;
+            base_change = (base_change as f64
+                * streak_multiplier.min(self.config.streak_bonus_multiplier))
+                as i32;
         }
 
         // Apply consensus bonus
@@ -40,7 +42,11 @@ impl ReputationScorer {
         }
 
         // Apply confidence multiplier
-        let confidence_multiplier = update.confidence_score.to_string().parse::<f64>().unwrap_or(1.0);
+        let confidence_multiplier = update
+            .confidence_score
+            .to_string()
+            .parse::<f64>()
+            .unwrap_or(1.0);
         base_change = (base_change as f64 * confidence_multiplier) as i32;
 
         base_change
@@ -74,8 +80,8 @@ impl ReputationScorer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
     use chrono::Utc;
+    use uuid::Uuid;
 
     fn test_config() -> ReputationConfig {
         ReputationConfig {

@@ -2,10 +2,10 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use crate::models::{NotificationChannel, NotificationError, NotificationResult};
-use shared::messaging::event_types::{VerdyxEvent, NotificationPayload, NotificationPriority};
+use shared::messaging::event_types::{NotificationPayload, NotificationPriority, VerdyxEvent};
 
 /// Push notification channel implementation
 /// Supports Firebase Cloud Messaging (FCM) and Apple Push Notification Service (APNS)
@@ -38,7 +38,10 @@ impl PushChannel {
                 title: notification.title.clone(),
                 body: notification.body.clone(),
                 icon: notification.icon.clone(),
-                sound: notification.sound.clone().unwrap_or_else(|| "default".to_string()),
+                sound: notification
+                    .sound
+                    .clone()
+                    .unwrap_or_else(|| "default".to_string()),
                 badge: notification.badge,
                 click_action: notification.click_action.clone(),
             },
@@ -59,10 +62,13 @@ impl PushChannel {
             .json(&fcm_message)
             .send()
             .await
-            .map_err(|e| NotificationError::SendError(format!("FCM request failed: {}", e)))?;
+            .map_err(|e| NotificationError::SendError(format!("FCM request failed: {e}")))?;
 
         if response.status().is_success() {
-            info!("FCM push notification sent successfully to {}", device_token);
+            info!(
+                "FCM push notification sent successfully to {}",
+                device_token
+            );
             Ok(())
         } else {
             let status = response.status();
@@ -75,8 +81,7 @@ impl PushChannel {
                 status, error_body
             );
             Err(NotificationError::SendError(format!(
-                "FCM error {}: {}",
-                status, error_body
+                "FCM error {status}: {error_body}"
             )))
         }
     }
@@ -95,35 +100,44 @@ impl PushChannel {
                     body: notification.body.clone(),
                 },
                 badge: notification.badge,
-                sound: notification.sound.clone().unwrap_or_else(|| "default".to_string()),
+                sound: notification
+                    .sound
+                    .clone()
+                    .unwrap_or_else(|| "default".to_string()),
                 thread_id: notification.thread_id.clone(),
                 category: notification.category.clone(),
             },
             data: notification.data.clone(),
         };
 
-        let url = format!(
-            "{}/3/device/{}",
-            config.endpoint, device_token
-        );
+        let url = format!("{}/3/device/{}", config.endpoint, device_token);
 
         let response = self
             .http_client
             .post(&url)
             .header("authorization", format!("bearer {}", config.auth_token))
             .header("apns-topic", &config.bundle_id)
-            .header("apns-priority", match notification.priority {
-                NotificationPriority::Critical | NotificationPriority::High => "10",
-                _ => "5",
-            })
-            .header("apns-expiration", notification.ttl.unwrap_or(86400).to_string())
+            .header(
+                "apns-priority",
+                match notification.priority {
+                    NotificationPriority::Critical | NotificationPriority::High => "10",
+                    _ => "5",
+                },
+            )
+            .header(
+                "apns-expiration",
+                notification.ttl.unwrap_or(86400).to_string(),
+            )
             .json(&apns_payload)
             .send()
             .await
-            .map_err(|e| NotificationError::SendError(format!("APNS request failed: {}", e)))?;
+            .map_err(|e| NotificationError::SendError(format!("APNS request failed: {e}")))?;
 
         if response.status().is_success() {
-            info!("APNS push notification sent successfully to {}", device_token);
+            info!(
+                "APNS push notification sent successfully to {}",
+                device_token
+            );
             Ok(())
         } else {
             let status = response.status();
@@ -136,23 +150,26 @@ impl PushChannel {
                 status, error_body
             );
             Err(NotificationError::SendError(format!(
-                "APNS error {}: {}",
-                status, error_body
+                "APNS error {status}: {error_body}"
             )))
         }
     }
 
     /// Build push notification from event
-    fn build_push_notification(
-        payload: &NotificationPayload,
-    ) -> PushNotification {
+    fn build_push_notification(payload: &NotificationPayload) -> PushNotification {
         let title = payload.event.get_title();
         let body = payload.event.get_description();
 
         let mut data = HashMap::new();
-        data.insert("notification_id".to_string(), payload.notification_id.to_string());
+        data.insert(
+            "notification_id".to_string(),
+            payload.notification_id.to_string(),
+        );
         data.insert("user_id".to_string(), payload.user_id.to_string());
-        data.insert("event_type".to_string(), Self::get_event_type(&payload.event));
+        data.insert(
+            "event_type".to_string(),
+            Self::get_event_type(&payload.event),
+        );
         data.insert("timestamp".to_string(), payload.created_at.to_rfc3339());
 
         // Add event-specific data
@@ -232,11 +249,7 @@ impl PushChannel {
 
 #[async_trait]
 impl NotificationChannel for PushChannel {
-    async fn send(
-        &self,
-        payload: &NotificationPayload,
-        recipient: &str,
-    ) -> NotificationResult<()> {
+    async fn send(&self, payload: &NotificationPayload, recipient: &str) -> NotificationResult<()> {
         info!(
             "Sending push notification to {} for event: {}",
             recipient,
@@ -276,8 +289,7 @@ impl NotificationChannel for PushChannel {
                 }
             }
             _ => Err(NotificationError::ValidationError(format!(
-                "Unsupported platform: {}",
-                platform
+                "Unsupported platform: {platform}"
             ))),
         }
     }
@@ -300,8 +312,7 @@ impl NotificationChannel for PushChannel {
         // Validate platform
         if !["fcm", "android", "apns", "ios"].contains(&platform) {
             return Err(NotificationError::ValidationError(format!(
-                "Invalid platform: {}",
-                platform
+                "Invalid platform: {platform}"
             )));
         }
 
@@ -412,9 +423,9 @@ struct ApnsAlert {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
     use chrono::Utc;
-    use shared::messaging::event_types::{BountyCreatedEvent, NotificationPriority};
+    use shared::messaging::event_types::BountyCreatedEvent;
+    use uuid::Uuid;
 
     #[tokio::test]
     async fn test_validate_recipient() {

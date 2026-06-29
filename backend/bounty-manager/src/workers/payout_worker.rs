@@ -1,12 +1,12 @@
 // backend/bounty-manager/src/workers/payout_worker.rs
 
+use crate::models::payout::PayoutModel;
+use crate::services::blockchain::BlockchainService;
+use crate::services::notification::NotificationService;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::time::{interval, Duration};
 use tracing::{error, info};
-use crate::services::blockchain::BlockchainService;
-use crate::services::notification::NotificationService;
-use crate::models::payout::PayoutModel;
 
 pub struct PayoutWorker {
     db: PgPool,
@@ -36,7 +36,7 @@ impl PayoutWorker {
 
         loop {
             ticker.tick().await;
-            
+
             if let Err(e) = self.process_pending_payouts().await {
                 error!("Error processing payouts: {}", e);
             }
@@ -70,12 +70,9 @@ impl PayoutWorker {
         );
 
         // Create blockchain transaction
-        let transaction = self.blockchain_service
-            .create_payout_transaction(
-                &payout.recipient,
-                payout.bounty_id,
-                payout.amount as u64,
-            )
+        let transaction = self
+            .blockchain_service
+            .create_payout_transaction(&payout.recipient, payout.bounty_id, payout.amount as u64)
             .await
             .map_err(|e| WorkerError::BlockchainError(e.to_string()))?;
 
@@ -90,7 +87,8 @@ impl PayoutWorker {
         .map_err(|e| WorkerError::DatabaseError(e.to_string()))?;
 
         // Send notification
-        if let Err(e) = self.notification_service
+        if let Err(e) = self
+            .notification_service
             .notify_payout_processed(
                 &payout.recipient,
                 payout.amount as u64,

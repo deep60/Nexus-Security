@@ -10,13 +10,13 @@ pub type ReputationResult<T> = Result<T, ReputationError>;
 pub enum ReputationError {
     #[error("Validation error: {0}")]
     ValidationError(String),
-    
+
     #[error("Database error: {0}")]
     DatabaseError(String),
-    
+
     #[error("Not found: {0}")]
     NotFound(String),
-    
+
     #[error("Calculation error: {0}")]
     CalculationError(String),
 }

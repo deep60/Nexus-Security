@@ -6,10 +6,8 @@
 /// - Process creation and termination
 /// - Registry modifications (Windows)
 /// - System calls
-
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -20,9 +18,9 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::analyzers::dynamic_analyzer::{
-    DynamicBehavior, FileOperation, FileOperationType, MonitoringConfig, NetworkOperation,
-    ProcessOperation, ProcessOperationType, RegistryOperation, RegistryOperationType,
-    Screenshot, SystemCall, ConnectionState, NetworkCapture,
+    ConnectionState, DynamicBehavior, FileOperation, FileOperationType, MonitoringConfig,
+    NetworkCapture, NetworkOperation, ProcessOperation, ProcessOperationType, RegistryOperation,
+    RegistryOperationType, Screenshot, SystemCall,
 };
 
 /// Monitor handle for tracking active monitoring sessions
@@ -122,10 +120,7 @@ impl Monitor {
 
             // File system monitoring
             if config.monitor_file_system {
-                let fs_task = Self::monitor_file_system(
-                    sandbox_id.clone(),
-                    behavior_data.clone(),
-                );
+                let fs_task = Self::monitor_file_system(sandbox_id.clone(), behavior_data.clone());
                 tasks.push(tokio::spawn(fs_task));
             }
 
@@ -141,28 +136,20 @@ impl Monitor {
 
             // Process monitoring
             if config.monitor_processes {
-                let proc_task = Self::monitor_processes(
-                    sandbox_id.clone(),
-                    behavior_data.clone(),
-                );
+                let proc_task = Self::monitor_processes(sandbox_id.clone(), behavior_data.clone());
                 tasks.push(tokio::spawn(proc_task));
             }
 
             // Registry monitoring (Windows only)
             if config.monitor_registry {
-                let reg_task = Self::monitor_registry(
-                    sandbox_id.clone(),
-                    behavior_data.clone(),
-                );
+                let reg_task = Self::monitor_registry(sandbox_id.clone(), behavior_data.clone());
                 tasks.push(tokio::spawn(reg_task));
             }
 
             // Screenshot capture
             if config.capture_screenshots {
-                let screenshot_task = Self::capture_screenshots(
-                    sandbox_id.clone(),
-                    behavior_data.clone(),
-                );
+                let screenshot_task =
+                    Self::capture_screenshots(sandbox_id.clone(), behavior_data.clone());
                 tasks.push(tokio::spawn(screenshot_task));
             }
 
@@ -286,12 +273,7 @@ impl Monitor {
 
         // Monitor network connections using netstat
         let netstat_output = Command::new("docker")
-            .args([
-                "exec",
-                &sandbox_id,
-                "netstat",
-                "-tunaep",
-            ])
+            .args(["exec", &sandbox_id, "netstat", "-tunaep"])
             .output()
             .await;
 
@@ -376,14 +358,14 @@ impl Monitor {
             .output()
             .await;
 
-        if let Ok(_) = output {
+        if output.is_ok() {
             // Copy pcap file from container
             let pcap_output = Command::new("docker")
-                .args(["cp", &format!("{}:/tmp/capture.pcap", sandbox_id), "/tmp/"])
+                .args(["cp", &format!("{sandbox_id}:/tmp/capture.pcap"), "/tmp/"])
                 .output()
                 .await;
 
-            if let Ok(_) = pcap_output {
+            if pcap_output.is_ok() {
                 if let Ok(pcap_data) = tokio::fs::read("/tmp/capture.pcap").await {
                     let mut collector = behavior_data.lock().await;
                     collector.network_capture = Some(NetworkCapture {
@@ -421,10 +403,7 @@ impl Monitor {
     }
 
     /// Parse process list from ps output
-    async fn parse_process_list(
-        ps_output: &str,
-        behavior_data: &Arc<Mutex<BehaviorCollector>>,
-    ) {
+    async fn parse_process_list(ps_output: &str, behavior_data: &Arc<Mutex<BehaviorCollector>>) {
         let mut collector = behavior_data.lock().await;
 
         for line in ps_output.lines().skip(1) {
@@ -498,21 +477,22 @@ impl Monitor {
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
             // Use xwd or similar to capture screenshots (if X server is available)
-            let screenshot_path = format!("/tmp/screenshot_{}.png", i);
-            let command = format!("scrot {}", screenshot_path);
+            let screenshot_path = format!("/tmp/screenshot_{i}.png");
+            let command = format!("scrot {screenshot_path}");
 
             let output = Command::new("docker")
                 .args(["exec", &sandbox_id, "bash", "-c", &command])
                 .output()
                 .await;
 
-            if let Ok(_) = output {
+            if output.is_ok() {
                 // Copy screenshot from container
-                let copy_cmd = format!("{}:{}", sandbox_id, screenshot_path);
-                if let Ok(_) = Command::new("docker")
+                let copy_cmd = format!("{sandbox_id}:{screenshot_path}");
+                if Command::new("docker")
                     .args(["cp", &copy_cmd, "/tmp/"])
                     .output()
                     .await
+                    .is_ok()
                 {
                     if let Ok(image_data) = tokio::fs::read(&screenshot_path).await {
                         let mut collector = behavior_data.lock().await;

@@ -1,7 +1,7 @@
 //! This module contains all data models used throughout the API gateway,
 //! including request/response structures, database models, and domain entities.
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 // Re-export all model modules
@@ -10,17 +10,10 @@ pub mod error;
 pub mod request;
 pub mod response;
 
-pub use error::*;
-pub use request::*;
-pub use response::*;
-
 pub mod bounty;
 pub mod user;
 
 // Re-export commonly used types for convenience
-pub use analysis::*;
-pub use bounty::*;
-pub use user::*;
 
 /// Common response wrapper for API endpoints
 #[derive(Debug, Serialize, Deserialize)]
@@ -160,10 +153,10 @@ pub struct ServiceStatus {
 /// Authentication token claims
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TokenClaims {
-    pub sub: Uuid,      // User ID
-    pub exp: i64,       // Expiration timestamp
-    pub iat: i64,       // Issued at timestamp
-    pub role: String,   // User role
+    pub sub: Uuid,    // User ID
+    pub exp: i64,     // Expiration timestamp
+    pub iat: i64,     // Issued at timestamp
+    pub role: String, // User role
 }
 
 /// Blockchain transaction status
@@ -227,7 +220,7 @@ pub enum ThreatSeverity {
 /// Reputation score range
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ReputationScore {
-    pub score: f64,  // 0.0 to 100.0
+    pub score: f64, // 0.0 to 100.0
     pub total_submissions: u32,
     pub successful_submissions: u32,
     pub last_updated: DateTime<Utc>,
@@ -256,7 +249,7 @@ impl ReputationScore {
         if success {
             self.successful_submissions += 1;
         }
-        
+
         // Simple scoring algorithm - can be made more sophisticated
         let accuracy = self.accuracy_rate();
         let submission_bonus = (self.total_submissions as f64).min(100.0) * 0.1;
@@ -277,44 +270,32 @@ mod tests {
 
     #[test]
     fn test_pagination_params_offset() {
-        let params = PaginationParams {
-            page: 3,
-            limit: 10,
-        };
+        let params = PaginationParams { page: 3, limit: 10 };
         assert_eq!(params.offset(), 20);
     }
 
     #[test]
     fn test_pagination_params_validation() {
-        let invalid_page = PaginationParams {
-            page: 0,
-            limit: 10,
-        };
+        let invalid_page = PaginationParams { page: 0, limit: 10 };
         assert!(invalid_page.validate().is_err());
 
-        let invalid_limit = PaginationParams {
-            page: 1,
-            limit: 0,
-        };
+        let invalid_limit = PaginationParams { page: 1, limit: 0 };
         assert!(invalid_limit.validate().is_err());
 
-        let valid_params = PaginationParams {
-            page: 1,
-            limit: 20,
-        };
+        let valid_params = PaginationParams { page: 1, limit: 20 };
         assert!(valid_params.validate().is_ok());
     }
 
     #[test]
     fn test_reputation_score_update() {
         let mut score = ReputationScore::new();
-        
+
         // Test successful submission
         score.update_score(true);
         assert_eq!(score.total_submissions, 1);
         assert_eq!(score.successful_submissions, 1);
         assert_eq!(score.accuracy_rate(), 100.0);
-        
+
         // Test failed submission
         score.update_score(false);
         assert_eq!(score.total_submissions, 2);

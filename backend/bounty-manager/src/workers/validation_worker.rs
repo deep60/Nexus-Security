@@ -1,9 +1,9 @@
 // backend/bounty-manager/src/workers/validation_worker.rs
 
+use crate::models::submission::SubmissionModel;
 use sqlx::PgPool;
 use tokio::time::{interval, Duration};
 use tracing::{error, info};
-use crate::models::submission::SubmissionModel;
 use uuid::Uuid;
 
 pub struct ValidationWorker {
@@ -26,7 +26,7 @@ impl ValidationWorker {
 
         loop {
             ticker.tick().await;
-            
+
             if let Err(e) = self.validate_pending_submissions().await {
                 error!("Error validating submissions: {}", e);
             }
@@ -39,7 +39,7 @@ impl ValidationWorker {
 
         // Get all pending submissions
         let pending: Vec<SubmissionModel> = sqlx::query_as(
-            "SELECT * FROM submissions WHERE status = 'Pending' ORDER BY submitted_at ASC LIMIT 50"
+            "SELECT * FROM submissions WHERE status = 'Pending' ORDER BY submitted_at ASC LIMIT 50",
         )
         .fetch_all(&self.db)
         .await
@@ -75,14 +75,14 @@ impl ValidationWorker {
                 SubmissionModel::update_status(&self.db, submission_id, "Active")
                     .await
                     .map_err(|e| WorkerError::DatabaseError(e.to_string()))?;
-                
+
                 info!("Submission {} validated successfully", submission_id);
             } else {
                 // Mark as invalid
                 SubmissionModel::update_status(&self.db, submission_id, "Invalid")
                     .await
                     .map_err(|e| WorkerError::DatabaseError(e.to_string()))?;
-                
+
                 info!("Submission {} failed validation", submission_id);
             }
 
@@ -93,7 +93,10 @@ impl ValidationWorker {
     }
 
     /// Perform validation checks on a submission
-    async fn perform_validation_checks(&self, submission: &SubmissionModel) -> Result<bool, WorkerError> {
+    async fn perform_validation_checks(
+        &self,
+        submission: &SubmissionModel,
+    ) -> Result<bool, WorkerError> {
         // Check 1: Confidence is within valid range
         if submission.confidence < 0.0 || submission.confidence > 1.0 {
             return Ok(false);

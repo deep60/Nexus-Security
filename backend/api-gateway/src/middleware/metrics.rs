@@ -253,70 +253,56 @@ pub fn export_prometheus_metrics(
     let mut output = String::new();
 
     // Total requests
-    output.push_str(&format!(
-        "# HELP http_requests_total Total number of HTTP requests\n"
-    ));
-    output.push_str(&format!("# TYPE http_requests_total counter\n"));
+    output.push_str("# HELP http_requests_total Total number of HTTP requests\n");
+    output.push_str("# TYPE http_requests_total counter\n");
     output.push_str(&format!(
         "http_requests_total {}\n\n",
         snapshot.total_requests
     ));
 
     // Active requests
-    output.push_str(&format!(
-        "# HELP http_requests_active Number of active HTTP requests\n"
-    ));
-    output.push_str(&format!("# TYPE http_requests_active gauge\n"));
+    output.push_str("# HELP http_requests_active Number of active HTTP requests\n");
+    output.push_str("# TYPE http_requests_active gauge\n");
     output.push_str(&format!(
         "http_requests_active {}\n\n",
         snapshot.active_requests
     ));
 
     // Total errors
-    output.push_str(&format!(
-        "# HELP http_requests_errors_total Total number of HTTP errors\n"
-    ));
-    output.push_str(&format!("# TYPE http_requests_errors_total counter\n"));
+    output.push_str("# HELP http_requests_errors_total Total number of HTTP errors\n");
+    output.push_str("# TYPE http_requests_errors_total counter\n");
     output.push_str(&format!(
         "http_requests_errors_total {}\n\n",
         snapshot.total_errors
     ));
 
     // Average response time
-    output.push_str(&format!(
-        "# HELP http_response_time_ms_avg Average response time in milliseconds\n"
-    ));
-    output.push_str(&format!("# TYPE http_response_time_ms_avg gauge\n"));
+    output.push_str("# HELP http_response_time_ms_avg Average response time in milliseconds\n");
+    output.push_str("# TYPE http_response_time_ms_avg gauge\n");
     output.push_str(&format!(
         "http_response_time_ms_avg {}\n\n",
         snapshot.avg_response_time_ms
     ));
 
     // P95 response time
-    output.push_str(&format!(
-        "# HELP http_response_time_ms_p95 95th percentile response time\n"
-    ));
-    output.push_str(&format!("# TYPE http_response_time_ms_p95 gauge\n"));
+    output.push_str("# HELP http_response_time_ms_p95 95th percentile response time\n");
+    output.push_str("# TYPE http_response_time_ms_p95 gauge\n");
     output.push_str(&format!(
         "http_response_time_ms_p95 {}\n\n",
         snapshot.p95_response_time_ms
     ));
 
     // Error rate
-    output.push_str(&format!(
-        "# HELP http_error_rate_percent Error rate percentage\n"
-    ));
-    output.push_str(&format!("# TYPE http_error_rate_percent gauge\n"));
+    output.push_str("# HELP http_error_rate_percent Error rate percentage\n");
+    output.push_str("# TYPE http_error_rate_percent gauge\n");
     output.push_str(&format!(
         "http_error_rate_percent {}\n\n",
         snapshot.error_rate
     ));
 
     // Per-endpoint metrics
-    output.push_str(&format!(
-        "# HELP http_requests_by_endpoint_total Requests per endpoint\n"
-    ));
-    output.push_str(&format!("# TYPE http_requests_by_endpoint_total counter\n"));
+    output.push_str("# HELP http_requests_by_endpoint_total Requests per endpoint\n");
+    output.push_str("# TYPE http_requests_by_endpoint_total counter\n");
     for (endpoint, metrics) in endpoint_metrics {
         output.push_str(&format!(
             "http_requests_by_endpoint_total{{endpoint=\"{}\"}} {}\n",

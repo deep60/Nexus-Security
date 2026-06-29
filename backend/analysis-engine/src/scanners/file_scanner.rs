@@ -6,17 +6,14 @@
 /// - Entropy calculation
 /// - Embedded resource extraction
 /// - Signature-based detection
-
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::Path;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use super::{
-    ArtifactType, Finding, FindingCategory, ScanResult, ScanVerdict, Scanner, ScannerConfig,
-    ThreatLevel,
+    ArtifactType, Finding, FindingCategory, ScanResult, Scanner, ScannerConfig, ThreatLevel,
 };
 
 /// Configuration for file scanner
@@ -161,7 +158,7 @@ impl Scanner for FileScanner {
                 finding_id: Uuid::new_v4(),
                 category: FindingCategory::Suspicious,
                 title: "High entropy detected".to_string(),
-                description: format!("File entropy: {:.2} (possible packing/encryption)", entropy),
+                description: format!("File entropy: {entropy:.2} (possible packing/encryption)"),
                 severity: ThreatLevel::Medium,
                 evidence: vec![format!("Entropy: {:.2}", entropy)],
                 recommendation: Some("Investigate for packed or encrypted content".to_string()),
@@ -185,7 +182,7 @@ impl Scanner for FileScanner {
                     finding_id: Uuid::new_v4(),
                     category: FindingCategory::Suspicious,
                     title: "Packer detected".to_string(),
-                    description: format!("File appears to be packed with: {}", packer_name),
+                    description: format!("File appears to be packed with: {packer_name}"),
                     severity: ThreatLevel::Medium,
                     evidence: vec![format!("Packer: {}", packer_name)],
                     recommendation: Some("Unpack and analyze contents".to_string()),
@@ -299,7 +296,10 @@ impl FileScanner {
         }
 
         // Check for text content
-        if data.iter().take(512).all(|&b| b.is_ascii() || b == b'\n' || b == b'\r' || b == b'\t')
+        if data
+            .iter()
+            .take(512)
+            .all(|&b| b.is_ascii() || b == b'\n' || b == b'\r' || b == b'\t')
         {
             return FileType::Text;
         }
@@ -314,7 +314,10 @@ impl FileScanner {
         metadata: &Option<HashMap<String, String>>,
     ) -> FileInfo {
         let magic_bytes = if data.len() >= 4 {
-            format!("{:02X}{:02X}{:02X}{:02X}", data[0], data[1], data[2], data[3])
+            format!(
+                "{:02X}{:02X}{:02X}{:02X}",
+                data[0], data[1], data[2], data[3]
+            )
         } else {
             "Unknown".to_string()
         };
@@ -443,10 +446,8 @@ impl FileScanner {
     /// Detect packer
     fn detect_packer(&self, data: &[u8]) -> Option<String> {
         for (packer_name, signature) in &self.known_packer_signatures {
-            if data.len() >= signature.len() {
-                if data[..signature.len()] == signature[..] {
-                    return Some(packer_name.clone());
-                }
+            if data.len() >= signature.len() && data[..signature.len()] == signature[..] {
+                return Some(packer_name.clone());
             }
         }
         None
@@ -483,7 +484,7 @@ impl FileScanner {
                 // Likely embedded PE
                 embedded_files.push(EmbeddedFile {
                     file_id: Uuid::new_v4(),
-                    name: format!("embedded_pe_{}.exe", i),
+                    name: format!("embedded_pe_{i}.exe"),
                     size: 0, // Unknown size
                     offset: i as u64,
                     file_type: FileType::Executable,
@@ -497,7 +498,7 @@ impl FileScanner {
             if window == b"PK" && i > 512 {
                 embedded_files.push(EmbeddedFile {
                     file_id: Uuid::new_v4(),
-                    name: format!("embedded_archive_{}.zip", i),
+                    name: format!("embedded_archive_{i}.zip"),
                     size: 0,
                     offset: i as u64,
                     file_type: FileType::Archive,

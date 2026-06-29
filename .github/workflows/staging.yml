@@ -122,7 +122,7 @@ jobs:
       - name: Deploy
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }} \
-            "cd /opt/verdyx && git pull origin develop && docker-compose pull && docker-compose up -d && docker system prune -af --filter until=24h"
+            "cd /opt/verdyx && git pull origin develop && docker compose pull && docker compose up -d && docker system prune -af --filter until=24h"
       - name: Smoke test
         run: |
           sleep 30

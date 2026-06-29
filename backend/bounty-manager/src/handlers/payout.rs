@@ -1,20 +1,20 @@
 // backend/bounty-manager/src/handlers/payout_handler.rs
 
+use super::bounty_crud::PaginationParams;
+use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
+use crate::handlers::submission::{Submission, SubmissionStatus};
+use crate::models::{BountyModel, PayoutModel, ReputationModel, SubmissionModel};
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
     Extension,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use shared::types::ApiResponse;
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use shared::types::ApiResponse;
-use super::bounty_crud::PaginationParams;
-use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
-use crate::handlers::submission::{Submission, SubmissionStatus};
-use crate::models::{BountyModel, SubmissionModel, PayoutModel, ReputationModel};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PayoutInfo {
@@ -46,11 +46,11 @@ pub enum PayoutStatus {
 pub struct RewardDistribution {
     pub engine_id: String,
     pub submission_id: Uuid,
-    pub base_reward: u64,         // Share of bounty reward
-    pub accuracy_bonus: u64,      // Bonus for high confidence in correct verdict
+    pub base_reward: u64,           // Share of bounty reward
+    pub accuracy_bonus: u64,        // Bonus for high confidence in correct verdict
     pub reputation_multiplier: f32, // Reputation-based multiplier
-    pub stake_return: u64,        // Original stake returned
-    pub total_payout: u64,        // Total amount to be paid
+    pub stake_return: u64,          // Original stake returned
+    pub total_payout: u64,          // Total amount to be paid
     pub transaction_hash: Option<String>,
     pub processed: bool,
 }
@@ -67,10 +67,10 @@ pub struct SlashedStake {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SlashingReason {
-    IncorrectVerdict,     // Wrong consensus verdict
-    LowConfidence,        // High confidence in wrong verdict
-    MaliciousActivity,    // Detected coordinated false submissions
-    TechnicalViolation,   // Violated submission rules
+    IncorrectVerdict,   // Wrong consensus verdict
+    LowConfidence,      // High confidence in wrong verdict
+    MaliciousActivity,  // Detected coordinated false submissions
+    TechnicalViolation, // Violated submission rules
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,14 +141,20 @@ pub async fn process_bounty_completion(
     if bounty.creator != caller_id {
         tracing::warn!(
             "Caller {} denied payout on bounty {} (creator: {})",
-            caller_id, bounty_id, bounty.creator
+            caller_id,
+            bounty_id,
+            bounty.creator
         );
         return Err(StatusCode::FORBIDDEN);
     }
 
     // Guard against double-processing: payout only allowed on Active/InProgress bounties
     if bounty.status == "Completed" || bounty.status == "Cancelled" {
-        tracing::warn!("Bounty {} already {} — cannot process payout", bounty_id, bounty.status);
+        tracing::warn!(
+            "Bounty {} already {} — cannot process payout",
+            bounty_id,
+            bounty.status
+        );
         return Err(StatusCode::CONFLICT);
     }
 
@@ -156,12 +162,19 @@ pub async fn process_bounty_completion(
     let db_submissions = SubmissionModel::find_by_bounty(&state.db, bounty_id)
         .await
         .map_err(|e| {
-            tracing::error!("Failed to fetch submissions for bounty {}: {}", bounty_id, e);
+            tracing::error!(
+                "Failed to fetch submissions for bounty {}: {}",
+                bounty_id,
+                e
+            );
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
     if db_submissions.is_empty() {
-        tracing::warn!("Bounty {} has no submissions — cannot process payout", bounty_id);
+        tracing::warn!(
+            "Bounty {} has no submissions — cannot process payout",
+            bounty_id
+        );
         return Err(StatusCode::BAD_REQUEST);
     }
 
@@ -190,26 +203,29 @@ pub async fn process_bounty_completion(
         calculate_weighted_consensus(&handler_submissions, &reputation_weights);
 
     // Determine which submissions agree/disagree with consensus
-    let consensus_verdict_str = format!("{:?}", consensus_verdict);
+    let consensus_verdict_str = format!("{consensus_verdict:?}");
     let correct_submissions: Vec<Submission> = handler_submissions
         .iter()
-        .filter(|s| format!("{:?}", s.verdict) == consensus_verdict_str && s.status == SubmissionStatus::Active)
+        .filter(|s| {
+            format!("{:?}", s.verdict) == consensus_verdict_str
+                && s.status == SubmissionStatus::Active
+        })
         .cloned()
         .collect();
 
     let incorrect_submissions: Vec<Submission> = handler_submissions
         .iter()
-        .filter(|s| format!("{:?}", s.verdict) != consensus_verdict_str && s.status == SubmissionStatus::Active)
+        .filter(|s| {
+            format!("{:?}", s.verdict) != consensus_verdict_str
+                && s.status == SubmissionStatus::Active
+        })
         .cloned()
         .collect();
 
     // Calculate reward distribution
     let total_reward = bounty.reward_amount as u64;
-    let reward_distributions = calculate_reward_distribution(
-        total_reward,
-        &correct_submissions,
-        &reputation_weights,
-    );
+    let reward_distributions =
+        calculate_reward_distribution(total_reward, &correct_submissions, &reputation_weights);
 
     // Calculate slashed stakes for incorrect submissions
     let slashed_stakes: Vec<SlashedStake> = incorrect_submissions
@@ -295,7 +311,11 @@ pub async fn process_bounty_completion(
             })),
         };
         if let Err(e) = PayoutModel::create(&state.db, &slash_record).await {
-            tracing::error!("Failed to save slashing record for {}: {}", slash.engine_id, e);
+            tracing::error!(
+                "Failed to save slashing record for {}: {}",
+                slash.engine_id,
+                e
+            );
         }
     }
 
@@ -323,18 +343,17 @@ pub async fn distribute_rewards(
     Path(payout_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<PayoutInfo>>, StatusCode> {
     // Fetch pending payout records for this session
-    let pending_payouts = PayoutModel::get_pending(&state.db)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to fetch pending payouts: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let pending_payouts = PayoutModel::get_pending(&state.db).await.map_err(|e| {
+        tracing::error!("Failed to fetch pending payouts: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Filter to only records belonging to this payout session
     let session_payouts: Vec<PayoutModel> = pending_payouts
         .into_iter()
         .filter(|p| {
-            p.metadata.as_ref()
+            p.metadata
+                .as_ref()
                 .and_then(|m| m.get("payout_session_id"))
                 .and_then(|v| v.as_str())
                 .map(|s| s == payout_id.to_string())
@@ -359,7 +378,9 @@ pub async fn distribute_rewards(
     if bounty.creator != caller_id {
         tracing::warn!(
             "Caller {} denied reward distribution on bounty {} (creator: {})",
-            caller_id, bounty_id, bounty.creator
+            caller_id,
+            bounty_id,
+            bounty.creator
         );
         return Err(StatusCode::FORBIDDEN);
     }
@@ -390,8 +411,14 @@ pub async fn distribute_rewards(
 
         // Update engine reputation: increment correct submission
         let is_correct = payout.amount > 0;
-        if let Err(e) = ReputationModel::increment_submission(&state.db, &payout.recipient, is_correct).await {
-            tracing::error!("Failed to update reputation for {}: {}", payout.recipient, e);
+        if let Err(e) =
+            ReputationModel::increment_submission(&state.db, &payout.recipient, is_correct).await
+        {
+            tracing::error!(
+                "Failed to update reputation for {}: {}",
+                payout.recipient,
+                e
+            );
         }
 
         // Update submission status to Correct
@@ -456,18 +483,17 @@ pub async fn handle_stake_slashing(
     Path(payout_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<Vec<SlashedStake>>>, StatusCode> {
     // Fetch slashing records for this payout session from DB
-    let pending_payouts = PayoutModel::get_pending(&state.db)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to fetch pending slashing records: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let pending_payouts = PayoutModel::get_pending(&state.db).await.map_err(|e| {
+        tracing::error!("Failed to fetch pending slashing records: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let slashing_records: Vec<PayoutModel> = pending_payouts
         .into_iter()
         .filter(|p| {
             p.payout_type == "StakeSlashing"
-                && p.metadata.as_ref()
+                && p.metadata
+                    .as_ref()
                     .and_then(|m| m.get("payout_session_id"))
                     .and_then(|v| v.as_str())
                     .map(|s| s == payout_id.to_string())
@@ -492,7 +518,9 @@ pub async fn handle_stake_slashing(
     if bounty.creator != caller_id {
         tracing::warn!(
             "Caller {} denied stake slashing on bounty {} (creator: {})",
-            caller_id, bounty_id, bounty.creator
+            caller_id,
+            bounty_id,
+            bounty.creator
         );
         return Err(StatusCode::FORBIDDEN);
     }
@@ -516,8 +544,14 @@ pub async fn handle_stake_slashing(
             })?;
 
         // Update reputation negatively
-        if let Err(e) = ReputationModel::increment_submission(&state.db, &record.recipient, false).await {
-            tracing::error!("Failed to update reputation for slashed engine {}: {}", record.recipient, e);
+        if let Err(e) =
+            ReputationModel::increment_submission(&state.db, &record.recipient, false).await
+        {
+            tracing::error!(
+                "Failed to update reputation for slashed engine {}: {}",
+                record.recipient,
+                e
+            );
         }
 
         // Update submission status to Incorrect
@@ -527,7 +561,9 @@ pub async fn handle_stake_slashing(
             }
         }
 
-        let redistributed = record.metadata.as_ref()
+        let redistributed = record
+            .metadata
+            .as_ref()
             .and_then(|m| m.get("redistributed_amount"))
             .and_then(|v| v.as_u64())
             .unwrap_or(0);
@@ -611,7 +647,10 @@ pub async fn get_payout_history(
                 } else {
                     PayoutStatus::Processing
                 },
-                processing_started_at: records.first().map(|r| r.created_at).unwrap_or_else(Utc::now),
+                processing_started_at: records
+                    .first()
+                    .map(|r| r.created_at)
+                    .unwrap_or_else(Utc::now),
                 completed_at: records.last().and_then(|r| r.processed_at),
                 blockchain_transactions: vec![],
             }
@@ -679,7 +718,10 @@ pub async fn get_payout_summary(
 }
 
 // Internal helper functions for consensus calculation
-pub fn calculate_weighted_consensus(submissions: &[Submission], reputation_weights: &HashMap<String, f32>) -> (ThreatVerdict, f32) {
+pub fn calculate_weighted_consensus(
+    submissions: &[Submission],
+    reputation_weights: &HashMap<String, f32>,
+) -> (ThreatVerdict, f32) {
     let mut verdict_scores: HashMap<String, f32> = HashMap::new();
     let mut total_weight = 0.0;
 
@@ -688,12 +730,14 @@ pub fn calculate_weighted_consensus(submissions: &[Submission], reputation_weigh
             continue;
         }
 
-        let reputation_weight = reputation_weights.get(&submission.engine_id).unwrap_or(&1.0);
+        let reputation_weight = reputation_weights
+            .get(&submission.engine_id)
+            .unwrap_or(&1.0);
         let stake_weight = submission.stake_amount as f32 / 100000.0; // Normalize stake
         let confidence_weight = submission.confidence;
-        
+
         let combined_weight = reputation_weight * stake_weight * confidence_weight;
-        
+
         let verdict_key = format!("{:?}", submission.verdict);
         *verdict_scores.entry(verdict_key).or_insert(0.0) += combined_weight;
         total_weight += combined_weight;
@@ -729,18 +773,20 @@ pub fn calculate_reward_distribution(
 ) -> Vec<RewardDistribution> {
     let mut distributions = Vec::new();
     let total_stake: u64 = correct_submissions.iter().map(|s| s.stake_amount).sum();
-    
+
     if total_stake == 0 {
         return distributions;
     }
 
     for submission in correct_submissions {
-        let reputation_multiplier = reputation_weights.get(&submission.engine_id).unwrap_or(&1.0);
-        
+        let reputation_multiplier = reputation_weights
+            .get(&submission.engine_id)
+            .unwrap_or(&1.0);
+
         // Base reward proportional to stake
         let stake_proportion = submission.stake_amount as f32 / total_stake as f32;
         let base_reward = (total_reward as f32 * stake_proportion) as u64;
-        
+
         // Accuracy bonus for high confidence
         let accuracy_bonus = if submission.confidence > 0.9 {
             (base_reward as f32 * 0.2) as u64
@@ -750,7 +796,8 @@ pub fn calculate_reward_distribution(
             0
         };
 
-        let total_payout = ((base_reward + accuracy_bonus) as f32 * reputation_multiplier) as u64 + submission.stake_amount;
+        let total_payout = ((base_reward + accuracy_bonus) as f32 * reputation_multiplier) as u64
+            + submission.stake_amount;
 
         distributions.push(RewardDistribution {
             engine_id: submission.engine_id.clone(),

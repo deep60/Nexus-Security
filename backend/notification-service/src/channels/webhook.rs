@@ -1,12 +1,12 @@
 use async_trait::async_trait;
-use reqwest::{Client, header};
+use chrono::{DateTime, Utc};
+use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::{error, info, warn};
-use chrono::{DateTime, Utc};
 
 use crate::models::{NotificationChannel, NotificationError, NotificationResult};
-use shared::messaging::event_types::{VerdyxEvent, NotificationPayload};
+use shared::messaging::event_types::{NotificationPayload, VerdyxEvent};
 
 /// Webhook notification channel implementation
 /// Sends HTTP POST requests to registered webhook URLs
@@ -122,8 +122,9 @@ impl WebhookChannel {
         url: &str,
         payload: &WebhookPayload,
     ) -> NotificationResult<WebhookResponse> {
-        let payload_json = serde_json::to_string(payload)
-            .map_err(|e| NotificationError::SerializationError(format!("Failed to serialize payload: {}", e)))?;
+        let payload_json = serde_json::to_string(payload).map_err(|e| {
+            NotificationError::SerializationError(format!("Failed to serialize payload: {e}"))
+        })?;
 
         let mut request = self
             .http_client
@@ -139,21 +140,17 @@ impl WebhookChannel {
         }
 
         let start_time = Utc::now();
-        let response = request
-            .body(payload_json)
-            .send()
-            .await
-            .map_err(|e| NotificationError::SendError(format!("Webhook request failed: {}", e)))?;
+        let response =
+            request.body(payload_json).send().await.map_err(|e| {
+                NotificationError::SendError(format!("Webhook request failed: {e}"))
+            })?;
 
         let status_code = response.status().as_u16();
-        let response_body = response
-            .text()
-            .await
-            .unwrap_or_else(|_| String::new());
+        let response_body = response.text().await.unwrap_or_else(|_| String::new());
 
         let delivery_time_ms = (Utc::now() - start_time).num_milliseconds() as u64;
 
-        if status_code >= 200 && status_code < 300 {
+        if (200..300).contains(&status_code) {
             info!(
                 "Webhook delivered successfully to {} in {}ms (status: {})",
                 url, delivery_time_ms, status_code
@@ -169,8 +166,7 @@ impl WebhookChannel {
                 url, status_code, response_body
             );
             Err(NotificationError::SendError(format!(
-                "Webhook returned error status {}: {}",
-                status_code, response_body
+                "Webhook returned error status {status_code}: {response_body}"
             )))
         }
     }
@@ -178,7 +174,7 @@ impl WebhookChannel {
     /// Validate webhook URL
     fn validate_url(url: &str) -> NotificationResult<()> {
         let parsed_url = url::Url::parse(url)
-            .map_err(|e| NotificationError::ValidationError(format!("Invalid URL: {}", e)))?;
+            .map_err(|e| NotificationError::ValidationError(format!("Invalid URL: {e}")))?;
 
         // Only allow HTTP and HTTPS
         if !["http", "https"].contains(&parsed_url.scheme()) {
@@ -214,11 +210,7 @@ impl WebhookChannel {
 
 #[async_trait]
 impl NotificationChannel for WebhookChannel {
-    async fn send(
-        &self,
-        payload: &NotificationPayload,
-        recipient: &str,
-    ) -> NotificationResult<()> {
+    async fn send(&self, payload: &NotificationPayload, recipient: &str) -> NotificationResult<()> {
         info!(
             "Sending webhook notification to {} for event: {}",
             recipient,
@@ -311,9 +303,9 @@ pub struct WebhookRegistration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
     use chrono::Utc;
-    use shared::messaging::event_types::{BountyCreatedEvent, NotificationPriority};
+    use shared::messaging::event_types::BountyCreatedEvent;
+    use uuid::Uuid;
 
     #[test]
     fn test_validate_url() {
@@ -362,7 +354,13 @@ mod tests {
     async fn test_validate_recipient() {
         let channel = WebhookChannel::new(None);
 
-        assert!(channel.validate_recipient("https://example.com/webhook").await.is_ok());
-        assert!(channel.validate_recipient("https://localhost/webhook").await.is_err());
+        assert!(channel
+            .validate_recipient("https://example.com/webhook")
+            .await
+            .is_ok());
+        assert!(channel
+            .validate_recipient("https://localhost/webhook")
+            .await
+            .is_err());
     }
 }

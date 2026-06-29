@@ -1,3 +1,8 @@
+// Pre-production scaffolding: some items are intentionally unused while
+// features are wired up. This crate-level allow keeps `clippy -D warnings`
+// green without deleting code we are about to use. Remove before GA.
+#![allow(dead_code)]
+
 mod blockchain;
 mod config;
 mod handlers;
@@ -11,10 +16,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-use tower_http::{
-    cors::CorsLayer,
-    trace::TraceLayer,
-};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{info, warn};
 
 use crate::config::Config;
@@ -109,7 +111,7 @@ async fn main() -> Result<()> {
         .split(',')
         .filter_map(|origin| origin.trim().parse::<axum::http::HeaderValue>().ok())
         .collect();
-    
+
     let cors = CorsLayer::new()
         .allow_origin(allowed_origins)
         .allow_methods([
@@ -131,22 +133,64 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .route("/health", get(handlers::health::health_check))
         // Payment endpoints
-        .route("/api/v1/payments/bounty/deposit", post(handlers::payment::deposit_bounty_reward))
-        .route("/api/v1/payments/bounty/distribute", post(handlers::payment::distribute_bounty_reward))
-        .route("/api/v1/payments/stake/lock", post(handlers::payment::lock_stake))
-        .route("/api/v1/payments/stake/unlock", post(handlers::payment::unlock_stake))
-        .route("/api/v1/payments/stake/slash", post(handlers::payment::slash_stake))
-        .route("/api/v1/payments/withdraw", post(handlers::payment::withdraw_funds))
-        .route("/api/v1/payments/balance/:address", get(handlers::payment::get_balance))
-        .route("/api/v1/payments/transactions/:address", get(handlers::payment::get_transactions))
-        .route("/api/v1/payments/transaction/:tx_hash", get(handlers::payment::get_transaction_status))
+        .route(
+            "/api/v1/payments/bounty/deposit",
+            post(handlers::payment::deposit_bounty_reward),
+        )
+        .route(
+            "/api/v1/payments/bounty/distribute",
+            post(handlers::payment::distribute_bounty_reward),
+        )
+        .route(
+            "/api/v1/payments/stake/lock",
+            post(handlers::payment::lock_stake),
+        )
+        .route(
+            "/api/v1/payments/stake/unlock",
+            post(handlers::payment::unlock_stake),
+        )
+        .route(
+            "/api/v1/payments/stake/slash",
+            post(handlers::payment::slash_stake),
+        )
+        .route(
+            "/api/v1/payments/withdraw",
+            post(handlers::payment::withdraw_funds),
+        )
+        .route(
+            "/api/v1/payments/balance/:address",
+            get(handlers::payment::get_balance),
+        )
+        .route(
+            "/api/v1/payments/transactions/:address",
+            get(handlers::payment::get_transactions),
+        )
+        .route(
+            "/api/v1/payments/transaction/:tx_hash",
+            get(handlers::payment::get_transaction_status),
+        )
         // Gas estimation
-        .route("/api/v1/payments/gas/estimate", post(handlers::payment::estimate_gas))
+        .route(
+            "/api/v1/payments/gas/estimate",
+            post(handlers::payment::estimate_gas),
+        )
         // Admin endpoints
-        .route("/api/v1/admin/payments/pending", get(handlers::admin::get_pending_payments))
-        .route("/api/v1/admin/payments/failed", get(handlers::admin::get_failed_payments))
-        .route("/api/v1/admin/payments/:id/retry", post(handlers::admin::retry_payment))
-        .route("/api/v1/admin/treasury/balance", get(handlers::admin::get_treasury_balance))
+        .route(
+            "/api/v1/admin/payments/pending",
+            get(handlers::admin::get_pending_payments),
+        )
+        .route(
+            "/api/v1/admin/payments/failed",
+            get(handlers::admin::get_failed_payments),
+        )
+        .route(
+            "/api/v1/admin/payments/:id/retry",
+            post(handlers::admin::retry_payment),
+        )
+        .route(
+            "/api/v1/admin/treasury/balance",
+            get(handlers::admin::get_treasury_balance),
+        )
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);

@@ -1,10 +1,10 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clamav_client::tokio::{ClamClient, ScanResult};
-use tracing::{info, warn, error};
 use std::time::Instant;
+use tracing::{error, info, warn};
 
 use crate::models::analysis_result::{
-    DetectionResult, ThreatVerdict, SeverityLevel, EngineType, ThreatCategory,
+    DetectionResult, EngineType, SeverityLevel, ThreatCategory, ThreatVerdict,
 };
 
 /// Configuration for ClamAV analyzer
@@ -23,8 +23,7 @@ pub struct ClamAvAnalyzerConfig {
 impl Default for ClamAvAnalyzerConfig {
     fn default() -> Self {
         Self {
-            host: std::env::var("CLAMAV_HOST")
-                .unwrap_or_else(|_| "localhost".to_string()),
+            host: std::env::var("CLAMAV_HOST").unwrap_or_else(|_| "localhost".to_string()),
             port: 3310,
             timeout_seconds: 30,
             enabled: std::env::var("ENABLE_CLAMAV")
@@ -70,10 +69,9 @@ impl ClamAvAnalyzer {
             Ok(c) => c,
             Err(e) => {
                 error!("Failed to connect to ClamAV daemon at {}: {}", address, e);
-                return Ok(self.create_error_result(
-                    filename,
-                    &format!("ClamAV connection failed: {}", e),
-                ));
+                return Ok(
+                    self.create_error_result(filename, &format!("ClamAV connection failed: {}", e))
+                );
             }
         };
 
@@ -82,10 +80,7 @@ impl ClamAvAnalyzer {
             Ok(result) => result,
             Err(e) => {
                 error!("ClamAV scan failed for {}: {}", filename, e);
-                return Ok(self.create_error_result(
-                    filename,
-                    &format!("ClamAV scan error: {}", e),
-                ));
+                return Ok(self.create_error_result(filename, &format!("ClamAV scan error: {}", e)));
             }
         };
 

@@ -2,16 +2,15 @@
 ///
 /// This module generates comprehensive analysis reports from behavioral data
 /// collected during sandbox execution, including threat assessments and IOCs.
-
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, info};
+use tracing::info;
 
 use crate::analyzers::dynamic_analyzer::{
-    DynamicBehavior, DynamicThreatIndicators, FileOperation, FileOperationType,
-    NetworkOperation, ProcessOperation, RegistryOperation,
+    DynamicBehavior, DynamicThreatIndicators, FileOperation, FileOperationType, NetworkOperation,
+    ProcessOperation,
 };
 
 /// Comprehensive dynamic analysis report
@@ -294,7 +293,7 @@ impl ReportGenerator {
     /// Generate executive summary
     fn generate_executive_summary(
         &self,
-        behavior: &DynamicBehavior,
+        _behavior: &DynamicBehavior,
         threat_indicators: &DynamicThreatIndicators,
     ) -> ExecutiveSummary {
         let total_indicators = threat_indicators.malicious_network_connections.len()
@@ -368,8 +367,14 @@ impl ReportGenerator {
                     timestamp: file_op.timestamp,
                     details: {
                         let mut map = HashMap::new();
-                        map.insert("path".to_string(), file_op.source_path.display().to_string());
-                        map.insert("operation".to_string(), format!("{:?}", file_op.operation_type));
+                        map.insert(
+                            "path".to_string(),
+                            file_op.source_path.display().to_string(),
+                        );
+                        map.insert(
+                            "operation".to_string(),
+                            format!("{:?}", file_op.operation_type),
+                        );
                         map
                     },
                 });
@@ -457,7 +462,8 @@ impl ReportGenerator {
             techniques.push(AttackTechnique {
                 mitre_id: Some("T1547".to_string()),
                 technique_name: "Boot or Logon Autostart Execution".to_string(),
-                description: "Malware establishes persistence through autostart mechanisms".to_string(),
+                description: "Malware establishes persistence through autostart mechanisms"
+                    .to_string(),
                 evidence: threat_indicators.persistence_mechanisms.clone(),
             });
         }
@@ -561,10 +567,11 @@ impl ReportGenerator {
             }
         }
 
-        let (total_sent, total_received) = network_operations.iter().fold(
-            (0u64, 0u64),
-            |(sent, recv), op| (sent + op.bytes_sent, recv + op.bytes_received),
-        );
+        let (total_sent, total_received) = network_operations
+            .iter()
+            .fold((0u64, 0u64), |(sent, recv), op| {
+                (sent + op.bytes_sent, recv + op.bytes_received)
+            });
 
         NetworkAnalysisSection {
             total_connections,
@@ -594,10 +601,7 @@ impl ReportGenerator {
             let suspicious = self.is_sensitive_path(&path);
 
             if suspicious {
-                suspicious_file_operations.push(format!(
-                    "{:?} on {}",
-                    op.operation_type, path
-                ));
+                suspicious_file_operations.push(format!("{:?} on {}", op.operation_type, path));
             }
 
             let detail = FileActivityDetail {
@@ -655,7 +659,10 @@ impl ReportGenerator {
                 suspicious,
             });
 
-            if matches!(op.operation_type, crate::analyzers::dynamic_analyzer::ProcessOperationType::Inject) {
+            if matches!(
+                op.operation_type,
+                crate::analyzers::dynamic_analyzer::ProcessOperationType::Inject
+            ) {
                 process_injections.push(format!(
                     "{} injected into PID {}",
                     op.process_name, op.process_id
@@ -681,7 +688,9 @@ impl ReportGenerator {
         }
 
         if threat_assessment.capability_assessment.can_persist {
-            recommendations.push("Check for persistence mechanisms on potentially affected systems".to_string());
+            recommendations.push(
+                "Check for persistence mechanisms on potentially affected systems".to_string(),
+            );
         }
 
         if threat_assessment.capability_assessment.can_exfiltrate {
@@ -689,10 +698,12 @@ impl ReportGenerator {
         }
 
         if threat_assessment.capability_assessment.can_evade_detection {
-            recommendations.push("Update detection signatures to account for evasion techniques".to_string());
+            recommendations
+                .push("Update detection signatures to account for evasion techniques".to_string());
         }
 
-        recommendations.push("Conduct full forensic analysis if deployed in production".to_string());
+        recommendations
+            .push("Conduct full forensic analysis if deployed in production".to_string());
 
         recommendations
     }

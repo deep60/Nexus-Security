@@ -33,13 +33,12 @@ pub struct FileMetadata {
 impl S3Client {
     /// Create a new S3 client configured for MinIO or AWS S3
     pub async fn new() -> Result<Self> {
-        let endpoint = env::var("S3_ENDPOINT")
-            .unwrap_or_else(|_| "http://minio:9000".to_string());
+        let endpoint = env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://minio:9000".to_string());
         let region = env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
         let bucket = env::var("S3_BUCKET").unwrap_or_else(|_| "verdyx-submissions".to_string());
         let access_key = env::var("S3_ACCESS_KEY").unwrap_or_else(|_| "verdyx_admin".to_string());
-        let secret_key = env::var("S3_SECRET_KEY")
-            .unwrap_or_else(|_| "verdyx_secret_key_2024".to_string());
+        let secret_key =
+            env::var("S3_SECRET_KEY").unwrap_or_else(|_| "verdyx_secret_key_2024".to_string());
 
         info!(
             "Initializing S3 client with endpoint: {}, region: {}, bucket: {}",
@@ -47,13 +46,7 @@ impl S3Client {
         );
 
         // Create credentials
-        let credentials = Credentials::new(
-            access_key,
-            secret_key,
-            None,
-            None,
-            "verdyx",
-        );
+        let credentials = Credentials::new(access_key, secret_key, None, None, "verdyx");
 
         // Build S3 config
         let s3_config = Config::builder()
@@ -137,7 +130,7 @@ impl S3Client {
         request
             .send()
             .await
-            .with_context(|| format!("Failed to upload file with key: {}", key))?;
+            .with_context(|| format!("Failed to upload file with key: {key}"))?;
 
         info!("File uploaded successfully: key={}, hash={}", key, hash);
         Ok(hash)
@@ -154,7 +147,7 @@ impl S3Client {
             .key(key)
             .send()
             .await
-            .with_context(|| format!("Failed to download file with key: {}", key))?;
+            .with_context(|| format!("Failed to download file with key: {key}"))?;
 
         let bytes = response
             .body
@@ -164,7 +157,11 @@ impl S3Client {
             .into_bytes()
             .to_vec();
 
-        info!("File downloaded successfully: key={}, size={} bytes", key, bytes.len());
+        info!(
+            "File downloaded successfully: key={}, size={} bytes",
+            key,
+            bytes.len()
+        );
         Ok(bytes)
     }
 
@@ -178,7 +175,7 @@ impl S3Client {
             .key(key)
             .send()
             .await
-            .with_context(|| format!("Failed to delete file with key: {}", key))?;
+            .with_context(|| format!("Failed to delete file with key: {key}"))?;
 
         info!("File deleted successfully: key={}", key);
         Ok(())
@@ -195,7 +192,7 @@ impl S3Client {
             .key(key)
             .send()
             .await
-            .with_context(|| format!("Failed to get metadata for file with key: {}", key))?;
+            .with_context(|| format!("Failed to get metadata for file with key: {key}"))?;
 
         // Extract SHA256 from metadata
         let sha256_hash = response
@@ -209,9 +206,9 @@ impl S3Client {
             size: response.content_length().unwrap_or(0),
             content_type: response.content_type().map(|s| s.to_string()),
             etag: response.e_tag().map(|s| s.to_string()),
-            last_modified: response.last_modified().and_then(|dt| {
-                chrono::DateTime::from_timestamp(dt.secs(), 0)
-            }),
+            last_modified: response
+                .last_modified()
+                .and_then(|dt| chrono::DateTime::from_timestamp(dt.secs(), 0)),
             sha256_hash,
         };
 
@@ -220,7 +217,11 @@ impl S3Client {
     }
 
     /// List all files in the bucket with optional prefix
-    pub async fn list_files(&self, prefix: Option<&str>, max_keys: Option<i32>) -> Result<Vec<String>> {
+    pub async fn list_files(
+        &self,
+        prefix: Option<&str>,
+        max_keys: Option<i32>,
+    ) -> Result<Vec<String>> {
         debug!("Listing files with prefix: {:?}", prefix);
 
         let mut request = self.client.list_objects_v2().bucket(&self.bucket);
@@ -233,10 +234,7 @@ impl S3Client {
             request = request.max_keys(max);
         }
 
-        let response = request
-            .send()
-            .await
-            .context("Failed to list files")?;
+        let response = request.send().await.context("Failed to list files")?;
 
         let keys: Vec<String> = response
             .contents()
@@ -260,7 +258,11 @@ impl S3Client {
     }
 
     /// Generate a pre-signed URL for file download (valid for 1 hour)
-    pub async fn generate_presigned_url(&self, key: &str, expires_in_secs: Option<u64>) -> Result<String> {
+    pub async fn generate_presigned_url(
+        &self,
+        key: &str,
+        expires_in_secs: Option<u64>,
+    ) -> Result<String> {
         let expires = std::time::Duration::from_secs(expires_in_secs.unwrap_or(3600));
 
         let presigned = self

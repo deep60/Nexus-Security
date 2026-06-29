@@ -191,14 +191,14 @@ pub struct AnalysisResult {
     pub participation_id: Option<Uuid>,
     pub engine_id: Uuid,
     pub submission_id: Uuid,
-    pub bounty_id: Option<Uuid>,        // added by migration 005
-    pub analyzer_id: Option<Uuid>,       // added by migration 005
-    pub verdict: String,                 // 'malicious','benign','suspicious','unknown'
-    pub confidence_score: String,        // DECIMAL(5,4)
+    pub bounty_id: Option<Uuid>,           // added by migration 005
+    pub analyzer_id: Option<Uuid>,         // added by migration 005
+    pub verdict: String,                   // 'malicious','benign','suspicious','unknown'
+    pub confidence_score: String,          // DECIMAL(5,4)
     pub threat_types: Option<Vec<String>>, // TEXT[]
-    pub analysis_duration: Option<i32>,  // seconds
+    pub analysis_duration: Option<i32>,    // seconds
     pub detailed_report: Option<serde_json::Value>, // JSONB
-    pub analysis_status: Option<String>, // 'pending','running','completed','failed','timeout'
+    pub analysis_status: Option<String>,   // 'pending','running','completed','failed','timeout'
     pub created_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
 }
@@ -372,9 +372,9 @@ impl EngineAnalysis {
 // Helper functions for consensus calculation
 impl AnalysisStats {
     pub fn calculate_consensus(&self) -> (ThreatVerdict, f64) {
-        let total_votes = self.benign_votes + self.suspicious_votes + 
-                         self.malicious_votes + self.unknown_votes;
-        
+        let total_votes =
+            self.benign_votes + self.suspicious_votes + self.malicious_votes + self.unknown_votes;
+
         if total_votes == 0 {
             return (ThreatVerdict::Unknown, 0.0);
         }

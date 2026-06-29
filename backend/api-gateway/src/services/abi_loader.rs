@@ -51,14 +51,19 @@ fn load_abi_from_file<P: AsRef<Path>>(path: P) -> Result<Abi> {
         .with_context(|| format!("Failed to parse ABI JSON from {}", path_ref.display()))?;
 
     // Extract the ABI array from the Hardhat artifact
-    let abi_value = json.get("abi")
+    let abi_value = json
+        .get("abi")
         .with_context(|| format!("ABI field not found in {}", path_ref.display()))?;
 
     // Parse the ABI
     let abi: Abi = serde_json::from_value(abi_value.clone())
         .with_context(|| format!("Failed to parse ABI from {}", path_ref.display()))?;
 
-    tracing::debug!("Loaded ABI from {} with {} functions", path_ref.display(), abi.functions().count());
+    tracing::debug!(
+        "Loaded ABI from {} with {} functions",
+        path_ref.display(),
+        abi.functions().count()
+    );
 
     Ok(abi)
 }
@@ -88,7 +93,9 @@ pub fn verify_abi_files() -> Result<()> {
 
     for abi_file in &abi_files {
         if !Path::new(abi_file).exists() {
-            anyhow::bail!("ABI file not found: {}. Please run 'blockchain/scripts/extract-abis.sh'", abi_file);
+            anyhow::bail!(
+                "ABI file not found: {abi_file}. Please run 'blockchain/scripts/extract-abis.sh'"
+            );
         }
     }
 
@@ -105,10 +112,17 @@ mod tests {
         // This test will only pass if ABIs are extracted
         if Path::new(BOUNTY_MANAGER_ABI).exists() {
             let result = load_bounty_manager_abi();
-            assert!(result.is_ok(), "Failed to load BountyManager ABI: {:?}", result.err());
+            assert!(
+                result.is_ok(),
+                "Failed to load BountyManager ABI: {:?}",
+                result.err()
+            );
 
             let abi = result.unwrap();
-            assert!(!abi.functions().collect::<Vec<_>>().is_empty(), "BountyManager ABI should have functions");
+            assert!(
+                !abi.functions().collect::<Vec<_>>().is_empty(),
+                "BountyManager ABI should have functions"
+            );
         }
     }
 

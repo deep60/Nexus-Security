@@ -22,9 +22,7 @@ pub async fn websocket_handler(
     Query(params): Query<HashMap<String, String>>,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    let user_id = params
-        .get("user_id")
-        .and_then(|v| Uuid::parse_str(v).ok());
+    let user_id = params.get("user_id").and_then(|v| Uuid::parse_str(v).ok());
 
     ws.on_upgrade(move |socket| handle_socket(socket, state, user_id))
 }

@@ -119,14 +119,17 @@ pub async fn create_webhook(
     Json(payload): Json<RegisterWebhookRequest>,
 ) -> Result<Json<Webhook>, StatusCode> {
     // Generate a random secret for HMAC signing
-    let secret = format!("whsec_{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
+    let secret = format!(
+        "whsec_{}",
+        uuid::Uuid::new_v4().to_string().replace("-", "")
+    );
     let webhook_id = Uuid::new_v4();
     let user_id = claims.sub;
 
     let webhook = sqlx::query_as::<_, Webhook>(
         "INSERT INTO webhooks (id, user_id, url, events, secret, description, headers)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING *"
+         RETURNING *",
     )
     .bind(webhook_id)
     .bind(user_id)
@@ -162,7 +165,7 @@ pub async fn list_webhooks(
         .unwrap_or(0);
 
     let webhooks = sqlx::query_as::<_, Webhook>(
-        "SELECT * FROM webhooks WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3"
+        "SELECT * FROM webhooks WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
     )
     .bind(claims.sub)
     .bind(limit as i64)
@@ -188,18 +191,17 @@ pub async fn get_webhook(
     claims: crate::middleware::auth::Claims,
     Path(webhook_id): Path<Uuid>,
 ) -> Result<Json<Webhook>, StatusCode> {
-    let webhook = sqlx::query_as::<_, Webhook>(
-        "SELECT * FROM webhooks WHERE id = $1 AND user_id = $2"
-    )
-    .bind(webhook_id)
-    .bind(claims.sub)
-    .fetch_optional(state.db.pool())
-    .await
-    .map_err(|e| {
-        tracing::error!("DB error: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?
-    .ok_or(StatusCode::NOT_FOUND)?;
+    let webhook =
+        sqlx::query_as::<_, Webhook>("SELECT * FROM webhooks WHERE id = $1 AND user_id = $2")
+            .bind(webhook_id)
+            .bind(claims.sub)
+            .fetch_optional(state.db.pool())
+            .await
+            .map_err(|e| {
+                tracing::error!("DB error: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+            .ok_or(StatusCode::NOT_FOUND)?;
 
     Ok(Json(webhook))
 }
@@ -221,7 +223,7 @@ pub async fn update_webhook(
             headers = COALESCE($6, headers),
             updated_at = NOW()
          WHERE id = $1 AND user_id = $7
-         RETURNING *"
+         RETURNING *",
     )
     .bind(webhook_id)
     .bind(&payload.url)
@@ -271,14 +273,12 @@ pub async fn test_webhook(
     Json(payload): Json<TestWebhookRequest>,
 ) -> Result<Json<WebhookDelivery>, StatusCode> {
     // First fetch the webhook
-    let webhook = sqlx::query_as::<_, Webhook>(
-        "SELECT * FROM webhooks WHERE id = $1"
-    )
-    .bind(webhook_id)
-    .fetch_optional(state.db.pool())
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::NOT_FOUND)?;
+    let webhook = sqlx::query_as::<_, Webhook>("SELECT * FROM webhooks WHERE id = $1")
+        .bind(webhook_id)
+        .fetch_optional(state.db.pool())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
     let test_payload = payload.sample_payload.unwrap_or(serde_json::json!({
         "event": payload.event_type,
@@ -301,15 +301,18 @@ pub async fn test_webhook(
         Ok(resp) => {
             let code = resp.status().as_u16() as i16;
             let body = resp.text().await.unwrap_or_default();
-            if code >= 200 && code < 300 {
+            if (200..300).contains(&code) {
                 ("success".to_string(), Some(code), Some(body), None)
             } else {
-                ("failed".to_string(), Some(code), Some(body), Some(format!("HTTP {}", code)))
+                (
+                    "failed".to_string(),
+                    Some(code),
+                    Some(body),
+                    Some(format!("HTTP {code}")),
+                )
             }
         }
-        Err(e) => {
-            ("failed".to_string(), None, None, Some(e.to_string()))
-        }
+        Err(e) => ("failed".to_string(), None, None, Some(e.to_string())),
     };
 
     // Record delivery
@@ -346,17 +349,16 @@ pub async fn get_webhook_deliveries(
     let limit = params.limit.unwrap_or(20).min(100);
     let offset = (page.saturating_sub(1)) * limit;
 
-    let total: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM webhook_deliveries WHERE webhook_id = $1"
-    )
-    .bind(webhook_id)
-    .fetch_one(state.db.pool())
-    .await
-    .unwrap_or(0);
+    let total: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM webhook_deliveries WHERE webhook_id = $1")
+            .bind(webhook_id)
+            .fetch_one(state.db.pool())
+            .await
+            .unwrap_or(0);
 
     let deliveries = sqlx::query_as::<_, WebhookDelivery>(
         "SELECT * FROM webhook_deliveries WHERE webhook_id = $1
-         ORDER BY triggered_at DESC LIMIT $2 OFFSET $3"
+         ORDER BY triggered_at DESC LIMIT $2 OFFSET $3",
     )
     .bind(webhook_id)
     .bind(limit as i64)
@@ -381,11 +383,35 @@ pub async fn list_available_events(
     State(_state): State<AppState>,
 ) -> Result<Json<Vec<WebhookEvent>>, StatusCode> {
     Ok(Json(vec![
-        WebhookEvent { name: "analysis.completed".into(), description: "Analysis completed".into(), category: "analysis".into() },
-        WebhookEvent { name: "bounty.created".into(), description: "New bounty created".into(), category: "bounty".into() },
-        WebhookEvent { name: "bounty.submission".into(), description: "Analysis submitted to bounty".into(), category: "bounty".into() },
-        WebhookEvent { name: "bounty.finalized".into(), description: "Bounty resolved with winner".into(), category: "bounty".into() },
-        WebhookEvent { name: "transaction.confirmed".into(), description: "Blockchain tx confirmed".into(), category: "transaction".into() },
-        WebhookEvent { name: "reputation.updated".into(), description: "Reputation score changed".into(), category: "reputation".into() },
+        WebhookEvent {
+            name: "analysis.completed".into(),
+            description: "Analysis completed".into(),
+            category: "analysis".into(),
+        },
+        WebhookEvent {
+            name: "bounty.created".into(),
+            description: "New bounty created".into(),
+            category: "bounty".into(),
+        },
+        WebhookEvent {
+            name: "bounty.submission".into(),
+            description: "Analysis submitted to bounty".into(),
+            category: "bounty".into(),
+        },
+        WebhookEvent {
+            name: "bounty.finalized".into(),
+            description: "Bounty resolved with winner".into(),
+            category: "bounty".into(),
+        },
+        WebhookEvent {
+            name: "transaction.confirmed".into(),
+            description: "Blockchain tx confirmed".into(),
+            category: "transaction".into(),
+        },
+        WebhookEvent {
+            name: "reputation.updated".into(),
+            description: "Reputation score changed".into(),
+            category: "reputation".into(),
+        },
     ]))
 }

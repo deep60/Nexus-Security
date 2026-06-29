@@ -134,19 +134,15 @@ impl ApiError {
 
     fn error_details(&self) -> Option<serde_json::Value> {
         match self {
-            ApiError::InsufficientReputation { required, actual } => {
-                Some(json!({
-                    "required_reputation": required,
-                    "actual_reputation": actual,
-                    "deficit": required - actual,
-                }))
-            }
-            ApiError::StakeTooLow { minimum, provided } => {
-                Some(json!({
-                    "minimum_stake": minimum,
-                    "provided_stake": provided,
-                }))
-            }
+            ApiError::InsufficientReputation { required, actual } => Some(json!({
+                "required_reputation": required,
+                "actual_reputation": actual,
+                "deficit": required - actual,
+            })),
+            ApiError::StakeTooLow { minimum, provided } => Some(json!({
+                "minimum_stake": minimum,
+                "provided_stake": provided,
+            })),
             _ => None,
         }
     }
@@ -196,7 +192,7 @@ impl From<sqlx::Error> for ApiError {
             sqlx::Error::Database(db_err) => {
                 // Check for unique constraint violations
                 if let Some(constraint) = db_err.constraint() {
-                    ApiError::Conflict(format!("Constraint violation: {}", constraint))
+                    ApiError::Conflict(format!("Constraint violation: {constraint}"))
                 } else {
                     ApiError::Database(db_err.to_string())
                 }
@@ -208,19 +204,19 @@ impl From<sqlx::Error> for ApiError {
 
 impl From<serde_json::Error> for ApiError {
     fn from(err: serde_json::Error) -> Self {
-        ApiError::BadRequest(format!("JSON parsing error: {}", err))
+        ApiError::BadRequest(format!("JSON parsing error: {err}"))
     }
 }
 
 impl From<std::io::Error> for ApiError {
     fn from(err: std::io::Error) -> Self {
-        ApiError::Internal(format!("IO error: {}", err))
+        ApiError::Internal(format!("IO error: {err}"))
     }
 }
 
 impl From<redis::RedisError> for ApiError {
     fn from(err: redis::RedisError) -> Self {
-        ApiError::ServiceUnavailable(format!("Redis error: {}", err))
+        ApiError::ServiceUnavailable(format!("Redis error: {err}"))
     }
 }
 
@@ -258,7 +254,8 @@ impl ValidationErrorBuilder {
             Ok(())
         } else {
             Err(ApiError::Validation(
-                serde_json::to_string(&self.errors).unwrap_or_else(|_| "Validation failed".to_string())
+                serde_json::to_string(&self.errors)
+                    .unwrap_or_else(|_| "Validation failed".to_string()),
             ))
         }
     }

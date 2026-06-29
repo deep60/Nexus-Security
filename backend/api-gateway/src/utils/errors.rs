@@ -30,7 +30,7 @@ impl IntoResponse for ApiError {
             ApiError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
             ApiError::Database(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
+                format!("Database error: {e}"),
             ),
             ApiError::Conflict(msg) => (StatusCode::CONFLICT, msg),
         };

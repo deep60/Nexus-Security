@@ -1,8 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
-use serde::{Deserialize, Serialize};
 
 /// Circuit breaker pattern implementation for fault tolerance
 /// Prevents cascading failures by failing fast when a service is unhealthy
@@ -160,8 +160,13 @@ impl CircuitBreaker {
             State::Closed => {
                 // Check if we should reset failure count based on time window
                 if let Some(last_failure) = state.last_failure_time {
-                    if last_failure.elapsed() > Duration::from_secs(self.config.failure_window_seconds) {
-                        debug!("Failure window expired, resetting failure count for {}", self.config.name);
+                    if last_failure.elapsed()
+                        > Duration::from_secs(self.config.failure_window_seconds)
+                    {
+                        debug!(
+                            "Failure window expired, resetting failure count for {}",
+                            self.config.name
+                        );
                         state.failure_count = 0;
                         state.last_failure_time = None;
                     }
@@ -170,19 +175,30 @@ impl CircuitBreaker {
             }
             State::Open => {
                 // Check if timeout has elapsed to transition to half-open
-                if state.last_state_change.elapsed() >= Duration::from_secs(self.config.timeout_seconds) {
-                    info!("Circuit breaker {} timeout elapsed - transitioning to HalfOpen", self.config.name);
+                if state.last_state_change.elapsed()
+                    >= Duration::from_secs(self.config.timeout_seconds)
+                {
+                    info!(
+                        "Circuit breaker {} timeout elapsed - transitioning to HalfOpen",
+                        self.config.name
+                    );
                     self.transition_to_half_open(&mut state, &mut stats);
                     true
                 } else {
                     stats.rejected_requests += 1;
-                    debug!("Circuit breaker {} is Open - rejecting request", self.config.name);
+                    debug!(
+                        "Circuit breaker {} is Open - rejecting request",
+                        self.config.name
+                    );
                     false
                 }
             }
             State::HalfOpen => {
                 // Allow limited requests through to test service health
-                debug!("Circuit breaker {} is HalfOpen - allowing test request", self.config.name);
+                debug!(
+                    "Circuit breaker {} is HalfOpen - allowing test request",
+                    self.config.name
+                );
                 true
             }
         }
@@ -208,21 +224,29 @@ impl CircuitBreaker {
                 } else {
                     debug!(
                         "Circuit breaker {} HalfOpen - success {}/{}",
-                        self.config.name, state.consecutive_successes, self.config.success_threshold
+                        self.config.name,
+                        state.consecutive_successes,
+                        self.config.success_threshold
                     );
                 }
             }
             State::Closed => {
                 // Reset failure count on success
                 if state.failure_count > 0 {
-                    debug!("Circuit breaker {} - resetting failure count on success", self.config.name);
+                    debug!(
+                        "Circuit breaker {} - resetting failure count on success",
+                        self.config.name
+                    );
                     state.failure_count = 0;
                     state.last_failure_time = None;
                 }
             }
             State::Open => {
                 // Should not happen as Open state rejects requests
-                warn!("Circuit breaker {} recorded success while Open (unexpected)", self.config.name);
+                warn!(
+                    "Circuit breaker {} recorded success while Open (unexpected)",
+                    self.config.name
+                );
             }
         }
     }
@@ -261,7 +285,10 @@ impl CircuitBreaker {
             }
             State::Open => {
                 // Already open, just increment counter
-                debug!("Circuit breaker {} - additional failure while Open", self.config.name);
+                debug!(
+                    "Circuit breaker {} - additional failure while Open",
+                    self.config.name
+                );
             }
         }
     }
@@ -321,7 +348,11 @@ impl CircuitBreaker {
     }
 
     // Transition helpers
-    fn transition_to_closed(&self, state: &mut CircuitBreakerState, stats: &mut CircuitBreakerStats) {
+    fn transition_to_closed(
+        &self,
+        state: &mut CircuitBreakerState,
+        stats: &mut CircuitBreakerStats,
+    ) {
         state.state = State::Closed;
         state.failure_count = 0;
         state.consecutive_successes = 0;
@@ -342,7 +373,11 @@ impl CircuitBreaker {
         }
     }
 
-    fn transition_to_half_open(&self, state: &mut CircuitBreakerState, stats: &mut CircuitBreakerStats) {
+    fn transition_to_half_open(
+        &self,
+        state: &mut CircuitBreakerState,
+        stats: &mut CircuitBreakerStats,
+    ) {
         state.state = State::HalfOpen;
         state.consecutive_successes = 0;
         state.last_state_change = Instant::now();
@@ -364,7 +399,7 @@ impl<E: std::fmt::Display> std::fmt::Display for CircuitBreakerError<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Open => write!(f, "Circuit breaker is open - request rejected"),
-            Self::ServiceError(e) => write!(f, "Service error: {}", e),
+            Self::ServiceError(e) => write!(f, "Service error: {e}"),
         }
     }
 }
@@ -425,7 +460,9 @@ mod tests {
         assert_eq!(result.unwrap(), 42);
 
         // Failed call
-        let result = cb.call(async { Err::<i32, String>("error".to_string()) }).await;
+        let result = cb
+            .call(async { Err::<i32, String>("error".to_string()) })
+            .await;
         assert!(matches!(result, Err(CircuitBreakerError::ServiceError(_))));
     }
 

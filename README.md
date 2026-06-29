@@ -8,17 +8,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/your-org/verdyx/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/your-org/verdyx/ci.yml?branch=main" alt="Build Status">
+  <a href="https://github.com/deep60/Nexus-Security/actions/workflows/rust.yml">
+    <img src="https://github.com/deep60/Nexus-Security/actions/workflows/rust.yml/badge.svg" alt="Rust CI">
   </a>
-  <a href="https://github.com/your-org/verdyx/blob/main/LICENSE">
+  <a href="https://github.com/deep60/Nexus-Security/actions/workflows/frontend-ci.yml">
+    <img src="https://github.com/deep60/Nexus-Security/actions/workflows/frontend-ci.yml/badge.svg" alt="Frontend CI">
+  </a>
+  <a href="https://github.com/deep60/Nexus-Security/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
-  </a>
-  <a href="https://discord.gg/your-invite">
-    <img src="https://img.shields.io/discord/123456789.svg?label=Discord&logo=discord&logoColor=white" alt="Chat">
-  </a>
-  <a href="https://twitter.com/verdyx">
-    <img src="https://img.shields.io/twitter/follow/verdyx?style=social" alt="Twitter">
   </a>
 </p>
 

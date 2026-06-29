@@ -7,16 +7,14 @@
 /// - Malicious attachment scanning
 /// - URL extraction and analysis
 /// - Content analysis
-
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 use super::{
-    ArtifactType, Finding, FindingCategory, ScanResult, ScanVerdict, Scanner, ScannerConfig,
-    ThreatLevel,
+    ArtifactType, Finding, FindingCategory, ScanResult, Scanner, ScannerConfig, ThreatLevel,
 };
 
 /// Configuration for email scanner
@@ -152,13 +150,13 @@ impl Scanner for EmailScanner {
     async fn scan(
         &self,
         data: &[u8],
-        metadata: Option<HashMap<String, String>>,
+        _metadata: Option<HashMap<String, String>>,
     ) -> Result<Self::Result> {
         let start_time = std::time::Instant::now();
 
         // Parse email content
-        let email_text = String::from_utf8(data.to_vec())
-            .map_err(|_| anyhow!("Invalid UTF-8 in email"))?;
+        let email_text =
+            String::from_utf8(data.to_vec()).map_err(|_| anyhow!("Invalid UTF-8 in email"))?;
 
         info!("Starting email scan ({} bytes)", data.len());
 
@@ -201,16 +199,17 @@ impl Scanner for EmailScanner {
         }
 
         // Check email authentication
-        let authentication_results = if self.config.check_spf || self.config.check_dkim || self.config.check_dmarc {
-            self.check_authentication(&headers)
-        } else {
-            AuthenticationResults {
-                spf_result: AuthResult::None,
-                dkim_result: AuthResult::None,
-                dmarc_result: AuthResult::None,
-                is_authenticated: false,
-            }
-        };
+        let authentication_results =
+            if self.config.check_spf || self.config.check_dkim || self.config.check_dmarc {
+                self.check_authentication(&headers)
+            } else {
+                AuthenticationResults {
+                    spf_result: AuthResult::None,
+                    dkim_result: AuthResult::None,
+                    dmarc_result: AuthResult::None,
+                    is_authenticated: false,
+                }
+            };
 
         if !authentication_results.is_authenticated {
             let severity = if authentication_results.spf_result == AuthResult::Fail
@@ -333,7 +332,7 @@ impl Scanner for EmailScanner {
                 finding_id: Uuid::new_v4(),
                 category: FindingCategory::Suspicious,
                 title: "High spam score".to_string(),
-                description: format!("Spam score: {:.1}/10", spam_score),
+                description: format!("Spam score: {spam_score:.1}/10"),
                 severity: ThreatLevel::Medium,
                 evidence: vec![format!("Score: {:.1}", spam_score)],
                 recommendation: Some("Likely spam email".to_string()),
@@ -362,9 +361,18 @@ impl Scanner for EmailScanner {
 
     fn get_stats(&self) -> HashMap<String, String> {
         let mut stats = HashMap::new();
-        stats.insert("scanner_name".to_string(), self.config.base.scanner_name.clone());
-        stats.insert("spam_keywords".to_string(), self.spam_keywords.len().to_string());
-        stats.insert("phishing_patterns".to_string(), self.phishing_patterns.len().to_string());
+        stats.insert(
+            "scanner_name".to_string(),
+            self.config.base.scanner_name.clone(),
+        );
+        stats.insert(
+            "spam_keywords".to_string(),
+            self.spam_keywords.len().to_string(),
+        );
+        stats.insert(
+            "phishing_patterns".to_string(),
+            self.phishing_patterns.len().to_string(),
+        );
         stats
     }
 
@@ -413,7 +421,11 @@ impl EmailScanner {
     }
 
     /// Analyze email headers
-    fn analyze_headers(&self, headers: &HashMap<String, String>, email_info: &EmailInfo) -> HeaderAnalysis {
+    fn analyze_headers(
+        &self,
+        headers: &HashMap<String, String>,
+        email_info: &EmailInfo,
+    ) -> HeaderAnalysis {
         let mut suspicious_headers = Vec::new();
         let mut is_forged = false;
 
@@ -439,7 +451,7 @@ impl EmailScanner {
             .count();
 
         if received_hops > 10 {
-            suspicious_headers.push(format!("Excessive mail hops: {}", received_hops));
+            suspicious_headers.push(format!("Excessive mail hops: {received_hops}"));
         }
 
         // Check for missing important headers
@@ -462,7 +474,11 @@ impl EmailScanner {
     /// Check email authentication (SPF, DKIM, DMARC)
     fn check_authentication(&self, headers: &HashMap<String, String>) -> AuthenticationResults {
         // Simplified authentication check - in production, validate properly
-        let auth_results = headers.get("authentication-results").cloned().unwrap_or_default().to_lowercase();
+        let auth_results = headers
+            .get("authentication-results")
+            .cloned()
+            .unwrap_or_default()
+            .to_lowercase();
 
         let spf_result = if auth_results.contains("spf=pass") {
             AuthResult::Pass
@@ -509,14 +525,14 @@ impl EmailScanner {
         // Check for spam keywords
         for keyword in &self.spam_keywords {
             if body_lower.contains(keyword) {
-                suspicious_patterns.push(format!("Spam keyword: {}", keyword));
+                suspicious_patterns.push(format!("Spam keyword: {keyword}"));
             }
         }
 
         // Check for phishing patterns
         for pattern in &self.phishing_patterns {
             if body_lower.contains(pattern) {
-                suspicious_patterns.push(format!("Phishing pattern: {}", pattern));
+                suspicious_patterns.push(format!("Phishing pattern: {pattern}"));
             }
         }
 
@@ -587,7 +603,8 @@ impl EmailScanner {
                             .and_then(|e| e.to_str())
                             .unwrap_or("");
 
-                        let is_suspicious = self.suspicious_extensions.contains(&extension.to_string());
+                        let is_suspicious =
+                            self.suspicious_extensions.contains(&extension.to_string());
 
                         attachments.push(AttachmentInfo {
                             filename: filename.clone(),

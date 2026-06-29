@@ -76,6 +76,7 @@ pub enum PaymentType {
     Refund,
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for PaymentType {
     fn to_string(&self) -> String {
         match self {
@@ -102,6 +103,7 @@ pub enum PaymentStatus {
     Cancelled,
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for PaymentStatus {
     fn to_string(&self) -> String {
         match self {
@@ -143,6 +145,7 @@ pub enum StakeStatus {
     PartiallySlashed,
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for StakeStatus {
     fn to_string(&self) -> String {
         match self {

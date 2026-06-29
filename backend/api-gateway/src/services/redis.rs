@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use redis::{AsyncCommands, Client, RedisResult};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -64,7 +63,7 @@ impl RedisService {
         analysis: &AnalysisCache,
         ttl_seconds: u64,
     ) -> Result<()> {
-        let key = format!("analysis:{}", file_hash);
+        let key = format!("analysis:{file_hash}");
         let serialized =
             serde_json::to_string(analysis).context("Failed to serialize analysis cache")?;
 
@@ -79,7 +78,7 @@ impl RedisService {
     }
 
     pub async fn get_cached_analysis(&self, file_hash: &str) -> Result<Option<AnalysisCache>> {
-        let key = format!("analysis:{}", file_hash);
+        let key = format!("analysis:{file_hash}");
 
         let mut conn = self.connection_pool.clone();
         let cached: Option<String> = conn
@@ -114,7 +113,7 @@ impl RedisService {
     }
 
     pub async fn get_cached_bounty(&self, bounty_id: &Uuid) -> Result<Option<BountyCache>> {
-        let key = format!("bounty:{}", bounty_id);
+        let key = format!("bounty:{bounty_id}");
 
         let mut conn = self.connection_pool.clone();
         let cached: Option<String> = conn
@@ -133,7 +132,7 @@ impl RedisService {
     }
 
     pub async fn invalidate_bounty_cache(&self, bounty_id: &Uuid) -> Result<()> {
-        let key = format!("bounty:{}", bounty_id);
+        let key = format!("bounty:{bounty_id}");
 
         let mut conn = self.connection_pool.clone();
         let _: () = conn
@@ -171,7 +170,7 @@ impl RedisService {
     }
 
     pub async fn get_session(&self, session_token: &str) -> Result<Option<UserSession>> {
-        let key = format!("session:{}", session_token);
+        let key = format!("session:{session_token}");
 
         let mut conn = self.connection_pool.clone();
         let cached: Option<String> = conn.get(&key).await.context("Failed to retrieve session")?;
@@ -201,7 +200,7 @@ impl RedisService {
 
     pub async fn invalidate_session(&self, session_token: &str) -> Result<()> {
         // Get session data directly without calling get_session to avoid recursion
-        let key = format!("session:{}", session_token);
+        let key = format!("session:{session_token}");
         let mut conn = self.connection_pool.clone();
         let cached: Option<String> = conn.get(&key).await.context("Failed to retrieve session")?;
 
@@ -215,7 +214,7 @@ impl RedisService {
             }
         }
 
-        let key = format!("session:{}", session_token);
+        let key = format!("session:{session_token}");
         let _: () = conn
             .del(&key)
             .await
@@ -232,7 +231,7 @@ impl RedisService {
         max_requests: u32,
         window_seconds: u64,
     ) -> Result<bool> {
-        let key = format!("rate_limit:{}", identifier);
+        let key = format!("rate_limit:{identifier}");
 
         let mut conn = self.connection_pool.clone();
         // Use Redis sliding window rate limiting
@@ -293,7 +292,7 @@ impl RedisService {
         update_type: &str,
         data: serde_json::Value,
     ) -> Result<()> {
-        let channel = format!("bounty_updates:{}", bounty_id);
+        let channel = format!("bounty_updates:{bounty_id}");
         let message = serde_json::json!({
             "bounty_id": bounty_id,
             "update_type": update_type,
@@ -321,7 +320,7 @@ impl RedisService {
         reputation_score: f64,
         ttl_seconds: u64,
     ) -> Result<()> {
-        let key = format!("engine_reputation:{}", engine_id);
+        let key = format!("engine_reputation:{engine_id}");
 
         let mut conn = self.connection_pool.clone();
         let _: () = conn
@@ -337,7 +336,7 @@ impl RedisService {
     }
 
     pub async fn get_engine_reputation(&self, engine_id: &str) -> Result<Option<f64>> {
-        let key = format!("engine_reputation:{}", engine_id);
+        let key = format!("engine_reputation:{engine_id}");
 
         let mut conn = self.connection_pool.clone();
         let reputation: Option<f64> = conn
@@ -355,7 +354,7 @@ impl RedisService {
         member: &str,
         score: f64,
     ) -> Result<()> {
-        let key = format!("leaderboard:{}", leaderboard_name);
+        let key = format!("leaderboard:{leaderboard_name}");
 
         let mut conn = self.connection_pool.clone();
         let _: () = conn
@@ -371,7 +370,7 @@ impl RedisService {
         leaderboard_name: &str,
         limit: isize,
     ) -> Result<Vec<(String, f64)>> {
-        let key = format!("leaderboard:{}", leaderboard_name);
+        let key = format!("leaderboard:{leaderboard_name}");
 
         let mut conn = self.connection_pool.clone();
         let results: Vec<(String, f64)> = conn
@@ -438,7 +437,7 @@ impl RedisService {
     /// Push item to queue (FIFO using RPUSH/LPOP)
     /// Uses Redis list as a queue
     pub async fn push_to_queue(&self, queue_name: &str, item: &str) -> Result<()> {
-        let key = format!("queue:{}", queue_name);
+        let key = format!("queue:{queue_name}");
 
         let mut conn = self.connection_pool.clone();
         let _: () = conn
@@ -452,7 +451,7 @@ impl RedisService {
 
     /// Pop item from queue (FIFO using LPOP)
     pub async fn pop_from_queue(&self, queue_name: &str) -> Result<Option<String>> {
-        let key = format!("queue:{}", queue_name);
+        let key = format!("queue:{queue_name}");
 
         let mut conn = self.connection_pool.clone();
         let item: Option<String> = conn
@@ -479,12 +478,15 @@ impl RedisService {
             .await
             .context("Failed to queue analysis")?;
 
-        info!("Queued analysis: {} with priority: {}", analysis_id, priority);
+        info!(
+            "Queued analysis: {} with priority: {}",
+            analysis_id, priority
+        );
         Ok(())
     }
 
-    /// Dequeue highest priority analysis
-    /// Pops item with highest score from sorted set
+    // Dequeue highest priority analysis
+    // Pops item with highest score from sorted set
     // pub async fn dequeue_analysis(&self) -> Result<Option<uuid::Uuid>> {
     //     let key = "queue:analysis";
 
@@ -512,9 +514,9 @@ impl RedisService {
         file_hash: &str,
         file_info: &crate::handlers::submission::FileInfo,
     ) -> Result<()> {
-        let key = format!("file_info:{}", file_hash);
-        let serialized = serde_json::to_string(file_info)
-            .context("Failed to serialize file info")?;
+        let key = format!("file_info:{file_hash}");
+        let serialized =
+            serde_json::to_string(file_info).context("Failed to serialize file info")?;
 
         let mut conn = self.connection_pool.clone();
         let _: () = conn
@@ -531,7 +533,7 @@ impl RedisService {
         &self,
         file_hash: &str,
     ) -> Result<Option<crate::handlers::submission::FileInfo>> {
-        let key = format!("file_info:{}", file_hash);
+        let key = format!("file_info:{file_hash}");
 
         let mut conn = self.connection_pool.clone();
         let cached: Option<String> = conn
@@ -542,8 +544,7 @@ impl RedisService {
         match cached {
             Some(data) => {
                 let file_info: crate::handlers::submission::FileInfo =
-                    serde_json::from_str(&data)
-                        .context("Failed to deserialize file info")?;
+                    serde_json::from_str(&data).context("Failed to deserialize file info")?;
                 Ok(Some(file_info))
             }
             None => Ok(None),
@@ -556,9 +557,9 @@ impl RedisService {
         submission_id: uuid::Uuid,
         submission: &crate::handlers::submission::SubmissionResponse,
     ) -> Result<()> {
-        let key = format!("submission:{}", submission_id);
-        let serialized = serde_json::to_string(submission)
-            .context("Failed to serialize submission")?;
+        let key = format!("submission:{submission_id}");
+        let serialized =
+            serde_json::to_string(submission).context("Failed to serialize submission")?;
 
         let mut conn = self.connection_pool.clone();
         let _: () = conn
@@ -576,9 +577,9 @@ impl RedisService {
         submission_id: uuid::Uuid,
         submission: &crate::handlers::submission::DetailedSubmissionResponse,
     ) -> Result<()> {
-        let key = format!("submission:detailed:{}", submission_id);
-        let serialized = serde_json::to_string(submission)
-            .context("Failed to serialize detailed submission")?;
+        let key = format!("submission:detailed:{submission_id}");
+        let serialized =
+            serde_json::to_string(submission).context("Failed to serialize detailed submission")?;
 
         let mut conn = self.connection_pool.clone();
         let _: () = conn
@@ -595,7 +596,7 @@ impl RedisService {
         &self,
         submission_id: uuid::Uuid,
     ) -> Result<Option<crate::handlers::submission::SubmissionResponse>> {
-        let key = format!("submission:{}", submission_id);
+        let key = format!("submission:{submission_id}");
 
         let mut conn = self.connection_pool.clone();
         let cached: Option<String> = conn
@@ -606,8 +607,7 @@ impl RedisService {
         match cached {
             Some(data) => {
                 let submission: crate::handlers::submission::SubmissionResponse =
-                    serde_json::from_str(&data)
-                        .context("Failed to deserialize submission")?;
+                    serde_json::from_str(&data).context("Failed to deserialize submission")?;
                 Ok(Some(submission))
             }
             None => Ok(None),
@@ -619,7 +619,7 @@ impl RedisService {
         &self,
         submission_id: uuid::Uuid,
     ) -> Result<Option<crate::handlers::submission::DetailedSubmissionResponse>> {
-        let key = format!("submission:detailed:{}", submission_id);
+        let key = format!("submission:detailed:{submission_id}");
 
         let mut conn = self.connection_pool.clone();
         let cached: Option<String> = conn
@@ -667,7 +667,12 @@ impl RedisService {
     }
 
     /// Set a raw string value with TTL (in seconds)
-    pub async fn set_raw_with_ttl(&self, key: String, value: String, ttl_seconds: u64) -> Result<()> {
+    pub async fn set_raw_with_ttl(
+        &self,
+        key: String,
+        value: String,
+        ttl_seconds: u64,
+    ) -> Result<()> {
         let mut conn = self.connection_pool.clone();
         let _: () = conn
             .set_ex(&key, value, ttl_seconds)

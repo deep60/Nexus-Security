@@ -2,18 +2,12 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
-    routing::{get, post, put},
-    Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::models::{
-    bounty::Bounty,
-    user::User,
-};
+use crate::models::bounty::Bounty;
 use crate::AppState;
 
 // Request/Response DTOs
@@ -129,22 +123,35 @@ pub async fn create_bounty(
         })?;
 
     // Submit on-chain createBounty
-    let reward_amount = ethers::types::U256::from_dec_str(&bounty.reward_amount).unwrap_or_default();
-    let deadline_ts = bounty.deadline
+    let reward_amount =
+        ethers::types::U256::from_dec_str(&bounty.reward_amount).unwrap_or_default();
+    let deadline_ts = bounty
+        .deadline
         .map(|d| ethers::types::U256::from(d.timestamp() as u64))
         .unwrap_or(ethers::types::U256::from(
-            (chrono::Utc::now() + chrono::Duration::hours(24)).timestamp() as u64
+            (chrono::Utc::now() + chrono::Duration::hours(24)).timestamp() as u64,
         ));
 
     // Derive artifact hash from the submission's file hash when available
-    let artifact_hash = match state.db.get_submission_file_hash(request.submission_id).await {
+    let artifact_hash = match state
+        .db
+        .get_submission_file_hash(request.submission_id)
+        .await
+    {
         Ok(Some(hash)) => hash,
         Ok(None) => {
-            tracing::debug!("No file hash found for submission {}, using empty hash", request.submission_id);
+            tracing::debug!(
+                "No file hash found for submission {}, using empty hash",
+                request.submission_id
+            );
             String::new()
         }
         Err(e) => {
-            tracing::warn!("Failed to fetch file hash for submission {}: {}", request.submission_id, e);
+            tracing::warn!(
+                "Failed to fetch file hash for submission {}: {}",
+                request.submission_id,
+                e
+            );
             String::new()
         }
     };
@@ -160,10 +167,17 @@ pub async fn create_bounty(
 
     match state.blockchain.create_bounty(bc_params).await {
         Ok((tx_hash, on_chain_id)) => {
-            let hash_str = format!("{:?}", tx_hash);
+            let hash_str = format!("{tx_hash:?}");
             let chain_id = on_chain_id.as_u64() as i64;
-            if let Err(e) = state.db.update_bounty_on_chain_id(bounty.id, &hash_str, chain_id).await {
-                tracing::warn!("Bounty created on-chain but failed to store on_chain_id: {}", e);
+            if let Err(e) = state
+                .db
+                .update_bounty_on_chain_id(bounty.id, &hash_str, chain_id)
+                .await
+            {
+                tracing::warn!(
+                    "Bounty created on-chain but failed to store on_chain_id: {}",
+                    e
+                );
             }
             tracing::info!("Bounty {} mapped to on-chain ID {}", bounty.id, chain_id);
         }
@@ -220,14 +234,19 @@ pub async fn submit_analysis(
     use ethers::types::U256;
 
     // Look up the real on-chain bounty ID from DB
-    let on_chain_id = state.db.get_bounty_on_chain_id(bounty_id)
+    let on_chain_id = state
+        .db
+        .get_bounty_on_chain_id(bounty_id)
         .await
         .map_err(|e| {
             tracing::error!("DB error looking up on_chain_id: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?
         .ok_or_else(|| {
-            tracing::error!("Bounty {} has no on_chain_id — not yet confirmed on-chain", bounty_id);
+            tracing::error!(
+                "Bounty {} has no on_chain_id — not yet confirmed on-chain",
+                bounty_id
+            );
             StatusCode::PRECONDITION_FAILED
         })?;
 
@@ -244,14 +263,17 @@ pub async fn submit_analysis(
         verdict,
         confidence: U256::from((request.confidence * 100.0) as u64),
         stake_amount: U256::from(request.stake_amount),
-        analysis_hash: serde_json::to_string(&request.analysis_details)
-            .unwrap_or_default(),
+        analysis_hash: serde_json::to_string(&request.analysis_details).unwrap_or_default(),
     };
 
-    let tx_hash = state.blockchain.submit_analysis(params).await.map_err(|e| {
-        tracing::error!("Failed to submit analysis on-chain: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let _tx_hash = state
+        .blockchain
+        .submit_analysis(params)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to submit analysis on-chain: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(Json(SubmissionResponse {
         id: Uuid::new_v4(),
@@ -271,23 +293,32 @@ pub async fn finalize_bounty(
 ) -> Result<StatusCode, StatusCode> {
     use ethers::types::U256;
 
-    let chain_id = state.db.get_bounty_on_chain_id(bounty_id)
+    let chain_id = state
+        .db
+        .get_bounty_on_chain_id(bounty_id)
         .await
         .map_err(|e| {
             tracing::error!("DB error looking up on_chain_id: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?
         .ok_or_else(|| {
-            tracing::error!("Bounty {} has no on_chain_id — not yet confirmed on-chain", bounty_id);
+            tracing::error!(
+                "Bounty {} has no on_chain_id — not yet confirmed on-chain",
+                bounty_id
+            );
             StatusCode::PRECONDITION_FAILED
         })?;
 
     let on_chain_id = U256::from(chain_id as u64);
 
-    state.blockchain.resolve_bounty(on_chain_id).await.map_err(|e| {
-        tracing::error!("Failed to finalize bounty on-chain: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    state
+        .blockchain
+        .resolve_bounty(on_chain_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to finalize bounty on-chain: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(StatusCode::OK)
 }
@@ -299,7 +330,10 @@ pub async fn update_bounty(
     Path(bounty_id): Path<Uuid>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    let bounty = state.db.get_bounty_by_id(bounty_id).await
+    let bounty = state
+        .db
+        .get_bounty_by_id(bounty_id)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
@@ -340,7 +374,10 @@ pub async fn cancel_bounty(
     claims: crate::middleware::auth::Claims,
     Path(bounty_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    let bounty = state.db.get_bounty_by_id(bounty_id).await
+    let bounty = state
+        .db
+        .get_bounty_by_id(bounty_id)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
@@ -352,7 +389,10 @@ pub async fn cancel_bounty(
         return Err(StatusCode::CONFLICT);
     }
 
-    state.db.update_bounty_status(bounty_id, "cancelled").await
+    state
+        .db
+        .update_bounty_status(bounty_id, "cancelled")
+        .await
         .map_err(|e| {
             tracing::error!("Failed to cancel bounty: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
@@ -368,7 +408,10 @@ pub async fn extend_bounty(
     Path(bounty_id): Path<Uuid>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    let bounty = state.db.get_bounty_by_id(bounty_id).await
+    let bounty = state
+        .db
+        .get_bounty_by_id(bounty_id)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
@@ -376,7 +419,8 @@ pub async fn extend_bounty(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let new_deadline = payload.get("deadline")
+    let new_deadline = payload
+        .get("deadline")
         .and_then(|v| v.as_str())
         .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
         .map(|d| d.with_timezone(&chrono::Utc))
@@ -409,7 +453,10 @@ pub async fn claim_reward(
     claims: crate::middleware::auth::Claims,
     Path(bounty_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    let bounty = state.db.get_bounty_by_id(bounty_id).await
+    let bounty = state
+        .db
+        .get_bounty_by_id(bounty_id)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
@@ -417,7 +464,10 @@ pub async fn claim_reward(
         return Err(StatusCode::CONFLICT);
     }
 
-    let chain_id = state.db.get_bounty_on_chain_id(bounty_id).await
+    let chain_id = state
+        .db
+        .get_bounty_on_chain_id(bounty_id)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::PRECONDITION_FAILED)?;
 
@@ -435,20 +485,22 @@ pub async fn get_bounty_stats(
     State(state): State<crate::AppState>,
     Path(bounty_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    let _bounty = state.db.get_bounty_by_id(bounty_id).await
+    let _bounty = state
+        .db
+        .get_bounty_by_id(bounty_id)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let submissions: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM analysis_results WHERE bounty_id = $1"
-    )
-    .bind(bounty_id)
-    .fetch_one(state.db.pool())
-    .await
-    .unwrap_or(0);
+    let submissions: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM analysis_results WHERE bounty_id = $1")
+            .bind(bounty_id)
+            .fetch_one(state.db.pool())
+            .await
+            .unwrap_or(0);
 
     let participants: i64 = sqlx::query_scalar(
-        "SELECT COUNT(DISTINCT engine_id) FROM analysis_results WHERE bounty_id = $1"
+        "SELECT COUNT(DISTINCT engine_id) FROM analysis_results WHERE bounty_id = $1",
     )
     .bind(bounty_id)
     .fetch_one(state.db.pool())
@@ -467,11 +519,10 @@ pub async fn get_bounty_stats(
 pub async fn list_active_bounties(
     State(state): State<crate::AppState>,
 ) -> Result<Json<Vec<Bounty>>, StatusCode> {
-    let bounties = state.db.get_active_bounties(50, 0).await
-        .map_err(|e| {
-            tracing::error!("Failed to fetch active bounties: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let bounties = state.db.get_active_bounties(50, 0).await.map_err(|e| {
+        tracing::error!("Failed to fetch active bounties: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
     Ok(Json(bounties))
 }
 
@@ -485,7 +536,7 @@ pub async fn list_completed_bounties(
         WHERE bounty_status = 'completed'
         ORDER BY completed_at DESC NULLS LAST
         LIMIT 50
-        "#
+        "#,
     )
     .fetch_all(state.db.pool())
     .await

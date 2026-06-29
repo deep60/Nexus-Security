@@ -1,5 +1,4 @@
 use axum::{
-    body::Body,
     extract::{Request, State},
     http::{header, StatusCode},
     middleware::Next,
@@ -11,7 +10,6 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::{AuthService, Claims};
-use crate::config::JwtConfig;
 use crate::AppState;
 
 /// Extract user claims from Authorization header
@@ -124,7 +122,9 @@ impl IntoResponse for AuthError {
             AuthError::InvalidFormat => (StatusCode::UNAUTHORIZED, "Invalid authorization format"),
             AuthError::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid or expired token"),
             AuthError::InvalidTokenType => (StatusCode::UNAUTHORIZED, "Invalid token type"),
-            AuthError::InsufficientPermissions => (StatusCode::FORBIDDEN, "Insufficient permissions"),
+            AuthError::InsufficientPermissions => {
+                (StatusCode::FORBIDDEN, "Insufficient permissions")
+            }
         };
 
         let body = Json(json!({

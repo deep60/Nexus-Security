@@ -1,8 +1,8 @@
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use chrono::{DateTime, Utc, Duration};
-use uuid::Uuid;
 use tracing::{info, warn};
+use uuid::Uuid;
 
 use crate::models::ReputationModel;
 
@@ -30,11 +30,11 @@ pub enum ThreatVerdict {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ReputationTier {
-    Novice,     // 0-100 score
-    Skilled,    // 101-500 score
-    Expert,     // 501-1000 score
-    Master,     // 1001-2500 score
-    Legendary,  // 2500+ score
+    Novice,    // 0-100 score
+    Skilled,   // 101-500 score
+    Expert,    // 501-1000 score
+    Master,    // 1001-2500 score
+    Legendary, // 2500+ score
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,8 +64,10 @@ impl ReputationService {
     /// Register a new engine in the reputation system (persists to DB).
     pub async fn register_engine(&self, engine_id: String) -> Result<(), ReputationError> {
         // Check if already registered
-        if let Some(_) = ReputationModel::find_by_id(&self.db, &engine_id).await
+        if ReputationModel::find_by_id(&self.db, &engine_id)
+            .await
             .map_err(|e| ReputationError::DatabaseError(e.to_string()))?
+            .is_some()
         {
             return Err(ReputationError::EngineAlreadyExists);
         }
@@ -328,11 +330,26 @@ mod tests {
 
     #[test]
     fn test_tier_calculation() {
-        assert_eq!(ReputationService::calculate_tier(50.0), ReputationTier::Novice);
-        assert_eq!(ReputationService::calculate_tier(200.0), ReputationTier::Skilled);
-        assert_eq!(ReputationService::calculate_tier(750.0), ReputationTier::Expert);
-        assert_eq!(ReputationService::calculate_tier(2000.0), ReputationTier::Master);
-        assert_eq!(ReputationService::calculate_tier(3000.0), ReputationTier::Legendary);
+        assert_eq!(
+            ReputationService::calculate_tier(50.0),
+            ReputationTier::Novice
+        );
+        assert_eq!(
+            ReputationService::calculate_tier(200.0),
+            ReputationTier::Skilled
+        );
+        assert_eq!(
+            ReputationService::calculate_tier(750.0),
+            ReputationTier::Expert
+        );
+        assert_eq!(
+            ReputationService::calculate_tier(2000.0),
+            ReputationTier::Master
+        );
+        assert_eq!(
+            ReputationService::calculate_tier(3000.0),
+            ReputationTier::Legendary
+        );
     }
 
     #[test]

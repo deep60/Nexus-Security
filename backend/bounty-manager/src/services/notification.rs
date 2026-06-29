@@ -39,7 +39,10 @@ impl NotificationService {
     }
 
     /// Send a notification to a user
-    pub async fn send_notification(&self, notification: Notification) -> Result<(), NotificationError> {
+    pub async fn send_notification(
+        &self,
+        notification: Notification,
+    ) -> Result<(), NotificationError> {
         // Notification delivery is currently log-only. Production would dispatch
         // to email, WebSocket, or push notification providers here.
         tracing::info!(
@@ -62,7 +65,7 @@ impl NotificationService {
             recipient: creator.to_string(),
             notification_type: NotificationType::BountyCreated,
             title: "Bounty Created".to_string(),
-            message: format!("Your bounty '{}' has been created successfully", title),
+            message: format!("Your bounty '{title}' has been created successfully"),
             data: Some(serde_json::json!({ "bounty_id": bounty_id })),
             created_at: chrono::Utc::now(),
         };
@@ -82,7 +85,7 @@ impl NotificationService {
             recipient: creator.to_string(),
             notification_type: NotificationType::SubmissionReceived,
             title: "New Submission".to_string(),
-            message: format!("A new submission from {} has been received", engine_id),
+            message: format!("A new submission from {engine_id} has been received"),
             data: Some(serde_json::json!({ "bounty_id": bounty_id, "engine_id": engine_id })),
             created_at: chrono::Utc::now(),
         };
@@ -103,7 +106,7 @@ impl NotificationService {
                 recipient: participant,
                 notification_type: NotificationType::ConsensusReached,
                 title: "Consensus Reached".to_string(),
-                message: format!("Consensus has been reached with verdict: {}", verdict),
+                message: format!("Consensus has been reached with verdict: {verdict}"),
                 data: Some(serde_json::json!({ "bounty_id": bounty_id, "verdict": verdict })),
                 created_at: chrono::Utc::now(),
             };
@@ -126,7 +129,7 @@ impl NotificationService {
             recipient: recipient.to_string(),
             notification_type: NotificationType::PayoutProcessed,
             title: "Payout Processed".to_string(),
-            message: format!("Your payout of {} has been processed", amount),
+            message: format!("Your payout of {amount} has been processed"),
             data: Some(serde_json::json!({ "amount": amount, "tx_hash": transaction_hash })),
             created_at: chrono::Utc::now(),
         };

@@ -1,20 +1,20 @@
 // backend/bounty-manager/src/handlers/validation.rs
 
+use super::bounty_crud::PaginationParams;
+use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
+use crate::handlers::submission::{AnalysisDetails, Submission};
+use crate::models::{BountyModel, SubmissionModel, ValidationResultModel};
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
     Extension,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use shared::types::ApiResponse;
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use shared::types::ApiResponse;
-use super::bounty_crud::PaginationParams;
-use crate::handlers::bounty_crud::{BountyManagerState, ThreatVerdict};
-use crate::handlers::submission::{Submission, AnalysisDetails};
-use crate::models::{SubmissionModel, BountyModel, ValidationResultModel};
 
 /// Validation result for a submission
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,19 +35,19 @@ pub struct ValidationResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ValidatorType {
-    Automated,     // Automated validation system
-    Human,         // Manual review by expert
-    Hybrid,        // Combination of both
+    Automated, // Automated validation system
+    Human,     // Manual review by expert
+    Hybrid,    // Combination of both
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ValidationStatus {
-    Pending,       // Awaiting validation
-    Validating,    // Currently being validated
-    Passed,        // All checks passed
+    Pending,            // Awaiting validation
+    Validating,         // Currently being validated
+    Passed,             // All checks passed
     PassedWithWarnings, // Passed but has minor issues
-    Failed,        // Critical issues found
-    RequiresReview, // Needs human review
+    Failed,             // Critical issues found
+    RequiresReview,     // Needs human review
 }
 
 /// Individual validation check performed
@@ -129,10 +129,10 @@ pub enum IssueType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IssueSeverity {
-    Minor,      // Can be ignored
-    Moderate,   // Should be addressed
-    Major,      // Must be fixed
-    Critical,   // Submission should be rejected
+    Minor,    // Can be ignored
+    Moderate, // Should be addressed
+    Major,    // Must be fixed
+    Critical, // Submission should be rejected
 }
 
 /// Submission quality metrics
@@ -158,10 +158,10 @@ pub struct ValidationRules {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AnalysisDepthLevel {
-    Basic,      // Minimal analysis
-    Standard,   // Normal depth
-    Detailed,   // Comprehensive analysis
-    Expert,     // Deep dive analysis
+    Basic,    // Minimal analysis
+    Standard, // Normal depth
+    Detailed, // Comprehensive analysis
+    Expert,   // Deep dive analysis
 }
 
 // Request/Response DTOs
@@ -246,29 +246,37 @@ pub async fn validate_submission(
     if db_sub.engine_id == validator_id {
         tracing::warn!(
             "Validator {} cannot validate their own submission {}",
-            validator_id, req.submission_id
+            validator_id,
+            req.submission_id
         );
         return Err(StatusCode::FORBIDDEN);
     }
 
     // Check if already validated and if revalidation is needed
     if !req.force_revalidation.unwrap_or(false) {
-        let existing = ValidationResultModel::find_latest_by_submission(&state.db, req.submission_id)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to check existing validation: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+        let existing =
+            ValidationResultModel::find_latest_by_submission(&state.db, req.submission_id)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to check existing validation: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
 
         if let Some(existing_result) = existing {
-            tracing::info!("Submission {} already validated (id: {}), returning cached result", req.submission_id, existing_result.id);
+            tracing::info!(
+                "Submission {} already validated (id: {}), returning cached result",
+                req.submission_id,
+                existing_result.id
+            );
             let result = db_validation_to_handler_result(existing_result);
             return Ok(Json(ApiResponse::success(result)));
         }
     }
 
     // Get validation rules (use provided or default)
-    let rules = req.validation_rules.unwrap_or_else(get_default_validation_rules);
+    let rules = req
+        .validation_rules
+        .unwrap_or_else(get_default_validation_rules);
 
     // Parse analysis details from the stored JSON
     let analysis_details: AnalysisDetails = serde_json::from_value(db_sub.analysis_details.clone())
@@ -345,7 +353,7 @@ pub async fn list_validations(
     let per_page = pagination.per_page.unwrap_or(20).min(100);
     let offset = ((page.saturating_sub(1)) * per_page) as i64;
 
-    let status_str = filters.status.as_ref().map(|s| format!("{:?}", s));
+    let status_str = filters.status.as_ref().map(|s| format!("{s:?}"));
 
     let db_results = ValidationResultModel::list(
         &state.db,
@@ -362,16 +370,13 @@ pub async fn list_validations(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    let total_count = ValidationResultModel::count(
-        &state.db,
-        filters.bounty_id,
-        status_str.as_deref(),
-    )
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to count validations: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })? as usize;
+    let total_count =
+        ValidationResultModel::count(&state.db, filters.bounty_id, status_str.as_deref())
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to count validations: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })? as usize;
 
     let validations: Vec<ValidationResult> = db_results
         .into_iter()
@@ -398,7 +403,9 @@ pub async fn bulk_validate_submissions(
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    let rules = req.validation_rules.unwrap_or_else(get_default_validation_rules);
+    let rules = req
+        .validation_rules
+        .unwrap_or_else(get_default_validation_rules);
     let mut results = Vec::new();
     let mut passed = 0;
     let mut failed = 0;
@@ -409,7 +416,10 @@ pub async fn bulk_validate_submissions(
         let db_sub = match SubmissionModel::find_by_id(&state.db, *submission_id).await {
             Ok(Some(sub)) => sub,
             Ok(None) => {
-                tracing::warn!("Submission {} not found during bulk validation", submission_id);
+                tracing::warn!(
+                    "Submission {} not found during bulk validation",
+                    submission_id
+                );
                 continue;
             }
             Err(e) => {
@@ -418,8 +428,9 @@ pub async fn bulk_validate_submissions(
             }
         };
 
-        let analysis_details: AnalysisDetails = serde_json::from_value(db_sub.analysis_details.clone())
-            .unwrap_or_else(|_| default_analysis_details());
+        let analysis_details: AnalysisDetails =
+            serde_json::from_value(db_sub.analysis_details.clone())
+                .unwrap_or_else(|_| default_analysis_details());
 
         let bounty_min_stake = BountyModel::find_by_id(&state.db, db_sub.bounty_id)
             .await
@@ -429,7 +440,8 @@ pub async fn bulk_validate_submissions(
             .unwrap_or(1000);
 
         let submission = db_sub_to_submission(db_sub, analysis_details);
-        let result = perform_validation(&submission, &rules, validator_id.clone(), bounty_min_stake);
+        let result =
+            perform_validation(&submission, &rules, validator_id.clone(), bounty_min_stake);
 
         match result.validation_status {
             ValidationStatus::Passed => passed += 1,
@@ -540,7 +552,10 @@ pub async fn revalidate_submission(
         _ => "Pending",
     };
     if let Err(e) = SubmissionModel::update_status(&state.db, submission_id, new_status).await {
-        tracing::error!("Failed to update submission status after revalidation: {}", e);
+        tracing::error!(
+            "Failed to update submission status after revalidation: {}",
+            e
+        );
     }
 
     Ok(Json(ApiResponse::success(validation_result)))
@@ -570,7 +585,9 @@ fn perform_validation(
             field: Some("required_fields".to_string()),
             message: "Missing required fields".to_string(),
             details: "Submission must include all required fields".to_string(),
-            suggested_fix: Some("Ensure verdict, confidence, and analysis_details are provided".to_string()),
+            suggested_fix: Some(
+                "Ensure verdict, confidence, and analysis_details are provided".to_string(),
+            ),
         });
     }
 
@@ -583,7 +600,10 @@ fn perform_validation(
             severity: IssueSeverity::Major,
             field: Some("confidence".to_string()),
             message: "Confidence value out of range".to_string(),
-            details: format!("Confidence must be between 0.0 and 1.0, got {}", submission.confidence),
+            details: format!(
+                "Confidence must be between 0.0 and 1.0, got {}",
+                submission.confidence
+            ),
             suggested_fix: Some("Provide a valid confidence value between 0.0 and 1.0".to_string()),
         });
     }
@@ -598,7 +618,10 @@ fn perform_validation(
             field: Some("analysis_details".to_string()),
             message: "Insufficient analysis depth".to_string(),
             details: "Analysis lacks required detail and depth".to_string(),
-            suggested_fix: Some("Provide more comprehensive analysis including behavioral and static data".to_string()),
+            suggested_fix: Some(
+                "Provide more comprehensive analysis including behavioral and static data"
+                    .to_string(),
+            ),
         });
         recommendations.push("Include more detailed threat indicators".to_string());
     }
@@ -612,8 +635,11 @@ fn perform_validation(
             severity: IssueSeverity::Major,
             field: Some("verdict".to_string()),
             message: "Verdict doesn't align with evidence".to_string(),
-            details: "The stated verdict is inconsistent with the analysis details provided".to_string(),
-            suggested_fix: Some("Review analysis and ensure verdict matches the evidence".to_string()),
+            details: "The stated verdict is inconsistent with the analysis details provided"
+                .to_string(),
+            suggested_fix: Some(
+                "Review analysis and ensure verdict matches the evidence".to_string(),
+            ),
         });
     }
 
@@ -654,7 +680,8 @@ fn perform_validation(
 
     // Add general recommendations
     if quality_score < 0.8 {
-        recommendations.push("Consider providing more detailed analysis to improve quality score".to_string());
+        recommendations
+            .push("Consider providing more detailed analysis to improve quality score".to_string());
     }
 
     ValidationResult {
@@ -689,8 +716,9 @@ fn check_required_fields(submission: &Submission) -> ValidationCheck {
         passed,
         severity: CheckSeverity::Critical,
         description: "Verify all required fields are present".to_string(),
-        details: Some(format!("Verdict: {}, Confidence: {}, Analysis: {}",
-            has_verdict, has_confidence, has_analysis)),
+        details: Some(format!(
+            "Verdict: {has_verdict}, Confidence: {has_confidence}, Analysis: {has_analysis}"
+        )),
         execution_time_ms: 5,
     }
 }
@@ -709,7 +737,10 @@ fn check_confidence_reasonable(submission: &Submission) -> ValidationCheck {
     }
 }
 
-fn check_analysis_depth(submission: &Submission, _min_depth: &AnalysisDepthLevel) -> ValidationCheck {
+fn check_analysis_depth(
+    submission: &Submission,
+    _min_depth: &AnalysisDepthLevel,
+) -> ValidationCheck {
     let details = &submission.analysis_details;
 
     // Score based on completeness
@@ -719,13 +750,16 @@ fn check_analysis_depth(submission: &Submission, _min_depth: &AnalysisDepthLevel
     let has_static = details.static_analysis.is_some();
     let has_network = details.network_analysis.is_some();
 
-    let completeness_count = vec![
+    let completeness_count = [
         has_malware_families,
         has_threat_indicators,
         has_behavioral,
         has_static,
         has_network,
-    ].iter().filter(|&&x| x).count();
+    ]
+    .iter()
+    .filter(|&&x| x)
+    .count();
 
     // Require at least 3 out of 5 for standard depth
     let passed = completeness_count >= 3;
@@ -736,7 +770,9 @@ fn check_analysis_depth(submission: &Submission, _min_depth: &AnalysisDepthLevel
         passed,
         severity: CheckSeverity::Medium,
         description: "Verify analysis has sufficient depth and detail".to_string(),
-        details: Some(format!("Analysis components present: {}/5", completeness_count)),
+        details: Some(format!(
+            "Analysis components present: {completeness_count}/5"
+        )),
         execution_time_ms: 15,
     }
 }
@@ -746,7 +782,9 @@ fn check_verdict_alignment(submission: &Submission) -> ValidationCheck {
 
     // Simple heuristic: if verdict is Malicious, should have threat indicators
     let passed = match submission.verdict {
-        ThreatVerdict::Malicious => !details.threat_indicators.is_empty() || !details.malware_families.is_empty(),
+        ThreatVerdict::Malicious => {
+            !details.threat_indicators.is_empty() || !details.malware_families.is_empty()
+        }
         ThreatVerdict::Benign => true, // For now, always pass for benign
         ThreatVerdict::Suspicious => !details.threat_indicators.is_empty(),
         ThreatVerdict::Unknown => true, // Unknown can have any indicators
@@ -758,8 +796,11 @@ fn check_verdict_alignment(submission: &Submission) -> ValidationCheck {
         passed,
         severity: CheckSeverity::High,
         description: "Ensure verdict matches the provided evidence".to_string(),
-        details: Some(format!("Verdict: {:?}, Indicators: {}",
-            submission.verdict, details.threat_indicators.len())),
+        details: Some(format!(
+            "Verdict: {:?}, Indicators: {}",
+            submission.verdict,
+            details.threat_indicators.len()
+        )),
         execution_time_ms: 10,
     }
 }
@@ -774,7 +815,10 @@ fn check_stake_requirements(submission: &Submission, bounty_min_stake: u64) -> V
         passed,
         severity: CheckSeverity::Critical,
         description: "Verify stake meets minimum requirements".to_string(),
-        details: Some(format!("Stake: {}, Required: {}", submission.stake_amount, bounty_min_stake)),
+        details: Some(format!(
+            "Stake: {}, Required: {}",
+            submission.stake_amount, bounty_min_stake
+        )),
         execution_time_ms: 3,
     }
 }
@@ -797,21 +841,43 @@ fn check_security_issues(submission: &Submission) -> ValidationCheck {
         passed: !suspicious,
         severity: CheckSeverity::Critical,
         description: "Detect potential malicious data or injection attempts".to_string(),
-        details: Some(if suspicious { "Suspicious patterns detected".to_string() } else { "No issues found".to_string() }),
+        details: Some(if suspicious {
+            "Suspicious patterns detected".to_string()
+        } else {
+            "No issues found".to_string()
+        }),
         execution_time_ms: 8,
     }
 }
 
-fn calculate_quality_metrics(submission: &Submission, checks: &[ValidationCheck]) -> QualityMetrics {
+fn calculate_quality_metrics(
+    submission: &Submission,
+    checks: &[ValidationCheck],
+) -> QualityMetrics {
     let total_checks = checks.len() as f32;
     let passed_checks = checks.iter().filter(|c| c.passed).count() as f32;
-    let overall_score = if total_checks > 0.0 { passed_checks / total_checks } else { 0.0 };
+    let overall_score = if total_checks > 0.0 {
+        passed_checks / total_checks
+    } else {
+        0.0
+    };
 
     // Calculate individual scores
-    let completeness_score = if submission.confidence > 0.0 { 0.9 } else { 0.5 };
+    let completeness_score = if submission.confidence > 0.0 {
+        0.9
+    } else {
+        0.5
+    };
     let accuracy_score = overall_score; // Simplified
     let detail_score = (submission.analysis_details.threat_indicators.len() as f32 / 5.0).min(1.0);
-    let consistency_score = if checks.iter().any(|c| c.check_type == ValidationCheckType::VerdictAlignedWithEvidence && c.passed) { 1.0 } else { 0.5 };
+    let consistency_score = if checks
+        .iter()
+        .any(|c| c.check_type == ValidationCheckType::VerdictAlignedWithEvidence && c.passed)
+    {
+        1.0
+    } else {
+        0.5
+    };
     let timeliness_score = 1.0; // Timeliness is checked at the bounty level
 
     QualityMetrics {
@@ -831,15 +897,17 @@ fn determine_validation_status(
     rules: &ValidationRules,
 ) -> ValidationStatus {
     // Check for critical failures
-    let has_critical_issues = issues.iter().any(|i| matches!(i.severity, IssueSeverity::Critical));
+    let has_critical_issues = issues
+        .iter()
+        .any(|i| matches!(i.severity, IssueSeverity::Critical));
     if has_critical_issues {
         return ValidationStatus::Failed;
     }
 
     // Check critical checks
-    let critical_check_failed = checks.iter().any(|c|
-        matches!(c.severity, CheckSeverity::Critical) && !c.passed
-    );
+    let critical_check_failed = checks
+        .iter()
+        .any(|c| matches!(c.severity, CheckSeverity::Critical) && !c.passed);
     if critical_check_failed {
         return ValidationStatus::Failed;
     }
@@ -850,13 +918,17 @@ fn determine_validation_status(
     }
 
     // Check for major issues
-    let has_major_issues = issues.iter().any(|i| matches!(i.severity, IssueSeverity::Major));
+    let has_major_issues = issues
+        .iter()
+        .any(|i| matches!(i.severity, IssueSeverity::Major));
     if has_major_issues {
         return ValidationStatus::PassedWithWarnings;
     }
 
     // Check for moderate issues
-    let has_moderate_issues = issues.iter().any(|i| matches!(i.severity, IssueSeverity::Moderate));
+    let has_moderate_issues = issues
+        .iter()
+        .any(|i| matches!(i.severity, IssueSeverity::Moderate));
     if has_moderate_issues {
         return ValidationStatus::PassedWithWarnings;
     }
@@ -974,7 +1046,8 @@ fn db_validation_to_handler_result(db: ValidationResultModel) -> ValidationResul
         issues_found: serde_json::from_value(db.issues_found).unwrap_or_default(),
         recommendations: serde_json::from_value(db.recommendations).unwrap_or_default(),
         validated_at: db.validated_at,
-        metadata: db.metadata
+        metadata: db
+            .metadata
             .and_then(|v| serde_json::from_value(v).ok())
             .unwrap_or_default(),
     }

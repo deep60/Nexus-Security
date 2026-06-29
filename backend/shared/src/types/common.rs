@@ -1,7 +1,7 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 // Core identifier types
 pub type UserId = Uuid;
@@ -17,11 +17,12 @@ pub type BlockNumber = u64;
 pub type TokenAmount = u128; // Wei amount for precision
 
 // Analysis types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum ThreatVerdict {
     Malicious,
     Benign,
     Suspicious,
+    #[default]
     Unknown,
 }
 
@@ -420,30 +421,29 @@ pub const MIN_STAKE_AMOUNT: TokenAmount = 1_000_000_000_000_000_000; // 1 token 
 pub const MAX_ANALYSIS_TIME: u64 = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 // Helper functions
-impl ThreatVerdict {
-    pub fn from_str(s: &str) -> Result<Self, String> {
+impl std::str::FromStr for ThreatVerdict {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "malicious" => Ok(ThreatVerdict::Malicious),
             "benign" => Ok(ThreatVerdict::Benign),
             "suspicious" => Ok(ThreatVerdict::Suspicious),
             "unknown" => Ok(ThreatVerdict::Unknown),
-            _ => Err(format!("Invalid threat verdict: {}", s)),
-        }
-    }
-    
-    pub fn to_string(&self) -> String {
-        match self {
-            ThreatVerdict::Malicious => "malicious".to_string(),
-            ThreatVerdict::Benign => "benign".to_string(),
-            ThreatVerdict::Suspicious => "suspicious".to_string(),
-            ThreatVerdict::Unknown => "unknown".to_string(),
+            _ => Err(format!("Invalid threat verdict: {s}")),
         }
     }
 }
 
-impl Default for ThreatVerdict {
-    fn default() -> Self {
-        ThreatVerdict::Unknown
+impl std::fmt::Display for ThreatVerdict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ThreatVerdict::Malicious => "malicious",
+            ThreatVerdict::Benign => "benign",
+            ThreatVerdict::Suspicious => "suspicious",
+            ThreatVerdict::Unknown => "unknown",
+        };
+        write!(f, "{s}")
     }
 }
 
@@ -462,13 +462,13 @@ impl AnalysisTarget {
 pub enum CommonError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
-    
+
     #[error("Validation failed: {0}")]
     ValidationFailed(String),
-    
+
     #[error("Serialization error: {0}")]
     SerializationError(String),
-    
+
     #[error("Parsing error: {0}")]
     ParseError(String),
 }

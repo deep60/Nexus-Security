@@ -1,23 +1,20 @@
 use axum::{
-    extract::{Query, State},
+    extract::State,
     http::{HeaderMap, StatusCode},
     response::Json,
     routing::{get, post},
     Router,
 };
-use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
-use std::sync::Arc;
-use uuid::Uuid;
-use chrono::{DateTime, Utc, Duration};
-use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
+use chrono::{DateTime, Duration, Utc};
 use ethers::core::types::Signature;
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::models::user::User;
-use crate::services::database::DatabaseService;
 use crate::utils::crypto::{hash_password, verify_password};
 use crate::utils::{ApiError, ApiResult};
-use crate::{AppState, ApiResponse};
+use crate::{ApiResponse, AppState};
 
 pub fn auth_routes() -> Router<AppState> {
     Router::new()
@@ -31,10 +28,9 @@ pub fn auth_routes() -> Router<AppState> {
         .route("/wallet/disconnect", post(disconnect_wallet))
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,          // user_id
+    pub sub: String, // user_id
     pub wallet_address: Option<String>,
     pub exp: usize,
     pub iat: usize,
@@ -151,7 +147,11 @@ pub async fn register(
     }
 
     // Validate username format (alphanumeric and underscores only)
-    if !payload.username.chars().all(|c| c.is_alphanumeric() || c == '_') {
+    if !payload
+        .username
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_')
+    {
         return Err(ApiError::Validation(
             "Username can only contain letters, numbers, and underscores".to_string(),
         ));
@@ -179,7 +179,7 @@ pub async fn register(
 
     // Hash Password
     let password_hash = hash_password(&payload.password)
-        .map_err(|e| ApiError::Internal(format!("Password hashing failed: {}", e)))?;
+        .map_err(|e| ApiError::Internal(format!("Password hashing failed: {e}")))?;
 
     // Create User
     let user_id = Uuid::new_v4();
@@ -188,7 +188,7 @@ pub async fn register(
         INSERT INTO users (id, username, email, password_hash, wallet_address, created_at)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
-        "#
+        "#,
     )
     .bind(user_id)
     .bind(&payload.username)
@@ -206,14 +206,14 @@ pub async fn register(
         user: user.into(),
         access_token,
         refresh_token,
-        expires_in: 3600      // 1 hour
+        expires_in: 3600, // 1 hour
     };
 
     Ok(Json(ApiResponse::success(response)))
 }
 
 pub async fn login(
-    State(state): State<AppState>, 
+    State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
 ) -> ApiResult<Json<ApiResponse<AuthResponse>>> {
     // Find user by username or email
@@ -225,7 +225,7 @@ pub async fn login(
 
     // Verify Password
     if !verify_password(&payload.password, &user.password_hash)
-        .map_err(|e| ApiError::Internal(format!("Password verification failed: {}", e)))? 
+        .map_err(|e| ApiError::Internal(format!("Password verification failed: {e}")))?
     {
         return Err(ApiError::Unauthorized);
     }
@@ -244,11 +244,11 @@ pub async fn login(
         user: user.into(),
         access_token,
         refresh_token,
-        expires_in: 3600
+        expires_in: 3600,
     };
 
     Ok(Json(ApiResponse::success(response)))
-} 
+}
 
 pub async fn logout(
     headers: HeaderMap,
@@ -266,24 +266,24 @@ pub async fn logout(
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_err(|_| ApiError::Internal("System time error".to_string()))?
                 .as_secs() as i64;
-            
+
             let ttl = (exp as i64 - now).max(0) as usize;
-            
+
             if ttl > 0 {
                 // Store token in Redis blacklist
-                let blacklist_key = format!("jwt_blacklist:{}", token);
+                let blacklist_key = format!("jwt_blacklist:{token}");
 
                 // Use Redis SETEX to store token with TTL
                 let mut conn = state.redis.connection_pool.clone();
-                
+
                 let _: () = redis::cmd("SETEX")
                     .arg(&blacklist_key)
                     .arg(ttl)
                     .arg("blacklisted")
                     .query_async(&mut conn)
                     .await
-                    .map_err(|e| ApiError::Internal(format!("Failed to blacklist token: {}", e)))?;
-                
+                    .map_err(|e| ApiError::Internal(format!("Failed to blacklist token: {e}")))?;
+
                 // Also remove from active sessions
                 let mut sessions = state.active_sessions.write().await;
                 sessions.remove(&claims.sub);
@@ -294,7 +294,7 @@ pub async fn logout(
                 "Successfully logged out".to_string(),
             )))
         }
-        Err(e) => {
+        Err(_e) => {
             // Token invalid or expired - still consider logout success for UX
             Ok(Json(ApiResponse::success_with_message(
                 (),
@@ -310,7 +310,7 @@ pub async fn refresh_token(
 ) -> ApiResult<Json<ApiResponse<AuthResponse>>> {
     // Decode refresh token
     let claims = decode_token(&payload.refresh_token, &state.config.security.jwt_secret)?;
-    
+
     // Get user from database
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| ApiError::BadRequest("Invalid user ID in token".to_string()))?;
@@ -335,8 +335,8 @@ pub async fn refresh_token(
 }
 
 pub async fn verify_token(
-    headers: HeaderMap, 
-    State(state): State<AppState>, 
+    headers: HeaderMap,
+    State(state): State<AppState>,
 ) -> ApiResult<Json<ApiResponse<UserResponse>>> {
     let token = extract_token_from_header(&headers)?;
     let claims = decode_token(&token, &state.config.security.jwt_secret)?;
@@ -354,8 +354,8 @@ pub async fn verify_token(
 }
 
 pub async fn get_profile(
-    headers: HeaderMap, 
-    State(state): State<AppState>, 
+    headers: HeaderMap,
+    State(state): State<AppState>,
 ) -> ApiResult<Json<ApiResponse<UserResponse>>> {
     let user = authenticate_user(&headers, &state).await?;
     Ok(Json(ApiResponse::success(user.into())))
@@ -369,7 +369,11 @@ pub async fn collect_wallet(
     let mut user = authenticate_user(&headers, &state).await?;
 
     // Verify wallet signature ()
-    if !verify_wallet_signature(&payload.wallet_address, &payload.signature, &payload.message) {
+    if !verify_wallet_signature(
+        &payload.wallet_address,
+        &payload.signature,
+        &payload.message,
+    ) {
         return Err(ApiError::BadRequest("Invalid wallet signature".to_string()));
     }
 
@@ -424,10 +428,10 @@ fn generate_tokens(user: &User, secret: &str) -> ApiResult<(String, String)> {
 
     let encoding_key = EncodingKey::from_secret(secret.as_ref());
     let access_token = encode(&Header::default(), &claims_access, &encoding_key)
-        .map_err(|e| ApiError::Internal(format!("Token generation failed: {}", e)))?;
+        .map_err(|e| ApiError::Internal(format!("Token generation failed: {e}")))?;
 
     let refresh_token = encode(&Header::default(), &claims_refresh, &encoding_key)
-        .map_err(|e| ApiError::Internal(format!("Token generation failed: {}", e)))?;
+        .map_err(|e| ApiError::Internal(format!("Token generation failed: {e}")))?;
 
     Ok((access_token, refresh_token))
 }
@@ -435,7 +439,7 @@ fn generate_tokens(user: &User, secret: &str) -> ApiResult<(String, String)> {
 fn decode_token(token: &str, secret: &str) -> ApiResult<Claims> {
     let decoding_key = DecodingKey::from_secret(secret.as_ref());
     let validation = Validation::default();
-    
+
     decode::<Claims>(token, &decoding_key, &validation)
         .map(|data| data.claims)
         .map_err(|_| ApiError::Unauthorized)
@@ -484,7 +488,7 @@ fn verify_wallet_signature(address: &str, signature: &str, message: &str) -> boo
     };
 
     // Compare recovered address to claimed address (case-insensitive hex comparison)
-    let recovered_hex = format!("{:?}", recovered); // "0x..." lowercase
+    let recovered_hex = format!("{recovered:?}"); // "0x..." lowercase
     recovered_hex.eq_ignore_ascii_case(address)
 }
 
@@ -501,7 +505,7 @@ pub async fn verify_email(
     // Look up verification token in Redis
     let user_id_str = state
         .redis
-        .get_raw(format!("email_verify:{}", token))
+        .get_raw(format!("email_verify:{token}"))
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::BAD_REQUEST)?;
@@ -516,7 +520,10 @@ pub async fn verify_email(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Clean up token
-    let _ = state.redis.delete_raw(format!("email_verify:{}", token)).await;
+    let _ = state
+        .redis
+        .delete_raw(format!("email_verify:{token}"))
+        .await;
 
     Ok(Json(serde_json::json!({
         "success": true,
@@ -547,7 +554,7 @@ pub async fn forgot_password(
         let _ = state
             .redis
             .set_raw_with_ttl(
-                format!("password_reset:{}", reset_token),
+                format!("password_reset:{reset_token}"),
                 user.id.to_string(),
                 3600,
             )
@@ -584,16 +591,16 @@ pub async fn reset_password(
     // Validate reset token
     let user_id_str = state
         .redis
-        .get_raw(format!("password_reset:{}", token))
+        .get_raw(format!("password_reset:{token}"))
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::BAD_REQUEST)?;
 
-    let user_id = Uuid::parse_str(&user_id_str).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let _user_id = Uuid::parse_str(&user_id_str).map_err(|_| StatusCode::BAD_REQUEST)?;
 
     // Hash the new password
-    let password_hash = hash_password(new_password)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let password_hash =
+        hash_password(new_password).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Update password
     sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
@@ -603,7 +610,10 @@ pub async fn reset_password(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Invalidate the reset token
-    let _ = state.redis.delete_raw(format!("password_reset:{}", token)).await;
+    let _ = state
+        .redis
+        .delete_raw(format!("password_reset:{token}"))
+        .await;
 
     Ok(Json(serde_json::json!({
         "success": true,

@@ -4,13 +4,11 @@ use axum::{
     extract::{FromRequestParts, State},
     http::{header, Request, StatusCode},
     middleware::Next,
-    response::{IntoResponse, Response},
-    Json,
+    response::Response,
 };
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::models::error::ApiError;
@@ -76,13 +74,13 @@ impl JwtService {
 
     pub fn generate_token(&self, claims: &Claims) -> Result<String, ApiError> {
         encode(&Header::default(), claims, &self.encoding_key)
-            .map_err(|e| ApiError::Internal(format!("Failed to generate token: {}", e)))
+            .map_err(|e| ApiError::Internal(format!("Failed to generate token: {e}")))
     }
 
     pub fn validate_token(&self, token: &str) -> Result<Claims, ApiError> {
         decode::<Claims>(token, &self.decoding_key, &self.validation)
             .map(|data| data.claims)
-            .map_err(|e| ApiError::Unauthorized(format!("Invalid token: {}", e)))
+            .map_err(|e| ApiError::Unauthorized(format!("Invalid token: {e}")))
     }
 
     pub fn refresh_token(&self, old_claims: &Claims) -> Result<String, ApiError> {
@@ -147,8 +145,7 @@ pub async fn optional_auth_middleware(
         .and_then(|h| h.to_str().ok());
 
     if let Some(header) = auth_header {
-        if header.starts_with("Bearer ") {
-            let token = &header[7..];
+        if let Some(token) = header.strip_prefix("Bearer ") {
             let jwt_service = JwtService::new(&state.config.security.jwt_secret);
 
             if let Ok(claims) = jwt_service.validate_token(token) {
@@ -161,7 +158,7 @@ pub async fn optional_auth_middleware(
 }
 
 /// Admin role middleware (must be used after auth_middleware)
-pub async fn require_admin(mut request: Request<Body>, next: Next) -> Result<Response, StatusCode> {
+pub async fn require_admin(request: Request<Body>, next: Next) -> Result<Response, StatusCode> {
     let claims = request
         .extensions()
         .get::<Claims>()
@@ -192,7 +189,7 @@ pub async fn api_key_middleware(
     }
 
     // Hash the API key and look it up in the database
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     let key_hash = format!("{:x}", Sha256::digest(api_key.as_bytes()));
 
     let row: Option<(Uuid, String, String)> = sqlx::query_as(

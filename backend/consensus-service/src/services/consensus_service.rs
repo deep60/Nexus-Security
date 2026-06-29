@@ -172,7 +172,7 @@ impl ConsensusService {
         // Best-effort cache invalidation of the cached response.
         let mut conn = self.redis_conn.clone();
         let _: Result<(), _> = redis::cmd("DEL")
-            .arg(format!("consensus:{}", bounty_id))
+            .arg(format!("consensus:{bounty_id}"))
             .query_async(&mut conn)
             .await;
 
@@ -189,10 +189,7 @@ impl ConsensusService {
     }
 
     /// Read a previously stored consensus result for a bounty.
-    pub async fn get_stored(
-        &self,
-        bounty_id: Uuid,
-    ) -> ConsensusResult<Option<ConsensusResponse>> {
+    pub async fn get_stored(&self, bounty_id: Uuid) -> ConsensusResult<Option<ConsensusResponse>> {
         let row = sqlx::query_as::<_, ResultRow>(
             r#"
             SELECT bounty_id, final_verdict, confidence, total_submissions,

@@ -20,8 +20,12 @@ fn err_response(e: ConsensusError) -> (StatusCode, Json<Value>) {
 }
 
 fn parse_uuid(s: &str) -> Result<Uuid, (StatusCode, Json<Value>)> {
-    Uuid::parse_str(s)
-        .map_err(|_| (StatusCode::BAD_REQUEST, Json(json!({ "error": "invalid id" }))))
+    Uuid::parse_str(s).map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid id" })),
+        )
+    })
 }
 
 /// Extract the acting user from the `x-user-id` header (set by the gateway),

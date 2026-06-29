@@ -452,7 +452,7 @@ jobs:
         run: |
           echo "Deploying services: $SERVICES"
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd /opt/verdyx && git pull origin main && docker-compose pull $SERVICES && docker-compose up -d $SERVICES && docker system prune -af --filter until=24h"
+            "cd /opt/verdyx && git pull origin main && docker compose pull $SERVICES && docker compose up -d $SERVICES && docker system prune -af --filter until=24h"
 
       - name: Health check
         run: |

@@ -1,47 +1,34 @@
+// Pre-production scaffolding: some items are intentionally unused while
+// features are wired up. This crate-level allow keeps `clippy -D warnings`
+// green without deleting code we are about to use. Remove before GA.
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use axum::{
-    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
+    extract::{DefaultBodyLimit, State},
     http::{header, StatusCode},
-    middleware::{self as axum_middleware, Next},
-    response::{IntoResponse, Json, Response},
-    routing::{get, post},
-    Router,
+    middleware::Next,
+    response::Response,
 };
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::SystemTime};
 use tokio::{net::TcpListener, sync::RwLock};
-use tower::ServiceBuilder;
-use tower_http::{
-    cors::CorsLayer,
-    limit::RequestBodyLimitLayer,
-    trace::TraceLayer,
-};
-use tracing::{debug, error, info, warn};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 mod config;
 mod handlers;
 mod middleware;
-use middleware::metrics::{metrics_middleware, MetricsCollector};
+use middleware::metrics::MetricsCollector;
 mod models;
 mod routes;
 mod services;
 mod utils;
 
 use config::AppConfig;
-use handlers::{auth, health, reputation, user};
-use models::{analysis::AnalysisResult, bounty::Bounty, user::User};
 use services::{blockchain::BlockchainService, database::DatabaseService, redis::RedisService};
-use utils::{crypto::JwtClaims, validation::ValidationError};
 
 use crate::models::response::ApiResponse;
-
-use crate::utils::helpers::current_timestamp;
 
 // Application state shared across handlers
 #[derive(Clone)]
@@ -81,7 +68,7 @@ async fn auth_middleware(
     if let Some(auth_header) = auth_header {
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
             // Check if token is blacklisted
-            let blacklist_key = format!("jwt_blacklist:{}", token);
+            let blacklist_key = format!("jwt_blacklist:{token}");
             {
                 let mut conn = state.redis.connection_pool.clone();
                 let is_blacklisted: Option<String> = redis::cmd("GET")
@@ -90,7 +77,7 @@ async fn auth_middleware(
                     .await
                     .ok()
                     .flatten();
-                
+
                 if is_blacklisted.is_some() {
                     warn!("Attempted use of blacklisted token");
                     return Err(StatusCode::UNAUTHORIZED);
@@ -151,9 +138,6 @@ async fn logging_middleware(request: axum::extract::Request, next: Next) -> Resp
     );
     response
 }
-
-
-
 
 // Initialize services
 async fn initialize_services(
@@ -221,10 +205,7 @@ async fn main() -> Result<()> {
         .compact()
         .init();
 
-    info!(
-        "Starting Verdyx API Gateway v{}",
-        env!("CARGO_PKG_VERSION")
-    );
+    info!("Starting Verdyx API Gateway v{}", env!("CARGO_PKG_VERSION"));
 
     // Load configuration
     let config = load_config()?;
@@ -247,7 +228,12 @@ async fn main() -> Result<()> {
     };
 
     // Create CORS layer from config
-    let allowed_origins: Vec<_> = state.config.security.cors.allowed_origins.iter()
+    let allowed_origins: Vec<_> = state
+        .config
+        .security
+        .cors
+        .allowed_origins
+        .iter()
         .filter_map(|origin| origin.parse::<axum::http::HeaderValue>().ok())
         .collect();
 

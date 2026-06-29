@@ -1,11 +1,15 @@
-use axum::{extract::{Multipart, State}, http::StatusCode, Json};
+use axum::{
+    extract::{Multipart, State},
+    http::StatusCode,
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::AppState;
 use crate::db::repository;
 use crate::models::{CreateSubmissionRequest, SubmissionType};
 use crate::queue::publisher;
+use crate::AppState;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileSubmissionResponse {
@@ -24,25 +28,25 @@ const MAX_FILE_SIZE: usize = 100 * 1024 * 1024;
 
 // Allowed MIME types for analysis
 const ALLOWED_MIME_TYPES: &[&str] = &[
-    "application/x-msdownload",  // .exe
-    "application/x-dosexec",     // .exe
+    "application/x-msdownload",                      // .exe
+    "application/x-dosexec",                         // .exe
     "application/vnd.microsoft.portable-executable", // .exe
-    "application/x-executable",  // executable
-    "application/x-elf",         // ELF
-    "application/x-mach-binary", // Mach-O
-    "application/pdf",           // PDF
-    "application/zip",           // ZIP
-    "application/x-zip-compressed", // ZIP
-    "application/x-rar-compressed", // RAR
-    "application/x-7z-compressed",  // 7z
-    "application/java-archive",  // JAR
-    "application/vnd.android.package-archive", // APK
-    "application/x-sh",          // Shell scripts
-    "application/x-python-code", // Python
-    "text/x-python",             // Python
-    "application/javascript",    // JavaScript
-    "text/javascript",           // JavaScript
-    "application/octet-stream",  // Generic binary
+    "application/x-executable",                      // executable
+    "application/x-elf",                             // ELF
+    "application/x-mach-binary",                     // Mach-O
+    "application/pdf",                               // PDF
+    "application/zip",                               // ZIP
+    "application/x-zip-compressed",                  // ZIP
+    "application/x-rar-compressed",                  // RAR
+    "application/x-7z-compressed",                   // 7z
+    "application/java-archive",                      // JAR
+    "application/vnd.android.package-archive",       // APK
+    "application/x-sh",                              // Shell scripts
+    "application/x-python-code",                     // Python
+    "text/x-python",                                 // Python
+    "application/javascript",                        // JavaScript
+    "text/javascript",                               // JavaScript
+    "application/octet-stream",                      // Generic binary
 ];
 
 /// Handle file upload submission
@@ -61,17 +65,14 @@ pub async fn submit_file(
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid multipart: {}", e)))?
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid multipart: {e}")))?
     {
         let field_name = field.name().unwrap_or("unknown").to_string();
         tracing::debug!("Processing field: {}", field_name);
 
         if field_name == "file" {
             // Get filename
-            filename = field
-                .file_name()
-                .unwrap_or("unknown")
-                .to_string();
+            filename = field.file_name().unwrap_or("unknown").to_string();
 
             // Get content type
             content_type = field.content_type().map(|s| s.to_string());
@@ -80,14 +81,22 @@ pub async fn submit_file(
             let data = field
                 .bytes()
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to read file: {}", e)))?
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Failed to read file: {e}"),
+                    )
+                })?
                 .to_vec();
 
             // Validate file size
             if data.len() > MAX_FILE_SIZE {
                 return Err((
                     StatusCode::PAYLOAD_TOO_LARGE,
-                    format!("File too large. Maximum size is {} MB", MAX_FILE_SIZE / (1024 * 1024)),
+                    format!(
+                        "File too large. Maximum size is {} MB",
+                        MAX_FILE_SIZE / (1024 * 1024)
+                    ),
                 ));
             }
 
@@ -106,7 +115,10 @@ pub async fn submit_file(
 
     // Validate content type if provided
     if let Some(ref ct) = content_type {
-        if !ALLOWED_MIME_TYPES.iter().any(|&allowed| ct.contains(allowed)) {
+        if !ALLOWED_MIME_TYPES
+            .iter()
+            .any(|&allowed| ct.contains(allowed))
+        {
             tracing::warn!("Potentially unsupported MIME type: {}", ct);
             // Don't reject, just warn - we'll analyze it anyway
         }
@@ -123,7 +135,7 @@ pub async fn submit_file(
     let submission_id = Uuid::new_v4().to_string();
 
     // Generate S3 key: submissions/{submission_id}/{filename}
-    let s3_key = format!("submissions/{}/{}", submission_id, filename);
+    let s3_key = format!("submissions/{submission_id}/{filename}");
 
     // Upload file to S3/MinIO
     let file_hash = state
@@ -132,7 +144,10 @@ pub async fn submit_file(
         .await
         .map_err(|e| {
             tracing::error!("Failed to upload file to S3: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to store file: {}", e))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to store file: {e}"),
+            )
         })?;
 
     tracing::info!(
@@ -167,7 +182,7 @@ pub async fn submit_file(
 
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to create submission record: {}", e),
+                format!("Failed to create submission record: {e}"),
             ));
         }
     };

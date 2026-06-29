@@ -4,13 +4,13 @@ const MAX_FILE_SIZE: usize = 100 * 1024 * 1024; // 100 MB
 
 pub fn validate_file_size(size: usize) -> Result<(), String> {
     if size > MAX_FILE_SIZE {
-        return Err(format!("File size {} exceeds maximum {}", size, MAX_FILE_SIZE));
+        return Err(format!("File size {size} exceeds maximum {MAX_FILE_SIZE}"));
     }
     Ok(())
 }
 
 pub fn validate_file_type(filename: &str) -> Result<(), String> {
-    let allowed_extensions = vec![
+    let allowed_extensions = [
         "exe", "dll", "pdf", "doc", "docx", "zip", "rar", "apk", "elf", "so",
     ];
 
@@ -23,7 +23,7 @@ pub fn validate_file_type(filename: &str) -> Result<(), String> {
     if allowed_extensions.contains(&extension.as_str()) {
         Ok(())
     } else {
-        Err(format!("File type '{}' is not allowed", extension))
+        Err(format!("File type '{extension}' is not allowed"))
     }
 }
 

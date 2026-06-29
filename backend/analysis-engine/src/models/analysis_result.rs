@@ -239,10 +239,7 @@ pub struct AnalysisResult {
 }
 
 impl AnalysisResult {
-    pub fn new(
-        submission_id: Uuid,
-        file_metadata: FileMetadata,
-    ) -> Self {
+    pub fn new(submission_id: Uuid, file_metadata: FileMetadata) -> Self {
         Self {
             analysis_id: Uuid::new_v4(),
             submission_id,
@@ -285,7 +282,7 @@ impl AnalysisResult {
 
         for detection in &self.detections {
             total_confidence += detection.confidence;
-            
+
             match detection.verdict {
                 ThreatVerdict::Malicious => malicious_count += 1,
                 ThreatVerdict::Benign => benign_count += 1,
@@ -314,11 +311,10 @@ impl AnalysisResult {
     pub fn mark_completed(&mut self) {
         self.completed_at = Some(Utc::now());
         self.status = AnalysisStatus::Completed;
-        
+
         if let Some(completed) = self.completed_at {
-            self.total_processing_time_ms = Some(
-                (completed - self.started_at).num_milliseconds() as u64
-            );
+            self.total_processing_time_ms =
+                Some((completed - self.started_at).num_milliseconds() as u64);
         }
     }
 
@@ -329,7 +325,7 @@ impl AnalysisResult {
     }
 
     pub fn is_high_confidence_malicious(&self) -> bool {
-        matches!(self.consensus_verdict, ThreatVerdict::Malicious) 
+        matches!(self.consensus_verdict, ThreatVerdict::Malicious)
             && self.consensus_confidence >= 0.8
     }
 
@@ -369,7 +365,7 @@ impl Default for AnalysisResult {
                 entropy: None,
                 magic_bytes: None,
                 executable_info: None,
-            }
+            },
         )
     }
 }

@@ -1,12 +1,12 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use redis::AsyncCommands;
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
+use uuid::Uuid;
 
-use crate::analyzers::{AnalysisEngine, FileAnalysisRequest, AnalysisOptions};
+use crate::analyzers::{AnalysisEngine, AnalysisOptions, FileAnalysisRequest};
 use crate::storage::S3Client;
 
 /// Redis queue key for analysis tasks
@@ -87,18 +87,18 @@ async fn pop_from_queue(redis_client: &redis::Client) -> Result<Option<Uuid>> {
     let mut conn = redis_client
         .get_multiplexed_async_connection()
         .await
-        .map_err(|e| anyhow!("Failed to connect to Redis: {}", e))?;
+        .map_err(|e| anyhow!("Failed to connect to Redis: {e}"))?;
 
     // BRPOP with 5 second timeout
     let result: Option<(String, String)> = conn
         .brpop(ANALYSIS_QUEUE_KEY, 5.0)
         .await
-        .map_err(|e| anyhow!("BRPOP failed: {}", e))?;
+        .map_err(|e| anyhow!("BRPOP failed: {e}"))?;
 
     match result {
         Some((_key, value)) => {
-            let submission_id = Uuid::parse_str(&value)
-                .map_err(|e| anyhow!("Invalid UUID in queue: {}", e))?;
+            let submission_id =
+                Uuid::parse_str(&value).map_err(|e| anyhow!("Invalid UUID in queue: {e}"))?;
             Ok(Some(submission_id))
         }
         None => Ok(None), // Timeout
@@ -144,7 +144,7 @@ async fn process_submission(
     let file_data = s3_client
         .download_file(file_path)
         .await
-        .map_err(|e| anyhow!("Failed to download file from S3: {}", e))?;
+        .map_err(|e| anyhow!("Failed to download file from S3: {e}"))?;
 
     info!(
         "Downloaded file from S3: submission_id={}, size={} bytes",
@@ -169,7 +169,7 @@ async fn process_submission(
     let analysis_result = engine
         .analyze_file(analysis_request)
         .await
-        .map_err(|e| anyhow!("Analysis failed: {}", e))?;
+        .map_err(|e| anyhow!("Analysis failed: {e}"))?;
 
     drop(engine); // Release lock
 
@@ -230,7 +230,7 @@ async fn fetch_submission_from_db(db_pool: &PgPool, submission_id: Uuid) -> Resu
     .bind(submission_id)
     .fetch_one(db_pool)
     .await
-    .map_err(|e| anyhow!("Failed to fetch submission from database: {}", e))?;
+    .map_err(|e| anyhow!("Failed to fetch submission from database: {e}"))?;
 
     Ok(submission)
 }
@@ -252,7 +252,7 @@ async fn update_submission_status(
     .bind(submission_id)
     .execute(db_pool)
     .await
-    .map_err(|e| anyhow!("Failed to update submission status: {}", e))?;
+    .map_err(|e| anyhow!("Failed to update submission status: {e}"))?;
 
     info!("Updated submission {} status to: {}", submission_id, status);
     Ok(())
@@ -313,7 +313,7 @@ async fn store_analysis_results(
     .bind(submission_id)
     .execute(db_pool)
     .await
-    .map_err(|e| anyhow!("Failed to store analysis results: {}", e))?;
+    .map_err(|e| anyhow!("Failed to store analysis results: {e}"))?;
 
     // Store individual detection results in analysis_results table
     for detection in &analysis_result.detections {
@@ -342,7 +342,10 @@ async fn store_analysis_results(
         .execute(db_pool)
         .await
         {
-            warn!("Failed to store detection result for submission {}: {}", submission_id, e);
+            warn!(
+                "Failed to store detection result for submission {}: {}",
+                submission_id, e
+            );
         }
     }
 
@@ -363,14 +366,14 @@ async fn publish_ws_event(
     let mut conn = redis_client
         .get_multiplexed_async_connection()
         .await
-        .map_err(|e| anyhow!("Failed to connect to Redis: {}", e))?;
+        .map_err(|e| anyhow!("Failed to connect to Redis: {e}"))?;
 
     let message = serde_json::to_string(payload)
-        .map_err(|e| anyhow!("Failed to serialize WebSocket event: {}", e))?;
+        .map_err(|e| anyhow!("Failed to serialize WebSocket event: {e}"))?;
 
-    conn.publish(channel, message)
+    conn.publish::<_, _, ()>(channel, message)
         .await
-        .map_err(|e| anyhow!("Failed to publish WebSocket event: {}", e))?;
+        .map_err(|e| anyhow!("Failed to publish WebSocket event: {e}"))?;
 
     info!("Published WebSocket event to channel: {}", channel);
     Ok(())

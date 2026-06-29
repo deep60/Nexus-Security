@@ -2,7 +2,7 @@ use axum::{
     extract::{Path, State},
     Extension, Json,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -58,17 +58,16 @@ pub async fn upload_avatar(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Unauthorized("Invalid token".to_string()))?;
 
-    let storage = state.avatar_storage.as_ref().ok_or_else(|| {
-        AppError::InternalError("Avatar storage is not configured".to_string())
-    })?;
+    let storage = state
+        .avatar_storage
+        .as_ref()
+        .ok_or_else(|| AppError::InternalError("Avatar storage is not configured".to_string()))?;
 
     // Pull the first file field from the multipart body.
     let mut field_data: Option<(Vec<u8>, String)> = None;
-    while let Some(field) = multipart
-        .next_field()
-        .await
-        .map_err(|e| AppError::UserError(UserError::ValidationError(format!("invalid upload: {e}"))))?
-    {
+    if let Some(field) = multipart.next_field().await.map_err(|e| {
+        AppError::UserError(UserError::ValidationError(format!("invalid upload: {e}")))
+    })? {
         let content_type = field
             .content_type()
             .map(|s| s.to_string())
@@ -76,10 +75,11 @@ pub async fn upload_avatar(
         let data = field
             .bytes()
             .await
-            .map_err(|e| AppError::UserError(UserError::ValidationError(format!("read failed: {e}"))))?
+            .map_err(|e| {
+                AppError::UserError(UserError::ValidationError(format!("read failed: {e}")))
+            })?
             .to_vec();
         field_data = Some((data, content_type));
-        break;
     }
 
     let (data, content_type) = field_data.ok_or_else(|| {
@@ -105,7 +105,7 @@ pub async fn upload_avatar(
         "image/webp" => "webp",
         _ => "img",
     };
-    let key = format!("avatars/{}.{}", user_id, ext);
+    let key = format!("avatars/{user_id}.{ext}");
 
     let url = storage
         .upload_avatar(&key, data, &content_type)

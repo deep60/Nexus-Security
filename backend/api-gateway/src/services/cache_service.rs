@@ -1,12 +1,9 @@
 use anyhow::{Context, Result};
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
-use uuid::Uuid;
 
 use super::redis::RedisService;
 
@@ -168,8 +165,8 @@ impl CacheService {
                 stats.hits += 1;
             }
 
-            let entry: CacheEntry<T> = serde_json::from_str(&data)
-                .context("Failed to deserialize cache entry")?;
+            let entry: CacheEntry<T> =
+                serde_json::from_str(&data).context("Failed to deserialize cache entry")?;
 
             // Check if expired
             if entry.is_expired() {
@@ -217,8 +214,8 @@ impl CacheService {
         debug!("Cache SET: {} (TTL: {}s)", cache_key, ttl);
 
         let entry = CacheEntry::new(value, ttl);
-        let serialized = serde_json::to_string(&entry)
-            .context("Failed to serialize cache entry")?;
+        let serialized =
+            serde_json::to_string(&entry).context("Failed to serialize cache entry")?;
 
         let mut redis = self.redis.write().await;
         let _: () = redis
@@ -324,8 +321,16 @@ impl CacheService {
     }
 
     /// Invalidate multiple related cache entries
-    pub async fn invalidate_group(&self, prefix: CacheKeyPrefix, identifiers: Vec<&str>) -> Result<()> {
-        debug!("Invalidating cache group: {:?} ({} entries)", prefix.as_str(), identifiers.len());
+    pub async fn invalidate_group(
+        &self,
+        prefix: CacheKeyPrefix,
+        identifiers: Vec<&str>,
+    ) -> Result<()> {
+        debug!(
+            "Invalidating cache group: {:?} ({} entries)",
+            prefix.as_str(),
+            identifiers.len()
+        );
 
         for identifier in &identifiers {
             self.delete(prefix.clone(), identifier).await?;
@@ -368,7 +373,10 @@ impl CacheService {
             }
         }
 
-        info!("Cache warming complete: {}/{} entries warmed", warmed, total_entries);
+        info!(
+            "Cache warming complete: {}/{} entries warmed",
+            warmed, total_entries
+        );
         Ok(warmed)
     }
 

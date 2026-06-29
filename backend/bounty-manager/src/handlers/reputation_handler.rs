@@ -3,15 +3,15 @@ use axum::{
     http::StatusCode,
     response::Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashMap;
+use tracing::{error, info, warn};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use tracing::{info, warn, error};
 
-use crate::models::ReputationModel;
 use crate::handlers::bounty_crud::BountyManagerState;
+use crate::models::ReputationModel;
 
 // Reputation scoring weights and parameters
 const ACCURACY_WEIGHT: f64 = 0.40;
@@ -70,6 +70,7 @@ pub enum ReputationTier {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum ThreatCategory {
     Malware,
     Phishing,
@@ -147,14 +148,13 @@ fn calculate_tier_from_score(score: f64) -> ReputationTier {
 async fn calculate_consistency_score(pool: &PgPool, engine_id: &str) -> f64 {
     // Query the last 5 batches of 10 submissions each and compute accuracy variance.
     // If the engine has fewer than MIN_SUBMISSIONS_FOR_RELIABLE_SCORE, return neutral 0.5.
-    let row: Option<(Option<i32>,)> = sqlx::query_as(
-        "SELECT total_submissions FROM reputations WHERE engine_id = $1"
-    )
-    .bind(engine_id)
-    .fetch_optional(pool)
-    .await
-    .ok()
-    .flatten();
+    let row: Option<(Option<i32>,)> =
+        sqlx::query_as("SELECT total_submissions FROM reputations WHERE engine_id = $1")
+            .bind(engine_id)
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten();
 
     let total = row.and_then(|r| r.0).unwrap_or(0);
     if total < MIN_SUBMISSIONS_FOR_RELIABLE_SCORE {
@@ -204,9 +204,21 @@ fn db_to_engine_reputation(rep: &ReputationModel, consistency: f64) -> EngineRep
     let fp = incorrect / 2;
     let fn_ = incorrect - fp;
 
-    let precision = if correct + fp > 0 { correct as f64 / (correct + fp) as f64 } else { 0.0 };
-    let recall = if correct + fn_ > 0 { correct as f64 / (correct + fn_) as f64 } else { 0.0 };
-    let f1 = if precision + recall > 0.0 { 2.0 * precision * recall / (precision + recall) } else { 0.0 };
+    let precision = if correct + fp > 0 {
+        correct as f64 / (correct + fp) as f64
+    } else {
+        0.0
+    };
+    let recall = if correct + fn_ > 0 {
+        correct as f64 / (correct + fn_) as f64
+    } else {
+        0.0
+    };
+    let f1 = if precision + recall > 0.0 {
+        2.0 * precision * recall / (precision + recall)
+    } else {
+        0.0
+    };
 
     let timeliness = 0.7; // Default until we have per-submission timing in the model
     let specialization = 0.0; // Default until we track categories per engine
@@ -265,7 +277,10 @@ pub async fn update_reputation(
     let mut rep = match ReputationModel::find_by_id(&state.db, &engine_id_str).await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            info!("Creating new reputation entry for engine: {}", engine_id_str);
+            info!(
+                "Creating new reputation entry for engine: {}",
+                engine_id_str
+            );
             let now = Utc::now();
             let new_rep = ReputationModel {
                 engine_id: engine_id_str.clone(),
@@ -280,10 +295,12 @@ pub async fn update_reputation(
                 created_at: now,
                 updated_at: now,
             };
-            ReputationModel::create(&state.db, &new_rep).await.map_err(|e| {
-                error!("Failed to create reputation: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?
+            ReputationModel::create(&state.db, &new_rep)
+                .await
+                .map_err(|e| {
+                    error!("Failed to create reputation: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?
         }
         Err(e) => {
             error!("DB error fetching reputation: {}", e);
@@ -313,13 +330,18 @@ pub async fn update_reputation(
     let consistency = calculate_consistency_score(&state.db, &engine_id_str).await;
     let consistency_component = consistency * CONSISTENCY_WEIGHT * MAX_REPUTATION_SCORE;
     let timeliness_component = if update_req.response_time_minutes > 0.0 {
-        ((60.0 / update_req.response_time_minutes).min(1.0)) * TIMELINESS_WEIGHT * MAX_REPUTATION_SCORE
+        ((60.0 / update_req.response_time_minutes).min(1.0))
+            * TIMELINESS_WEIGHT
+            * MAX_REPUTATION_SCORE
     } else {
         TIMELINESS_WEIGHT * MAX_REPUTATION_SCORE
     };
 
-    let new_score = (100.0 + accuracy_component + volume_component
-        + consistency_component + timeliness_component)
+    let new_score = (100.0
+        + accuracy_component
+        + volume_component
+        + consistency_component
+        + timeliness_component)
         .min(MAX_REPUTATION_SCORE);
 
     // Apply penalty factor for poor accuracy
@@ -334,10 +356,12 @@ pub async fn update_reputation(
     rep.reputation_score = (new_score * penalty_factor) as f32;
     rep.updated_at = Utc::now();
 
-    ReputationModel::update(&state.db, &rep).await.map_err(|e| {
-        error!("Failed to update reputation: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    ReputationModel::update(&state.db, &rep)
+        .await
+        .map_err(|e| {
+            error!("Failed to update reputation: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     info!(
         "Reputation updated for engine {}: {:.2} -> {:.2} (change: {:.2})",
@@ -373,7 +397,10 @@ pub async fn get_engine_reputation(
     let consistency = calculate_consistency_score(&state.db, &engine_id_str).await;
     let engine_rep = db_to_engine_reputation(&rep, consistency);
 
-    info!("Found reputation for engine {}: score {:.2}", engine_id_str, rep.reputation_score);
+    info!(
+        "Found reputation for engine {}: score {:.2}",
+        engine_id_str, rep.reputation_score
+    );
     Ok(Json(engine_rep))
 }
 
@@ -388,12 +415,9 @@ pub async fn get_leaderboard(
 
     // Build dynamic query based on filters
     let mut sql = String::from("SELECT * FROM reputations WHERE 1=1");
-    let mut bind_idx = 1;
-    let mut binds: Vec<String> = Vec::new();
 
     if let Some(min_score) = query.min_score {
-        bind_idx += 1;
-        sql.push_str(&format!(" AND reputation_score >= {}", min_score));
+        sql.push_str(&format!(" AND reputation_score >= {min_score}"));
     }
 
     // Tier filtering via score ranges
@@ -406,10 +430,12 @@ pub async fn get_leaderboard(
             "Diamond" => (801.0, 1000.0),
             _ => (0.0, 1000.0),
         };
-        sql.push_str(&format!(" AND reputation_score >= {} AND reputation_score <= {}", low, high));
+        sql.push_str(&format!(
+            " AND reputation_score >= {low} AND reputation_score <= {high}"
+        ));
     }
 
-    sql.push_str(&format!(" ORDER BY reputation_score DESC LIMIT {}", limit));
+    sql.push_str(&format!(" ORDER BY reputation_score DESC LIMIT {limit}"));
 
     let records = sqlx::query_as::<_, ReputationModel>(&sql)
         .fetch_all(&state.db)
@@ -435,7 +461,10 @@ pub async fn get_leaderboard(
         last_updated: Utc::now(),
     };
 
-    info!("Returning leaderboard with {} engines (from {} total)", leaderboard.total_count, total_count.0);
+    info!(
+        "Returning leaderboard with {} engines (from {} total)",
+        leaderboard.total_count, total_count.0
+    );
     Ok(Json(leaderboard))
 }
 
@@ -482,12 +511,15 @@ pub async fn get_reputation_history(
         .collect();
 
     // Always include the current score as the most recent entry
-    score_history.insert(0, ScoreHistoryEntry {
-        timestamp: rep.updated_at,
-        score: rep.reputation_score as f64,
-        change_reason: "Current score".to_string(),
-        submission_id: None,
-    });
+    score_history.insert(
+        0,
+        ScoreHistoryEntry {
+            timestamp: rep.updated_at,
+            score: rep.reputation_score as f64,
+            change_reason: "Current score".to_string(),
+            submission_id: None,
+        },
+    );
 
     let milestones = generate_milestones_from_db(&rep);
 
@@ -529,7 +561,10 @@ pub async fn apply_reputation_decay(
         .unwrap_or((0,));
 
     let mut decay_stats = HashMap::new();
-    decay_stats.insert("engines_affected".to_string(), result.rows_affected() as u32);
+    decay_stats.insert(
+        "engines_affected".to_string(),
+        result.rows_affected() as u32,
+    );
     decay_stats.insert("total_engines".to_string(), total.0 as u32);
 
     info!(
@@ -551,7 +586,7 @@ pub async fn register_engine(
     let engine_name = req
         .get("name")
         .and_then(|n| n.as_str())
-        .unwrap_or(&format!("Engine-{}", engine_id))
+        .unwrap_or(&format!("Engine-{engine_id}"))
         .to_string();
 
     let now = Utc::now();
@@ -569,10 +604,12 @@ pub async fn register_engine(
         updated_at: now,
     };
 
-    let created = ReputationModel::create(&state.db, &new_rep).await.map_err(|e| {
-        error!("Failed to register engine: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let created = ReputationModel::create(&state.db, &new_rep)
+        .await
+        .map_err(|e| {
+            error!("Failed to register engine: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     info!(engine_id = %engine_id_str, name = %engine_name, "Registered new engine");
 

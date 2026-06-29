@@ -18,7 +18,11 @@ impl ConsensusAggregator {
         votes: &[SubmissionVote],
     ) -> (Verdict, Decimal, VerdictDistribution) {
         if votes.is_empty() {
-            return (Verdict::Unknown, Decimal::new(0, 0), VerdictDistribution::default());
+            return (
+                Verdict::Unknown,
+                Decimal::new(0, 0),
+                VerdictDistribution::default(),
+            );
         }
 
         let distribution = if self.config.weighted_voting {
@@ -28,7 +32,7 @@ impl ConsensusAggregator {
         };
 
         let (final_verdict, confidence) = self.determine_final_verdict(&distribution);
-        
+
         (final_verdict, confidence, distribution)
     }
 
@@ -38,10 +42,10 @@ impl ConsensusAggregator {
 
         for vote in votes {
             let weight = self.calculate_vote_weight(vote);
-            
+
             verdict_map
                 .entry(vote.verdict.to_string())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(WeightedVote {
                     engine_id: vote.engine_id.clone(),
                     weight,
@@ -55,7 +59,7 @@ impl ConsensusAggregator {
     /// Simple majority voting (one vote per submission)
     fn calculate_simple_majority(&self, votes: &[SubmissionVote]) -> VerdictDistribution {
         let mut verdict_counts: HashMap<String, usize> = HashMap::new();
-        
+
         for vote in votes {
             *verdict_counts.entry(vote.verdict.to_string()).or_insert(0) += 1;
         }
@@ -64,8 +68,9 @@ impl ConsensusAggregator {
         let total = votes.len() as f64;
 
         for (verdict_str, count) in verdict_counts {
-            let percentage = Decimal::try_from((count as f64 / total) * 100.0).unwrap_or(Decimal::new(0, 0));
-            
+            let percentage =
+                Decimal::try_from((count as f64 / total) * 100.0).unwrap_or(Decimal::new(0, 0));
+
             let voters: Vec<String> = votes
                 .iter()
                 .filter(|v| v.verdict.to_string() == verdict_str)
@@ -103,16 +108,18 @@ impl ConsensusAggregator {
     fn calculate_vote_weight(&self, vote: &SubmissionVote) -> Decimal {
         // Normalize reputation score (0-10000 range to 0-1)
         let reputation_factor = Decimal::from(vote.reputation_score) / Decimal::from(10000);
-        
+
         // Confidence factor (already 0-1)
         let confidence_factor = vote.confidence;
-        
+
         // Time factor (early submissions weighted slightly higher)
         let time_factor = Decimal::new(10, 1); // 1.0 for now, can be time-based
 
         // Weighted combination
-        let reputation_weight = Decimal::try_from(self.config.reputation_weight).unwrap_or(Decimal::new(5, 1));
-        let confidence_weight = Decimal::try_from(self.config.confidence_weight).unwrap_or(Decimal::new(3, 1));
+        let reputation_weight =
+            Decimal::try_from(self.config.reputation_weight).unwrap_or(Decimal::new(5, 1));
+        let confidence_weight =
+            Decimal::try_from(self.config.confidence_weight).unwrap_or(Decimal::new(3, 1));
         let time_weight = Decimal::try_from(self.config.time_weight).unwrap_or(Decimal::new(2, 1));
 
         let total_weight = reputation_factor * reputation_weight
@@ -129,7 +136,7 @@ impl ConsensusAggregator {
         _total_votes: usize,
     ) -> VerdictDistribution {
         let mut distribution = VerdictDistribution::default();
-        
+
         let total_weight: Decimal = verdict_map
             .values()
             .flat_map(|votes| votes.iter().map(|v| v.weight))
@@ -144,8 +151,8 @@ impl ConsensusAggregator {
                 Decimal::new(0, 0)
             };
 
-            let avg_confidence = weighted_votes.iter().map(|v| v.confidence).sum::<Decimal>()
-                / Decimal::from(count);
+            let avg_confidence =
+                weighted_votes.iter().map(|v| v.confidence).sum::<Decimal>() / Decimal::from(count);
 
             let voters: Vec<String> = weighted_votes.iter().map(|v| v.engine_id.clone()).collect();
 
@@ -217,9 +224,9 @@ impl ConsensusAggregator {
 
     /// Check if result can be disputed (low agreement)
     pub fn can_be_disputed(&self, agreement_score: Decimal) -> bool {
-        let dispute_threshold = Decimal::try_from(self.config.dispute_threshold * 100.0)
-            .unwrap_or(Decimal::new(40, 0));
-        
+        let dispute_threshold =
+            Decimal::try_from(self.config.dispute_threshold * 100.0).unwrap_or(Decimal::new(40, 0));
+
         agreement_score < dispute_threshold
     }
 }
@@ -253,7 +260,7 @@ mod tests {
     #[test]
     fn test_weighted_consensus() {
         let aggregator = ConsensusAggregator::new(test_config());
-        
+
         let votes = vec![
             SubmissionVote {
                 submission_id: Uuid::new_v4(),
@@ -285,7 +292,7 @@ mod tests {
         ];
 
         let (verdict, _confidence, distribution) = aggregator.calculate_consensus(&votes);
-        
+
         assert_eq!(verdict, Verdict::Malicious);
         assert!(distribution.malicious.count == 2);
         assert!(distribution.benign.count == 1);
@@ -296,7 +303,7 @@ mod tests {
         let mut config = test_config();
         config.weighted_voting = false;
         let aggregator = ConsensusAggregator::new(config);
-        
+
         let votes = vec![
             SubmissionVote {
                 submission_id: Uuid::new_v4(),

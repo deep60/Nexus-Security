@@ -4,7 +4,6 @@ use argon2::{
 };
 use chrono::{Duration, Utc};
 use ethers::core::types::Signature;
-use ethers::signers::{LocalWallet, Signer};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -15,7 +14,7 @@ use crate::models::{UserError, UserResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,        // User ID
+    pub sub: String, // User ID
     pub email: String,
     pub username: String,
     pub is_admin: bool,
@@ -49,7 +48,7 @@ impl AuthService {
 
         let password_hash = argon2
             .hash_password(password.as_bytes(), &salt)
-            .map_err(|e| UserError::ValidationError(format!("Failed to hash password: {}", e)))?
+            .map_err(|e| UserError::ValidationError(format!("Failed to hash password: {e}")))?
             .to_string();
 
         Ok(password_hash)
@@ -58,7 +57,7 @@ impl AuthService {
     /// Verify a password against a hash
     pub fn verify_password(&self, password: &str, password_hash: &str) -> UserResult<bool> {
         let parsed_hash = PasswordHash::new(password_hash)
-            .map_err(|e| UserError::ValidationError(format!("Invalid password hash: {}", e)))?;
+            .map_err(|e| UserError::ValidationError(format!("Invalid password hash: {e}")))?;
 
         let argon2 = Argon2::default();
 
@@ -90,7 +89,7 @@ impl AuthService {
         };
 
         encode(&Header::default(), &claims, &self.encoding_key)
-            .map_err(|e| UserError::AuthenticationError(format!("Failed to generate token: {}", e)))
+            .map_err(|e| UserError::AuthenticationError(format!("Failed to generate token: {e}")))
     }
 
     /// Generate a refresh token
@@ -114,8 +113,9 @@ impl AuthService {
             token_type: "refresh".to_string(),
         };
 
-        encode(&Header::default(), &claims, &self.encoding_key)
-            .map_err(|e| UserError::AuthenticationError(format!("Failed to generate refresh token: {}", e)))
+        encode(&Header::default(), &claims, &self.encoding_key).map_err(|e| {
+            UserError::AuthenticationError(format!("Failed to generate refresh token: {e}"))
+        })
     }
 
     /// Validate and decode a token
@@ -136,15 +136,15 @@ impl AuthService {
     ) -> UserResult<bool> {
         // Parse the signature
         let sig = Signature::from_str(signature)
-            .map_err(|e| UserError::ValidationError(format!("Invalid signature format: {}", e)))?;
+            .map_err(|e| UserError::ValidationError(format!("Invalid signature format: {e}")))?;
 
         // Recover the address from the signature
         let recovered_address = sig
             .recover(message)
-            .map_err(|e| UserError::ValidationError(format!("Failed to recover address: {}", e)))?;
+            .map_err(|e| UserError::ValidationError(format!("Failed to recover address: {e}")))?;
 
         // Compare with expected address (case-insensitive)
-        let recovered_str = format!("{:?}", recovered_address).to_lowercase();
+        let recovered_str = format!("{recovered_address:?}").to_lowercase();
         let expected_str = expected_address.to_lowercase();
 
         Ok(recovered_str == expected_str)
@@ -220,7 +220,9 @@ mod tests {
 
         let hash = auth_service.hash_password(password).unwrap();
         assert!(auth_service.verify_password(password, &hash).unwrap());
-        assert!(!auth_service.verify_password("WrongPassword", &hash).unwrap());
+        assert!(!auth_service
+            .verify_password("WrongPassword", &hash)
+            .unwrap());
     }
 
     #[test]

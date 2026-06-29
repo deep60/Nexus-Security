@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State},
+    extract::State,
     http::{header, header::HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Extension, Json,
@@ -82,14 +82,14 @@ pub async fn logout(
                     .duration_since(std::time::UNIX_EPOCH)
                     .map_err(|_| AppError::InternalError("System time error".to_string()))?
                     .as_secs() as i64;
-                
+
                 let ttl = (exp - now).max(0) as usize;
-                
+
                 if ttl > 0 {
                     // Blacklist the token in Redis
-                    let blacklist_key = format!("jwt_blacklist:{}", token);
+                    let blacklist_key = format!("jwt_blacklist:{token}");
                     let mut conn = state.redis_conn.clone();
-                    
+
                     let _: Result<(), redis::RedisError> = redis::cmd("SETEX")
                         .arg(&blacklist_key)
                         .arg(ttl)
@@ -142,7 +142,11 @@ pub async fn forgot_password(
     // Generate reset token and store it. Use the user service to create
     // a time-limited reset token. Always return success to prevent
     // email enumeration attacks.
-    match state.user_service.create_password_reset_token(&req.email).await {
+    match state
+        .user_service
+        .create_password_reset_token(&req.email)
+        .await
+    {
         Ok(token) => {
             // In production, send this token via email/notification service.
             // For now, log it so developers can use it during testing.
@@ -227,9 +231,7 @@ impl From<UserError> for AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
-            AppError::UserError(UserError::ValidationError(msg)) => {
-                (StatusCode::BAD_REQUEST, msg)
-            }
+            AppError::UserError(UserError::ValidationError(msg)) => (StatusCode::BAD_REQUEST, msg),
             AppError::UserError(UserError::AuthenticationError(msg)) => {
                 (StatusCode::UNAUTHORIZED, msg)
             }
@@ -247,9 +249,10 @@ impl IntoResponse for AppError {
                     "Internal server error".to_string(),
                 )
             }
-            AppError::UserError(UserError::InvalidToken) => {
-                (StatusCode::UNAUTHORIZED, "Invalid or expired token".to_string())
-            }
+            AppError::UserError(UserError::InvalidToken) => (
+                StatusCode::UNAUTHORIZED,
+                "Invalid or expired token".to_string(),
+            ),
             AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
             AppError::InternalError(msg) => {
                 tracing::error!("Internal error: {}", msg);

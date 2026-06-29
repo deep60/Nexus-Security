@@ -78,8 +78,9 @@ impl Config {
                     .unwrap_or(4),
             },
             database: DatabaseConfig {
-                url: env::var("DATABASE_URL")
-                    .unwrap_or_else(|_| "postgresql://verdyx:password@localhost/verdyx".to_string()),
+                url: env::var("DATABASE_URL").unwrap_or_else(|_| {
+                    "postgresql://verdyx:password@localhost/verdyx".to_string()
+                }),
                 max_connections: env::var("DB_MAX_CONNECTIONS")
                     .unwrap_or_else(|_| "20".to_string())
                     .parse()
@@ -117,8 +118,7 @@ impl Config {
                     .unwrap_or(3),
             },
             redis: RedisConfig {
-                url: env::var("REDIS_URL")
-                    .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
+                url: env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string()),
                 max_connections: env::var("REDIS_MAX_CONNECTIONS")
                     .unwrap_or_else(|_| "10".to_string())
                     .parse()
@@ -165,11 +165,9 @@ impl Config {
 
     /// Load configuration from a TOML file
     pub fn from_file(path: &str) -> Result<Self, ConfigError> {
-        let contents = std::fs::read_to_string(path)
-            .map_err(|_| ConfigError::FileNotFound)?;
+        let contents = std::fs::read_to_string(path).map_err(|_| ConfigError::FileNotFound)?;
 
-        toml::from_str(&contents)
-            .map_err(|_| ConfigError::ParseError)
+        toml::from_str(&contents).map_err(|_| ConfigError::ParseError)
     }
 
     /// Validate configuration
@@ -179,15 +177,21 @@ impl Config {
         }
 
         if self.database.max_connections == 0 {
-            return Err(ConfigError::InvalidConfig("Max connections must be > 0".to_string()));
+            return Err(ConfigError::InvalidConfig(
+                "Max connections must be > 0".to_string(),
+            ));
         }
 
         if self.consensus.consensus_threshold < 0.5 || self.consensus.consensus_threshold > 1.0 {
-            return Err(ConfigError::InvalidConfig("Consensus threshold must be between 0.5 and 1.0".to_string()));
+            return Err(ConfigError::InvalidConfig(
+                "Consensus threshold must be between 0.5 and 1.0".to_string(),
+            ));
         }
 
         if self.bounty.min_quality_score < 0.0 || self.bounty.min_quality_score > 1.0 {
-            return Err(ConfigError::InvalidConfig("Min quality score must be between 0.0 and 1.0".to_string()));
+            return Err(ConfigError::InvalidConfig(
+                "Min quality score must be between 0.0 and 1.0".to_string(),
+            ));
         }
 
         Ok(())

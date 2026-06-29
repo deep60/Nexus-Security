@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
-use crate::channels::{EmailConfig, FcmConfig, ApnsConfig, WebhookConfig};
+use crate::channels::{ApnsConfig, EmailConfig, FcmConfig, WebhookConfig};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -52,10 +52,12 @@ impl Config {
                     .parse()?,
             },
             redis: RedisConfig {
-                url: std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string()),
+                url: std::env::var("REDIS_URL")
+                    .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
             },
             email: EmailConfig {
-                smtp_host: std::env::var("SMTP_HOST").unwrap_or_else(|_| "smtp.gmail.com".to_string()),
+                smtp_host: std::env::var("SMTP_HOST")
+                    .unwrap_or_else(|_| "smtp.gmail.com".to_string()),
                 smtp_port: std::env::var("SMTP_PORT")
                     .unwrap_or_else(|_| "587".to_string())
                     .parse()?,

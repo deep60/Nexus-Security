@@ -1,8 +1,8 @@
-use sqlx::{PgPool, Row};
-use uuid::Uuid;
 use chrono::Utc;
+use sqlx::PgPool;
+use uuid::Uuid;
 
-use crate::models::{Submission, CreateSubmissionRequest, SubmissionStatus};
+use crate::models::{CreateSubmissionRequest, Submission, SubmissionStatus};
 
 /// Create a new submission record in the database
 pub async fn create_submission(
@@ -123,8 +123,12 @@ pub async fn update_submission_results(
     .execute(pool)
     .await?;
 
-    tracing::info!("Updated submission {} results: malicious={}, confidence={}",
-        id, is_malicious, confidence_score);
+    tracing::info!(
+        "Updated submission {} results: malicious={}, confidence={}",
+        id,
+        is_malicious,
+        confidence_score
+    );
     Ok(())
 }
 
@@ -169,10 +173,7 @@ pub async fn get_submissions_by_submitter(
 }
 
 /// Check if a file hash already exists
-pub async fn file_hash_exists(
-    pool: &PgPool,
-    file_hash: &str,
-) -> Result<bool, sqlx::Error> {
+pub async fn file_hash_exists(pool: &PgPool, file_hash: &str) -> Result<bool, sqlx::Error> {
     let count: i64 = sqlx::query_scalar(
         r#"
         SELECT COUNT(*) FROM submissions WHERE file_hash = $1

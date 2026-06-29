@@ -1,12 +1,11 @@
 use anyhow::{Context, Result};
-use reqwest::{Client, Method, Request, Response, StatusCode};
+use reqwest::{Client, Method, Response};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
-use uuid::Uuid;
 
 /// Proxy service for making HTTP requests to other microservices
 /// Includes circuit breaker pattern, request retry logic, and service discovery
@@ -196,9 +195,9 @@ impl ServiceRegistry {
 /// Circuit breaker states
 #[derive(Debug, Clone, PartialEq)]
 pub enum CircuitBreakerState {
-    Closed,      // Normal operation
-    Open,        // Failing - reject requests
-    HalfOpen,    // Testing if service recovered
+    Closed,   // Normal operation
+    Open,     // Failing - reject requests
+    HalfOpen, // Testing if service recovered
 }
 
 /// Circuit breaker for fault tolerance
@@ -300,7 +299,8 @@ impl ProxyService {
         path: &str,
         headers: Option<HashMap<String, String>>,
     ) -> Result<Response> {
-        self.request(Method::GET, service_name, path, None::<()>, headers).await
+        self.request(Method::GET, service_name, path, None::<()>, headers)
+            .await
     }
 
     /// Make a POST request to a service
@@ -311,7 +311,8 @@ impl ProxyService {
         body: T,
         headers: Option<HashMap<String, String>>,
     ) -> Result<Response> {
-        self.request(Method::POST, service_name, path, Some(body), headers).await
+        self.request(Method::POST, service_name, path, Some(body), headers)
+            .await
     }
 
     /// Make a PUT request to a service
@@ -322,7 +323,8 @@ impl ProxyService {
         body: T,
         headers: Option<HashMap<String, String>>,
     ) -> Result<Response> {
-        self.request(Method::PUT, service_name, path, Some(body), headers).await
+        self.request(Method::PUT, service_name, path, Some(body), headers)
+            .await
     }
 
     /// Make a DELETE request to a service
@@ -332,7 +334,8 @@ impl ProxyService {
         path: &str,
         headers: Option<HashMap<String, String>>,
     ) -> Result<Response> {
-        self.request(Method::DELETE, service_name, path, None::<()>, headers).await
+        self.request(Method::DELETE, service_name, path, None::<()>, headers)
+            .await
     }
 
     /// Make an HTTP request with circuit breaker and retry logic
@@ -347,22 +350,19 @@ impl ProxyService {
         // Check circuit breaker
         {
             let mut breakers = self.circuit_breakers.write().await;
-            let breaker = breakers
-                .entry(service_name.to_string())
-                .or_insert_with(|| {
-                    CircuitBreaker::new(
-                        self.config.circuit_breaker_threshold,
-                        self.config.circuit_breaker_timeout_seconds,
-                    )
-                });
+            let breaker = breakers.entry(service_name.to_string()).or_insert_with(|| {
+                CircuitBreaker::new(
+                    self.config.circuit_breaker_threshold,
+                    self.config.circuit_breaker_timeout_seconds,
+                )
+            });
 
             if !breaker.can_attempt_request() {
                 let mut stats = self.stats.write().await;
                 stats.circuit_breaker_trips += 1;
 
                 return Err(anyhow::anyhow!(
-                    "Circuit breaker is open for service: {}",
-                    service_name
+                    "Circuit breaker is open for service: {service_name}"
                 ));
             }
         }
@@ -371,7 +371,7 @@ impl ProxyService {
         let registry = ServiceRegistry::default_services();
         let endpoint = registry
             .get(service_name)
-            .ok_or_else(|| anyhow::anyhow!("Service not found: {}", service_name))?;
+            .ok_or_else(|| anyhow::anyhow!("Service not found: {service_name}"))?;
 
         let url = format!("{}{}", endpoint.base_url, path);
         debug!("Proxy request: {} {}", method, url);
@@ -380,7 +380,10 @@ impl ProxyService {
         {
             let mut stats = self.stats.write().await;
             stats.total_requests += 1;
-            *stats.requests_by_service.entry(service_name.to_string()).or_insert(0) += 1;
+            *stats
+                .requests_by_service
+                .entry(service_name.to_string())
+                .or_insert(0) += 1;
         }
 
         let start_time = Instant::now();
@@ -390,7 +393,10 @@ impl ProxyService {
         for attempt in 0..=self.config.max_retries {
             if attempt > 0 {
                 let delay = Duration::from_millis(self.config.retry_delay_ms * attempt as u64);
-                debug!("Retrying request (attempt {}/{}) after {:?}", attempt, self.config.max_retries, delay);
+                debug!(
+                    "Retrying request (attempt {}/{}) after {:?}",
+                    attempt, self.config.max_retries, delay
+                );
                 tokio::time::sleep(delay).await;
 
                 let mut stats = self.stats.write().await;
@@ -440,7 +446,7 @@ impl ProxyService {
                             return Ok(response);
                         } else {
                             stats.failed_requests += 1;
-                            last_error = Some(anyhow::anyhow!("HTTP error: {}", status));
+                            last_error = Some(anyhow::anyhow!("HTTP error: {status}"));
                         }
                     }
 
@@ -451,7 +457,7 @@ impl ProxyService {
                 }
                 Err(e) => {
                     error!("Proxy request failed: {}", e);
-                    last_error = Some(anyhow::anyhow!("Request failed: {}", e));
+                    last_error = Some(anyhow::anyhow!("Request failed: {e}"));
 
                     let mut stats = self.stats.write().await;
                     stats.failed_requests += 1;
@@ -467,7 +473,9 @@ impl ProxyService {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| anyhow::anyhow!("Request failed after {} retries", self.config.max_retries)))
+        Err(last_error.unwrap_or_else(|| {
+            anyhow::anyhow!("Request failed after {} retries", self.config.max_retries)
+        }))
     }
 
     /// Check health of a service
@@ -475,12 +483,11 @@ impl ProxyService {
         let registry = ServiceRegistry::default_services();
         let endpoint = registry
             .get(service_name)
-            .ok_or_else(|| anyhow::anyhow!("Service not found: {}", service_name))?;
+            .ok_or_else(|| anyhow::anyhow!("Service not found: {service_name}"))?;
 
-        let health_path = endpoint
-            .health_check_path
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No health check path configured for service: {}", service_name))?;
+        let health_path = endpoint.health_check_path.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("No health check path configured for service: {service_name}")
+        })?;
 
         let url = format!("{}{}", endpoint.base_url, health_path);
 
@@ -503,7 +510,10 @@ impl ProxyService {
     }
 
     /// Get circuit breaker status for a service
-    pub async fn get_circuit_breaker_state(&self, service_name: &str) -> Option<CircuitBreakerState> {
+    pub async fn get_circuit_breaker_state(
+        &self,
+        service_name: &str,
+    ) -> Option<CircuitBreakerState> {
         let breakers = self.circuit_breakers.read().await;
         breakers.get(service_name).map(|b| b.state.clone())
     }
@@ -519,7 +529,9 @@ impl ProxyService {
             info!("Circuit breaker reset for service: {}", service_name);
             Ok(())
         } else {
-            Err(anyhow::anyhow!("No circuit breaker found for service: {}", service_name))
+            Err(anyhow::anyhow!(
+                "No circuit breaker found for service: {service_name}"
+            ))
         }
     }
 
@@ -542,11 +554,14 @@ impl ProxyService {
     }
 
     /// Send notification
-    pub async fn send_notification<T: Serialize>(
-        &self,
-        notification: T,
-    ) -> Result<Response> {
-        self.post("notification-service", "/api/v1/notifications", notification, None).await
+    pub async fn send_notification<T: Serialize>(&self, notification: T) -> Result<Response> {
+        self.post(
+            "notification-service",
+            "/api/v1/notifications",
+            notification,
+            None,
+        )
+        .await
     }
 }
 

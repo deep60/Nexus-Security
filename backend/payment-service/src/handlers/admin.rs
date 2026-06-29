@@ -1,11 +1,13 @@
-use axum::{extract::{State, Path}, response::Json, http::StatusCode};
+use crate::AppState;
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::Json,
+};
 use serde_json::{json, Value};
 use std::sync::Arc;
-use crate::AppState;
 
-pub async fn get_pending_payments(
-    State(state): State<Arc<AppState>>,
-) -> (StatusCode, Json<Value>) {
+pub async fn get_pending_payments(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Value>) {
     match state.payment_service.list_pending().await {
         Ok(payments) => (StatusCode::OK, Json(json!({ "payments": payments }))),
         Err(e) => (
@@ -15,9 +17,7 @@ pub async fn get_pending_payments(
     }
 }
 
-pub async fn get_failed_payments(
-    State(state): State<Arc<AppState>>,
-) -> (StatusCode, Json<Value>) {
+pub async fn get_failed_payments(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Value>) {
     let rows = sqlx::query_as::<_, crate::models::Payment>(
         "SELECT * FROM payments WHERE status = 'failed' ORDER BY updated_at DESC LIMIT 100",
     )
@@ -56,9 +56,10 @@ pub async fn retry_payment(
     .await;
 
     match res {
-        Ok(r) if r.rows_affected() > 0 => {
-            (StatusCode::OK, Json(json!({ "message": "payment requeued" })))
-        }
+        Ok(r) if r.rows_affected() > 0 => (
+            StatusCode::OK,
+            Json(json!({ "message": "payment requeued" })),
+        ),
         Ok(_) => (
             StatusCode::NOT_FOUND,
             Json(json!({ "error": "no failed payment with that id" })),
@@ -70,9 +71,7 @@ pub async fn retry_payment(
     }
 }
 
-pub async fn get_treasury_balance(
-    State(state): State<Arc<AppState>>,
-) -> (StatusCode, Json<Value>) {
+pub async fn get_treasury_balance(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Value>) {
     let treasury = state
         .payment_service
         .config()

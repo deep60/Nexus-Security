@@ -1,8 +1,6 @@
 use axum::{extract::State, http::StatusCode, response::Json};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::Arc;
 
 use crate::AppState;
 
@@ -79,7 +77,7 @@ pub async fn health_check(
         },
     };
 
-    let status_code = if response.status == ServiceStatus::Healthy {
+    let _status_code = if response.status == ServiceStatus::Healthy {
         StatusCode::OK
     } else {
         StatusCode::SERVICE_UNAVAILABLE

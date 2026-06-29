@@ -21,18 +21,18 @@ pub struct ScoringWeights {
 impl Default for ScoringWeights {
     fn default() -> Self {
         Self {
-            accuracy_weight: 0.40,      // 40% weight
-            confidence_weight: 0.20,    // 20% weight
-            stake_weight: 0.15,         // 15% weight
-            reputation_weight: 0.15,    // 15% weight
-            timeliness_weight: 0.10,    // 10% weight
+            accuracy_weight: 0.40,   // 40% weight
+            confidence_weight: 0.20, // 20% weight
+            stake_weight: 0.15,      // 15% weight
+            reputation_weight: 0.15, // 15% weight
+            timeliness_weight: 0.10, // 10% weight
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QualityScore {
-    pub overall_score: f32,          // 0.0 to 1.0
+    pub overall_score: f32, // 0.0 to 1.0
     pub component_scores: ComponentScores,
     pub grade: QualityGrade,
     pub feedback: Vec<String>,
@@ -49,11 +49,11 @@ pub struct ComponentScores {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum QualityGrade {
-    Excellent,  // 0.9-1.0
-    Good,       // 0.7-0.9
-    Fair,       // 0.5-0.7
-    Poor,       // 0.3-0.5
-    VeryPoor,   // 0.0-0.3
+    Excellent, // 0.9-1.0
+    Good,      // 0.7-0.9
+    Fair,      // 0.5-0.7
+    Poor,      // 0.3-0.5
+    VeryPoor,  // 0.0-0.3
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,10 +70,10 @@ pub struct SubmissionScore {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsensusScore {
-    pub agreement_score: f32,        // How much submissions agree
-    pub confidence_score: f32,       // Average confidence
-    pub participation_score: f32,    // Number of participants
-    pub quality_score: f32,          // Average quality of submissions
+    pub agreement_score: f32,     // How much submissions agree
+    pub confidence_score: f32,    // Average confidence
+    pub participation_score: f32, // Number of participants
+    pub quality_score: f32,       // Average quality of submissions
     pub overall_consensus_strength: f32,
 }
 
@@ -121,13 +121,11 @@ impl ScoringService {
         let timeliness_score = (1.0 - time_ratio).clamp(0.0, 1.0);
 
         // Calculate overall score (weighted average)
-        let overall_score = (
-            accuracy_score * 0.3 +
-            confidence_score * 0.2 +
-            detail_score * 0.25 +
-            consistency_score * 0.15 +
-            timeliness_score * 0.10
-        );
+        let overall_score = accuracy_score * 0.3
+            + confidence_score * 0.2
+            + detail_score * 0.25
+            + consistency_score * 0.15
+            + timeliness_score * 0.10;
 
         let grade = Self::score_to_grade(overall_score);
 
@@ -194,24 +192,25 @@ impl ScoringService {
 
         // Timeliness contribution (faster is better)
         let time_ratio = if avg_response_time_ms > 0 {
-            (avg_response_time_ms as f32 / response_time_ms as f32).min(2.0) / 2.0 // Cap at 2x benefit
+            (avg_response_time_ms as f32 / response_time_ms as f32).min(2.0) / 2.0
+        // Cap at 2x benefit
         } else {
             0.5
         };
         let timeliness_contribution = time_ratio * weights.timeliness_weight;
 
         // Total weighted score
-        let weighted_score = accuracy_contribution +
-                           confidence_contribution +
-                           stake_contribution +
-                           reputation_contribution +
-                           timeliness_contribution;
+        let weighted_score = accuracy_contribution
+            + confidence_contribution
+            + stake_contribution
+            + reputation_contribution
+            + timeliness_contribution;
 
-        let total_weight = weights.accuracy_weight +
-                         weights.confidence_weight +
-                         weights.stake_weight +
-                         weights.reputation_weight +
-                         weights.timeliness_weight;
+        let total_weight = weights.accuracy_weight
+            + weights.confidence_weight
+            + weights.stake_weight
+            + weights.reputation_weight
+            + weights.timeliness_weight;
 
         SubmissionScore {
             submission_id: "".to_string(), // Set by caller
@@ -250,12 +249,10 @@ impl ScoringService {
         let quality_score = avg_quality.clamp(0.0, 1.0);
 
         // Overall consensus strength (weighted combination)
-        let overall_consensus_strength = (
-            agreement_score * 0.4 +
-            confidence_score * 0.3 +
-            participation_score * 0.15 +
-            quality_score * 0.15
-        );
+        let overall_consensus_strength = agreement_score * 0.4
+            + confidence_score * 0.3
+            + participation_score * 0.15
+            + quality_score * 0.15;
 
         ConsensusScore {
             agreement_score,
@@ -275,10 +272,7 @@ impl ScoringService {
         let mut distribution = HashMap::new();
 
         // Calculate total weight
-        let total_weight: f32 = submission_scores
-            .iter()
-            .map(|s| s.weighted_score)
-            .sum();
+        let total_weight: f32 = submission_scores.iter().map(|s| s.weighted_score).sum();
 
         if total_weight == 0.0 {
             return distribution;
@@ -301,10 +295,10 @@ impl ScoringService {
         severity: PenaltySeverity,
     ) -> u64 {
         let base_penalty: f32 = match severity {
-            PenaltySeverity::Minor => 0.10,      // 10% slash
-            PenaltySeverity::Moderate => 0.25,   // 25% slash
-            PenaltySeverity::Severe => 0.50,     // 50% slash
-            PenaltySeverity::Critical => 1.0,    // 100% slash
+            PenaltySeverity::Minor => 0.10,    // 10% slash
+            PenaltySeverity::Moderate => 0.25, // 25% slash
+            PenaltySeverity::Severe => 0.50,   // 50% slash
+            PenaltySeverity::Critical => 1.0,  // 100% slash
         };
 
         // Increase penalty for high confidence incorrect submissions
@@ -360,14 +354,14 @@ mod tests {
     #[test]
     fn test_quality_score_calculation() {
         let service = ScoringService::new();
-        
+
         let score = service.calculate_quality_score(
-            true,                    // has all fields
-            0.95,                    // high confidence
-            DetailLevel::Expert,     // expert level detail
-            true,                    // consistent
-            100000,                  // submitted at 100s
-            1000000,                 // deadline at 1000s
+            true,                // has all fields
+            0.95,                // high confidence
+            DetailLevel::Expert, // expert level detail
+            true,                // consistent
+            100000,              // submitted at 100s
+            1000000,             // deadline at 1000s
         );
 
         assert!(score.overall_score >= 0.9);
@@ -377,14 +371,14 @@ mod tests {
     #[test]
     fn test_weighted_submission_score() {
         let service = ScoringService::new();
-        
+
         let score = service.calculate_weighted_submission_score(
-            true,    // correct
-            0.9,     // 90% confidence
-            10000,   // stake
-            0.85,    // reputation
-            500,     // response time
-            1000,    // avg response time
+            true,  // correct
+            0.9,   // 90% confidence
+            10000, // stake
+            0.85,  // reputation
+            500,   // response time
+            1000,  // avg response time
         );
 
         assert!(score.weighted_score > 0.5);
@@ -393,7 +387,7 @@ mod tests {
     #[test]
     fn test_consensus_score() {
         let service = ScoringService::new();
-        
+
         let score = service.calculate_consensus_score(
             10,   // total submissions
             8,    // matching submissions
@@ -408,28 +402,20 @@ mod tests {
     #[test]
     fn test_penalty_calculation() {
         let service = ScoringService::new();
-        
+
         // Minor penalty
-        let penalty = service.calculate_penalty(
-            10000,
-            0.5,
-            PenaltySeverity::Minor,
-        );
+        let penalty = service.calculate_penalty(10000, 0.5, PenaltySeverity::Minor);
         assert_eq!(penalty, 1000); // 10% of 10000
 
         // Severe penalty with high confidence
-        let penalty = service.calculate_penalty(
-            10000,
-            0.95,
-            PenaltySeverity::Severe,
-        );
+        let penalty = service.calculate_penalty(10000, 0.95, PenaltySeverity::Severe);
         assert!(penalty >= 5000); // At least 50%
     }
 
     #[test]
     fn test_reward_distribution() {
         let service = ScoringService::new();
-        
+
         let scores = vec![
             SubmissionScore {
                 submission_id: "sub1".to_string(),
@@ -454,7 +440,7 @@ mod tests {
         ];
 
         let distribution = service.calculate_reward_distribution(scores, 100000);
-        
+
         assert_eq!(*distribution.get("sub1").unwrap(), 80000);
         assert_eq!(*distribution.get("sub2").unwrap(), 20000);
     }

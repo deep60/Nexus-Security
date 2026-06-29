@@ -141,25 +141,28 @@ pub async fn get_analysis_stats(
         .await
         .unwrap_or(0);
 
-    let completed: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE status = 'completed'")
-        .fetch_one(state.db.pool())
-        .await
-        .unwrap_or(0);
+    let completed: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE status = 'completed'")
+            .fetch_one(state.db.pool())
+            .await
+            .unwrap_or(0);
 
-    let malicious: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE verdict = 'malicious'")
-        .fetch_one(state.db.pool())
-        .await
-        .unwrap_or(0);
+    let malicious: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE verdict = 'malicious'")
+            .fetch_one(state.db.pool())
+            .await
+            .unwrap_or(0);
 
     let benign: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE verdict = 'benign'")
         .fetch_one(state.db.pool())
         .await
         .unwrap_or(0);
 
-    let suspicious: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE verdict = 'suspicious'")
-        .fetch_one(state.db.pool())
-        .await
-        .unwrap_or(0);
+    let suspicious: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM analyses WHERE verdict = 'suspicious'")
+            .fetch_one(state.db.pool())
+            .await
+            .unwrap_or(0);
 
     // Extra dashboard fields
     let total_submissions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM bounty_submissions")
@@ -181,12 +184,11 @@ pub async fn get_analysis_stats(
     .await
     .unwrap_or(0);
 
-    let total_engines: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM security_engines WHERE is_active = true",
-    )
-    .fetch_one(state.db.pool())
-    .await
-    .unwrap_or(0);
+    let total_engines: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM security_engines WHERE is_active = true")
+            .fetch_one(state.db.pool())
+            .await
+            .unwrap_or(0);
 
     Ok(Json(AnalysisStats {
         total_analyses: total,
@@ -249,16 +251,19 @@ pub async fn submit_analysis(
     claims: crate::middleware::auth::Claims,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    let bounty_id = payload.get("bounty_id")
+    let bounty_id = payload
+        .get("bounty_id")
         .and_then(|v| v.as_str())
         .and_then(|s| Uuid::parse_str(s).ok())
         .ok_or(StatusCode::BAD_REQUEST)?;
 
-    let file_hash = payload.get("file_hash")
+    let file_hash = payload
+        .get("file_hash")
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
-    let verdict = payload.get("verdict")
+    let verdict = payload
+        .get("verdict")
         .and_then(|v| v.as_str())
         .ok_or(StatusCode::BAD_REQUEST)?;
 
@@ -267,7 +272,8 @@ pub async fn submit_analysis(
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    let confidence = payload.get("confidence")
+    let confidence = payload
+        .get("confidence")
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0);
 
@@ -328,7 +334,8 @@ pub async fn dispute_analysis(
         return Err(StatusCode::CONFLICT);
     }
 
-    let reason = payload.get("reason")
+    let reason = payload
+        .get("reason")
         .and_then(|v| v.as_str())
         .unwrap_or("No reason provided");
 
@@ -350,4 +357,3 @@ pub async fn dispute_analysis(
         "message": "Analysis has been disputed and flagged for review"
     })))
 }
-

@@ -5,7 +5,6 @@ use uuid::Uuid;
 
 use crate::auth::Claims;
 use crate::handlers::auth::{AppError, MessageResponse};
-use crate::models::*;
 use crate::AppState;
 
 #[derive(Debug, Deserialize)]

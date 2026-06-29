@@ -1,3 +1,8 @@
+// Pre-production scaffolding: some items are intentionally unused while
+// features are wired up. This crate-level allow keeps `clippy -D warnings`
+// green without deleting code we are about to use. Remove before GA.
+#![allow(dead_code)]
+
 mod channels;
 mod config;
 mod handlers;
@@ -11,10 +16,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-use tower_http::{
-    cors::CorsLayer,
-    trace::TraceLayer,
-};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{info, warn};
 
 use crate::config::Config;
@@ -52,19 +54,12 @@ async fn main() -> Result<()> {
 
     // Initialize Redis client
     let redis_client = redis::Client::open(config.redis.url.clone())?;
-    let redis_conn = redis_client
-        .get_connection_manager()
-        .await?;
+    let redis_conn = redis_client.get_connection_manager().await?;
     info!("Redis connection established");
 
     // Initialize notification manager
     let notification_manager = Arc::new(
-        NotificationManager::new(
-            config.clone(),
-            db_pool.clone(),
-            redis_conn.clone(),
-        )
-        .await?
+        NotificationManager::new(config.clone(), db_pool.clone(), redis_conn.clone()).await?,
     );
     info!("Notification manager initialized");
 
@@ -99,7 +94,7 @@ async fn main() -> Result<()> {
         .split(',')
         .filter_map(|origin| origin.trim().parse::<axum::http::HeaderValue>().ok())
         .collect();
-    
+
     let cors = CorsLayer::new()
         .allow_origin(allowed_origins)
         .allow_methods([
@@ -120,13 +115,34 @@ async fn main() -> Result<()> {
     // Build router
     let app = Router::new()
         .route("/health", get(handlers::health::health_check))
-        .route("/api/v1/notifications/send", post(handlers::notification::send_notification))
-        .route("/api/v1/notifications/preferences", get(handlers::preferences::get_preferences))
-        .route("/api/v1/notifications/preferences", post(handlers::preferences::update_preferences))
-        .route("/api/v1/notifications/history", get(handlers::notification::get_notification_history))
-        .route("/api/v1/notifications/:id/retry", post(handlers::notification::retry_notification))
-        .route("/api/v1/webhooks/register", post(handlers::webhook::register_webhook))
-        .route("/api/v1/webhooks/unregister", post(handlers::webhook::unregister_webhook))
+        .route(
+            "/api/v1/notifications/send",
+            post(handlers::notification::send_notification),
+        )
+        .route(
+            "/api/v1/notifications/preferences",
+            get(handlers::preferences::get_preferences),
+        )
+        .route(
+            "/api/v1/notifications/preferences",
+            post(handlers::preferences::update_preferences),
+        )
+        .route(
+            "/api/v1/notifications/history",
+            get(handlers::notification::get_notification_history),
+        )
+        .route(
+            "/api/v1/notifications/:id/retry",
+            post(handlers::notification::retry_notification),
+        )
+        .route(
+            "/api/v1/webhooks/register",
+            post(handlers::webhook::register_webhook),
+        )
+        .route(
+            "/api/v1/webhooks/unregister",
+            post(handlers::webhook::unregister_webhook),
+        )
         .route("/ws", get(handlers::websocket::websocket_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())

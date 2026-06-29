@@ -49,11 +49,12 @@ pub async fn wait_for_confirmations(
     tx_hash: H256,
     confirmations: usize,
 ) -> Result<Option<TransactionReceipt>> {
-    info!("Waiting for {} confirmations for tx {}", confirmations, tx_hash);
+    info!(
+        "Waiting for {} confirmations for tx {}",
+        confirmations, tx_hash
+    );
 
-    let receipt = provider
-        .get_transaction_receipt(tx_hash)
-        .await?;
+    let receipt = provider.get_transaction_receipt(tx_hash).await?;
 
     if let Some(ref receipt) = receipt {
         let current_block = provider.get_block_number().await?;

@@ -1,12 +1,12 @@
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::AppState;
 use crate::db::repository;
 use crate::models::{CreateSubmissionRequest, SubmissionType};
 use crate::queue::publisher;
+use crate::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct UrlSubmissionRequest {
@@ -33,23 +33,29 @@ pub async fn submit_url(
     tracing::info!("Received URL submission: {}", payload.url);
 
     // 1. Validate URL format
-    let parsed = url::Url::parse(&payload.url).map_err(|e| {
-        (StatusCode::BAD_REQUEST, format!("Invalid URL: {}", e))
-    })?;
+    let parsed = url::Url::parse(&payload.url)
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid URL: {e}")))?;
 
     // Only allow http/https schemes
     if parsed.scheme() != "http" && parsed.scheme() != "https" {
-        return Err((StatusCode::BAD_REQUEST, "Only HTTP/HTTPS URLs are accepted".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Only HTTP/HTTPS URLs are accepted".to_string(),
+        ));
     }
 
     // 2. Compute a hash of the URL for deduplication
     let url_hash = format!("{:x}", Sha256::digest(payload.url.as_bytes()));
 
     // 3. Check if URL was already submitted recently (last 24h)
-    let existing = repository::find_recent_url_submission(&state.db_pool, &url_hash).await
+    let existing = repository::find_recent_url_submission(&state.db_pool, &url_hash)
+        .await
         .map_err(|e| {
             tracing::error!("DB lookup failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database error".to_string())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error".to_string(),
+            )
         })?;
 
     if let Some(existing_sub) = existing {
@@ -58,7 +64,8 @@ pub async fn submit_url(
             url: payload.url,
             url_hash,
             status: existing_sub.analysis_status,
-            message: "URL was already submitted recently — returning existing submission".to_string(),
+            message: "URL was already submitted recently — returning existing submission"
+                .to_string(),
         }));
     }
 
@@ -75,10 +82,14 @@ pub async fn submit_url(
         metadata: payload.metadata,
     };
 
-    let submission = repository::create_submission(&state.db_pool, create_request).await
+    let submission = repository::create_submission(&state.db_pool, create_request)
+        .await
         .map_err(|e| {
             tracing::error!("Failed to create URL submission record: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create submission: {}", e))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to create submission: {e}"),
+            )
         })?;
 
     // 5. Queue for analysis

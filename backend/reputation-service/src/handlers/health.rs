@@ -1,4 +1,4 @@
-use axum::{response::Json, http::StatusCode};
+use axum::{http::StatusCode, response::Json};
 use serde_json::{json, Value};
 
 pub async fn health_check() -> (StatusCode, Json<Value>) {
@@ -8,6 +8,6 @@ pub async fn health_check() -> (StatusCode, Json<Value>) {
             "status": "healthy",
             "service": "reputation-service",
             "version": env!("CARGO_PKG_VERSION")
-        }))
+        })),
     )
 }

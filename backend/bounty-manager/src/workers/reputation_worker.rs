@@ -1,12 +1,12 @@
 // backend/bounty-manager/src/workers/reputation_worker.rs
 
+use crate::models::reputation::ReputationModel;
+use crate::models::submission::SubmissionModel;
+use crate::services::reputation::ReputationService;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::time::{interval, Duration};
 use tracing::{error, info};
-use crate::services::reputation::ReputationService;
-use crate::models::reputation::ReputationModel;
-use crate::models::submission::SubmissionModel;
 
 pub struct ReputationWorker {
     db: PgPool,
@@ -30,7 +30,7 @@ impl ReputationWorker {
 
         loop {
             ticker.tick().await;
-            
+
             if let Err(e) = self.update_reputations().await {
                 error!("Error updating reputations: {}", e);
             }
@@ -47,7 +47,7 @@ impl ReputationWorker {
             SELECT DISTINCT engine_id FROM submissions
             WHERE status IN ('Correct', 'Incorrect')
             AND processed_at > NOW() - INTERVAL '5 minutes'
-            "#
+            "#,
         )
         .fetch_all(&self.db)
         .await
@@ -105,30 +105,23 @@ impl ReputationWorker {
 
         // Calculate new metrics
         let total_submissions = submissions.len() as i32;
-        let correct_submissions = submissions.iter()
-            .filter(|s| s.status == "Correct")
-            .count() as i32;
-        
+        let correct_submissions =
+            submissions.iter().filter(|s| s.status == "Correct").count() as i32;
+
         let accuracy_rate = if total_submissions > 0 {
             correct_submissions as f32 / total_submissions as f32
         } else {
             0.0
         };
 
-        let average_confidence: f32 = submissions.iter()
-            .map(|s| s.confidence)
-            .sum::<f32>() / total_submissions as f32;
+        let average_confidence: f32 =
+            submissions.iter().map(|s| s.confidence).sum::<f32>() / total_submissions as f32;
 
-        let total_stake: i64 = submissions.iter()
-            .map(|s| s.stake_amount)
-            .sum();
+        let total_stake: i64 = submissions.iter().map(|s| s.stake_amount).sum();
 
         // Calculate reputation score (weighted formula)
-        let reputation_score = self.calculate_reputation_score(
-            accuracy_rate,
-            total_submissions,
-            average_confidence,
-        );
+        let reputation_score =
+            self.calculate_reputation_score(accuracy_rate, total_submissions, average_confidence);
 
         // Update reputation
         reputation.reputation_score = reputation_score;
@@ -144,7 +137,9 @@ impl ReputationWorker {
 
         info!(
             "Updated reputation for {}: score={:.2}, accuracy={:.2}%",
-            engine_id, reputation_score, accuracy_rate * 100.0
+            engine_id,
+            reputation_score,
+            accuracy_rate * 100.0
         );
 
         Ok(())
@@ -164,7 +159,7 @@ impl ReputationWorker {
 
         // Total score (0-100)
         let total_score = accuracy_score + experience_score + confidence_score;
-        total_score.min(100.0).max(0.0) / 100.0 // Normalize to 0-1
+        total_score.clamp(0.0, 100.0) / 100.0 // Normalize to 0-1
     }
 }
 

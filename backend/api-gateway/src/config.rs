@@ -20,7 +20,7 @@ pub enum ConfigError {
 pub type ConfigResult<T> = Result<T, ConfigError>;
 
 /// Main application configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
@@ -210,21 +210,6 @@ pub enum LogFormat {
     Json,
     Pretty,
     Compact,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            database: DatabaseConfig::default(),
-            redis: RedisConfig::default(),
-            blockchain: BlockchainConfig::default(),
-            security: SecurityConfig::default(),
-            services: ServicesConfig::default(),
-            features: FeaturesConfig::default(),
-            monitoring: MonitoringConfig::default(),
-        }
-    }
 }
 
 impl Default for ServerConfig {
@@ -439,8 +424,7 @@ impl AppConfig {
                 "testing" | "test" => Environment::Testing,
                 _ => {
                     return Err(ConfigError::InvalidValue(format!(
-                        "Invalid ENVIRONMENT: {}",
-                        env
+                        "Invalid ENVIRONMENT: {env}"
                     )))
                 }
             };
@@ -462,8 +446,8 @@ impl AppConfig {
         }
 
         // Blockchain configuration
-        if let Ok(rpc_url) = std::env::var("BLOCKCHAIN_RPC_URL")
-            .or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
+        if let Ok(rpc_url) =
+            std::env::var("BLOCKCHAIN_RPC_URL").or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
         {
             config.blockchain.rpc_url = rpc_url;
         }
@@ -522,9 +506,7 @@ impl AppConfig {
         if let Ok(url) = std::env::var("BOUNTY_MANAGER_URL") {
             config.services.bounty_manager_url = url;
         }
-        if let Ok(path) = std::env::var("UPLOAD_PATH")
-            .or_else(|_| std::env::var("UPLOAD_DIR"))
-        {
+        if let Ok(path) = std::env::var("UPLOAD_PATH").or_else(|_| std::env::var("UPLOAD_DIR")) {
             config.services.upload_path = path;
         }
 
@@ -599,7 +581,7 @@ impl AppConfig {
                         return Ok(config);
                     }
                     Err(e) => {
-                        eprintln!("Warning: Failed to load config from {}: {}", path, e);
+                        eprintln!("Warning: Failed to load config from {path}: {e}");
                     }
                 }
             }
@@ -632,9 +614,7 @@ impl AppConfig {
             self.security.cors.allowed_origins =
                 origins.split(',').map(|s| s.trim().to_string()).collect();
         }
-        if let Ok(path) = std::env::var("UPLOAD_PATH")
-            .or_else(|_| std::env::var("UPLOAD_DIR"))
-        {
+        if let Ok(path) = std::env::var("UPLOAD_PATH").or_else(|_| std::env::var("UPLOAD_DIR")) {
             self.services.upload_path = path;
         }
         if let Ok(url) = std::env::var("ANALYSIS_ENGINE_URL") {
@@ -643,8 +623,8 @@ impl AppConfig {
         if let Ok(url) = std::env::var("BOUNTY_MANAGER_URL") {
             self.services.bounty_manager_url = url;
         }
-        if let Ok(rpc_url) = std::env::var("BLOCKCHAIN_RPC_URL")
-            .or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
+        if let Ok(rpc_url) =
+            std::env::var("BLOCKCHAIN_RPC_URL").or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
         {
             self.blockchain.rpc_url = rpc_url;
         }
@@ -699,19 +679,17 @@ impl AppConfig {
         }
 
         // Validate blockchain configuration
-        if self.features.enable_blockchain_integration {
-            if self.blockchain.rpc_url.is_empty() {
-                return Err(ConfigError::MissingField("blockchain.rpc_url".to_string()));
-            }
+        if self.features.enable_blockchain_integration && self.blockchain.rpc_url.is_empty() {
+            return Err(ConfigError::MissingField("blockchain.rpc_url".to_string()));
         }
 
         // Validate rate limiting
-        if self.security.rate_limiting.enabled {
-            if self.security.rate_limiting.requests_per_minute == 0 {
-                return Err(ConfigError::InvalidValue(
-                    "Rate limit requests_per_minute cannot be 0".to_string(),
-                ));
-            }
+        if self.security.rate_limiting.enabled
+            && self.security.rate_limiting.requests_per_minute == 0
+        {
+            return Err(ConfigError::InvalidValue(
+                "Rate limit requests_per_minute cannot be 0".to_string(),
+            ));
         }
 
         Ok(())
@@ -794,7 +772,7 @@ impl AppConfig {
     /// Save configuration to a TOML file
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> ConfigResult<()> {
         let toml_string = toml::to_string_pretty(self)
-            .map_err(|e| ConfigError::InvalidValue(format!("Failed to serialize config: {}", e)))?;
+            .map_err(|e| ConfigError::InvalidValue(format!("Failed to serialize config: {e}")))?;
         fs::write(path, toml_string)?;
         Ok(())
     }

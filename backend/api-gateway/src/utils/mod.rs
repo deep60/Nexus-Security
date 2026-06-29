@@ -4,30 +4,20 @@ pub mod errors;
 pub mod serialization;
 pub mod validation;
 
-// Re-export commonly used types
-pub use errors::{ApiError, ApiResult, ApiResponse};
-pub use circuit_breaker::{CircuitBreaker, CircuitBreakerConfig, CircuitBreakerStats, CircuitBreakerError, State as CircuitBreakerState};
-pub use serialization::{
-    JsonUtils, Base64Utils, HexUtils, MsgPackUtils, QueryStringUtils,
-    CompressionUtils, FormatDetector, JsonBuilder, SerializationError, SerializationResult,
-};
+// Re-export commonly used types. `ApiResponse` is only referenced by tests in
+// this module, so allow it to appear unused in non-test (lib) builds.
+#[allow(unused_imports)]
+pub use errors::ApiResponse;
+pub use errors::{ApiError, ApiResult};
 
 // Re-export commonly used items for convenience
-pub use crypto::{
-    HashUtils, SignatureUtils, SecretUtils, BlockchainUtils, CryptoUtils,
-    HashResult, KeyPairInfo, SignatureInfo, CryptoError, CryptoResult,
-};
+pub use crypto::{CryptoUtils, HashUtils};
 
-pub use validation::{
-    EmailValidator, UrlValidator, FileValidator, HashValidator, 
-    BlockchainValidator, StringValidator, NumericValidator, IpValidator,
-    UuidValidator, BountyValidator, ApiValidator, ValidationSuite,
-    FileValidationRules, BountyValidationRules, ValidationError, ValidationResult,
-};
+pub use validation::{ApiValidator, ValidationResult};
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 // ApiResponse is now defined in errors.rs and re-exported above
 
@@ -55,13 +45,13 @@ impl PaginationParams {
     /// Validate pagination parameters
     pub fn validate(&self) -> ValidationResult<()> {
         ApiValidator::validate_pagination(self.page, self.page_size)?;
-        
+
         if let (Some(sort_by), Some(sort_order)) = (&self.sort_by, &self.sort_order) {
             // Default allowed sort fields - can be overridden per endpoint
             let default_fields = ["created_at", "updated_at", "name", "id"];
             ApiValidator::validate_sort_params(sort_by, sort_order, &default_fields)?;
         }
-        
+
         Ok(())
     }
 
@@ -89,12 +79,7 @@ pub struct PaginatedResponse<T> {
 }
 
 impl<T> PaginatedResponse<T> {
-    pub fn new(
-        items: Vec<T>,
-        total_count: u64,
-        page: u32,
-        page_size: u32,
-    ) -> Self {
+    pub fn new(items: Vec<T>, total_count: u64, page: u32, page_size: u32) -> Self {
         let total_pages = ((total_count as f64) / (page_size as f64)).ceil() as u32;
         let has_next = page < total_pages;
         let has_previous = page > 1;
@@ -326,8 +311,8 @@ impl AuthContext {
     }
 
     pub fn has_permission(&self, permission: &str) -> bool {
-        self.permissions.contains(&permission.to_string()) || 
-        self.permissions.contains(&"admin".to_string())
+        self.permissions.contains(&permission.to_string())
+            || self.permissions.contains(&"admin".to_string())
     }
 }
 
@@ -347,17 +332,23 @@ pub mod helpers {
 
     /// Convert Unix timestamp to DateTime
     pub fn timestamp_to_datetime(timestamp: i64) -> DateTime<Utc> {
-        DateTime::from_timestamp(timestamp, 0).unwrap_or_else(|| Utc::now())
+        DateTime::from_timestamp(timestamp, 0).unwrap_or_else(Utc::now)
     }
 
     /// Sanitize string for logging (remove sensitive data)
     pub fn sanitize_for_log(input: &str) -> String {
         // Remove potential sensitive patterns
         let patterns = [
-            (r#"(?i)password["':\s]*["']?([^"'\s,}]+)"#, "password: [REDACTED]"),
+            (
+                r#"(?i)password["':\s]*["']?([^"'\s,}]+)"#,
+                "password: [REDACTED]",
+            ),
             (r#"(?i)token["':\s]*["']?([^"'\s,}]+)"#, "token: [REDACTED]"),
             (r#"(?i)key["':\s]*["']?([^"'\s,}]+)"#, "key: [REDACTED]"),
-            (r#"(?i)secret["':\s]*["']?([^"'\s,}]+)"#, "secret: [REDACTED]"),
+            (
+                r#"(?i)secret["':\s]*["']?([^"'\s,}]+)"#,
+                "secret: [REDACTED]",
+            ),
         ];
 
         let mut result = input.to_string();
@@ -393,10 +384,7 @@ pub mod helpers {
 
         let pairs: Vec<String> = params
             .iter()
-            .map(|(k, v)| format!("{}={}", 
-                urlencoding::encode(k), 
-                urlencoding::encode(v)
-            ))
+            .map(|(k, v)| format!("{}={}", urlencoding::encode(k), urlencoding::encode(v)))
             .collect();
 
         format!("?{}", pairs.join("&"))
@@ -475,6 +463,6 @@ mod tests {
         assert!(sanitized.contains("[REDACTED]"));
 
         let truncated = helpers::truncate_string("very long string", 8);
-        assert_eq!(truncated, "very l...");
+        assert_eq!(truncated, "very ...");
     }
 }

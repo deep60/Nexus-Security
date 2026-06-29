@@ -1,6 +1,5 @@
 // Smart contract interaction module
 use ethers::prelude::*;
-use std::sync::Arc;
 
 // Token contract ABI
 abigen!(

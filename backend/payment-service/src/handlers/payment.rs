@@ -1,8 +1,12 @@
-use axum::{extract::{State, Path}, response::Json, http::StatusCode};
+use crate::models::*;
+use crate::AppState;
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::Json,
+};
 use serde_json::{json, Value};
 use std::sync::Arc;
-use crate::AppState;
-use crate::models::*;
 
 /// Map a PaymentError to an HTTP status + JSON body.
 fn map_err(e: PaymentError) -> (StatusCode, Json<Value>) {
@@ -81,14 +85,20 @@ pub async fn get_balance(
     Path(address): Path<String>,
 ) -> (StatusCode, Json<Value>) {
     match state.payment_service.get_token_balance(&address).await {
-        Ok(balance) => (StatusCode::OK, Json(json!({
-            "address": address,
-            "balance": format!("{}", balance),
-            "token": "THREAT"
-        }))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
-            "error": format!("Failed to get balance: {}", e)
-        }))),
+        Ok(balance) => (
+            StatusCode::OK,
+            Json(json!({
+                "address": address,
+                "balance": format!("{}", balance),
+                "token": "THREAT"
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "error": format!("Failed to get balance: {}", e)
+            })),
+        ),
     }
 }
 
@@ -97,11 +107,14 @@ pub async fn get_transactions(
     Path(address): Path<String>,
 ) -> (StatusCode, Json<Value>) {
     // Transaction history is populated by blockchain event sync
-    (StatusCode::OK, Json(json!({
-        "address": address,
-        "transactions": [],
-        "note": "Transaction history is populated by blockchain event sync"
-    })))
+    (
+        StatusCode::OK,
+        Json(json!({
+            "address": address,
+            "transactions": [],
+            "note": "Transaction history is populated by blockchain event sync"
+        })),
+    )
 }
 
 pub async fn get_transaction_status(
@@ -115,20 +128,29 @@ pub async fn get_transaction_status(
             } else {
                 "failed"
             };
-            (StatusCode::OK, Json(json!({
-                "tx_hash": tx_hash,
-                "status": status,
-                "block_number": receipt.block_number.map(|n| n.as_u64()),
-                "gas_used": receipt.gas_used.map(|g| format!("{}", g))
-            })))
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "tx_hash": tx_hash,
+                    "status": status,
+                    "block_number": receipt.block_number.map(|n| n.as_u64()),
+                    "gas_used": receipt.gas_used.map(|g| format!("{g}"))
+                })),
+            )
         }
-        Ok(None) => (StatusCode::OK, Json(json!({
-            "tx_hash": tx_hash,
-            "status": "pending"
-        }))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
-            "error": format!("Failed to get transaction status: {}", e)
-        }))),
+        Ok(None) => (
+            StatusCode::OK,
+            Json(json!({
+                "tx_hash": tx_hash,
+                "status": "pending"
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "error": format!("Failed to get transaction status: {}", e)
+            })),
+        ),
     }
 }
 
@@ -137,12 +159,18 @@ pub async fn estimate_gas(
     Json(_payload): Json<EstimateGasRequest>,
 ) -> (StatusCode, Json<Value>) {
     match state.payment_service.estimate_gas_for_transfer().await {
-        Ok(gas) => (StatusCode::OK, Json(json!({
-            "estimated_gas_cost": format!("{}", gas),
-            "unit": "wei"
-        }))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
-            "error": format!("Failed to estimate gas: {}", e)
-        }))),
+        Ok(gas) => (
+            StatusCode::OK,
+            Json(json!({
+                "estimated_gas_cost": format!("{}", gas),
+                "unit": "wei"
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "error": format!("Failed to estimate gas: {}", e)
+            })),
+        ),
     }
 }

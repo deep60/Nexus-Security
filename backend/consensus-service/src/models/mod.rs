@@ -10,16 +10,16 @@ pub type ConsensusResult<T> = Result<T, ConsensusError>;
 pub enum ConsensusError {
     #[error("Validation error: {0}")]
     ValidationError(String),
-    
+
     #[error("Database error: {0}")]
     DatabaseError(String),
-    
+
     #[error("Not found: {0}")]
     NotFound(String),
-    
+
     #[error("Insufficient submissions: need {required}, got {actual}")]
     InsufficientSubmissions { required: usize, actual: usize },
-    
+
     #[error("Consensus failed: {0}")]
     ConsensusFailed(String),
 }
@@ -33,6 +33,7 @@ pub enum Verdict {
     Unknown,
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for Verdict {
     fn to_string(&self) -> String {
         match self {
@@ -72,7 +73,7 @@ pub struct SubmissionVote {
     pub submitted_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct VerdictDistribution {
     pub malicious: VoteStats,
     pub benign: VoteStats,
@@ -148,17 +149,6 @@ pub struct ResolveDisputeRequest {
     pub resolution: String,
     pub final_verdict: Verdict,
     pub compensation: Option<Decimal>,
-}
-
-impl Default for VerdictDistribution {
-    fn default() -> Self {
-        Self {
-            malicious: VoteStats::default(),
-            benign: VoteStats::default(),
-            suspicious: VoteStats::default(),
-            unknown: VoteStats::default(),
-        }
-    }
 }
 
 impl Default for VoteStats {

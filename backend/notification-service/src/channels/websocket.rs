@@ -1,15 +1,13 @@
 use async_trait::async_trait;
-use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{RwLock, mpsc};
-use tokio_tungstenite::tungstenite::Message;
-use tracing::{error, info, warn};
+use tokio::sync::{mpsc, RwLock};
+use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::models::{NotificationChannel, NotificationError, NotificationResult};
-use shared::messaging::event_types::{VerdyxEvent, NotificationPayload};
+use shared::messaging::event_types::{NotificationPayload, VerdyxEvent};
 
 /// WebSocket notification channel implementation
 /// Maintains active WebSocket connections and broadcasts notifications to connected clients
@@ -27,11 +25,7 @@ impl WebSocketChannel {
     }
 
     /// Register a new WebSocket connection for a user
-    pub async fn register_connection(
-        &self,
-        user_id: Uuid,
-        connection: WebSocketConnection,
-    ) {
+    pub async fn register_connection(&self, user_id: Uuid, connection: WebSocketConnection) {
         let mut connections = self.connections.write().await;
         connections
             .entry(user_id)
@@ -194,14 +188,10 @@ impl Default for WebSocketChannel {
 
 #[async_trait]
 impl NotificationChannel for WebSocketChannel {
-    async fn send(
-        &self,
-        payload: &NotificationPayload,
-        recipient: &str,
-    ) -> NotificationResult<()> {
+    async fn send(&self, payload: &NotificationPayload, recipient: &str) -> NotificationResult<()> {
         // Parse user_id from recipient
         let user_id = Uuid::parse_str(recipient)
-            .map_err(|e| NotificationError::ValidationError(format!("Invalid user ID: {}", e)))?;
+            .map_err(|e| NotificationError::ValidationError(format!("Invalid user ID: {e}")))?;
 
         info!(
             "Sending WebSocket notification to user {} for event: {}",
@@ -228,7 +218,7 @@ impl NotificationChannel for WebSocketChannel {
     async fn validate_recipient(&self, recipient: &str) -> NotificationResult<bool> {
         Uuid::parse_str(recipient)
             .map(|_| true)
-            .map_err(|e| NotificationError::ValidationError(format!("Invalid user ID: {}", e)))
+            .map_err(|e| NotificationError::ValidationError(format!("Invalid user ID: {e}")))
     }
 }
 
@@ -294,9 +284,13 @@ pub struct WebSocketMessage {
 #[serde(tag = "type", content = "data")]
 pub enum WebSocketControlMessage {
     /// Ping message to keep connection alive
-    Ping { timestamp: chrono::DateTime<chrono::Utc> },
+    Ping {
+        timestamp: chrono::DateTime<chrono::Utc>,
+    },
     /// Pong response
-    Pong { timestamp: chrono::DateTime<chrono::Utc> },
+    Pong {
+        timestamp: chrono::DateTime<chrono::Utc>,
+    },
     /// Subscribe to specific event types
     Subscribe { events: Vec<String> },
     /// Unsubscribe from event types
@@ -321,7 +315,7 @@ pub struct WebSocketSubscription {
 mod tests {
     use super::*;
     use chrono::Utc;
-    use shared::messaging::event_types::{BountyCreatedEvent, NotificationPriority};
+    use shared::messaging::event_types::BountyCreatedEvent;
 
     #[tokio::test]
     async fn test_register_and_unregister_connection() {

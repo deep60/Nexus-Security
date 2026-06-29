@@ -123,8 +123,10 @@ pub struct EmailValidator;
 impl EmailValidator {
     /// Validate email format using regex
     pub fn validate(email: &str) -> ValidationResult<()> {
+        // Requires a domain with at least one dot (a TLD), so intranet-style
+        // addresses like "user@domain" are rejected.
         let email_regex = Regex::new(
-            r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
+            r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$"
         ).unwrap();
 
         if email_regex.is_match(email) {
@@ -143,8 +145,7 @@ impl EmailValidator {
             Ok(())
         } else {
             Err(ValidationError::InvalidEmail(format!(
-                "Domain {} not in allowed list",
-                domain
+                "Domain {domain} not in allowed list"
             )))
         }
     }
@@ -213,7 +214,7 @@ impl FileValidator {
 
     /// Validate file extension
     pub fn validate_extension(filename: &str, rules: &FileValidationRules) -> ValidationResult<()> {
-        let extension = filename.split('.').last().unwrap_or("").to_lowercase();
+        let extension = filename.split('.').next_back().unwrap_or("").to_lowercase();
 
         if rules.allowed_extensions.is_empty() || rules.allowed_extensions.contains(&extension) {
             Ok(())
@@ -257,7 +258,7 @@ impl FileValidator {
 
     /// Validate file type based on extension
     pub fn validate_file_type(filename: &str, allowed_types: &[&str]) -> ValidationResult<()> {
-        if let Some(extension) = filename.split('.').last() {
+        if let Some(extension) = filename.split('.').next_back() {
             let ext = extension.to_lowercase();
             if allowed_types.contains(&ext.as_str()) {
                 Ok(())
@@ -469,8 +470,7 @@ impl NumericValidator {
             Ok(())
         } else {
             Err(ValidationError::InvalidReputationScore(format!(
-                "Reputation score {} exceeds maximum 1000",
-                score
+                "Reputation score {score} exceeds maximum 1000"
             )))
         }
     }
@@ -489,8 +489,7 @@ impl NumericValidator {
 
         if timestamp < one_year_ago || timestamp > one_year_future {
             Err(ValidationError::InvalidTimestamp(format!(
-                "Timestamp {} is outside reasonable range",
-                timestamp
+                "Timestamp {timestamp} is outside reasonable range"
             )))
         } else {
             Ok(())
@@ -597,7 +596,7 @@ impl BountyValidator {
         bounty_id: &str,
         analysis_result: &str,
         confidence_score: f64,
-        is_malicious: bool,
+        _is_malicious: bool,
     ) -> ValidationResult<()> {
         // Validate bounty ID format (UUID)
         UuidValidator::validate_uuid_v4(bounty_id)?;
@@ -644,7 +643,7 @@ impl ApiValidator {
             });
         }
 
-        if page_size < 1 || page_size > 100 {
+        if !(1..=100).contains(&page_size) {
             return Err(ValidationError::ValueOutOfRange {
                 value: page_size as f64,
                 min: 1.0,

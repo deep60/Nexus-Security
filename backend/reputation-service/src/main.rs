@@ -1,10 +1,15 @@
+// Pre-production scaffolding: some items are intentionally unused while
+// features are wired up. This crate-level allow keeps `clippy -D warnings`
+// green without deleting code we are about to use. Remove before GA.
+#![allow(dead_code)]
+
+mod analytics;
 mod config;
 mod handlers;
 mod models;
 mod scoring;
 mod services;
 mod workers;
-mod analytics;
 
 use anyhow::Result;
 use axum::{
@@ -12,10 +17,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-use tower_http::{
-    cors::CorsLayer,
-    trace::TraceLayer,
-};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{info, warn};
 
 use crate::config::Config;
@@ -58,12 +60,7 @@ async fn main() -> Result<()> {
 
     // Initialize reputation service
     let reputation_service = Arc::new(
-        ReputationService::new(
-            config.clone(),
-            db_pool.clone(),
-            redis_conn.clone(),
-        )
-        .await?,
+        ReputationService::new(config.clone(), db_pool.clone(), redis_conn.clone()).await?,
     );
     info!("Reputation service initialized");
 
@@ -105,7 +102,7 @@ async fn main() -> Result<()> {
         .split(',')
         .filter_map(|origin| origin.trim().parse::<axum::http::HeaderValue>().ok())
         .collect();
-    
+
     let cors = CorsLayer::new()
         .allow_origin(allowed_origins)
         .allow_methods([
@@ -127,20 +124,56 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .route("/health", get(handlers::health::health_check))
         // Reputation endpoints
-        .route("/api/v1/reputation/user/:user_id", get(handlers::reputation::get_user_reputation))
-        .route("/api/v1/reputation/user/:user_id/history", get(handlers::reputation::get_reputation_history))
-        .route("/api/v1/reputation/user/:user_id/update", post(handlers::reputation::update_reputation))
-        .route("/api/v1/reputation/engine/:engine_id", get(handlers::reputation::get_engine_reputation))
-        .route("/api/v1/reputation/leaderboard", get(handlers::reputation::get_leaderboard))
-        .route("/api/v1/reputation/badges/:user_id", get(handlers::reputation::get_user_badges))
+        .route(
+            "/api/v1/reputation/user/:user_id",
+            get(handlers::reputation::get_user_reputation),
+        )
+        .route(
+            "/api/v1/reputation/user/:user_id/history",
+            get(handlers::reputation::get_reputation_history),
+        )
+        .route(
+            "/api/v1/reputation/user/:user_id/update",
+            post(handlers::reputation::update_reputation),
+        )
+        .route(
+            "/api/v1/reputation/engine/:engine_id",
+            get(handlers::reputation::get_engine_reputation),
+        )
+        .route(
+            "/api/v1/reputation/leaderboard",
+            get(handlers::reputation::get_leaderboard),
+        )
+        .route(
+            "/api/v1/reputation/badges/:user_id",
+            get(handlers::reputation::get_user_badges),
+        )
         // Analytics endpoints
-        .route("/api/v1/analytics/reputation/trends", get(handlers::analytics::get_reputation_trends))
-        .route("/api/v1/analytics/reputation/distribution", get(handlers::analytics::get_score_distribution))
-        .route("/api/v1/analytics/accuracy/stats", get(handlers::analytics::get_accuracy_stats))
+        .route(
+            "/api/v1/analytics/reputation/trends",
+            get(handlers::analytics::get_reputation_trends),
+        )
+        .route(
+            "/api/v1/analytics/reputation/distribution",
+            get(handlers::analytics::get_score_distribution),
+        )
+        .route(
+            "/api/v1/analytics/accuracy/stats",
+            get(handlers::analytics::get_accuracy_stats),
+        )
         // Admin endpoints
-        .route("/api/v1/admin/reputation/recalculate/:user_id", post(handlers::admin::recalculate_reputation))
-        .route("/api/v1/admin/reputation/reset/:user_id", post(handlers::admin::reset_reputation))
-        .route("/api/v1/admin/badges/award", post(handlers::admin::award_badge))
+        .route(
+            "/api/v1/admin/reputation/recalculate/:user_id",
+            post(handlers::admin::recalculate_reputation),
+        )
+        .route(
+            "/api/v1/admin/reputation/reset/:user_id",
+            post(handlers::admin::reset_reputation),
+        )
+        .route(
+            "/api/v1/admin/badges/award",
+            post(handlers::admin::award_badge),
+        )
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);

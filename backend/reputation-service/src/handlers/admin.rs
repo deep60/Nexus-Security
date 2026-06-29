@@ -11,8 +11,12 @@ use uuid::Uuid;
 use crate::AppState;
 
 fn parse_uuid(s: &str) -> Result<Uuid, (StatusCode, Json<Value>)> {
-    Uuid::parse_str(s)
-        .map_err(|_| (StatusCode::BAD_REQUEST, Json(json!({ "error": "invalid id" }))))
+    Uuid::parse_str(s).map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid id" })),
+        )
+    })
 }
 
 /// Recompute ranks (and re-evaluate this user's badges).
@@ -53,7 +57,10 @@ pub async fn reset_reputation(
     };
 
     match state.reputation_service.reset(user_id).await {
-        Ok(()) => (StatusCode::OK, Json(json!({ "message": "reputation reset" }))),
+        Ok(()) => (
+            StatusCode::OK,
+            Json(json!({ "message": "reputation reset" })),
+        ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -71,7 +78,11 @@ pub async fn award_badge(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<AwardBadgeRequest>,
 ) -> (StatusCode, Json<Value>) {
-    match state.reputation_service.evaluate_badges(payload.user_id).await {
+    match state
+        .reputation_service
+        .evaluate_badges(payload.user_id)
+        .await
+    {
         Ok(awarded) => (
             StatusCode::OK,
             Json(json!({ "message": "evaluated", "badges_awarded": awarded })),

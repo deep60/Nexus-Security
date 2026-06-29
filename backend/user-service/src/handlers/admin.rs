@@ -54,9 +54,7 @@ pub async fn list_users(
     Query(query): Query<ListUsersQuery>,
 ) -> Result<Json<UserListResponse>, AppError> {
     if !claims.is_admin {
-        return Err(AppError::Unauthorized(
-            "Admin access required".to_string(),
-        ));
+        return Err(AppError::Unauthorized("Admin access required".to_string()));
     }
 
     let page = query.page.unwrap_or(1);
@@ -68,27 +66,27 @@ pub async fn list_users(
     let mut count_str = "SELECT COUNT(*) FROM users WHERE 1=1".to_string();
 
     if let Some(search) = &query.search {
-        let search_clause = format!(
-            " AND (username ILIKE '%{}%' OR email ILIKE '%{}%')",
-            search, search
-        );
+        let search_clause =
+            format!(" AND (username ILIKE '%{search}%' OR email ILIKE '%{search}%')");
         query_str.push_str(&search_clause);
         count_str.push_str(&search_clause);
     }
 
     if let Some(kyc_status) = &query.kyc_status {
-        let kyc_clause = format!(" AND kyc_status = '{}'", kyc_status);
+        let kyc_clause = format!(" AND kyc_status = '{kyc_status}'");
         query_str.push_str(&kyc_clause);
         count_str.push_str(&kyc_clause);
     }
 
     if let Some(is_active) = query.is_active {
-        let active_clause = format!(" AND is_active = {}", is_active);
+        let active_clause = format!(" AND is_active = {is_active}");
         query_str.push_str(&active_clause);
         count_str.push_str(&active_clause);
     }
 
-    query_str.push_str(&format!(" ORDER BY created_at DESC LIMIT {} OFFSET {}", limit, offset));
+    query_str.push_str(&format!(
+        " ORDER BY created_at DESC LIMIT {limit} OFFSET {offset}"
+    ));
 
     // Execute queries
     let users: Vec<User> = sqlx::query_as(&query_str)
@@ -132,9 +130,7 @@ pub async fn get_user(
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<User>, AppError> {
     if !claims.is_admin {
-        return Err(AppError::Unauthorized(
-            "Admin access required".to_string(),
-        ));
+        return Err(AppError::Unauthorized("Admin access required".to_string()));
     }
 
     let user = state.user_service.get_user_by_id(user_id).await?;
@@ -149,9 +145,7 @@ pub async fn suspend_user(
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<MessageResponse>, AppError> {
     if !claims.is_admin {
-        return Err(AppError::Unauthorized(
-            "Admin access required".to_string(),
-        ));
+        return Err(AppError::Unauthorized("Admin access required".to_string()));
     }
 
     sqlx::query("UPDATE users SET is_active = false WHERE id = $1")
@@ -172,9 +166,7 @@ pub async fn activate_user(
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<MessageResponse>, AppError> {
     if !claims.is_admin {
-        return Err(AppError::Unauthorized(
-            "Admin access required".to_string(),
-        ));
+        return Err(AppError::Unauthorized("Admin access required".to_string()));
     }
 
     sqlx::query("UPDATE users SET is_active = true WHERE id = $1")
@@ -195,9 +187,7 @@ pub async fn approve_kyc(
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<MessageResponse>, AppError> {
     if !claims.is_admin {
-        return Err(AppError::Unauthorized(
-            "Admin access required".to_string(),
-        ));
+        return Err(AppError::Unauthorized("Admin access required".to_string()));
     }
 
     let admin_id = Uuid::parse_str(&claims.sub)
@@ -246,9 +236,7 @@ pub async fn reject_kyc(
     Json(req): Json<RejectKycRequest>,
 ) -> Result<Json<MessageResponse>, AppError> {
     if !claims.is_admin {
-        return Err(AppError::Unauthorized(
-            "Admin access required".to_string(),
-        ));
+        return Err(AppError::Unauthorized("Admin access required".to_string()));
     }
 
     let admin_id = Uuid::parse_str(&claims.sub)

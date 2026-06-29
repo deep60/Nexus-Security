@@ -1,10 +1,9 @@
 // backend/bounty-manager/src/services/ranking.rs
 
+use crate::models::ReputationModel;
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::collections::HashMap;
-use chrono::{DateTime, Utc, Duration};
-use crate::models::ReputationModel;
 
 /// Service for ranking and leaderboard management
 #[derive(Clone)]
@@ -104,15 +103,16 @@ impl RankingService {
         limit: u32,
     ) -> Result<LeaderboardResponse, RankingError> {
         let time_cutoff = self.time_period_to_cutoff(&filters.time_period);
-        let category = filters.category.clone().unwrap_or(LeaderboardCategory::OverallScore);
+        let category = filters
+            .category
+            .clone()
+            .unwrap_or(LeaderboardCategory::OverallScore);
 
         // Query reputations table with optional time filter
-        let mut query = String::from(
-            "SELECT * FROM reputations WHERE updated_at >= $1"
-        );
+        let mut query = String::from("SELECT * FROM reputations WHERE updated_at >= $1");
 
         if let Some(min_subs) = filters.min_submissions {
-            query.push_str(&format!(" AND total_submissions >= {}", min_subs));
+            query.push_str(&format!(" AND total_submissions >= {min_subs}"));
         }
 
         let order_clause = match &category {
@@ -122,20 +122,19 @@ impl RankingService {
             _ => " ORDER BY reputation_score DESC",
         };
         query.push_str(order_clause);
-        query.push_str(&format!(" LIMIT {}", limit));
+        query.push_str(&format!(" LIMIT {limit}"));
 
         let records = sqlx::query_as::<_, ReputationModel>(&query)
             .bind(time_cutoff)
             .fetch_all(&self.db)
             .await?;
 
-        let total_count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM reputations WHERE updated_at >= $1"
-        )
-        .bind(time_cutoff)
-        .fetch_one(&self.db)
-        .await
-        .unwrap_or((0,));
+        let total_count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM reputations WHERE updated_at >= $1")
+                .bind(time_cutoff)
+                .fetch_one(&self.db)
+                .await
+                .unwrap_or((0,));
 
         let rankings: Vec<EngineRanking> = records
             .into_iter()
@@ -159,13 +158,12 @@ impl RankingService {
             .ok_or_else(|| RankingError::EngineNotFound(engine_id.to_string()))?;
 
         // Calculate rank position by counting engines with higher scores
-        let rank_row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) + 1 FROM reputations WHERE reputation_score > $1"
-        )
-        .bind(reputation.reputation_score)
-        .fetch_one(&self.db)
-        .await
-        .unwrap_or((1,));
+        let rank_row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) + 1 FROM reputations WHERE reputation_score > $1")
+                .bind(reputation.reputation_score)
+                .fetch_one(&self.db)
+                .await
+                .unwrap_or((1,));
 
         Ok(self.reputation_to_ranking(rank_row.0 as u32, reputation))
     }
@@ -210,7 +208,10 @@ impl RankingService {
     }
 
     /// Check and award badges based on engine performance from DB
-    pub async fn check_and_award_badges(&self, engine_id: &str) -> Result<Vec<Badge>, RankingError> {
+    pub async fn check_and_award_badges(
+        &self,
+        engine_id: &str,
+    ) -> Result<Vec<Badge>, RankingError> {
         let mut new_badges = Vec::new();
         let now = Utc::now();
 
@@ -305,10 +306,7 @@ impl RankingService {
             LeaderboardCategory::OverallScore => "reputation_score DESC",
         };
 
-        let query = format!(
-            "SELECT * FROM reputations ORDER BY {} LIMIT $1",
-            order_clause
-        );
+        let query = format!("SELECT * FROM reputations ORDER BY {order_clause} LIMIT $1");
 
         let records = sqlx::query_as::<_, ReputationModel>(&query)
             .bind(limit as i64)
@@ -362,7 +360,10 @@ impl RankingService {
     }
 
     /// Get comparative stats (engine vs global averages) from DB
-    pub async fn get_comparative_stats(&self, engine_id: &str) -> Result<ComparativeStats, RankingError> {
+    pub async fn get_comparative_stats(
+        &self,
+        engine_id: &str,
+    ) -> Result<ComparativeStats, RankingError> {
         let reputation = ReputationModel::find_by_id(&self.db, engine_id)
             .await?
             .ok_or_else(|| RankingError::EngineNotFound(engine_id.to_string()))?;
@@ -381,13 +382,12 @@ impl RankingService {
             .await
             .unwrap_or((1,));
 
-        let engines_below: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM reputations WHERE reputation_score < $1"
-        )
-        .bind(reputation.reputation_score)
-        .fetch_one(&self.db)
-        .await
-        .unwrap_or((0,));
+        let engines_below: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM reputations WHERE reputation_score < $1")
+                .bind(reputation.reputation_score)
+                .fetch_one(&self.db)
+                .await
+                .unwrap_or((0,));
 
         let percentile = if total_engines.0 > 0 {
             (engines_below.0 as f32 / total_engines.0 as f32) * 100.0
@@ -478,10 +478,16 @@ mod tests {
 
     #[test]
     fn test_tier_calculation() {
-        assert_eq!(RankingService::calculate_tier(85.0), RankingTier::GrandMaster);
+        assert_eq!(
+            RankingService::calculate_tier(85.0),
+            RankingTier::GrandMaster
+        );
         assert_eq!(RankingService::calculate_tier(65.0), RankingTier::Master);
         assert_eq!(RankingService::calculate_tier(45.0), RankingTier::Expert);
-        assert_eq!(RankingService::calculate_tier(25.0), RankingTier::Apprentice);
+        assert_eq!(
+            RankingService::calculate_tier(25.0),
+            RankingTier::Apprentice
+        );
         assert_eq!(RankingService::calculate_tier(10.0), RankingTier::Novice);
     }
 
@@ -494,7 +500,7 @@ mod tests {
             50000,     // 50k rewards
         );
 
-        assert!(score >= 70.0 && score <= 100.0);
+        assert!((70.0..=100.0).contains(&score));
     }
 
     #[test]

@@ -31,19 +31,19 @@ impl PayoutModel {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING *
-            "#
+            "#,
         )
-        .bind(&payout.id)
-        .bind(&payout.bounty_id)
-        .bind(&payout.submission_id)
+        .bind(payout.id)
+        .bind(payout.bounty_id)
+        .bind(payout.submission_id)
         .bind(&payout.recipient)
         .bind(payout.amount)
         .bind(&payout.currency)
         .bind(&payout.payout_type)
         .bind(&payout.status)
         .bind(&payout.transaction_hash)
-        .bind(&payout.created_at)
-        .bind(&payout.processed_at)
+        .bind(payout.created_at)
+        .bind(payout.processed_at)
         .bind(&payout.metadata)
         .fetch_one(pool)
         .await?;
@@ -52,19 +52,20 @@ impl PayoutModel {
     }
 
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<PayoutModel>, sqlx::Error> {
-        let record = sqlx::query_as::<_, PayoutModel>(
-            "SELECT * FROM payouts WHERE id = $1"
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
+        let record = sqlx::query_as::<_, PayoutModel>("SELECT * FROM payouts WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
 
         Ok(record)
     }
 
-    pub async fn find_by_bounty(pool: &PgPool, bounty_id: Uuid) -> Result<Vec<PayoutModel>, sqlx::Error> {
+    pub async fn find_by_bounty(
+        pool: &PgPool,
+        bounty_id: Uuid,
+    ) -> Result<Vec<PayoutModel>, sqlx::Error> {
         let records = sqlx::query_as::<_, PayoutModel>(
-            "SELECT * FROM payouts WHERE bounty_id = $1 ORDER BY created_at DESC"
+            "SELECT * FROM payouts WHERE bounty_id = $1 ORDER BY created_at DESC",
         )
         .bind(bounty_id)
         .fetch_all(pool)
@@ -73,9 +74,12 @@ impl PayoutModel {
         Ok(records)
     }
 
-    pub async fn find_by_recipient(pool: &PgPool, recipient: &str) -> Result<Vec<PayoutModel>, sqlx::Error> {
+    pub async fn find_by_recipient(
+        pool: &PgPool,
+        recipient: &str,
+    ) -> Result<Vec<PayoutModel>, sqlx::Error> {
         let records = sqlx::query_as::<_, PayoutModel>(
-            "SELECT * FROM payouts WHERE recipient = $1 ORDER BY created_at DESC"
+            "SELECT * FROM payouts WHERE recipient = $1 ORDER BY created_at DESC",
         )
         .bind(recipient)
         .fetch_all(pool)
@@ -105,7 +109,7 @@ impl PayoutModel {
 
     pub async fn get_pending(pool: &PgPool) -> Result<Vec<PayoutModel>, sqlx::Error> {
         let records = sqlx::query_as::<_, PayoutModel>(
-            "SELECT * FROM payouts WHERE status = 'Pending' ORDER BY created_at ASC"
+            "SELECT * FROM payouts WHERE status = 'Pending' ORDER BY created_at ASC",
         )
         .fetch_all(pool)
         .await?;

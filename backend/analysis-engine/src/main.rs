@@ -1,39 +1,43 @@
+// Pre-production scaffolding: some items are intentionally unused while
+// features are wired up. This crate-level allow keeps `clippy -D warnings`
+// green without deleting code we are about to use. Remove before GA.
+#![allow(dead_code)]
+
 use std::env;
 use std::sync::Arc;
 
 use axum::{
     extract::{Multipart, Path, State},
-    response::Json,
     http::StatusCode,
+    response::Json,
     routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
-use tower::ServiceBuilder;
+use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::error;
-use uuid::Uuid;
-use tokio::net::TcpListener;
 use tracing::info;
+use uuid::Uuid;
 
 mod analyzers;
 mod models;
-mod utils;
-mod storage;
-mod scanners;
-mod sandbox;
 mod queue;
+mod sandbox;
+mod scanners;
+mod storage;
+mod utils;
 
-use crate::scanners::Scanner;
-use crate::analyzers::{AnalysisEngine, AnalysisEngineConfig, FileAnalysisRequest, AnalysisOptions, AnalysisPriority};
 use crate::analyzers::hash_analyzer::{HashInfo, HashType};
-use crate::models::analysis_result::{AnalysisResult, ThreatVerdict, FileMetadata};
-use crate::utils::file_handler::FileHandler;
-use crate::storage::S3Client;
+use crate::analyzers::{
+    AnalysisEngine, AnalysisEngineConfig, AnalysisOptions, FileAnalysisRequest,
+};
 use crate::scanners::file_scanner::{FileScanner, FileScannerConfig};
 use crate::scanners::url_scanner::{UrlScanner, UrlScannerConfig};
+use crate::scanners::Scanner;
+use crate::storage::S3Client;
+use crate::utils::file_handler::FileHandler;
 use chrono::Utc;
-use std::time::Duration;
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
@@ -47,7 +51,7 @@ pub struct AppState {
 }
 #[derive(Deserialize)]
 struct AnalysisRequest {
-    artifact_type: String,    // "file", "url", "hash"
+    artifact_type: String, // "file", "url", "hash"
     priority: Option<u8>,
     bounty_id: Option<String>,
     metadata: Option<serde_json::Value>,
@@ -83,19 +87,16 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     info!("Starting Verdyx Analysis Engine");
 
     // Load configuration
-    let database_url = env::var("DATABASE_URL")
-        .map_err(|_| anyhow::anyhow!("DATABASE_URL must be set"))?;
-    let redis_url = env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let database_url =
+        env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL must be set"))?;
+    let redis_url = env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let port = env::var("SERVER_PORT")
         .or_else(|_| env::var("PORT"))
         .unwrap_or_else(|_| "8082".to_string())
         .parse::<u16>()
         .unwrap_or(8082);
-    let yara_rule_path = env::var("YARA_RULE_PATH")
-        .unwrap_or_else(|_| "./rules".to_string());
-    let upload_dir = env::var("UPLOAD_DIR")
-        .unwrap_or_else(|_| "./temp/verdyx-uploads".to_string());
+    let yara_rule_path = env::var("YARA_RULE_PATH").unwrap_or_else(|_| "./rules".to_string());
+    let upload_dir = env::var("UPLOAD_DIR").unwrap_or_else(|_| "./temp/verdyx-uploads".to_string());
 
     // Initialize database connection pool with proper error handling
     info!("Connecting to database...");
@@ -106,7 +107,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
         Err(e) => {
             error!("Failed to connect to database: {}", e);
-            return Err(anyhow::anyhow!("Database connection failed: {}", e).into());
+            return Err(anyhow::anyhow!("Database connection failed: {e}").into());
         }
     };
 
@@ -126,15 +127,15 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         Ok(client) => client,
         Err(e) => {
             error!("Failed to create Redis client: {}", e);
-            return Err(anyhow::anyhow!("Redis client creation failed: {}", e).into());
+            return Err(anyhow::anyhow!("Redis client creation failed: {e}").into());
         }
     };
-    
+
     match redis_client.get_multiplexed_async_connection().await {
         Ok(_) => info!("Redis connection established"),
         Err(e) => {
             error!("Failed to connect to Redis: {}", e);
-            return Err(anyhow::anyhow!("Redis connection failed: {}", e).into());
+            return Err(anyhow::anyhow!("Redis connection failed: {e}").into());
         }
     }
 
@@ -220,7 +221,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .layer(TraceLayer::new_for_http());
 
     // Start the server
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("0.0.0.0:{port}");
     info!("Analysis Engine listening on {}", addr);
 
     let listener = TcpListener::bind(&addr).await?;
@@ -230,15 +231,15 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn health_check() -> Json<HealthResponse> {
-    Json(HealthResponse { 
-        status: "healthy".to_string(), 
-        service: "analysis-engine".to_string(), 
-        version: env!("CARGO_PKG_VERSION").to_string(), 
-        engines: EngineStatus { 
-            static_analyzer: true, 
-            hash_analyzer: true, 
-            yara_engine: true, 
-        }, 
+    Json(HealthResponse {
+        status: "healthy".to_string(),
+        service: "analysis-engine".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        engines: EngineStatus {
+            static_analyzer: true,
+            hash_analyzer: true,
+            yara_engine: true,
+        },
     })
 }
 
@@ -248,7 +249,7 @@ async fn analyze_file(
 ) -> Result<Json<AnalysisResponse>, StatusCode> {
     info!("Received file analysis request");
 
-    let analysis_id = Uuid::new_v4().to_string();
+    let _analysis_id = Uuid::new_v4().to_string();
 
     // Process multipart data
     let mut file_data = Vec::new();
@@ -262,10 +263,14 @@ async fn analyze_file(
         let name = field.name().map(|s| s.to_string()).unwrap_or_default();
         if name == "file" {
             filename = field.file_name().map(|s| s.to_string()).unwrap_or_default();
-            file_data = field.bytes().await.map_err(|e| {
-                error!("Failed to read file bytes: {}", e);
-                StatusCode::BAD_REQUEST
-            })?.to_vec();
+            file_data = field
+                .bytes()
+                .await
+                .map_err(|e| {
+                    error!("Failed to read file bytes: {}", e);
+                    StatusCode::BAD_REQUEST
+                })?
+                .to_vec();
         } else if name == "request" {
             let json_str = field.text().await.map_err(|e| {
                 error!("Failed to read request json: {}", e);
@@ -323,12 +328,14 @@ async fn analyze_file(
 }
 
 async fn analyze_url(
-    State(state): State<AppState>, 
+    State(state): State<AppState>,
     Json(request): Json<serde_json::Value>,
 ) -> Result<Json<AnalysisResponse>, StatusCode> {
-    let url = request.get("url")
+    let url = request
+        .get("url")
         .and_then(|v| v.as_str())
-        .ok_or(StatusCode::BAD_REQUEST)?.to_string();
+        .ok_or(StatusCode::BAD_REQUEST)?
+        .to_string();
 
     let analysis_id = Uuid::new_v4().to_string();
 
@@ -349,16 +356,18 @@ async fn analyze_url(
 }
 
 async fn analyze_hash(
-    State(state): State<AppState>, 
+    State(state): State<AppState>,
     Json(request): Json<serde_json::Value>,
 ) -> Result<Json<AnalysisResponse>, StatusCode> {
     info!("Received hash analysis request");
 
     let analysis_id = Uuid::new_v4().to_string();
 
-    let hash = request.get("hash")
+    let hash = request
+        .get("hash")
         .and_then(|v| v.as_str())
-        .ok_or(StatusCode::BAD_REQUEST)?.to_string();
+        .ok_or(StatusCode::BAD_REQUEST)?
+        .to_string();
 
     let state_clone = state.clone();
     let analysis_id_clone = analysis_id.clone();
@@ -385,6 +394,7 @@ async fn get_analysis_result(
 
     let analysis_id = Uuid::parse_str(&id).map_err(|_| StatusCode::BAD_REQUEST)?;
 
+    #[allow(clippy::type_complexity)]
     let row: Option<(String, Option<String>, Option<f32>, chrono::DateTime<Utc>, Option<chrono::DateTime<Utc>>)> = sqlx::query_as(
         "SELECT status, verdict, confidence, created_at, completed_at FROM engine_analysis_results WHERE analysis_id = $1"
     )
@@ -419,16 +429,15 @@ async fn get_detailed_analysis(
 
     let analysis_id = Uuid::parse_str(&id).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    let row: Option<(serde_json::Value,)> = sqlx::query_as(
-        "SELECT result_data FROM engine_analysis_results WHERE analysis_id = $1"
-    )
-    .bind(analysis_id)
-    .fetch_optional(&state.db)
-    .await
-    .map_err(|e| {
-        error!("Failed to query detailed analysis: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let row: Option<(serde_json::Value,)> =
+        sqlx::query_as("SELECT result_data FROM engine_analysis_results WHERE analysis_id = $1")
+            .bind(analysis_id)
+            .fetch_optional(&state.db)
+            .await
+            .map_err(|e| {
+                error!("Failed to query detailed analysis: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
 
     match row {
         Some((result_data,)) => Ok(Json(result_data)),
@@ -436,9 +445,7 @@ async fn get_detailed_analysis(
     }
 }
 
-async fn engines_status(
-    State(_state): State<AppState>
-) -> Json<EngineStatus> {
+async fn engines_status(State(_state): State<AppState>) -> Json<EngineStatus> {
     Json(EngineStatus {
         static_analyzer: true,
         hash_analyzer: true,
@@ -491,7 +498,10 @@ async fn perform_url_analysis(
     let confidence = scan_result.base.confidence_score;
     let result_json = serde_json::to_value(&scan_result).unwrap_or_default();
 
-    info!("URL analysis completed for: {} - Verdict: {}", analysis_id, verdict);
+    info!(
+        "URL analysis completed for: {} - Verdict: {}",
+        analysis_id, verdict
+    );
 
     // Update with results
     sqlx::query(
@@ -523,7 +533,10 @@ async fn perform_hash_analysis(
         computed_at: chrono::Utc::now(),
     };
 
-    info!("Hash analysis requested for hash: {} (type: {:?})", hash_info.hash_value, hash_info.hash_type);
+    info!(
+        "Hash analysis requested for hash: {} (type: {:?})",
+        hash_info.hash_value, hash_info.hash_type
+    );
 
     // Persist hash analysis result
     let result_json = serde_json::json!({

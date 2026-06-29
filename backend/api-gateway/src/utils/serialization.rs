@@ -1,4 +1,4 @@
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
@@ -69,32 +69,25 @@ impl JsonUtils {
     /// Extract string field
     pub fn extract_string(value: &Value, field_name: &str) -> SerializationResult<String> {
         let field = Self::extract_field(value, field_name)?;
-        field
-            .as_str()
-            .map(|s| s.to_string())
-            .ok_or_else(|| SerializationError::InvalidFormat(format!(
-                "Field '{}' is not a string", field_name
-            )))
+        field.as_str().map(|s| s.to_string()).ok_or_else(|| {
+            SerializationError::InvalidFormat(format!("Field '{field_name}' is not a string"))
+        })
     }
 
     /// Extract number field as u64
     pub fn extract_u64(value: &Value, field_name: &str) -> SerializationResult<u64> {
         let field = Self::extract_field(value, field_name)?;
-        field
-            .as_u64()
-            .ok_or_else(|| SerializationError::InvalidFormat(format!(
-                "Field '{}' is not a valid u64", field_name
-            )))
+        field.as_u64().ok_or_else(|| {
+            SerializationError::InvalidFormat(format!("Field '{field_name}' is not a valid u64"))
+        })
     }
 
     /// Extract boolean field
     pub fn extract_bool(value: &Value, field_name: &str) -> SerializationResult<bool> {
         let field = Self::extract_field(value, field_name)?;
-        field
-            .as_bool()
-            .ok_or_else(|| SerializationError::InvalidFormat(format!(
-                "Field '{}' is not a boolean", field_name
-            )))
+        field.as_bool().ok_or_else(|| {
+            SerializationError::InvalidFormat(format!("Field '{field_name}' is not a boolean"))
+        })
     }
 
     /// Check if JSON value has a specific field
@@ -163,9 +156,8 @@ impl HexUtils {
 
     /// Decode hex string to bytes
     pub fn decode(encoded: &str) -> SerializationResult<Vec<u8>> {
-        hex::decode(encoded).map_err(|e| {
-            SerializationError::InvalidFormat(format!("Invalid hex string: {}", e))
-        })
+        hex::decode(encoded)
+            .map_err(|e| SerializationError::InvalidFormat(format!("Invalid hex string: {e}")))
     }
 
     /// Encode bytes to hex with 0x prefix
@@ -193,14 +185,14 @@ impl MsgPackUtils {
     /// Serialize to MessagePack bytes
     pub fn to_bytes<T: Serialize>(value: &T) -> SerializationResult<Vec<u8>> {
         rmp_serde::to_vec(value).map_err(|e| {
-            SerializationError::InvalidFormat(format!("MessagePack serialization error: {}", e))
+            SerializationError::InvalidFormat(format!("MessagePack serialization error: {e}"))
         })
     }
 
     /// Deserialize from MessagePack bytes
     pub fn from_bytes<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> SerializationResult<T> {
         rmp_serde::from_slice(bytes).map_err(|e| {
-            SerializationError::InvalidFormat(format!("MessagePack deserialization error: {}", e))
+            SerializationError::InvalidFormat(format!("MessagePack deserialization error: {e}"))
         })
     }
 
@@ -211,7 +203,9 @@ impl MsgPackUtils {
     }
 
     /// Decode base64 and then deserialize from MessagePack
-    pub fn from_base64<'a, T: for<'de> Deserialize<'de>>(encoded: &'a str) -> SerializationResult<T> {
+    pub fn from_base64<'a, T: for<'de> Deserialize<'de>>(
+        encoded: &'a str,
+    ) -> SerializationResult<T> {
         let bytes = Base64Utils::decode(encoded)?;
         Self::from_bytes(&bytes)
     }
@@ -224,14 +218,14 @@ impl QueryStringUtils {
     /// Serialize struct to query string
     pub fn to_string<T: Serialize>(value: &T) -> SerializationResult<String> {
         serde_urlencoded::to_string(value).map_err(|e| {
-            SerializationError::InvalidFormat(format!("Query string serialization error: {}", e))
+            SerializationError::InvalidFormat(format!("Query string serialization error: {e}"))
         })
     }
 
     /// Deserialize query string to struct
     pub fn from_str<'a, T: Deserialize<'a>>(s: &'a str) -> SerializationResult<T> {
         serde_urlencoded::from_str(s).map_err(|e| {
-            SerializationError::InvalidFormat(format!("Query string deserialization error: {}", e))
+            SerializationError::InvalidFormat(format!("Query string deserialization error: {e}"))
         })
     }
 
@@ -250,13 +244,7 @@ impl QueryStringUtils {
 
         let pairs: Vec<String> = params
             .iter()
-            .map(|(k, v)| {
-                format!(
-                    "{}={}",
-                    urlencoding::encode(k),
-                    urlencoding::encode(v)
-                )
-            })
+            .map(|(k, v)| format!("{}={}", urlencoding::encode(k), urlencoding::encode(v)))
             .collect();
 
         format!("?{}", pairs.join("&"))
@@ -274,12 +262,12 @@ impl CompressionUtils {
         use std::io::Write;
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(data).map_err(|e| {
-            SerializationError::InvalidFormat(format!("Compression error: {}", e))
-        })?;
+        encoder
+            .write_all(data)
+            .map_err(|e| SerializationError::InvalidFormat(format!("Compression error: {e}")))?;
 
         encoder.finish().map_err(|e| {
-            SerializationError::InvalidFormat(format!("Compression finalization error: {}", e))
+            SerializationError::InvalidFormat(format!("Compression finalization error: {e}"))
         })
     }
 
@@ -291,9 +279,9 @@ impl CompressionUtils {
         let mut decoder = GzDecoder::new(compressed);
         let mut decompressed = Vec::new();
 
-        decoder.read_to_end(&mut decompressed).map_err(|e| {
-            SerializationError::InvalidFormat(format!("Decompression error: {}", e))
-        })?;
+        decoder
+            .read_to_end(&mut decompressed)
+            .map_err(|e| SerializationError::InvalidFormat(format!("Decompression error: {e}")))?;
 
         Ok(decompressed)
     }
@@ -305,7 +293,9 @@ impl CompressionUtils {
     }
 
     /// Decompress gzip to JSON
-    pub fn decompress_json<T: for<'de> Deserialize<'de>>(compressed: &[u8]) -> SerializationResult<T> {
+    pub fn decompress_json<T: for<'de> Deserialize<'de>>(
+        compressed: &[u8],
+    ) -> SerializationResult<T> {
         let decompressed = Self::decompress_gzip(compressed)?;
         let json_str = String::from_utf8(decompressed)?;
         JsonUtils::from_str(&json_str)
@@ -348,7 +338,8 @@ impl FormatDetector {
             let first_byte = data[0];
             if (0x80..=0x8f).contains(&first_byte)  // fixmap
                 || (0x90..=0x9f).contains(&first_byte)  // fixarray
-                || (0xa0..=0xbf).contains(&first_byte)  // fixstr
+                || (0xa0..=0xbf).contains(&first_byte)
+            // fixstr
             {
                 return "messagepack";
             }
@@ -365,9 +356,7 @@ pub struct JsonBuilder {
 
 impl JsonBuilder {
     pub fn new() -> Self {
-        Self {
-            map: Map::new(),
-        }
+        Self { map: Map::new() }
     }
 
     pub fn insert<V: Into<Value>>(mut self, key: &str, value: V) -> Self {
@@ -466,9 +455,18 @@ mod tests {
 
         JsonUtils::sanitize_json(&mut json, &["password", "api_key"]);
 
-        assert_eq!(JsonUtils::extract_string(&json, "username").unwrap(), "alice");
-        assert_eq!(JsonUtils::extract_string(&json, "password").unwrap(), "[REDACTED]");
-        assert_eq!(JsonUtils::extract_string(&json, "api_key").unwrap(), "[REDACTED]");
+        assert_eq!(
+            JsonUtils::extract_string(&json, "username").unwrap(),
+            "alice"
+        );
+        assert_eq!(
+            JsonUtils::extract_string(&json, "password").unwrap(),
+            "[REDACTED]"
+        );
+        assert_eq!(
+            JsonUtils::extract_string(&json, "api_key").unwrap(),
+            "[REDACTED]"
+        );
     }
 
     #[test]

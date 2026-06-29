@@ -1,19 +1,18 @@
-use std::collections::HashMap;
+use crate::utils::constants::MAX_FILE_SIZE;
+use anyhow::{anyhow, Result};
+use chrono::Utc;
+use md5;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use sha2::{Sha256, Digest};
 use tokio::fs as async_fs;
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
-use anyhow::{Result, anyhow};
-use md5;
-use crate::utils::constants::MAX_FILE_SIZE;
-use chrono::Utc;
 
-const ALLOWED_EXTENSIONS: &[&str] = &["exe", "dll", "bat", "cmd", "scr", "pif", "com", "vbs", "js", "jar", 
-    "zip", "rar", "7z", "tar", "gz", "pdf", "doc", "docx", "xls", "xlsx", 
-    "ppt", "pptx", "rtf", "apk", "ipa", "deb", "rpm", "msi", "dmg"
+const ALLOWED_EXTENSIONS: &[&str] = &[
+    "exe", "dll", "bat", "cmd", "scr", "pif", "com", "vbs", "js", "jar", "zip", "rar", "7z", "tar",
+    "gz", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "rtf", "apk", "ipa", "deb", "rpm",
+    "msi", "dmg",
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,7 +70,10 @@ impl FileHandler {
         submitter_address: Option<String>,
     ) -> Result<FileMetadata> {
         if file_data.len() as u64 > MAX_FILE_SIZE {
-            return Err(anyhow!("File size exceeds maximum limit of {}MB", MAX_FILE_SIZE / 1024 / 1024));
+            return Err(anyhow!(
+                "File size exceeds maximum limit of {}MB",
+                MAX_FILE_SIZE / 1024 / 1024
+            ));
         }
 
         let extension = Path::new(original_name)
@@ -80,7 +82,9 @@ impl FileHandler {
             .unwrap_or("");
 
         if !ALLOWED_EXTENSIONS.contains(&extension.to_lowercase().as_str()) {
-            return Err(anyhow!("File type '{}' is not allowed for analysis", extension));
+            return Err(anyhow!(
+                "File type '{extension}' is not allowed for analysis"
+            ));
         }
 
         let file_id = Uuid::new_v4().to_string();
@@ -117,7 +121,7 @@ impl FileHandler {
         let file_path = self.storage_path.join(file_id);
 
         if !file_path.exists() {
-            return Err(anyhow!("File not found: {}", file_id));
+            return Err(anyhow!("File not found: {file_id}"));
         }
 
         let file_data = async_fs::read(file_path).await?;
@@ -125,10 +129,10 @@ impl FileHandler {
     }
 
     pub async fn get_metadata(&self, file_id: &str) -> Result<FileMetadata> {
-        let metadata_path = self.storage_path.join(format!("{}.meta", file_id));
+        let metadata_path = self.storage_path.join(format!("{file_id}.meta"));
 
         if !metadata_path.exists() {
-            return Err(anyhow!("Metadata not found for file: {}", file_id));
+            return Err(anyhow!("Metadata not found for file: {file_id}"));
         }
 
         let metadata_json = async_fs::read_to_string(metadata_path).await?;
@@ -137,7 +141,11 @@ impl FileHandler {
         Ok(metadata)
     }
 
-    pub async fn update_analysis_status(&self, file_id: &str, status: AnalysisStatus) -> Result<()> {
+    pub async fn update_analysis_status(
+        &self,
+        file_id: &str,
+        status: AnalysisStatus,
+    ) -> Result<()> {
         let mut metadata = self.get_metadata(file_id).await?;
         metadata.analysis_status = status;
         self.store_metadata(&metadata).await?;
@@ -151,8 +159,10 @@ impl FileHandler {
 
         async_fs::rename(source_path, dest_path).await?;
 
-        self.update_analysis_status(file_id, AnalysisStatus::Quarantined).await?;
-        self.log_action(&format!("Quarantined {}: {}", file_id, reason)).await?;
+        self.update_analysis_status(file_id, AnalysisStatus::Quarantined)
+            .await?;
+        self.log_action(&format!("Quarantined {file_id}: {reason}"))
+            .await?;
 
         Ok(())
     }
@@ -188,7 +198,7 @@ impl FileHandler {
 
     fn calculate_md5(&self, data: &[u8]) -> String {
         let digest = md5::Md5::digest(data);
-        format!("{:x}", digest)
+        format!("{digest:x}")
     }
 
     fn detect_file_type(&self, data: &[u8], filename: &str) -> String {
@@ -201,25 +211,25 @@ impl FileHandler {
                 _ => {}
             }
         }
-        
+
         let extension = Path::new(filename)
             .extension()
             .and_then(|ext| ext.to_str())
             .unwrap_or("unknown");
-            
+
         match extension.to_lowercase().as_str() {
             "exe" | "dll" | "sys" => "Windows Executable".to_string(),
             "pdf" => "PDF Document".to_string(),
             "zip" | "rar" | "7z" => "Archive".to_string(),
             "doc" | "docx" => "Word Document".to_string(),
             "apk" => "Android Package".to_string(),
-            _ => format!("Unknown ({})", extension),
+            _ => format!("Unknown ({extension})"),
         }
     }
 
     async fn file_exists_by_hash(&self, hash: &str) -> Result<bool> {
         let mut entries = async_fs::read_dir(&self.storage_path).await?;
-        
+
         while let Some(entry) = entries.next_entry().await? {
             let os_file_name = entry.file_name();
             let file_name = os_file_name.to_str().unwrap_or("");
@@ -232,7 +242,7 @@ impl FileHandler {
                 }
             }
         }
-        
+
         Ok(false)
     }
 
@@ -246,14 +256,16 @@ impl FileHandler {
     async fn log_action(&self, log_entry: &str) -> Result<()> {
         let log_path = self.storage_path.join("file_handler.log");
         let mut log_content = if log_path.exists() {
-            async_fs::read_to_string(&log_path).await.unwrap_or_default()
+            async_fs::read_to_string(&log_path)
+                .await
+                .unwrap_or_default()
         } else {
             String::new()
         };
-        
+
         log_content.push_str(log_entry);
         log_content.push('\n');
-        
+
         async_fs::write(log_path, log_content).await?;
         Ok(())
     }
@@ -268,16 +280,16 @@ mod tests {
     async fn test_file_storage_and_retrieval() {
         let temp_dir = tempdir().unwrap();
         let handler = FileHandler::new(temp_dir.path().to_str().unwrap()).unwrap();
-        
+
         let test_data = b"This is test malware content";
         let metadata = handler
             .store_file(test_data, "test.exe", Some(0.1), Some("0x123".to_string()))
             .await
             .unwrap();
-        
+
         assert_eq!(metadata.original_name, "test.exe");
         assert_eq!(metadata.file_size, test_data.len() as u64);
-        
+
         let retrieved_data = handler.get_file(&metadata.file_id).await.unwrap();
         assert_eq!(retrieved_data, test_data.to_vec());
     }
@@ -286,19 +298,22 @@ mod tests {
     async fn test_file_quarantine() {
         let temp_dir = tempdir().unwrap();
         let handler = FileHandler::new(temp_dir.path().to_str().unwrap()).unwrap();
-        
+
         let test_data = b"Malicious content";
         let metadata = handler
             .store_file(test_data, "malware.exe", None, None)
             .await
             .unwrap();
-        
+
         handler
             .quarantine_file(&metadata.file_id, "Detected as malware")
             .await
             .unwrap();
-        
+
         let updated_metadata = handler.get_metadata(&metadata.file_id).await.unwrap();
-        assert!(matches!(updated_metadata.analysis_status, AnalysisStatus::Quarantined));
+        assert!(matches!(
+            updated_metadata.analysis_status,
+            AnalysisStatus::Quarantined
+        ));
     }
 }

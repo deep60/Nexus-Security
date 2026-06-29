@@ -1,4 +1,4 @@
+pub mod admin;
+pub mod analytics;
 pub mod health;
 pub mod reputation;
-pub mod analytics;
-pub mod admin;

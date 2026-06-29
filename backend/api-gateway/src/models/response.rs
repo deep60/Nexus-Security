@@ -463,12 +463,7 @@ mod tests {
 
     #[test]
     fn test_paginated_response() {
-        let response = PaginatedResponse::new(
-            vec!["item1", "item2"],
-            10,
-            1,
-            5,
-        );
+        let response = PaginatedResponse::new(vec!["item1", "item2"], 10, 1, 5);
         assert_eq!(response.total_pages, 2);
         assert!(response.has_more);
     }

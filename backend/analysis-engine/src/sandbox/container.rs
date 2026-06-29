@@ -2,7 +2,6 @@
 ///
 /// This module handles Docker container lifecycle management for secure execution
 /// of potentially malicious samples in isolated environments.
-
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -11,11 +10,9 @@ use tokio::process::Command;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use crate::analyzers::dynamic_analyzer::{
-    DynamicAnalyzerConfig, NetworkConfig, ResourceLimits,
-};
+use crate::analyzers::dynamic_analyzer::{DynamicAnalyzerConfig, NetworkConfig, ResourceLimits};
 
-use super::{SandboxConfig, SandboxEnvironment, SandboxStatus, OsType, ResourceUsage};
+use super::ResourceUsage;
 
 /// Manages Docker containers for sandbox execution
 pub struct Container {
@@ -52,7 +49,7 @@ pub struct SandboxContainerConfig {
 
 impl Container {
     /// Create a new container manager
-    pub fn new(config: &DynamicAnalyzerConfig) -> Result<Self> {
+    pub fn new(_config: &DynamicAnalyzerConfig) -> Result<Self> {
         let work_dir = PathBuf::from("/tmp/verdyx-sandbox");
         std::fs::create_dir_all(&work_dir)?;
 
@@ -150,7 +147,7 @@ impl Container {
 
         // Add environment variables
         for (key, value) in &config.environment {
-            cmd.arg("--env").arg(format!("{}={}", key, value));
+            cmd.arg("--env").arg(format!("{key}={value}"));
         }
 
         // Add security options
@@ -177,9 +174,7 @@ impl Container {
         }
 
         // Add the image and command
-        cmd.arg(&config.image)
-            .arg("sleep")
-            .arg("infinity"); // Keep container running
+        cmd.arg(&config.image).arg("sleep").arg("infinity"); // Keep container running
 
         debug!("Docker create command: {:?}", cmd);
 
@@ -188,7 +183,7 @@ impl Container {
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
             error!("Failed to create container: {}", error);
-            return Err(anyhow!("Docker create failed: {}", error));
+            return Err(anyhow!("Docker create failed: {error}"));
         }
 
         let actual_container_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -205,7 +200,8 @@ impl Container {
             status: "running".to_string(),
         };
 
-        self.active_containers.insert(actual_container_id.clone(), info);
+        self.active_containers
+            .insert(actual_container_id.clone(), info);
 
         info!("Container created and started: {}", actual_container_id);
 
@@ -243,7 +239,7 @@ impl Container {
 
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow!("Failed to pull image: {}", error));
+            return Err(anyhow!("Failed to pull image: {error}"));
         }
 
         Ok(())
@@ -302,7 +298,7 @@ CMD ["/bin/bash"]
 
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow!("Failed to build sandbox image: {}", error));
+            return Err(anyhow!("Failed to build sandbox image: {error}"));
         }
 
         info!("Sandbox image built successfully");
@@ -321,7 +317,7 @@ CMD ["/bin/bash"]
 
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow!("Failed to start container: {}", error));
+            return Err(anyhow!("Failed to start container: {error}"));
         }
 
         Ok(())
@@ -393,7 +389,7 @@ CMD ["/bin/bash"]
             .ok_or_else(|| anyhow!("Invalid file path"))?
             .to_string_lossy();
 
-        let container_path = format!("/workspace/{}", filename);
+        let container_path = format!("/workspace/{filename}");
 
         info!(
             "Copying file to container: {} -> {}",
@@ -405,7 +401,7 @@ CMD ["/bin/bash"]
             .args([
                 "cp",
                 file_path.to_str().unwrap(),
-                &format!("{}:{}", container_id, container_path),
+                &format!("{container_id}:{container_path}"),
             ])
             .output()
             .await
@@ -413,7 +409,7 @@ CMD ["/bin/bash"]
 
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow!("Failed to copy file: {}", error));
+            return Err(anyhow!("Failed to copy file: {error}"));
         }
 
         Ok(PathBuf::from(container_path))
@@ -421,7 +417,10 @@ CMD ["/bin/bash"]
 
     /// Execute a command in the sandbox container
     pub async fn execute_command(&self, container_id: &str, command: &str) -> Result<String> {
-        debug!("Executing command in container {}: {}", container_id, command);
+        debug!(
+            "Executing command in container {}: {}",
+            container_id, command
+        );
 
         let output = Command::new("docker")
             .args(["exec", container_id, "bash", "-c", command])
@@ -436,13 +435,19 @@ CMD ["/bin/bash"]
             warn!("Command execution had non-zero exit: {}", stderr);
         }
 
-        Ok(format!("STDOUT:\n{}\nSTDERR:\n{}", stdout, stderr))
+        Ok(format!("STDOUT:\n{stdout}\nSTDERR:\n{stderr}"))
     }
 
     /// Get resource usage statistics for a container
     pub async fn get_resource_usage(&self, container_id: &str) -> Result<ResourceUsage> {
         let output = Command::new("docker")
-            .args(["stats", "--no-stream", "--format", "{{json .}}", container_id])
+            .args([
+                "stats",
+                "--no-stream",
+                "--format",
+                "{{json .}}",
+                container_id,
+            ])
             .output()
             .await
             .context("Failed to get container stats")?;
@@ -452,8 +457,8 @@ CMD ["/bin/bash"]
         }
 
         let stats_json = String::from_utf8_lossy(&output.stdout);
-        let stats: serde_json::Value = serde_json::from_str(&stats_json)
-            .unwrap_or_else(|_| serde_json::json!({}));
+        let stats: serde_json::Value =
+            serde_json::from_str(&stats_json).unwrap_or_else(|_| serde_json::json!({}));
 
         Ok(ResourceUsage {
             cpu_percent: stats["CPUPerc"]
@@ -543,7 +548,10 @@ impl Drop for Container {
         // Attempt to cleanup containers on drop
         // This is best-effort and may not complete
         if !self.active_containers.is_empty() {
-            warn!("Container manager dropped with {} active containers", self.active_containers.len());
+            warn!(
+                "Container manager dropped with {} active containers",
+                self.active_containers.len()
+            );
         }
     }
 }

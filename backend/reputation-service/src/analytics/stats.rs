@@ -1,5 +1,5 @@
-use rust_decimal::Decimal;
 use crate::models::ReputationStats;
+use rust_decimal::Decimal;
 
 pub fn calculate_stats() -> ReputationStats {
     ReputationStats {

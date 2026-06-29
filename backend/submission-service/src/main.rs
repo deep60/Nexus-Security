@@ -1,19 +1,21 @@
-use anyhow;
+// Pre-production scaffolding: some items are intentionally unused while
+// features are wired up. This crate-level allow keeps `clippy -D warnings`
+// green without deleting code we are about to use. Remove before GA.
+#![allow(dead_code)]
+
 use axum::{
-    extract::State,
     routing::{get, post},
     Router,
 };
+use sqlx::PgPool;
 use std::{net::SocketAddr, sync::Arc};
 use tower_http::cors::CorsLayer;
-use tracing_subscriber;
-use sqlx::PgPool;
 
+mod db;
 mod handlers;
 mod models;
-mod storage;
-mod db;
 mod queue;
+mod storage;
 
 use storage::s3_client::S3Client;
 
@@ -36,8 +38,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
 
     // Initialize database connection with proper error handling
-    let database_url = std::env::var("DATABASE_URL")
-        .map_err(|_| anyhow::anyhow!("DATABASE_URL must be set"))?;
+    let database_url =
+        std::env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL must be set"))?;
 
     tracing::info!("Connecting to database...");
     let db_pool = match PgPool::connect(&database_url).await {
@@ -47,20 +49,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(e) => {
             tracing::error!("Failed to connect to database: {}", e);
-            return Err(anyhow::anyhow!("Database connection failed: {}", e).into());
+            return Err(anyhow::anyhow!("Database connection failed: {e}").into());
         }
     };
 
     // Initialize Redis client with error handling
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     tracing::info!("Connecting to Redis at {}...", redis_url);
     let redis_client = match redis::Client::open(redis_url) {
         Ok(client) => client,
         Err(e) => {
             tracing::error!("Failed to create Redis client: {}", e);
-            return Err(anyhow::anyhow!("Redis client creation failed: {}", e).into());
+            return Err(anyhow::anyhow!("Redis client creation failed: {e}").into());
         }
     };
 
@@ -69,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(_) => tracing::info!("Redis connection established"),
         Err(e) => {
             tracing::error!("Failed to connect to Redis: {}", e);
-            return Err(anyhow::anyhow!("Redis connection failed: {}", e).into());
+            return Err(anyhow::anyhow!("Redis connection failed: {e}").into());
         }
     }
 
@@ -90,7 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .split(',')
         .filter_map(|origin| origin.trim().parse::<axum::http::HeaderValue>().ok())
         .collect();
-    
+
     let cors = CorsLayer::new()
         .allow_origin(allowed_origins)
         .allow_methods([

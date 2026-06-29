@@ -88,7 +88,10 @@ impl PaymentService {
             .context("Failed to call balanceOf")
     }
 
-    pub async fn get_tx_receipt(&self, tx_hash: &str) -> Result<Option<ethers::types::TransactionReceipt>> {
+    pub async fn get_tx_receipt(
+        &self,
+        tx_hash: &str,
+    ) -> Result<Option<ethers::types::TransactionReceipt>> {
         let hash: H256 = tx_hash.parse().context("Invalid transaction hash")?;
         self.provider
             .get_transaction_receipt(hash)
@@ -137,18 +140,11 @@ impl PaymentService {
             .context("Invalid treasury address")?;
         let balance = token.balance_of(treasury).call().await?;
         if balance < amount {
-            anyhow::bail!(
-                "Treasury balance {} below required {}",
-                balance,
-                amount
-            );
+            anyhow::bail!("Treasury balance {balance} below required {amount}");
         }
 
         let call = token.transfer(to_addr, amount);
-        let pending = call
-            .send()
-            .await
-            .context("Failed to broadcast transfer")?;
+        let pending = call.send().await.context("Failed to broadcast transfer")?;
 
         info!("Treasury transfer broadcast: {:?}", pending.tx_hash());
 
@@ -235,9 +231,7 @@ impl PaymentService {
 
     fn to_wei(amount: &Decimal) -> PaymentResult<U256> {
         // Amounts are stored as whole-token decimals; assume 18 decimals.
-        let scaled = amount
-            .round_dp(0)
-            .to_string();
+        let scaled = amount.round_dp(0).to_string();
         U256::from_dec_str(&scaled)
             .map_err(|e| PaymentError::ValidationError(format!("invalid amount: {e}")))
     }
@@ -261,7 +255,10 @@ impl PaymentService {
             )
             .await?;
 
-        match self.treasury_transfer(&req.winner_address, amount_wei).await {
+        match self
+            .treasury_transfer(&req.winner_address, amount_wei)
+            .await
+        {
             Ok(receipt) => {
                 let tx_hash = format!("{:?}", receipt.transaction_hash);
                 let block = receipt.block_number.map(|b| b.as_u64() as i64);
@@ -443,10 +440,7 @@ impl PaymentService {
     /// Slash a stake: treasury transfers the slashed portion out of the
     /// slashed user. In this model slashing is enforced by transferring the
     /// slashed amount from treasury custody to the bounty pool address.
-    pub async fn slash_stake(
-        &self,
-        req: &SlashStakeRequest,
-    ) -> PaymentResult<PaymentResponse> {
+    pub async fn slash_stake(&self, req: &SlashStakeRequest) -> PaymentResult<PaymentResponse> {
         let amount_wei = Self::to_wei(&req.slash_amount)?;
         let payment_id = self
             .insert_payment(

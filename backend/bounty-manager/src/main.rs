@@ -1,18 +1,23 @@
+// Pre-production scaffolding: some items are intentionally unused while
+// features are wired up. This crate-level allow keeps `clippy -D warnings`
+// green without deleting code we are about to use. Remove before GA.
+#![allow(dead_code)]
+
 use axum::{
     response::Json,
     routing::{get, post, put},
     Router,
 };
+use chrono::{DateTime, Utc};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use sqlx::{PgPool, Row};
+use sqlx::PgPool;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use rust_decimal::Decimal;
 
 mod config;
 mod handlers;
@@ -23,7 +28,7 @@ mod workers;
 use handlers::bounty_crud;
 use services::reputation;
 
-// Application State 
+// Application State
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
@@ -44,7 +49,7 @@ pub struct Bounty {
     pub status: BountyStatus,
     pub min_reputation: i32,
     pub max_participants: i32,
-    pub current_participants: i32, 
+    pub current_participants: i32,
     pub created_at: DateTime<Utc>,
     pub expires_at: Option<DateTime<Utc>>,
     pub metadata: Option<serde_json::Value>,
@@ -150,9 +155,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load configuration
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://verdyx:password@localhost/verdyx".to_string());
-    
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+
+    let _redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     let port = std::env::var("SERVER_PORT")
         .or_else(|_| std::env::var("PORT"))
@@ -189,7 +194,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let private_key = std::env::var("BLOCKCHAIN_PRIVATE_KEY")
             .or_else(|_| std::env::var("PRIVATE_KEY"))
             .unwrap_or_default();
-        let chain_id: u64 = std::env::var("CHAIN_ID").unwrap_or_else(|_| "31337".to_string()).parse().unwrap_or(31337);
+        let chain_id: u64 = std::env::var("CHAIN_ID")
+            .unwrap_or_else(|_| "31337".to_string())
+            .parse()
+            .unwrap_or(31337);
         let bounty_manager_addr = std::env::var("BOUNTY_MANAGER_ADDRESS")
             .or_else(|_| std::env::var("CONTRACT_ADDRESS_BOUNTY"))
             .unwrap_or_default();
@@ -214,7 +222,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &threat_token_addr,
             bounty_abi,
             token_abi,
-        ).await {
+        )
+        .await
+        {
             Ok(blockchain_service) => {
                 let sync_service = services::blockchain_sync::BlockchainSyncService::new(
                     sync_db,
@@ -245,29 +255,36 @@ fn create_router(state: bounty_crud::BountyManagerState) -> Router {
     Router::new()
         // Health check
         .route("/health", get(health_check))
-
         // Bounty management routes
         .route("/bounties", post(bounty_crud::create_bounty))
         .route("/bounties", get(bounty_crud::list_bounties))
         .route("/bounties/{id}", get(bounty_crud::get_bounty))
         .route("/bounties/{id}", put(bounty_crud::update_bounty))
         .route("/bounties/{id}/cancel", post(bounty_crud::cancel_bounty))
-
         // Stats route
         .route("/bounties/stats", get(bounty_crud::get_bounty_stats))
-
         // Submission routes
         .route("/bounties/{id}/submit", post(handlers::submit_analysis))
-        .route("/bounties/{id}/submissions", get(handlers::list_submissions_for_bounty))
+        .route(
+            "/bounties/{id}/submissions",
+            get(handlers::list_submissions_for_bounty),
+        )
         .route("/submissions/{id}", get(handlers::get_submission))
-        .route("/submissions/{id}/status", put(handlers::update_submission_status))
-
+        .route(
+            "/submissions/{id}/status",
+            put(handlers::update_submission_status),
+        )
         // Payout routes
-        .route("/bounties/{id}/payout", post(handlers::process_bounty_completion))
-        .route("/payouts/{id}/distribute", post(handlers::distribute_rewards))
+        .route(
+            "/bounties/{id}/payout",
+            post(handlers::process_bounty_completion),
+        )
+        .route(
+            "/payouts/{id}/distribute",
+            post(handlers::distribute_rewards),
+        )
         .route("/payouts/{id}/slash", post(handlers::handle_stake_slashing))
         .route("/payouts/history", get(handlers::get_payout_history))
-
         // Dispute routes
         .route("/disputes", post(handlers::create_dispute))
         .route("/disputes", get(handlers::list_disputes))
@@ -277,30 +294,42 @@ fn create_router(state: bounty_crud::BountyManagerState) -> Router {
         .route("/disputes/{id}/vote", post(handlers::vote_on_dispute))
         .route("/disputes/{id}/withdraw", post(handlers::withdraw_dispute))
         .route("/disputes/stats", get(handlers::get_dispute_stats))
-
         // Validation routes
-        .route("/submissions/{id}/validate", post(handlers::validate_submission))
-        .route("/submissions/{id}/validation", get(handlers::get_validation_result))
+        .route(
+            "/submissions/{id}/validate",
+            post(handlers::validate_submission),
+        )
+        .route(
+            "/submissions/{id}/validation",
+            get(handlers::get_validation_result),
+        )
         .route("/validations", get(handlers::list_validations))
-        .route("/validations/bulk", post(handlers::bulk_validate_submissions))
+        .route(
+            "/validations/bulk",
+            post(handlers::bulk_validate_submissions),
+        )
         .route("/validations/stats", get(handlers::get_validation_stats))
-        .route("/submissions/{id}/revalidate", post(handlers::revalidate_submission))
-
+        .route(
+            "/submissions/{id}/revalidate",
+            post(handlers::revalidate_submission),
+        )
         // Reputation routes
         .route("/reputation/{id}", get(handlers::get_engine_reputation))
         .route("/reputation/{id}", put(handlers::update_reputation))
         .route("/reputation/leaderboard", get(handlers::get_leaderboard))
-        .route("/reputation/{id}/history", get(handlers::get_reputation_history))
+        .route(
+            "/reputation/{id}/history",
+            get(handlers::get_reputation_history),
+        )
         .route("/reputation/decay", post(handlers::apply_reputation_decay))
         .route("/engines/register", post(handlers::register_engine))
         // State management
         .with_state(state)
-
         // Middleware
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(CorsLayer::permissive())
+                .layer(CorsLayer::permissive()),
         )
 }
 
@@ -309,7 +338,7 @@ async fn health_check() -> Json<ApiResponse<HashMap<String, String>>> {
     status.insert("service".to_string(), "bounty-manager".to_string());
     status.insert("status".to_string(), "healthy".to_string());
     status.insert("version".to_string(), env!("CARGO_PKG_VERSION").to_string());
-    
+
     Json(ApiResponse::success(status))
 }
 

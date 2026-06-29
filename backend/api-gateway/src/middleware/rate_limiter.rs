@@ -6,13 +6,13 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use chrono::Utc;
 
 /// Rate limit configuration
 #[derive(Debug, Clone)]
@@ -117,7 +117,9 @@ impl RateLimiter {
     /// Check if request is allowed
     pub async fn check_rate_limit(&self, identifier: &str) -> RateLimitResult {
         let mut entries = self.entries.write().await;
-        let entry = entries.entry(identifier.to_string()).or_insert_with(RateLimitEntry::new);
+        let entry = entries
+            .entry(identifier.to_string())
+            .or_insert_with(RateLimitEntry::new);
 
         // Reset window if expired
         if entry.should_reset(self.config.window_duration) {
@@ -126,7 +128,9 @@ impl RateLimiter {
 
         // Check if limit exceeded
         if entry.count >= self.config.requests_per_window {
-            let retry_after = self.config.window_duration
+            let retry_after = self
+                .config
+                .window_duration
                 .checked_sub(entry.window_start.elapsed())
                 .unwrap_or(Duration::from_secs(0));
 
@@ -183,14 +187,26 @@ impl RateLimitResult {
 
     pub fn headers(&self) -> Vec<(String, String)> {
         match self {
-            RateLimitResult::Allowed { limit, remaining, reset_at } => {
+            RateLimitResult::Allowed {
+                limit,
+                remaining,
+                reset_at,
+            } => {
                 vec![
                     ("X-RateLimit-Limit".to_string(), limit.to_string()),
                     ("X-RateLimit-Remaining".to_string(), remaining.to_string()),
-                    ("X-RateLimit-Reset".to_string(), format!("{}", reset_at.elapsed().as_secs())),
+                    (
+                        "X-RateLimit-Reset".to_string(),
+                        format!("{}", reset_at.elapsed().as_secs()),
+                    ),
                 ]
             }
-            RateLimitResult::Limited { retry_after_secs, limit, remaining, .. } => {
+            RateLimitResult::Limited {
+                retry_after_secs,
+                limit,
+                remaining,
+                ..
+            } => {
                 vec![
                     ("X-RateLimit-Limit".to_string(), limit.to_string()),
                     ("X-RateLimit-Remaining".to_string(), remaining.to_string()),
@@ -221,29 +237,40 @@ pub async fn ip_rate_limit_middleware(
     let ip = addr.ip().to_string();
 
     match limiter.check_rate_limit(&ip).await {
-        RateLimitResult::Allowed { limit, remaining, .. } => {
+        RateLimitResult::Allowed {
+            limit, remaining, ..
+        } => {
             let mut response = next.run(request).await;
 
             // Add rate limit headers to successful responses
             if let Ok(limit_value) = limit.to_string().parse() {
-                response.headers_mut().insert("X-RateLimit-Limit", limit_value);
+                response
+                    .headers_mut()
+                    .insert("X-RateLimit-Limit", limit_value);
             }
             if let Ok(remaining_value) = remaining.to_string().parse() {
-                response.headers_mut().insert("X-RateLimit-Remaining", remaining_value);
+                response
+                    .headers_mut()
+                    .insert("X-RateLimit-Remaining", remaining_value);
             }
 
             Ok(response)
         }
-        RateLimitResult::Limited { retry_after_secs, limit, .. } => {
+        RateLimitResult::Limited {
+            retry_after_secs,
+            limit,
+            ..
+        } => {
             let error_response = RateLimitError {
                 error: "RATE_LIMIT_EXCEEDED".to_string(),
-                message: format!("Rate limit of {} requests exceeded", limit),
+                message: format!("Rate limit of {limit} requests exceeded"),
                 retry_after_seconds: retry_after_secs,
                 limit,
                 timestamp: Utc::now(),
             };
 
-            let mut response = (StatusCode::TOO_MANY_REQUESTS, Json(error_response)).into_response();
+            let mut response =
+                (StatusCode::TOO_MANY_REQUESTS, Json(error_response)).into_response();
 
             // Add retry-after header
             if let Ok(value) = retry_after_secs.to_string().parse() {
@@ -269,29 +296,40 @@ pub async fn user_rate_limit_middleware(
         .unwrap_or_else(|| "anonymous".to_string());
 
     match limiter.check_rate_limit(&user_id).await {
-        RateLimitResult::Allowed { limit, remaining, .. } => {
+        RateLimitResult::Allowed {
+            limit, remaining, ..
+        } => {
             let mut response = next.run(request).await;
 
             // Add rate limit headers
             if let Ok(limit_value) = limit.to_string().parse() {
-                response.headers_mut().insert("X-RateLimit-Limit", limit_value);
+                response
+                    .headers_mut()
+                    .insert("X-RateLimit-Limit", limit_value);
             }
             if let Ok(remaining_value) = remaining.to_string().parse() {
-                response.headers_mut().insert("X-RateLimit-Remaining", remaining_value);
+                response
+                    .headers_mut()
+                    .insert("X-RateLimit-Remaining", remaining_value);
             }
 
             Ok(response)
         }
-        RateLimitResult::Limited { retry_after_secs, limit, .. } => {
+        RateLimitResult::Limited {
+            retry_after_secs,
+            limit,
+            ..
+        } => {
             let error_response = RateLimitError {
                 error: "RATE_LIMIT_EXCEEDED".to_string(),
-                message: format!("User rate limit of {} requests exceeded", limit),
+                message: format!("User rate limit of {limit} requests exceeded"),
                 retry_after_seconds: retry_after_secs,
                 limit,
                 timestamp: Utc::now(),
             };
 
-            let mut response = (StatusCode::TOO_MANY_REQUESTS, Json(error_response)).into_response();
+            let mut response =
+                (StatusCode::TOO_MANY_REQUESTS, Json(error_response)).into_response();
 
             if let Ok(value) = retry_after_secs.to_string().parse() {
                 response.headers_mut().insert("Retry-After", value);
@@ -317,10 +355,14 @@ pub async fn api_key_rate_limit_middleware(
 
     match limiter.check_rate_limit(api_key).await {
         RateLimitResult::Allowed { .. } => Ok(next.run(request).await),
-        RateLimitResult::Limited { retry_after_secs, limit, .. } => {
+        RateLimitResult::Limited {
+            retry_after_secs,
+            limit,
+            ..
+        } => {
             let error_response = RateLimitError {
                 error: "RATE_LIMIT_EXCEEDED".to_string(),
-                message: format!("API key rate limit of {} requests exceeded", limit),
+                message: format!("API key rate limit of {limit} requests exceeded"),
                 retry_after_seconds: retry_after_secs,
                 limit,
                 timestamp: Utc::now(),
