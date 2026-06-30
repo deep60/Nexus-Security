@@ -40,4 +40,7 @@ pub mod messaging;
 pub mod service_metrics;
 pub mod types;
 
+#[cfg(feature = "axum-mw")]
+pub mod metrics_mw;
+
 pub use service_metrics::MetricsRegistry;

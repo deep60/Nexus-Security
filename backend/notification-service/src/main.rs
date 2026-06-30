@@ -177,6 +177,13 @@ async fn main() -> Result<()> {
             post(handlers::webhook::unregister_webhook),
         )
         .route("/ws", get(handlers::websocket::websocket_handler))
+        .layer(axum::middleware::from_fn({
+            let r = app_state.metrics.clone();
+            move |req, next| {
+                let r = r.clone();
+                async move { shared::metrics_mw::track_with(r, req, next).await }
+            }
+        }))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .layer(tower_http::catch_panic::CatchPanicLayer::new())

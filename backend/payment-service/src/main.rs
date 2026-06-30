@@ -224,6 +224,13 @@ async fn main() -> Result<()> {
             "/api/v1/admin/treasury/balance",
             get(handlers::admin::get_treasury_balance),
         )
+        .layer(axum::middleware::from_fn({
+            let r = app_state.metrics.clone();
+            move |req, next| {
+                let r = r.clone();
+                async move { shared::metrics_mw::track_with(r, req, next).await }
+            }
+        }))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .layer(tower_http::catch_panic::CatchPanicLayer::new())

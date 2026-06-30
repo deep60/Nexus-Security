@@ -72,7 +72,7 @@ aws-config = "1.0"
 async-trait = "0.1"
 
 # Shared module
-shared = { path = "../shared" }
+shared = { path = "../shared", features = ["axum-mw"] }
 
 [dev-dependencies]
 tokio-test = "0.4"

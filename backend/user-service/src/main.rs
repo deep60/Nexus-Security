@@ -256,11 +256,18 @@ async fn main() -> Result<()> {
             admin_middleware,
         ));
 
-    // Combine all routes
+    // Combine all routes. The metrics middleware sees every request before
+    // routing and ticks `verdyx_http_requests_total` / `verdyx_http_errors_total`
+    // — the same counters served at `/metrics`.
+    let prom_registry = app_state.metrics.clone();
     let app = Router::new()
         .merge(public_routes)
         .merge(protected_routes)
         .merge(admin_routes)
+        .layer(axum_middleware::from_fn(move |req, next| {
+            let r = prom_registry.clone();
+            async move { shared::metrics_mw::track_with(r, req, next).await }
+        }))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .layer(tower_http::catch_panic::CatchPanicLayer::new())

@@ -173,6 +173,7 @@ dependencies = [
  "sha1",
  "sha2",
  "sha3",
+ "shared",
  "sqlx",
  "tempfile",
  "thiserror 1.0.69",
@@ -1079,6 +1080,7 @@ dependencies = [
  "anyhow",
  "axum 0.8.7",
  "chrono",
+ "dotenvy",
  "ethers",
  "rand 0.8.5",
  "rust_decimal",
@@ -5729,6 +5731,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "axum 0.7.9",
  "chrono",
  "redis",
  "rust_decimal",

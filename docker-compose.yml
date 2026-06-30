@@ -16,8 +16,11 @@ services:
       - ./database/init:/docker-entrypoint-initdb.d
     networks:
       - verdyx-network
+    # Restart on failure so a single OOM or crashed transaction does not take
+    # the whole stack down — every backend service depends_on this.
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U verdyx_user -d verdyx"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-verdyx_user} -d ${POSTGRES_DB:-verdyx}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -35,8 +38,10 @@ services:
       - redis_data:/data
     networks:
       - verdyx-network
+    # Restart on failure — same rationale as postgres above.
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "--raw", "incr", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -468,8 +473,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # Wait for api-gateway to pass its healthcheck before the BFF accepts
+      # traffic, otherwise the first wave of frontend requests races the
+      # gateway start_period and 502s.
       api-gateway:
-        condition: service_started
+        condition: service_healthy
     networks:
       - verdyx-network
     restart: unless-stopped
@@ -480,10 +488,14 @@ services:
       retries: 3
       start_period: 40s
 
-  # PgAdmin (Optional - for database management)
+  # PgAdmin (DEV ONLY - gated behind the `dev-tools` profile so a stock
+  # `docker compose up` does not start it. Bring it up explicitly with:
+  #   docker compose --profile dev-tools up -d pgadmin
+  # `.env.production` is explicit that pgAdmin must NOT be deployed to prod.)
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: verdyx-pgadmin
+    profiles: ["dev-tools"]
     env_file:
       - .env
     environment:
@@ -492,7 +504,8 @@ services:
     ports:
       - "5050:80"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - verdyx-network
     restart: unless-stopped

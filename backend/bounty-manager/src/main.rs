@@ -149,12 +149,37 @@ impl<T> ApiResponse<T> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing
-    tracing_subscriber::fmt::init();
+    // Load .env first so RUST_LOG/log-level/secret env are honored everywhere.
+    dotenvy::dotenv().ok();
 
-    // Load configuration
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://verdyx:password@localhost/verdyx".to_string());
+    // Initialize tracing — JSON format with thread ids + line numbers so logs
+    // aggregate cleanly across the fleet (matches user/consensus/payment/etc).
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .with_thread_ids(true)
+        .with_line_number(true)
+        .json()
+        .init();
+
+    info!("Starting Bounty Manager...");
+
+    // Load configuration. In production we refuse to fall back to a localhost
+    // dev DSN — a misconfigured deploy that boots against an empty local DB
+    // is worse than a hard failure at startup.
+    let environment = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string());
+    let database_url = match std::env::var("DATABASE_URL") {
+        Ok(url) => url,
+        Err(_) if environment != "production" => {
+            warn!("DATABASE_URL not set; using local dev default (NEVER use in prod)");
+            "postgresql://verdyx:password@localhost/verdyx".to_string()
+        }
+        Err(_) => {
+            return Err(anyhow::anyhow!(
+                "DATABASE_URL must be set in production (ENVIRONMENT=production)"
+            )
+            .into());
+        }
+    };
 
     let _redis_url =
         std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
@@ -164,13 +189,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| "8080".to_string())
         .parse::<u16>()?;
 
-    // Initialize database connection
-    info!("Connecting to database: {}", database_url);
+    // Initialize database connection. Avoid logging the full DSN — it
+    // contains credentials.
+    info!("Connecting to database...");
     let db = PgPool::connect(&database_url).await?;
+    info!("Database connection established");
 
-    // Run database migrations
+    // Run database migrations — fail-fast on error.
     info!("Running database migrations...");
     sqlx::migrate!("./migrations").run(&db).await?;
+    info!("Database migrations complete");
 
     // Initialize reputation service with database pool
     let reputation_service = Arc::new(reputation::ReputationService::new(db.clone()));
@@ -282,7 +310,27 @@ async fn shutdown_signal() {
     info!("Shutdown signal received, draining connections...");
 }
 
+/// Inline metrics middleware for bounty-manager. The rest of the fleet uses
+/// `shared::metrics_mw::track_with`, but bounty-manager is on axum 0.8 (the
+/// rest are on 0.7) so its `Request`/`Next` types are incompatible. The
+/// behavior is identical: tick `inc_request` for every request, `inc_error`
+/// for any 5xx.
+async fn bounty_metrics_track(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let reg = metrics_registry();
+    reg.inc_request();
+    let resp = next.run(req).await;
+    if resp.status().is_server_error() {
+        reg.inc_error();
+    }
+    resp
+}
+
 fn create_router(state: bounty_crud::BountyManagerState) -> Router {
+    let metrics_layer = axum::middleware::from_fn(bounty_metrics_track);
+
     Router::new()
         // Health check
         .route("/health", get(health_check))
@@ -361,6 +409,7 @@ fn create_router(state: bounty_crud::BountyManagerState) -> Router {
         // State management
         .with_state(state)
         // Middleware
+        .layer(metrics_layer)
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())

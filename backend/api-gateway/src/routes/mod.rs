@@ -1,15 +1,68 @@
 pub mod v1;
 
-use axum::{routing::get, Router};
+use axum::{extract::State, http::header, routing::get, Json, Router};
 
 use crate::AppState;
 
-/// Create the main router with API v1 and the root-level /ws proxy.
+/// Create the main router with API v1, the root-level /ws proxy, and the
+/// platform-uniform `/health`, `/ready`, `/metrics` endpoints used by
+/// `docker-compose` healthchecks and the Prometheus scrape config in
+/// `infrastructure/docker/production/prometheus.yml`.
 pub fn create_router(state: AppState) -> Router {
     Router::new()
         // WebSocket proxy — lives at the root so the frontend can connect to /ws
         .route("/ws", get(crate::handlers::websocket::ws_proxy))
+        // Root observability endpoints — kept consistent with every other
+        // service so a single Prometheus job (metrics_path: /metrics) and a
+        // single compose healthcheck pattern (`curl /health`) work fleet-wide.
+        .route("/health", get(root_health))
+        .route("/ready", get(root_ready))
+        .route("/metrics", get(root_metrics))
         .with_state(state.clone())
         .nest("/api/v1", v1::create_routes(state.clone()))
         .nest("/api", v1::create_routes(state))
+}
+
+/// Liveness — always 200 when the process can answer HTTP.
+async fn root_health() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "status": "healthy",
+        "service": "api-gateway",
+        "version": env!("CARGO_PKG_VERSION"),
+    }))
+}
+
+/// Readiness — returns 503 if a critical dependency is down so an
+/// orchestrator stops routing traffic without killing the pod.
+async fn root_ready(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, axum::http::StatusCode> {
+    let db_ok = state.db.health_check().await.is_ok();
+    let redis_ok = state.redis.health_check().await.unwrap_or(false);
+    if db_ok && redis_ok {
+        Ok(Json(serde_json::json!({
+            "ready": true,
+            "database": "up",
+            "redis": "up",
+        })))
+    } else {
+        tracing::warn!(db_ok, redis_ok, "api-gateway readiness check failed");
+        Err(axum::http::StatusCode::SERVICE_UNAVAILABLE)
+    }
+}
+
+/// Prometheus text exposition format, sharing the `verdyx_*` schema with
+/// every other service.
+async fn root_metrics(
+    State(state): State<AppState>,
+) -> (
+    axum::http::StatusCode,
+    [(axum::http::HeaderName, &'static str); 1],
+    String,
+) {
+    (
+        axum::http::StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        state.prom_metrics.render_prometheus(),
+    )
 }

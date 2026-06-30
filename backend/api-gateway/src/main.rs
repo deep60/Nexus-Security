@@ -39,6 +39,10 @@ pub struct AppState {
     pub config: Arc<AppConfig>,
     pub active_sessions: Arc<RwLock<HashMap<String, SessionInfo>>>,
     pub metrics: Arc<MetricsCollector>,
+    /// Prometheus-text-format registry. Kept alongside the existing per-endpoint
+    /// `MetricsCollector` so the gateway emits the same `verdyx_*` schema as
+    /// every other service for the root `/metrics` scrape.
+    pub prom_metrics: shared::MetricsRegistry,
 }
 
 // Session information for active users
@@ -244,6 +248,7 @@ async fn main() -> Result<()> {
         config: Arc::new(config.clone()),
         active_sessions: Arc::new(RwLock::new(HashMap::new())),
         metrics: metrics_collector.clone(),
+        prom_metrics: shared::MetricsRegistry::new("api-gateway", env!("CARGO_PKG_VERSION")),
     };
 
     // Create CORS layer from config
@@ -274,7 +279,15 @@ async fn main() -> Result<()> {
         ])
         .allow_credentials(true);
 
+    // Tower middleware that increments the `verdyx_http_requests_total` /
+    // `verdyx_http_errors_total` counters exposed by `/metrics`. Kept as a
+    // tiny closure so we can hand each request a cheap clone of the registry.
+    let prom_registry = state.prom_metrics.clone();
     let app = routes::create_router(state)
+        .layer(axum::middleware::from_fn(move |req, next| {
+            let r = prom_registry.clone();
+            async move { shared::metrics_mw::track_with(r, req, next).await }
+        }))
         .layer(TraceLayer::new_for_http())
         .layer(tower_http::catch_panic::CatchPanicLayer::new())
         .layer(cors)

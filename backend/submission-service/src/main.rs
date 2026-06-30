@@ -28,17 +28,25 @@ pub struct AppState {
     pub s3_client: Arc<S3Client>,
     pub db_pool: PgPool,
     pub redis_client: redis::Client,
+    pub metrics: shared::MetricsRegistry,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing
-    tracing_subscriber::fmt::init();
+    // Load environment variables before tracing so RUST_LOG/log level from
+    // .env are honored.
+    dotenvy::dotenv().ok();
+
+    // Initialize tracing — JSON format with thread ids + line numbers so logs
+    // aggregate cleanly across the fleet (matches user/consensus/payment/etc).
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .with_thread_ids(true)
+        .with_line_number(true)
+        .json()
+        .init();
 
     tracing::info!("Starting Submission Service...");
-
-    // Load environment variables
-    dotenvy::dotenv().ok();
 
     // Initialize database connection with proper error handling
     let database_url =
@@ -55,6 +63,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err(anyhow::anyhow!("Database connection failed: {e}").into());
         }
     };
+
+    // Run migrations on startup. Submission-service does not yet own
+    // service-local tables (schema is in /database/init), so when migrations
+    // dir is empty this is effectively a no-op. We still call it so that
+    // adding a migration later does not require touching main.rs.
+    if std::path::Path::new("./migrations").exists() {
+        match sqlx::migrate!("./migrations").run(&db_pool).await {
+            Ok(_) => tracing::info!("Database migrations completed"),
+            Err(e) => {
+                tracing::error!("Database migration failed: {}", e);
+                return Err(anyhow::anyhow!("Database migration failed: {e}").into());
+            }
+        }
+    } else {
+        tracing::info!("Migrations directory not found - using centralized schema");
+    }
 
     // Initialize Redis client with error handling
     let redis_url =
@@ -87,6 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         s3_client: Arc::new(s3_client),
         db_pool,
         redis_client,
+        metrics: shared::MetricsRegistry::new("submission-service", env!("CARGO_PKG_VERSION")),
     };
 
     // Build CORS layer - allow specific origins from environment
@@ -113,14 +138,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .allow_credentials(true);
 
-    // Build our application with routes
+    // Build our application with routes. Metrics middleware updates
+    // request/error counters exposed by `/metrics`.
+    let prom_registry = state.metrics.clone();
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/health/live", get(liveness_check))
         .route("/health/ready", get(readiness_check))
         .route("/ready", get(readiness_check))
+        .route("/metrics", get(metrics_handler))
         .route("/submit/file", post(handlers::file_upload::submit_file))
         .route("/submit/url", post(handlers::url_submission::submit_url))
+        .layer(axum::middleware::from_fn(move |req, next| {
+            let r = prom_registry.clone();
+            async move { shared::metrics_mw::track_with(r, req, next).await }
+        }))
         .layer(cors)
         .layer(tower_http::catch_panic::CatchPanicLayer::new())
         .with_state(state);
@@ -212,4 +244,23 @@ async fn readiness_check(
         tracing::warn!(db_ok, redis_ok, "readiness check failed");
         Err(StatusCode::SERVICE_UNAVAILABLE)
     }
+}
+
+/// Prometheus text-format metrics. Mirrors the other services so the single
+/// `prometheus.yml` scrape config works without per-service path overrides.
+async fn metrics_handler(
+    State(state): State<AppState>,
+) -> (
+    axum::http::StatusCode,
+    [(axum::http::HeaderName, &'static str); 1],
+    String,
+) {
+    (
+        axum::http::StatusCode::OK,
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
+        state.metrics.render_prometheus(),
+    )
 }

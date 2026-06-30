@@ -112,15 +112,15 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // Run migrations with error handling
+    // Run migrations with error handling. Fail-fast: a broken migration is a
+    // production-blocking bug; silently continuing risks the service running
+    // against a schema it does not expect.
     info!("Running database migrations...");
     if let Err(e) = sqlx::migrate!("./migrations").run(&db_pool).await {
         error!("Failed to run database migrations: {}", e);
-        // Don't fail startup - migrations might already be applied
-        info!("Continuing despite migration error...");
-    } else {
-        info!("Database migrations complete");
+        return Err(anyhow::anyhow!("Database migration failed: {e}").into());
     }
+    info!("Database migrations complete");
 
     // Initialize Redis client with error handling
     info!("Connecting to Redis...");
@@ -191,7 +191,9 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     });
     info!("Queue consumer worker started");
 
-    // Build the application router
+    // Build the application router. Metrics middleware ticks
+    // `verdyx_http_requests_total` / `verdyx_http_errors_total` per request.
+    let prom_registry = app_state.metrics.clone();
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/health/live", get(liveness_check))
@@ -205,6 +207,10 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .route("/analysis/:id/detailed", get(get_detailed_analysis))
         .route("/engines/status", get(engines_status))
         .with_state(app_state)
+        .layer(axum::middleware::from_fn(move |req, next| {
+            let r = prom_registry.clone();
+            async move { shared::metrics_mw::track_with(r, req, next).await }
+        }))
         .layer({
             let allowed_origins: Vec<_> = std::env::var("CORS_ALLOWED_ORIGINS")
                 .unwrap_or_else(|_| "http://localhost:8080".to_string())

@@ -21,6 +21,14 @@ BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP"
 DB_USER="${POSTGRES_USER:-verdyx_user}"
 INCLUDE_MINIO=1
 
+# Redis runs with `--requirepass ${REDIS_PASSWORD}` in docker-compose, so the
+# backup must authenticate or `SAVE` returns NOAUTH and we'd copy a stale RDB.
+# Pull the value from the environment, falling back to the project .env file.
+REDIS_PASSWORD="${REDIS_PASSWORD:-}"
+if [[ -z "$REDIS_PASSWORD" && -f "$ROOT_DIR/.env" ]]; then
+  REDIS_PASSWORD="$(grep -E '^REDIS_PASSWORD=' "$ROOT_DIR/.env" | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")"
+fi
+
 # All per-service databases, kept in sync with database/init/01-init-databases.sql.
 DATABASES=(
   verdyx
@@ -80,8 +88,12 @@ $COMPOSE -f "$COMPOSE_FILE" exec -T postgres \
 
 backed_up=()
 for db in "${DATABASES[@]}"; do
+  # Connect to the always-present `postgres` maintenance DB to query the
+  # catalog. Without -d, psql would try to connect to a database named after
+  # the user ("verdyx_user"), which doesn't exist, and every DB would be
+  # wrongly skipped.
   exists=$($COMPOSE -f "$COMPOSE_FILE" exec -T postgres \
-    psql -U "$DB_USER" -tAc "SELECT 1 FROM pg_database WHERE datname='$db'" 2>/dev/null || true)
+    psql -U "$DB_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$db'" 2>/dev/null || true)
   if [[ "$exists" != "1" ]]; then
     echo "[warn] Skipping $db (does not exist on this server)"
     continue
@@ -95,7 +107,18 @@ done
 
 # ------------------------------------------------------------------- redis
 echo "[info] Snapshotting redis"
-$COMPOSE -f "$COMPOSE_FILE" exec -T redis redis-cli SAVE >/dev/null
+# Authenticate when a password is configured; `--no-auth-warning` keeps the
+# password out of stderr. Verify SAVE actually succeeded before copying the
+# RDB so a silent NOAUTH/auth failure can't produce a stale/empty backup.
+redis_auth=()
+if [[ -n "$REDIS_PASSWORD" ]]; then
+  redis_auth=(-a "$REDIS_PASSWORD" --no-auth-warning)
+fi
+if ! $COMPOSE -f "$COMPOSE_FILE" exec -T redis \
+    redis-cli "${redis_auth[@]}" SAVE | grep -q OK; then
+  echo "[error] redis SAVE failed (check REDIS_PASSWORD); aborting redis backup" >&2
+  exit 1
+fi
 $COMPOSE -f "$COMPOSE_FILE" cp redis:/data/dump.rdb "$BACKUP_DIR/redis.rdb"
 
 # ------------------------------------------------------------------- minio
@@ -113,6 +136,12 @@ if [[ -f .env ]]; then
 fi
 
 # ----------------------------------------------------------------- manifest
+if [[ ${#backed_up[@]} -eq 0 ]]; then
+  echo "[error] No databases were backed up — check POSTGRES_USER and that the" >&2
+  echo "        databases exist. Refusing to write an empty manifest." >&2
+  exit 1
+fi
+
 {
   echo '{'
   echo "  \"timestamp\": \"$TIMESTAMP\","

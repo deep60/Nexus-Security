@@ -20,6 +20,25 @@ use crate::models::analysis_result::{
 };
 
 /// Custom error types for hash analysis
+/// Wrap a possibly-NaN/Infinite `f64` in a JSON `Number`. `serde_json::Number::from_f64`
+/// returns `None` for NaN or ±Inf; rather than `.unwrap()`-ing and panicking
+/// when an analyzer hits a degenerate score, we substitute 0.0 (a valid finite
+/// number) and log so the bad value can be tracked down. Callers using this in
+/// metric/metadata output keep emitting a well-formed JSON document.
+fn safe_json_number(value: f64) -> serde_json::Number {
+    match serde_json::Number::from_f64(value) {
+        Some(n) => n,
+        None => {
+            tracing::warn!(
+                value = ?value,
+                "non-finite float in hash analyzer output; substituting 0"
+            );
+            // 0 is always a valid JSON Number, so this fallback can never fail.
+            serde_json::Number::from_f64(0.0).expect("0.0 is a finite JSON number")
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum HashAnalysisError {
     #[error("Invalid hash format for {hash_type}: {hash}")]
@@ -433,7 +452,17 @@ impl HashAnalyzer {
         file_data: Option<&[u8]>,
     ) -> Result<AnalysisResult, HashAnalysisError> {
         let start_time = Instant::now();
-        let _permit = self.semaphore.acquire().await.unwrap();
+        // The concurrency semaphore is never `close()`d in our code, so
+        // `acquire()` cannot fail in practice. We still treat a closed
+        // semaphore as a config error rather than panicking so that future
+        // hot-reload / shutdown work cannot crash the engine.
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|e| HashAnalysisError::ConfigError {
+                message: format!("hash analyzer semaphore closed: {e}"),
+            })?;
 
         info!(
             "Starting enhanced hash analysis for {} hash: {}",
@@ -616,7 +645,13 @@ impl HashAnalyzer {
         hashes
     }
 
-    /// Query with retry logic and circuit breaker
+    /// Query with retry logic and circuit breaker.
+    ///
+    /// Returns `ConfigError` if the given `source` was not registered with a
+    /// circuit breaker or rate limiter at construction time. Previously this
+    /// path used `.unwrap()` and would panic — survivable thanks to
+    /// `CatchPanicLayer`, but a misconfigured new API source would generate
+    /// 500s instead of a clean diagnostic.
     async fn query_with_retry<F, Fut, T>(
         &self,
         source: &str,
@@ -626,8 +661,16 @@ impl HashAnalyzer {
         F: FnMut() -> Fut,
         Fut: std::future::Future<Output = Result<T, HashAnalysisError>>,
     {
-        let circuit_breaker = self.circuit_breakers.get(source).unwrap();
-        let rate_limiter = self.rate_limiters.get(source).unwrap();
+        let circuit_breaker = self.circuit_breakers.get(source).ok_or_else(|| {
+            HashAnalysisError::ConfigError {
+                message: format!("no circuit breaker registered for source '{source}'"),
+            }
+        })?;
+        let rate_limiter = self.rate_limiters.get(source).ok_or_else(|| {
+            HashAnalysisError::ConfigError {
+                message: format!("no rate limiter registered for source '{source}'"),
+            }
+        })?;
 
         if !circuit_breaker.is_available().await {
             return Err(HashAnalysisError::ApiError {
@@ -1253,9 +1296,7 @@ impl HashAnalyzer {
             let mut metadata = reputation.metadata.clone();
             metadata.insert(
                 "reliability_score".to_string(),
-                serde_json::Value::Number(
-                    serde_json::Number::from_f64(reputation.reliability_score as f64).unwrap(),
-                ),
+                serde_json::Value::Number(safe_json_number(reputation.reliability_score as f64)),
             );
             metadata.insert(
                 "query_time_ms".to_string(),
@@ -1313,21 +1354,15 @@ impl HashAnalyzer {
                 );
                 meta.insert(
                     "malicious_weight".to_string(),
-                    serde_json::Value::Number(
-                        serde_json::Number::from_f64(malicious_weight as f64).unwrap(),
-                    ),
+                    serde_json::Value::Number(safe_json_number(malicious_weight as f64)),
                 );
                 meta.insert(
                     "suspicious_weight".to_string(),
-                    serde_json::Value::Number(
-                        serde_json::Number::from_f64(suspicious_weight as f64).unwrap(),
-                    ),
+                    serde_json::Value::Number(safe_json_number(suspicious_weight as f64)),
                 );
                 meta.insert(
                     "benign_weight".to_string(),
-                    serde_json::Value::Number(
-                        serde_json::Number::from_f64(benign_weight as f64).unwrap(),
-                    ),
+                    serde_json::Value::Number(safe_json_number(benign_weight as f64)),
                 );
                 meta
             },
@@ -1413,15 +1448,11 @@ impl HashAnalyzer {
             );
             stats.insert(
                 "cache_hit_rate".to_string(),
-                serde_json::Value::Number(
-                    serde_json::Number::from_f64(metrics.cache_hit_rate()).unwrap(),
-                ),
+                serde_json::Value::Number(safe_json_number(metrics.cache_hit_rate())),
             );
             stats.insert(
                 "success_rate".to_string(),
-                serde_json::Value::Number(
-                    serde_json::Number::from_f64(metrics.success_rate()).unwrap(),
-                ),
+                serde_json::Value::Number(safe_json_number(metrics.success_rate())),
             );
             stats.insert(
                 "average_response_time_ms".to_string(),

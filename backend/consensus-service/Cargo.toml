@@ -57,7 +57,7 @@ validator = { version = "0.18", features = ["derive"] }
 statrs = "0.16"
 
 # Shared module
-shared = { path = "../shared" }
+shared = { path = "../shared", features = ["axum-mw"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
