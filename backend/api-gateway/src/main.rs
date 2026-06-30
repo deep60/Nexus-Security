@@ -187,11 +187,30 @@ fn load_config() -> Result<AppConfig> {
 //         .as_secs()
 // }
 
-// Graceful shutdown handler
+// Graceful shutdown handler — waits for SIGINT (Ctrl+C) or SIGTERM (sent by
+// Docker/Kubernetes on stop/rollout) so in-flight requests can drain.
 async fn shutdown_signal() {
-    tokio::signal::ctrl_c()
-        .await
-        .expect("Failed to listen for shutdown signal");
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => warn!("failed to install SIGTERM handler: {e}"),
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = terminate => {}
+    }
 
     info!("Shutdown signal received, starting graceful shutdown...");
 }
@@ -257,6 +276,7 @@ async fn main() -> Result<()> {
 
     let app = routes::create_router(state)
         .layer(TraceLayer::new_for_http())
+        .layer(tower_http::catch_panic::CatchPanicLayer::new())
         .layer(cors)
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024)); // 10MB
 

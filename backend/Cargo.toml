@@ -63,7 +63,10 @@ pretty_assertions = "1.4"
 opt-level = 3
 lto = true
 codegen-units = 1
-panic = "abort"
+# Unwind (not abort) so a panicking request handler can be caught by
+# tower-http's CatchPanicLayer and turned into a 500 response instead of
+# taking down the entire service process. Graceful degradation > hard crash.
+panic = "unwind"
 
 [profile.dev]
 opt-level = 0

@@ -4,6 +4,9 @@
 #![allow(dead_code)]
 
 use axum::{
+    extract::State,
+    http::StatusCode,
+    response::Json,
     routing::{get, post},
     Router,
 };
@@ -113,9 +116,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build our application with routes
     let app = Router::new()
         .route("/health", get(health_check))
+        .route("/health/live", get(liveness_check))
+        .route("/health/ready", get(readiness_check))
+        .route("/ready", get(readiness_check))
         .route("/submit/file", post(handlers::file_upload::submit_file))
         .route("/submit/url", post(handlers::url_submission::submit_url))
         .layer(cors)
+        .layer(tower_http::catch_panic::CatchPanicLayer::new())
         .with_state(state);
 
     // Get port from environment or use default
@@ -128,11 +135,81 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Run the server
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
+    tracing::info!("Submission Service shut down gracefully");
     Ok(())
 }
 
-async fn health_check() -> &'static str {
-    "Submission Service is healthy"
+/// Waits for SIGINT or SIGTERM so the server can drain in-flight requests
+/// before the process exits (Docker/Kubernetes send SIGTERM on stop).
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => tracing::warn!("failed to install SIGTERM handler: {e}"),
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = terminate => {}
+    }
+
+    tracing::info!("Shutdown signal received, draining connections...");
+}
+
+async fn health_check() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "status": "healthy",
+        "service": "submission-service",
+        "version": env!("CARGO_PKG_VERSION"),
+        "timestamp": chrono::Utc::now(),
+    }))
+}
+
+/// Liveness: process is up. Always 200 unless the process is dead.
+async fn liveness_check() -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "alive": true }))
+}
+
+/// Readiness: can we serve traffic? Checks DB + Redis connectivity.
+/// Returns 503 if a dependency is unreachable so orchestrators stop routing
+/// traffic to this pod without killing it.
+async fn readiness_check(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let db_ok = sqlx::query("SELECT 1")
+        .execute(&state.db_pool)
+        .await
+        .is_ok();
+
+    let redis_ok = state
+        .redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_ok();
+
+    if db_ok && redis_ok {
+        Ok(Json(serde_json::json!({
+            "ready": true,
+            "database": "up",
+            "redis": "up",
+        })))
+    } else {
+        tracing::warn!(db_ok, redis_ok, "readiness check failed");
+        Err(StatusCode::SERVICE_UNAVAILABLE)
+    }
 }

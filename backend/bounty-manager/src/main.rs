@@ -246,15 +246,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Bounty Manager service starting on {}", addr);
 
     let listener = TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
+    info!("Bounty Manager shut down gracefully");
     Ok(())
+}
+
+/// Waits for SIGINT or SIGTERM so the server can drain in-flight requests
+/// before the process exits (Docker/Kubernetes send SIGTERM on stop).
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => warn!("failed to install SIGTERM handler: {e}"),
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = terminate => {}
+    }
+
+    info!("Shutdown signal received, draining connections...");
 }
 
 fn create_router(state: bounty_crud::BountyManagerState) -> Router {
     Router::new()
         // Health check
         .route("/health", get(health_check))
+        .route("/health/live", get(liveness_check))
+        .route("/health/ready", get(readiness_check))
+        .route("/ready", get(readiness_check))
+        .route("/metrics", get(metrics_handler))
         // Bounty management routes
         .route("/bounties", post(bounty_crud::create_bounty))
         .route("/bounties", get(bounty_crud::list_bounties))
@@ -329,6 +364,7 @@ fn create_router(state: bounty_crud::BountyManagerState) -> Router {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
+                .layer(tower_http::catch_panic::CatchPanicLayer::new())
                 .layer(CorsLayer::permissive()),
         )
 }
@@ -340,6 +376,48 @@ async fn health_check() -> Json<ApiResponse<HashMap<String, String>>> {
     status.insert("version".to_string(), env!("CARGO_PKG_VERSION").to_string());
 
     Json(ApiResponse::success(status))
+}
+
+/// Process-global metrics registry (bounty-manager shares its router state with
+/// handlers, so a global keeps the metrics endpoint decoupled from that state).
+fn metrics_registry() -> &'static shared::MetricsRegistry {
+    static REGISTRY: std::sync::OnceLock<shared::MetricsRegistry> = std::sync::OnceLock::new();
+    REGISTRY
+        .get_or_init(|| shared::MetricsRegistry::new("bounty-manager", env!("CARGO_PKG_VERSION")))
+}
+
+/// Liveness: process is up.
+async fn liveness_check() -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "alive": true }))
+}
+
+/// Readiness: checks DB connectivity. 503 when not ready.
+async fn readiness_check(
+    axum::extract::State(state): axum::extract::State<bounty_crud::BountyManagerState>,
+) -> Result<Json<serde_json::Value>, axum::http::StatusCode> {
+    let db_ok = sqlx::query("SELECT 1").execute(&state.db).await.is_ok();
+    if db_ok {
+        Ok(Json(serde_json::json!({ "ready": true, "database": "up" })))
+    } else {
+        warn!("readiness check failed: database unreachable");
+        Err(axum::http::StatusCode::SERVICE_UNAVAILABLE)
+    }
+}
+
+/// Prometheus text-format metrics.
+async fn metrics_handler() -> (
+    axum::http::StatusCode,
+    [(axum::http::HeaderName, &'static str); 1],
+    String,
+) {
+    (
+        axum::http::StatusCode::OK,
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
+        metrics_registry().render_prometheus(),
+    )
 }
 
 // Database helper functions

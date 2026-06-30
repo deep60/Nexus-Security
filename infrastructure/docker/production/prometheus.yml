@@ -18,40 +18,84 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # API Gateway metrics
+  # ── Backend microservices ────────────────────────────────────────────────
+  # Every backend service listens on internal port 8080 inside the compose
+  # network and exposes Prometheus text metrics at /metrics. (Host port
+  # mappings differ, but Prometheus scrapes by container name + internal port.)
   - job_name: 'api-gateway'
+    metrics_path: /metrics
+    scrape_interval: 10s
     static_configs:
       - targets: ['api-gateway:8080']
+        labels: { service: 'api-gateway' }
+
+  - job_name: 'user-service'
     metrics_path: /metrics
     scrape_interval: 10s
+    static_configs:
+      - targets: ['user-service:8080']
+        labels: { service: 'user-service' }
 
-  # Analysis Engine metrics
   - job_name: 'analysis-engine'
-    static_configs:
-      - targets: ['analysis-engine:8082']
     metrics_path: /metrics
     scrape_interval: 10s
+    static_configs:
+      - targets: ['analysis-engine:8080']
+        labels: { service: 'analysis-engine' }
 
-  # Bounty Manager metrics
   - job_name: 'bounty-manager'
-    static_configs:
-      - targets: ['bounty-manager:8083']
     metrics_path: /metrics
     scrape_interval: 10s
+    static_configs:
+      - targets: ['bounty-manager:8080']
+        labels: { service: 'bounty-manager' }
 
-  # PostgreSQL metrics (if using postgres_exporter)
+  - job_name: 'submission-service'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['submission-service:8080']
+        labels: { service: 'submission-service' }
+
+  - job_name: 'consensus-service'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['consensus-service:8080']
+        labels: { service: 'consensus-service' }
+
+  - job_name: 'payment-service'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['payment-service:8080']
+        labels: { service: 'payment-service' }
+
+  - job_name: 'reputation-service'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['reputation-service:8080']
+        labels: { service: 'reputation-service' }
+
+  - job_name: 'notification-service'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['notification-service:8080']
+        labels: { service: 'notification-service' }
+
+  # ── Infra exporters (optional; enable the exporters in compose to use) ────
   - job_name: 'postgresql'
     static_configs:
-      - targets: ['postgres:9187']
+      - targets: ['postgres-exporter:9187']
     scrape_interval: 30s
 
-  # Redis metrics (if using redis_exporter)
   - job_name: 'redis'
     static_configs:
-      - targets: ['redis:9121']
+      - targets: ['redis-exporter:9121']
     scrape_interval: 30s
 
-  # Node exporter for system metrics
   - job_name: 'node'
     static_configs:
       - targets: ['node-exporter:9100']

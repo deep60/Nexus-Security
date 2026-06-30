@@ -37,4 +37,7 @@ pub type Result<T> = std::result::Result<T, VerdyxError>;
 
 // Export modules
 pub mod messaging;
+pub mod service_metrics;
 pub mod types;
+
+pub use service_metrics::MetricsRegistry;

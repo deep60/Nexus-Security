@@ -19,7 +19,7 @@ COPY user-service ./user-service
 RUN cargo build --release --bin api-gateway
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ca-certificates libssl3 libpq5 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates libssl3 libpq5 curl && rm -rf /var/lib/apt/lists/*
 RUN useradd -m -u 1000 app
 WORKDIR /app
 COPY --from=builder /app/target/release/api-gateway /usr/local/bin/app

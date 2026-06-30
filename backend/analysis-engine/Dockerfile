@@ -44,6 +44,7 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
     ca-certificates \
     libssl3 \
     libpq5 \
+    curl \
     && apt-get install -y -t bookworm-backports libyara10 \
     && rm -rf /var/lib/apt/lists/*
 

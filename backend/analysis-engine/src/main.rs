@@ -48,6 +48,7 @@ pub struct AppState {
     file_scanner: Arc<FileScanner>,
     url_scanner: Arc<UrlScanner>,
     db: sqlx::PgPool,
+    metrics: shared::MetricsRegistry,
 }
 #[derive(Deserialize)]
 struct AnalysisRequest {
@@ -164,6 +165,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         file_scanner,
         url_scanner,
         db: db_pool.clone(),
+        metrics: shared::MetricsRegistry::new("analysis-engine", env!("CARGO_PKG_VERSION")),
     };
 
     info!("Analysis engines initialized successfully");
@@ -192,6 +194,10 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Build the application router
     let app = Router::new()
         .route("/health", get(health_check))
+        .route("/health/live", get(liveness_check))
+        .route("/health/ready", get(readiness_check))
+        .route("/ready", get(readiness_check))
+        .route("/metrics", get(metrics_handler))
         .route("/analyze/file", post(analyze_file))
         .route("/analyze/url", post(analyze_url))
         .route("/analyze/hash", post(analyze_hash))
@@ -218,16 +224,48 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     axum::http::header::CONTENT_TYPE,
                 ])
         })
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        .layer(tower_http::catch_panic::CatchPanicLayer::new());
 
     // Start the server
     let addr = format!("0.0.0.0:{port}");
     info!("Analysis Engine listening on {}", addr);
 
     let listener = TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
+    info!("Analysis Engine shut down gracefully");
     Ok(())
+}
+
+/// Waits for SIGINT or SIGTERM so the server can drain in-flight requests
+/// before the process exits (Docker/Kubernetes send SIGTERM on stop).
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => tracing::warn!("failed to install SIGTERM handler: {e}"),
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = terminate => {}
+    }
+
+    info!("Shutdown signal received, draining connections...");
 }
 
 async fn health_check() -> Json<HealthResponse> {
@@ -241,6 +279,42 @@ async fn health_check() -> Json<HealthResponse> {
             yara_engine: true,
         },
     })
+}
+
+/// Liveness: process is up.
+async fn liveness_check() -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "alive": true }))
+}
+
+/// Readiness: checks DB connectivity. 503 when not ready.
+async fn readiness_check(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let db_ok = sqlx::query("SELECT 1").execute(&state.db).await.is_ok();
+    if db_ok {
+        Ok(Json(serde_json::json!({ "ready": true, "database": "up" })))
+    } else {
+        error!("readiness check failed: database unreachable");
+        Err(StatusCode::SERVICE_UNAVAILABLE)
+    }
+}
+
+/// Prometheus text-format metrics.
+async fn metrics_handler(
+    State(state): State<AppState>,
+) -> (
+    StatusCode,
+    [(axum::http::HeaderName, &'static str); 1],
+    String,
+) {
+    (
+        StatusCode::OK,
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
+        state.metrics.render_prometheus(),
+    )
 }
 
 async fn analyze_file(

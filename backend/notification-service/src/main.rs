@@ -22,6 +22,34 @@ use tracing::{info, warn};
 use crate::config::Config;
 use crate::notification_manager::NotificationManager;
 
+/// Waits for SIGINT or SIGTERM so the server can drain in-flight requests
+/// before the process exits (Docker/Kubernetes send SIGTERM on stop).
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => warn!("failed to install SIGTERM handler: {e}"),
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = terminate => {}
+    }
+
+    info!("Shutdown signal received, draining connections...");
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load environment variables
@@ -86,6 +114,7 @@ async fn main() -> Result<()> {
         db_pool,
         redis_conn,
         notification_manager,
+        metrics: shared::MetricsRegistry::new("notification-service", env!("CARGO_PKG_VERSION")),
     });
 
     // Configure CORS - allow specific origins from environment
@@ -115,6 +144,10 @@ async fn main() -> Result<()> {
     // Build router
     let app = Router::new()
         .route("/health", get(handlers::health::health_check))
+        .route("/health/live", get(liveness_check))
+        .route("/health/ready", get(readiness_check))
+        .route("/ready", get(readiness_check))
+        .route("/metrics", get(metrics_handler))
         .route(
             "/api/v1/notifications/send",
             post(handlers::notification::send_notification),
@@ -146,6 +179,7 @@ async fn main() -> Result<()> {
         .route("/ws", get(handlers::websocket::websocket_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
+        .layer(tower_http::catch_panic::CatchPanicLayer::new())
         .with_state(app_state);
 
     // Start server
@@ -153,8 +187,11 @@ async fn main() -> Result<()> {
     info!("Notification Service listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
+    info!("Notification Service shut down gracefully");
     Ok(())
 }
 
@@ -164,4 +201,46 @@ pub struct AppState {
     pub db_pool: sqlx::PgPool,
     pub redis_conn: redis::aio::ConnectionManager,
     pub notification_manager: Arc<NotificationManager>,
+    pub metrics: shared::MetricsRegistry,
+}
+
+/// Liveness: process is up. Always 200 unless the process is dead.
+async fn liveness_check() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({ "alive": true }))
+}
+
+/// Readiness: checks DB connectivity. 503 when not ready.
+async fn readiness_check(
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+) -> Result<axum::Json<serde_json::Value>, axum::http::StatusCode> {
+    let db_ok = sqlx::query("SELECT 1")
+        .execute(&state.db_pool)
+        .await
+        .is_ok();
+    if db_ok {
+        Ok(axum::Json(
+            serde_json::json!({ "ready": true, "database": "up" }),
+        ))
+    } else {
+        warn!("readiness check failed: database unreachable");
+        Err(axum::http::StatusCode::SERVICE_UNAVAILABLE)
+    }
+}
+
+/// Prometheus text-format metrics.
+async fn metrics_handler(
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+) -> (
+    axum::http::StatusCode,
+    [(axum::http::HeaderName, &'static str); 1],
+    String,
+) {
+    (
+        axum::http::StatusCode::OK,
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
+        state.metrics.render_prometheus(),
+    )
 }

@@ -25,6 +25,34 @@ use crate::config::Config;
 use crate::middleware::{admin_middleware, auth_middleware};
 use crate::services::user_service::UserService;
 
+/// Waits for SIGINT or SIGTERM so the server can drain in-flight requests
+/// before the process exits (Docker/Kubernetes send SIGTERM on stop).
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => tracing::warn!("failed to install SIGTERM handler: {e}"),
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = terminate => {}
+    }
+
+    info!("Shutdown signal received, draining connections...");
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load environment variables
@@ -94,6 +122,7 @@ async fn main() -> Result<()> {
         redis_conn,
         user_service,
         avatar_storage,
+        metrics: shared::MetricsRegistry::new("user-service", env!("CARGO_PKG_VERSION")),
     });
 
     // Configure CORS - allow specific origins from environment
@@ -123,6 +152,10 @@ async fn main() -> Result<()> {
     // Public routes (no authentication required)
     let public_routes = Router::new()
         .route("/health", get(handlers::health::health_check))
+        .route("/health/live", get(liveness_check))
+        .route("/health/ready", get(readiness_check))
+        .route("/ready", get(readiness_check))
+        .route("/metrics", get(metrics_handler))
         .route("/api/v1/auth/register", post(handlers::auth::register))
         .route("/api/v1/auth/login", post(handlers::auth::login))
         .route("/api/v1/auth/refresh", post(handlers::auth::refresh_token))
@@ -230,6 +263,7 @@ async fn main() -> Result<()> {
         .merge(admin_routes)
         .layer(cors)
         .layer(TraceLayer::new_for_http())
+        .layer(tower_http::catch_panic::CatchPanicLayer::new())
         .with_state(app_state);
 
     // Start server
@@ -237,8 +271,11 @@ async fn main() -> Result<()> {
     info!("User Service listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
+    info!("User Service shut down gracefully");
     Ok(())
 }
 
@@ -249,4 +286,46 @@ pub struct AppState {
     pub redis_conn: redis::aio::ConnectionManager,
     pub user_service: Arc<UserService>,
     pub avatar_storage: Option<Arc<storage::AvatarStorage>>,
+    pub metrics: shared::MetricsRegistry,
+}
+
+/// Liveness: process is up. Always 200 unless the process is dead.
+async fn liveness_check() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({ "alive": true }))
+}
+
+/// Readiness: checks DB connectivity. 503 when not ready.
+async fn readiness_check(
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+) -> Result<axum::Json<serde_json::Value>, axum::http::StatusCode> {
+    let db_ok = sqlx::query("SELECT 1")
+        .execute(&state.db_pool)
+        .await
+        .is_ok();
+    if db_ok {
+        Ok(axum::Json(
+            serde_json::json!({ "ready": true, "database": "up" }),
+        ))
+    } else {
+        tracing::warn!("readiness check failed: database unreachable");
+        Err(axum::http::StatusCode::SERVICE_UNAVAILABLE)
+    }
+}
+
+/// Prometheus text-format metrics.
+async fn metrics_handler(
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+) -> (
+    axum::http::StatusCode,
+    [(axum::http::HeaderName, &'static str); 1],
+    String,
+) {
+    (
+        axum::http::StatusCode::OK,
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
+        state.metrics.render_prometheus(),
+    )
 }
