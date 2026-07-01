@@ -15,6 +15,9 @@ backend/.env
 backend/**/.env
 config/**/*.env
 
+# CI: per-service test DATABASE_URLs written by scripts/ci/setup-test-databases.sh
+.ci-test-db-env
+
 # Node modules
 node_modules/
 blockchain/node_modules/

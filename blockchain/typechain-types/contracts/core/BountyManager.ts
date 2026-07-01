@@ -104,6 +104,7 @@ export interface BountyManagerInterface extends Interface {
     nameOrSignature:
       | "ANALYSIS_TIMEOUT"
       | "CONSENSUS_THRESHOLD"
+      | "MAX_ANALYSTS_PER_BOUNTY"
       | "MIN_ANALYSES_TO_RESOLVE"
       | "MIN_STAKE_AMOUNT"
       | "PLATFORM_FEE_PERCENT"
@@ -123,13 +124,16 @@ export interface BountyManagerInterface extends Interface {
       | "owner"
       | "pause"
       | "paused"
+      | "pendingWithdrawals"
       | "reputationSystem"
       | "resolveBounty"
       | "setFeeCollector"
       | "submitAnalysis"
       | "threatToken"
+      | "totalEscrowed"
       | "unpause"
       | "userBounties"
+      | "withdraw"
   ): FunctionFragment;
 
   getEvent(
@@ -137,7 +141,9 @@ export interface BountyManagerInterface extends Interface {
       | "AnalysisSubmitted"
       | "BountyCreated"
       | "ConsensusReached"
+      | "PaymentCredited"
       | "RewardsDistributed"
+      | "Withdrawal"
   ): EventFragment;
 
   encodeFunctionData(
@@ -146,6 +152,10 @@ export interface BountyManagerInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "CONSENSUS_THRESHOLD",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "MAX_ANALYSTS_PER_BOUNTY",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -216,6 +226,10 @@ export interface BountyManagerInterface extends Interface {
   encodeFunctionData(functionFragment: "pause", values?: undefined): string;
   encodeFunctionData(functionFragment: "paused", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "pendingWithdrawals",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "reputationSystem",
     values?: undefined
   ): string;
@@ -235,11 +249,16 @@ export interface BountyManagerInterface extends Interface {
     functionFragment: "threatToken",
     values?: undefined
   ): string;
+  encodeFunctionData(
+    functionFragment: "totalEscrowed",
+    values?: undefined
+  ): string;
   encodeFunctionData(functionFragment: "unpause", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "userBounties",
     values: [AddressLike, BigNumberish]
   ): string;
+  encodeFunctionData(functionFragment: "withdraw", values?: undefined): string;
 
   decodeFunctionResult(
     functionFragment: "ANALYSIS_TIMEOUT",
@@ -247,6 +266,10 @@ export interface BountyManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "CONSENSUS_THRESHOLD",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "MAX_ANALYSTS_PER_BOUNTY",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -308,6 +331,10 @@ export interface BountyManagerInterface extends Interface {
   decodeFunctionResult(functionFragment: "pause", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "paused", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "pendingWithdrawals",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "reputationSystem",
     data: BytesLike
   ): Result;
@@ -327,11 +354,16 @@ export interface BountyManagerInterface extends Interface {
     functionFragment: "threatToken",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "totalEscrowed",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "unpause", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "userBounties",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
 }
 
 export namespace AnalysisSubmittedEvent {
@@ -415,6 +447,19 @@ export namespace ConsensusReachedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
+export namespace PaymentCreditedEvent {
+  export type InputTuple = [account: AddressLike, amount: BigNumberish];
+  export type OutputTuple = [account: string, amount: bigint];
+  export interface OutputObject {
+    account: string;
+    amount: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
 export namespace RewardsDistributedEvent {
   export type InputTuple = [
     bountyId: BigNumberish,
@@ -433,6 +478,19 @@ export namespace RewardsDistributedEvent {
     winners: string[];
     rewards: bigint[];
     stakes: bigint[];
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace WithdrawalEvent {
+  export type InputTuple = [account: AddressLike, amount: BigNumberish];
+  export type OutputTuple = [account: string, amount: bigint];
+  export interface OutputObject {
+    account: string;
+    amount: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -486,6 +544,8 @@ export interface BountyManager extends BaseContract {
   ANALYSIS_TIMEOUT: TypedContractMethod<[], [bigint], "view">;
 
   CONSENSUS_THRESHOLD: TypedContractMethod<[], [bigint], "view">;
+
+  MAX_ANALYSTS_PER_BOUNTY: TypedContractMethod<[], [bigint], "view">;
 
   MIN_ANALYSES_TO_RESOLVE: TypedContractMethod<[], [bigint], "view">;
 
@@ -606,6 +666,12 @@ export interface BountyManager extends BaseContract {
 
   paused: TypedContractMethod<[], [boolean], "view">;
 
+  pendingWithdrawals: TypedContractMethod<
+    [arg0: AddressLike],
+    [bigint],
+    "view"
+  >;
+
   reputationSystem: TypedContractMethod<[], [string], "view">;
 
   resolveBounty: TypedContractMethod<
@@ -634,6 +700,8 @@ export interface BountyManager extends BaseContract {
 
   threatToken: TypedContractMethod<[], [string], "view">;
 
+  totalEscrowed: TypedContractMethod<[], [bigint], "view">;
+
   unpause: TypedContractMethod<[], [void], "nonpayable">;
 
   userBounties: TypedContractMethod<
@@ -641,6 +709,8 @@ export interface BountyManager extends BaseContract {
     [bigint],
     "view"
   >;
+
+  withdraw: TypedContractMethod<[], [void], "nonpayable">;
 
   getFunction<T extends ContractMethod = ContractMethod>(
     key: string | FunctionFragment
@@ -651,6 +721,9 @@ export interface BountyManager extends BaseContract {
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "CONSENSUS_THRESHOLD"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "MAX_ANALYSTS_PER_BOUNTY"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "MIN_ANALYSES_TO_RESOLVE"
@@ -787,6 +860,9 @@ export interface BountyManager extends BaseContract {
     nameOrSignature: "paused"
   ): TypedContractMethod<[], [boolean], "view">;
   getFunction(
+    nameOrSignature: "pendingWithdrawals"
+  ): TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
+  getFunction(
     nameOrSignature: "reputationSystem"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
@@ -812,6 +888,9 @@ export interface BountyManager extends BaseContract {
     nameOrSignature: "threatToken"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
+    nameOrSignature: "totalEscrowed"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
     nameOrSignature: "unpause"
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
@@ -821,6 +900,9 @@ export interface BountyManager extends BaseContract {
     [bigint],
     "view"
   >;
+  getFunction(
+    nameOrSignature: "withdraw"
+  ): TypedContractMethod<[], [void], "nonpayable">;
 
   getEvent(
     key: "AnalysisSubmitted"
@@ -844,11 +926,25 @@ export interface BountyManager extends BaseContract {
     ConsensusReachedEvent.OutputObject
   >;
   getEvent(
+    key: "PaymentCredited"
+  ): TypedContractEvent<
+    PaymentCreditedEvent.InputTuple,
+    PaymentCreditedEvent.OutputTuple,
+    PaymentCreditedEvent.OutputObject
+  >;
+  getEvent(
     key: "RewardsDistributed"
   ): TypedContractEvent<
     RewardsDistributedEvent.InputTuple,
     RewardsDistributedEvent.OutputTuple,
     RewardsDistributedEvent.OutputObject
+  >;
+  getEvent(
+    key: "Withdrawal"
+  ): TypedContractEvent<
+    WithdrawalEvent.InputTuple,
+    WithdrawalEvent.OutputTuple,
+    WithdrawalEvent.OutputObject
   >;
 
   filters: {
@@ -885,6 +981,17 @@ export interface BountyManager extends BaseContract {
       ConsensusReachedEvent.OutputObject
     >;
 
+    "PaymentCredited(address,uint256)": TypedContractEvent<
+      PaymentCreditedEvent.InputTuple,
+      PaymentCreditedEvent.OutputTuple,
+      PaymentCreditedEvent.OutputObject
+    >;
+    PaymentCredited: TypedContractEvent<
+      PaymentCreditedEvent.InputTuple,
+      PaymentCreditedEvent.OutputTuple,
+      PaymentCreditedEvent.OutputObject
+    >;
+
     "RewardsDistributed(uint256,address[],uint256[],uint256[])": TypedContractEvent<
       RewardsDistributedEvent.InputTuple,
       RewardsDistributedEvent.OutputTuple,
@@ -894,6 +1001,17 @@ export interface BountyManager extends BaseContract {
       RewardsDistributedEvent.InputTuple,
       RewardsDistributedEvent.OutputTuple,
       RewardsDistributedEvent.OutputObject
+    >;
+
+    "Withdrawal(address,uint256)": TypedContractEvent<
+      WithdrawalEvent.InputTuple,
+      WithdrawalEvent.OutputTuple,
+      WithdrawalEvent.OutputObject
+    >;
+    Withdrawal: TypedContractEvent<
+      WithdrawalEvent.InputTuple,
+      WithdrawalEvent.OutputTuple,
+      WithdrawalEvent.OutputObject
     >;
   };
 }

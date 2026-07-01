@@ -158,6 +158,9 @@ pub struct CurrencyStats {
 pub struct BountyManagerState {
     pub db: PgPool,
     pub reputation_service: Arc<ReputationService>,
+    /// Optional on-chain client. `None` when blockchain env is not configured,
+    /// in which case chain-backed endpoints (e.g. claimable withdrawals) return 503.
+    pub blockchain: Option<Arc<crate::services::blockchain::BlockchainService>>,
 }
 
 // Handler implementations

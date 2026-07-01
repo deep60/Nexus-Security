@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Auth-flow smoke test — validates the migrated auth path end-to-end through
+# the API gateway (which proxies auth/identity to user-service).
+#
+# Unlike scripts/test/smoke.sh (which only checks health/readiness/metrics),
+# this exercises the REAL user journey across the gateway <-> user-service
+# boundary with a shared JWT:
+#
+#   1. register            (gateway -> user-service /auth/register)
+#   2. login               (gateway -> user-service /auth/login)
+#   3. verify / whoami      (gateway -> user-service /auth/me)  <-- proves the
+#                            gateway accepts a token user-service minted
+#   4. authenticated call   (GET /users/me on a strict-auth route)  <-- proves
+#                            gateway middleware authorizes that same token
+#
+# Steps 3 and 4 are the ones that would break if the JWT contract or shared
+# secret were wrong — i.e. the actual risk introduced by the auth migration.
+#
+# Usage:
+#   scripts/test/auth-smoke.sh                     # against http://localhost:8080
+#   BASE_URL=https://api.verdyx.com scripts/test/auth-smoke.sh
+#
+# Requires: curl. Uses jq if present, otherwise falls back to grep/sed.
+# Exit code 0 on success, 1 on any failure.
+set -euo pipefail
+
+BASE_URL="${BASE_URL:-http://localhost:8080}"
+PASSWORD="${SMOKE_PASSWORD:-SmokeTest123!}"   # meets gateway complexity rules
+SUFFIX="$(date +%s)$$"
+USERNAME="smoke_${SUFFIX}"
+EMAIL="smoke_${SUFFIX}@example.com"
+
+log()  { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
+fail() { log "  ✗ $*"; exit 1; }
+
+# Extract a JSON string field. Prefer jq; fall back to a simple grep/sed.
+json_get() {
+  local key="$1" body="$2"
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$body" | jq -r "$key // empty"
+  else
+    # crude fallback: matches "key":"value" for the leaf key name given as .foo.bar
+    local leaf="${key##*.}"
+    printf '%s' "$body" | grep -o "\"${leaf}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -1 | sed -E 's/.*:[[:space:]]*"([^"]*)"/\1/'
+  fi
+}
+
+log "Target gateway: $BASE_URL"
+
+# ── 1. Register ──────────────────────────────────────────────────
+log "1/4 register  ($EMAIL)"
+REG_BODY="$(curl -fsS --max-time 15 -X POST "$BASE_URL/api/v1/auth/register" \
+  -H 'Content-Type: application/json' \
+  -d "{\"username\":\"$USERNAME\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")" \
+  || fail "register request failed (is the stack up? is user-service reachable?)"
+
+TOKEN="$(json_get '.data.accessToken' "$REG_BODY")"
+[[ -n "$TOKEN" ]] || fail "register returned no accessToken. Body: $REG_BODY"
+log "  ✓ registered, got access token"
+
+# ── 2. Login ─────────────────────────────────────────────────────
+log "2/4 login"
+LOGIN_BODY="$(curl -fsS --max-time 15 -X POST "$BASE_URL/api/v1/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d "{\"identifier\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")" \
+  || fail "login request failed"
+
+LOGIN_TOKEN="$(json_get '.data.accessToken' "$LOGIN_BODY")"
+[[ -n "$LOGIN_TOKEN" ]] || fail "login returned no accessToken. Body: $LOGIN_BODY"
+TOKEN="$LOGIN_TOKEN"
+log "  ✓ logged in"
+
+# ── 3. Verify / whoami (gateway must accept user-service's token) ─
+log "3/4 verify  (GET /auth/verify)"
+VERIFY_BODY="$(curl -fsS --max-time 15 "$BASE_URL/api/v1/auth/verify" \
+  -H "Authorization: Bearer $TOKEN")" \
+  || fail "verify request failed — gateway did NOT accept the user-service token (JWT secret/claims mismatch?)"
+
+VERIFY_EMAIL="$(json_get '.data.email' "$VERIFY_BODY")"
+[[ "$VERIFY_EMAIL" == "$EMAIL" ]] \
+  || fail "verify returned wrong/no email (got '$VERIFY_EMAIL'). Body: $VERIFY_BODY"
+log "  ✓ verify resolved the current user via user-service"
+
+# ── 4. Authenticated call on a strict-auth route ─────────────────
+log "4/4 authenticated call  (GET /users/me)"
+ME_BODY="$(curl -fsS --max-time 15 "$BASE_URL/api/v1/users/me" \
+  -H "Authorization: Bearer $TOKEN")" \
+  || fail "GET /users/me failed — strict auth middleware rejected the token"
+
+ME_EMAIL="$(json_get '.email' "$ME_BODY")"
+[[ "$ME_EMAIL" == "$EMAIL" ]] \
+  || fail "/users/me returned wrong/no email (got '$ME_EMAIL'). Body: $ME_BODY"
+log "  ✓ authenticated request accepted and proxied to user-service"
+
+log "AUTH SMOKE TEST PASSED — register → login → verify → authenticated call all work end-to-end"

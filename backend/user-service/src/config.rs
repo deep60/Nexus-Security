@@ -46,6 +46,22 @@ pub struct EmailConfig {
 
 impl Config {
     pub fn from_env() -> Result<Self> {
+        let jwt_secret = std::env::var("JWT_SECRET")?;
+        let is_production = std::env::var("ENVIRONMENT")
+            .map(|e| e.eq_ignore_ascii_case("production"))
+            .unwrap_or(false);
+        if is_production {
+            if jwt_secret == "change-me-in-production" {
+                anyhow::bail!("JWT_SECRET must be changed in production");
+            }
+            if jwt_secret.len() < 32 {
+                anyhow::bail!(
+                    "JWT_SECRET must be at least 32 characters in production (got {})",
+                    jwt_secret.len()
+                );
+            }
+        }
+
         Ok(Self {
             server: ServerConfig {
                 host: std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
@@ -67,7 +83,7 @@ impl Config {
                     .parse()?,
             },
             jwt: JwtConfig {
-                secret: std::env::var("JWT_SECRET")?,
+                secret: jwt_secret,
                 access_token_expiry_hours: std::env::var("ACCESS_TOKEN_EXPIRY_HOURS")
                     .unwrap_or_else(|_| "24".to_string())
                     .parse()?,

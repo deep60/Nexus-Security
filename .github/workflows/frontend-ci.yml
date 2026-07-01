@@ -21,31 +21,6 @@ jobs:
       run:
         working-directory: ./frontend
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: verdyx_test
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -68,21 +43,9 @@ jobs:
 
       - name: Run tests
         run: npm run test:run
-        env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test
-          REDIS_URL: redis://localhost:6379
-          NODE_ENV: test
-          JWT_SECRET: test-secret-key
-          BCRYPT_SALT_ROUNDS: 4
 
       - name: Generate coverage report
         run: npm run test:coverage
-        env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test
-          REDIS_URL: redis://localhost:6379
-          NODE_ENV: test
-          JWT_SECRET: test-secret-key
-          BCRYPT_SALT_ROUNDS: 4
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

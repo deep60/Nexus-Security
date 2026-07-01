@@ -144,8 +144,9 @@ pub async fn update_profile(
             .await
             .map_err(|_| StatusCode::BAD_GATEWAY)?;
         if !resp.status().is_success() {
-            return Err(StatusCode::from_u16(resp.status().as_u16())
-                .unwrap_or(StatusCode::BAD_GATEWAY));
+            return Err(
+                StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY)
+            );
         }
     }
 

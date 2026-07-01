@@ -88,7 +88,10 @@ impl ClamAvAnalyzer {
         let response = match scan {
             Ok(Ok(resp)) => resp,
             Ok(Err(e)) => {
-                error!("ClamAV scan failed for {} via {}: {}", filename, self.config.address, e);
+                error!(
+                    "ClamAV scan failed for {} via {}: {}",
+                    filename, self.config.address, e
+                );
                 return Ok(self.create_error_result(filename, &format!("ClamAV scan error: {e}")));
             }
             Err(_) => {
@@ -143,8 +146,8 @@ impl ClamAvAnalyzer {
         }
 
         if text.contains("FOUND") {
-            let virus_name = Self::parse_signature(&text)
-                .unwrap_or_else(|| "Unknown.Signature".to_string());
+            let virus_name =
+                Self::parse_signature(&text).unwrap_or_else(|| "Unknown.Signature".to_string());
             warn!("ClamAV: Malware detected in {} - {}", filename, virus_name);
 
             let mut metadata = std::collections::HashMap::new();
@@ -313,10 +316,7 @@ mod tests {
             ClamAvAnalyzer::parse_signature("stream: Win.Test.EICAR_HDB-1 FOUND\0"),
             Some("Win.Test.EICAR_HDB-1".to_string())
         );
-        assert_eq!(
-            ClamAvAnalyzer::parse_signature("stream: OK\0"),
-            None
-        );
+        assert_eq!(ClamAvAnalyzer::parse_signature("stream: OK\0"), None);
     }
 
     #[tokio::test]

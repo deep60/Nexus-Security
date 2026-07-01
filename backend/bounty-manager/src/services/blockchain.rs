@@ -192,6 +192,59 @@ impl BlockchainService {
         })
     }
 
+    /// Trigger on-chain resolution of a bounty.
+    ///
+    /// Calls `BountyManager.resolveBounty(uint256)`. Resolution is decoupled from
+    /// submission in the contract, so a keeper (this service) must call it once the
+    /// bounty is eligible (deadline passed or enough analyses). The contract enforces
+    /// eligibility with its own `require`s, so a premature/duplicate call reverts and
+    /// surfaces here as `TransactionFailed`.
+    pub async fn resolve_bounty(
+        &self,
+        on_chain_bounty_id: u64,
+    ) -> Result<String, BlockchainError> {
+        let bounty_id = U256::from(on_chain_bounty_id);
+
+        let tx = self
+            .bounty_manager
+            .method::<_, ()>("resolveBounty", bounty_id)
+            .map_err(|e| BlockchainError::ContractError(e.to_string()))?;
+
+        let pending_tx = tx
+            .send()
+            .await
+            .map_err(|e| BlockchainError::TransactionFailed(e.to_string()))?;
+
+        let tx_hash = format!("{:?}", pending_tx.tx_hash());
+
+        // Wait for the receipt so callers know the resolution actually mined.
+        pending_tx
+            .await
+            .map_err(|e| BlockchainError::TransactionFailed(e.to_string()))?;
+
+        Ok(tx_hash)
+    }
+
+    /// Read the amount an address can claim via `BountyManager.withdraw()`.
+    ///
+    /// Reflects the contract's pull-payment ledger (`pendingWithdrawals(address)`),
+    /// letting the API surface claimable balances so users know to withdraw.
+    pub async fn get_pending_withdrawal(&self, address: &str) -> Result<u64, BlockchainError> {
+        let addr: Address = address
+            .parse()
+            .map_err(|_| BlockchainError::InvalidAddress(address.to_string()))?;
+
+        let amount: U256 = self
+            .bounty_manager
+            .method("pendingWithdrawals", (addr,))
+            .map_err(|e| BlockchainError::ContractError(e.to_string()))?
+            .call()
+            .await
+            .map_err(|e| BlockchainError::ConnectionError(e.to_string()))?;
+
+        Ok(amount.as_u64())
+    }
+
     /// Verify a transaction by checking its receipt
     pub async fn verify_transaction(&self, tx_hash: &str) -> Result<bool, BlockchainError> {
         let hash: H256 = tx_hash

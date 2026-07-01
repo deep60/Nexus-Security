@@ -4,17 +4,23 @@ pragma solidity ^0.8.19;
 
 import "../Interfaces/IBountyManager.sol";
 import "../Interfaces/IReputationSystem.sol";
-import "./ThreatToken.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title BountyManager
  * @dev Manages bounties for threat intelligence analysis in the Verdyx platform
  * @author Verdyx Team
+ * @notice Uses a pull-payment (withdraw) pattern for all outbound token movement so
+ *         that resolution never loops over external token transfers. This prevents
+ *         gas-limit griefing/DoS where a single failing or gas-heavy recipient could
+ *         block resolution and permanently lock staked funds.
  */
 
 
-contract BountyManager {
+contract BountyManager is ReentrancyGuard {
+    using SafeERC20 for IERC20;
     // Enums
     enum BountyStatus {
         Active,      // Bounty is open for submissions
@@ -59,7 +65,7 @@ contract BountyManager {
     }
 
     // state variables
-    ThreatToken public immutable threatToken;
+    IERC20 public immutable threatToken;
     IReputationSystem public immutable reputationSystem;
 
     uint256 public bountyCounter;
@@ -68,6 +74,7 @@ contract BountyManager {
     uint256 public constant CONSENSUS_THRESHOLD = 66;   // 66% consensus required
     uint256 public constant PLATFORM_FEE_PERCENT = 5;    // 5% platfrom fee
     uint256 public constant MIN_ANALYSES_TO_RESOLVE = 5; // Synced threshold
+    uint256 public constant MAX_ANALYSTS_PER_BOUNTY = 50; // Bounds resolution loops (gas-DoS guard)
 
     address public owner;
     address public feeCollector;
@@ -78,7 +85,16 @@ contract BountyManager {
     mapping(uint256 => mapping(address => Analysis)) public analyses;
     mapping(uint256 => address[]) public bountyAnalysts;
     mapping(address => uint256[]) public userBounties;
-    mapping(uint256 => mapping(address => uint256)) public analystSubmissionIds; // Added for rep integration
+    mapping(uint256 => mapping(address => uint256)) public analystSubmissionIds; // Reserved slot; currently unused (reputation handled at resolution)
+
+    // Pull-payment ledger: funds owed to an account, claimed via withdraw()
+    mapping(address => uint256) public pendingWithdrawals;
+
+    // Total threatToken the contract owes to users: bounty rewards + analyst
+    // stakes still in escrow plus everything credited but not yet withdrawn.
+    // emergencyWithdraw() is bounded by this so owner action can never touch
+    // escrowed user funds — only surplus (e.g. accidentally-sent tokens).
+    uint256 public totalEscrowed;
 
     // Events
     event BountyCreated(
@@ -111,6 +127,10 @@ contract BountyManager {
         uint256[] stakes
     );
 
+    event PaymentCredited(address indexed account, uint256 amount);
+
+    event Withdrawal(address indexed account, uint256 amount);
+
     // Modifiers
     modifier onlyOwner() {
         require(msg.sender == owner, "Not authorized");
@@ -142,7 +162,7 @@ contract BountyManager {
         require(_reputationSystem != address(0), "Invalid reputation system address");
         require(_feeCollector != address(0), "Invalid fee collector address");
 
-        threatToken = ThreatToken(_threatToken);
+        threatToken = IERC20(_threatToken);
         reputationSystem = IReputationSystem(_reputationSystem);
         feeCollector = _feeCollector;
         owner = msg.sender;
@@ -170,7 +190,8 @@ contract BountyManager {
         require(bytes(description).length > 0, "Description required");
 
         // Transfer reward tokens to contract
-        require(threatToken.transferFrom(msg.sender, address(this), rewardAmount), "Token transfer failed");
+        threatToken.safeTransferFrom(msg.sender, address(this), rewardAmount);
+        totalEscrowed += rewardAmount;
 
         bountyCounter++;
 
@@ -217,12 +238,16 @@ contract BountyManager {
         uint256 confidence,
         uint256 stakeAmount,
         string memory analysisHash
-     ) external validBounty(bountyId) bountyActive(bountyId) notPaused {
+     ) external nonReentrant validBounty(bountyId) bountyActive(bountyId) notPaused {
         require(verdict != ThreatVerdict.Pending, "Invalid verdict");
         require(confidence > 0 && confidence <= 100, "Invalid confidence");
         require(stakeAmount >= MIN_STAKE_AMOUNT, "Insufficient stake");
         require(bytes(analysisHash).length > 0, "Analysis hash required");
         require(analyses[bountyId][msg.sender].analyst == address(0), "Already submitted");
+        require(
+            bountyAnalysts[bountyId].length < MAX_ANALYSTS_PER_BOUNTY,
+            "Analyst cap reached"
+        );
 
         // Check reputation requirements
         require(
@@ -230,12 +255,7 @@ contract BountyManager {
             "Insufficient reputation"
         );
 
-        // Transfer stake to contract
-        require(
-            threatToken.transferFrom(msg.sender, address(this), stakeAmount),
-            "Stake transfer failed"
-        );
-        
+        // Effects: record the analysis before any external interaction
         analyses[bountyId][msg.sender] = Analysis({
             bountyId: bountyId,
             analyst: msg.sender,
@@ -251,15 +271,16 @@ contract BountyManager {
         bounties[bountyId].totalStaked += stakeAmount;
         bounties[bountyId].analysisCount++;
 
-        // TODO: Record submission in reputation system
-        // uint256 submissionId = reputationSystem.recordSubmission(
-        //     msg.sender,
-        //     bountyId,
-        //     (verdict == ThreatVerdict.Malicious),
-        //     stakeAmount,
-        //     confidence
-        // );
-        // analystSubmissionIds[bountyId][msg.sender] = submissionId;
+        // Interaction: pull the stake into escrow
+        threatToken.safeTransferFrom(msg.sender, address(this), stakeAmount);
+        totalEscrowed += stakeAmount;
+
+        // NOTE: Reputation is intentionally NOT recorded at submission time.
+        // Accuracy can only be judged once consensus is known, so all reputation
+        // updates happen in _resolveBountyInternal() via
+        // reputationSystem.updateReputationForAnalysis(). recordSubmission() is also
+        // deliberately absent from the IReputationSystem interface this contract binds
+        // to, so wiring it here is neither possible nor desirable.
 
         emit AnalysisSubmitted(
             bountyId,
@@ -268,9 +289,11 @@ contract BountyManager {
             stakeAmount,
             confidence
         );
-        
-        // Check if we can resolve the bounty
-        _checkAndResolveBounty(bountyId);
+
+        // NOTE: Resolution is intentionally decoupled from submission. It is triggered
+        // explicitly via resolveBounty() so that no single submitter is forced to pay
+        // the gas to resolve on behalf of everyone, and so submission cost stays
+        // bounded and predictable.
     }
 
     /**
@@ -279,6 +302,7 @@ contract BountyManager {
      */
     function resolveBounty(uint256 bountyId) 
         external 
+        nonReentrant
         validBounty(bountyId) 
         notPaused 
     {
@@ -293,18 +317,6 @@ contract BountyManager {
     }
 
     /**
-     * @dev Internal function to check if bounty can be resolved automatically
-     */
-    function _checkAndResolveBounty(uint256 bountyId) internal {
-        Bounty storage bounty = bounties[bountyId];
-        
-        // Auto-resolve if we have enough analyses or deadline passed
-        if (bounty.analysisCount >= MIN_ANALYSES_TO_RESOLVE * 2 || block.timestamp > bounty.deadline) { // Adjusted to 10 for auto
-            _resolveBountyInternal(bountyId);
-        }
-    }
-
-    /**
      * @dev Internal function to resolve bounty and distribute rewards
      */
     function _resolveBountyInternal(uint256 bountyId) internal {
@@ -312,12 +324,9 @@ contract BountyManager {
         address[] storage analysts = bountyAnalysts[bountyId];
         
         if (analysts.length == 0) {
-            // No analyses submitted, refund creator
+            // No analyses submitted, refund creator (via pull-payment)
             bounty.status = BountyStatus.Cancelled;
-            require(
-                threatToken.transfer(bounty.creator, bounty.rewardAmount),
-                "Refund failed"
-            );
+            _credit(bounty.creator, bounty.rewardAmount);
             return;
         }
         
@@ -430,17 +439,18 @@ contract BountyManager {
         uint256 rewardPool = totalRewardPool - platformFee;
         
         if (consensus == ThreatVerdict.Pending || winnerCount == 0) {
-            // No consensus reached, refund creator minus platform fee, return stakes
+            // No consensus reached: refund creator minus platform fee, return stakes.
+            // All amounts are credited for later withdrawal (no transfers in loops).
             uint256 refundAmount = totalRewardPool - platformFee;
-            
-            require(threatToken.transfer(feeCollector, platformFee), "Fee transfer failed");
-            require(threatToken.transfer(bounty.creator, refundAmount), "Refund failed");
-            
+
+            _credit(feeCollector, platformFee);
+            _credit(bounty.creator, refundAmount);
+
             // Return stakes
             for (uint256 i = 0; i < analysts.length; i++) {
                 address analyst = analysts[i];
                 Analysis storage analysis = analyses[bountyId][analyst];
-                require(threatToken.transfer(analyst, analysis.stakeAmount), "Stake return failed");
+                _credit(analyst, analysis.stakeAmount);
             }
             return;
         }
@@ -465,9 +475,9 @@ contract BountyManager {
             if (analysis.verdict == consensus && !analysis.rewarded) {
                 analysis.rewarded = true;
 
-                // Return stake + reward
+                // Credit stake + reward for later withdrawal
                 uint256 totalPayout = analysis.stakeAmount + individualReward;
-                require(threatToken.transfer(analyst, totalPayout), "Reward transfer failed");
+                _credit(analyst, totalPayout);
 
                 // Collect for event
                 winners[winnerIndex] = analyst;
@@ -477,11 +487,40 @@ contract BountyManager {
             }
         }
 
-        // Transfer platform fee
-        require(threatToken.transfer(feeCollector, platformFee), "Fee transfer failed");
+        // Credit platform fee
+        _credit(feeCollector, platformFee);
 
         // Emit rewards distributed event
         emit RewardsDistributed(bountyId, winners, rewards, stakes);
+    }
+
+    /**
+     * @dev Credit an account's pull-payment balance. Funds are claimed via withdraw().
+     */
+    function _credit(address account, uint256 amount) internal {
+        if (amount == 0) {
+            return;
+        }
+        pendingWithdrawals[account] += amount;
+        emit PaymentCredited(account, amount);
+    }
+
+    /**
+     * @dev Withdraw funds owed to the caller (pull-payment pattern).
+     * @notice This is the only path that moves tokens out of the contract to users,
+     *         isolating external transfers from resolution so a single bad recipient
+     *         cannot block everyone else.
+     */
+    function withdraw() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        require(amount > 0, "Nothing to withdraw");
+
+        // Effects before interaction
+        pendingWithdrawals[msg.sender] = 0;
+        totalEscrowed -= amount;
+
+        threatToken.safeTransfer(msg.sender, amount);
+        emit Withdrawal(msg.sender, amount);
     }
 
     /**
@@ -558,12 +597,30 @@ contract BountyManager {
         feeCollector = _feeCollector;
     }
 
+    /**
+     * @dev Rescue tokens/ETH that are NOT part of user escrow.
+     * @notice This can never touch funds the contract owes to users. For the
+     *         threatToken, withdrawals are capped to the surplus above
+     *         `totalEscrowed` (i.e. only tokens accidentally sent to the
+     *         contract, never bounty rewards, analyst stakes, or credited-but-
+     *         unwithdrawn balances). Native ETH and unrelated ERC20s are never
+     *         escrowed here, so they can be rescued in full.
+     *
+     *         The `owner` should be a multisig/timelock in production so even
+     *         this bounded rescue is not a single-key action.
+     */
     function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
         require(paused, "Contract must be paused");
         if (token == address(0)) {
             payable(owner).transfer(amount);
+        } else if (token == address(threatToken)) {
+            // Only the balance in excess of escrowed obligations is withdrawable.
+            uint256 balance = threatToken.balanceOf(address(this));
+            uint256 surplus = balance > totalEscrowed ? balance - totalEscrowed : 0;
+            require(amount <= surplus, "Exceeds unescrowed surplus");
+            threatToken.safeTransfer(owner, amount);
         } else {
-            IERC20(token).transfer(owner, amount);
+            IERC20(token).safeTransfer(owner, amount);
         }
     }
 }

@@ -131,7 +131,7 @@ describe("BountyManager", function () {
             await submitTestAnalysis(bountyManager, threatToken, analyst1, bountyId, 1);
             await submitTestAnalysis(bountyManager, threatToken, analyst2, bountyId, 1);
 
-            // Need more submissions for auto-resolve
+            // Add more submissions so analysisCount >= MIN_ANALYSES_TO_RESOLVE
             for (let i = 3; i <= 10; i++) {
                 const [, , , , , , ...users] = await ethers.getSigners();
                 const analyst = users[i];
@@ -145,6 +145,13 @@ describe("BountyManager", function () {
 
                 await submitTestAnalysis(bountyManager, threatToken, analyst, bountyId, 1);
             }
+
+            // Resolution is decoupled from submission; trigger it explicitly.
+            await bountyManager.resolveBounty(bountyId);
+
+            // Payouts use a pull-payment pattern: winners must withdraw().
+            await bountyManager.connect(analyst1).withdraw();
+            await bountyManager.connect(analyst2).withdraw();
 
             // Check balances increased (stake returned + reward)
             const finalBalance1 = await threatToken.balanceOf(analyst1.address);
@@ -241,6 +248,90 @@ describe("BountyManager", function () {
             await expect(
                 bountyManager.connect(deployer).setFeeCollector(analyst1.address)
             ).to.not.be.reverted;
+        });
+    });
+
+    describe("emergencyWithdraw escrow protection", function () {
+        it("Should not let the owner withdraw escrowed user funds", async function () {
+            const { bountyManager, threatToken, deployer, submitter, analyst1 } =
+                await loadFixture(deployFixture);
+
+            const rewardAmount = ethers.parseEther("100");
+            const { bountyId } = await createTestBounty(
+                bountyManager,
+                threatToken,
+                submitter,
+                rewardAmount
+            );
+            const stakeAmount = ethers.parseEther("10");
+            await submitTestAnalysis(bountyManager, threatToken, analyst1, bountyId, 1, 90, stakeAmount);
+
+            // Reward + stake are now escrowed and fully accounted.
+            const escrowed = await bountyManager.totalEscrowed();
+            expect(escrowed).to.equal(rewardAmount + stakeAmount);
+
+            await bountyManager.connect(deployer).pause();
+
+            // With no surplus, the owner cannot pull any threatToken.
+            await expect(
+                bountyManager
+                    .connect(deployer)
+                    .emergencyWithdraw(await threatToken.getAddress(), 1n)
+            ).to.be.revertedWith("Exceeds unescrowed surplus");
+
+            // Escrowed balance is untouched.
+            expect(await threatToken.balanceOf(await bountyManager.getAddress())).to.equal(escrowed);
+        });
+
+        it("Should let the owner rescue only the unescrowed surplus", async function () {
+            const { bountyManager, threatToken, deployer, submitter, analyst1 } =
+                await loadFixture(deployFixture);
+
+            const rewardAmount = ethers.parseEther("100");
+            const { bountyId } = await createTestBounty(
+                bountyManager,
+                threatToken,
+                submitter,
+                rewardAmount
+            );
+            const stakeAmount = ethers.parseEther("10");
+            await submitTestAnalysis(bountyManager, threatToken, analyst1, bountyId, 1, 90, stakeAmount);
+
+            // Simulate tokens accidentally sent straight to the contract (not escrow).
+            const surplus = ethers.parseEther("25");
+            await threatToken.transfer(await bountyManager.getAddress(), surplus);
+
+            await bountyManager.connect(deployer).pause();
+
+            // Cannot take more than the surplus...
+            await expect(
+                bountyManager
+                    .connect(deployer)
+                    .emergencyWithdraw(await threatToken.getAddress(), surplus + 1n)
+            ).to.be.revertedWith("Exceeds unescrowed surplus");
+
+            // ...but can rescue exactly the surplus.
+            const ownerBefore = await threatToken.balanceOf(deployer.address);
+            await bountyManager
+                .connect(deployer)
+                .emergencyWithdraw(await threatToken.getAddress(), surplus);
+            const ownerAfter = await threatToken.balanceOf(deployer.address);
+            expect(ownerAfter - ownerBefore).to.equal(surplus);
+
+            // Escrow is still intact and analyst can still withdraw their payout later.
+            expect(await threatToken.balanceOf(await bountyManager.getAddress())).to.equal(
+                rewardAmount + stakeAmount
+            );
+        });
+
+        it("Should require the contract to be paused", async function () {
+            const { bountyManager, threatToken, deployer } = await loadFixture(deployFixture);
+
+            await expect(
+                bountyManager
+                    .connect(deployer)
+                    .emergencyWithdraw(await threatToken.getAddress(), 1n)
+            ).to.be.revertedWith("Contract must be paused");
         });
     });
 });

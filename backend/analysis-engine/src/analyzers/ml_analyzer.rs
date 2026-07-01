@@ -197,7 +197,11 @@ impl MlAnalyzer {
             None => None,
         };
 
-        Ok(self.build_detection(classification, anomaly_score, start.elapsed().as_millis() as u64))
+        Ok(self.build_detection(
+            classification,
+            anomaly_score,
+            start.elapsed().as_millis() as u64,
+        ))
     }
 
     /// Run a single-input/single-output model over the feature vector and
@@ -294,7 +298,9 @@ impl MlAnalyzer {
 
         let severity = match predicted_label.as_deref() {
             Some("ransomware") | Some("rootkit") | Some("backdoor") => SeverityLevel::High,
-            Some("trojan") | Some("spyware") | Some("worm") | Some("virus") => SeverityLevel::Medium,
+            Some("trojan") | Some("spyware") | Some("worm") | Some("virus") => {
+                SeverityLevel::Medium
+            }
             Some(l) if l != "benign" => SeverityLevel::Low,
             _ if is_anomaly => SeverityLevel::Medium,
             _ => SeverityLevel::Info,
@@ -359,7 +365,11 @@ impl MlAnalyzer {
         }
 
         let entropy = Self::shannon_entropy(&counts, data.len());
-        let printable_ratio = if len > 0.0 { printable as f32 / len } else { 0.0 };
+        let printable_ratio = if len > 0.0 {
+            printable as f32 / len
+        } else {
+            0.0
+        };
 
         features.push(size_norm);
         features.push(entropy / 8.0); // entropy is 0..8 bits

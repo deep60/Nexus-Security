@@ -24,9 +24,7 @@ RUN npm run build
 #   they are marked external and never initialized in production.
 RUN npx esbuild server/index.ts --bundle --platform=node --format=esm --outfile=dist/server.js \
     --banner:js="import{createRequire as _cr}from'module';import{fileURLToPath as _f}from'url';import{dirname as _d}from'path';const require=_cr(import.meta.url);const __filename=_f(import.meta.url);const __dirname=_d(__filename);" \
-    --external:express --external:dotenv --external:drizzle-orm --external:drizzle-kit \
-    --external:pg --external:connect-pg-simple --external:express-session \
-    --external:memorystore --external:ws --external:cors \
+    --external:express --external:dotenv \
     --external:vite --external:../vite.config --external:lightningcss \
     --external:@babel/preset-typescript --external:fsevents
 
@@ -41,8 +39,6 @@ RUN npm ci --production
 
 # Copy built assets and bundled server from builder
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/drizzle ./drizzle
-COPY --from=builder /app/drizzle.config.ts ./
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \

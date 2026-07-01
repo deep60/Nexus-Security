@@ -34,9 +34,7 @@ pub struct ServiceHealth {
 /// Main health check endpoint
 ///
 /// GET /api/v1/health
-pub async fn health_check(
-    State(state): State<AppState>,
-) -> Result<Json<HealthResponse>, StatusCode> {
+pub async fn health_check(State(state): State<AppState>) -> (StatusCode, Json<HealthResponse>) {
     let start_time = std::time::Instant::now();
 
     // Check services
@@ -77,13 +75,15 @@ pub async fn health_check(
         },
     };
 
-    let _status_code = if response.status == ServiceStatus::Healthy {
+    // Reflect health in the HTTP status so external monitors see a non-2xx
+    // when the gateway is degraded, while still returning the diagnostic body.
+    let status_code = if response.status == ServiceStatus::Healthy {
         StatusCode::OK
     } else {
         StatusCode::SERVICE_UNAVAILABLE
     };
 
-    Ok(Json(response))
+    (status_code, Json(response))
 }
 
 /// Readiness check endpoint

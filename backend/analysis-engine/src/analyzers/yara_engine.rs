@@ -353,7 +353,11 @@ impl YaraEngine {
         };
 
         for m in matches {
-            let haystack = format!("{} {}", m.rule_name.to_lowercase(), m.tags.join(" ").to_lowercase());
+            let haystack = format!(
+                "{} {}",
+                m.rule_name.to_lowercase(),
+                m.tags.join(" ").to_lowercase()
+            );
             if haystack.contains("trojan") {
                 push_unique(ThreatCategory::Trojan, &mut categories);
             }
@@ -500,7 +504,11 @@ rule DetectsEvil : trojan {
     #[tokio::test]
     async fn test_bad_rule_file_is_skipped() {
         let temp = TempDir::new().unwrap();
-        write_rule(temp.path(), "broken.yara", "this is not a valid yara rule {");
+        write_rule(
+            temp.path(),
+            "broken.yara",
+            "this is not a valid yara rule {",
+        );
         write_rule(
             temp.path(),
             "good.yara",

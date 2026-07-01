@@ -9,6 +9,7 @@ pub mod payout;
 pub mod reputation_handler;
 pub mod submission;
 pub mod validation;
+pub mod withdrawal;
 
 // Re-export from additional handlers
 pub use submission::{
@@ -33,3 +34,5 @@ pub use validation::{
     bulk_validate_submissions, get_validation_result, get_validation_stats, list_validations,
     revalidate_submission, validate_submission,
 };
+
+pub use withdrawal::get_claimable;

@@ -57,6 +57,25 @@ jobs:
     - name: Build
       run: cargo build --workspace --verbose
 
+    - name: Install sqlx-cli
+      uses: taiki-e/install-action@v2
+      with:
+        tool: sqlx-cli
+
+    - name: Set up test databases (create + run migrations)
+      # Creates one database per service and applies that service's migrations,
+      # so a broken/missing schema fails CI here instead of only at runtime.
+      # Exposes the per-service DATABASE_URLs to later steps via $GITHUB_ENV.
+      working-directory: ${{ github.workspace }}
+      env:
+        PGHOST: localhost
+        PGPORT: 5432
+        PGUSER: test_user
+        PGPASSWORD: test_password
+      run: |
+        ./scripts/ci/setup-test-databases.sh
+        cat "${{ github.workspace }}/.ci-test-db-env" >> "$GITHUB_ENV"
+
     - name: Run tests
       run: cargo test --workspace --verbose
       env:

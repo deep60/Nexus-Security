@@ -203,71 +203,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize reputation service with database pool
     let reputation_service = Arc::new(reputation::ReputationService::new(db.clone()));
 
+    // Initialize the on-chain client up front so it can be shared by the router
+    // (claimable-balance queries), the sync service, and the resolution keeper.
+    let blockchain = init_blockchain_service().await;
+
     // Create application state using BountyManagerState
     let state = bounty_crud::BountyManagerState {
         db: db.clone(),
         reputation_service: reputation_service.clone(),
+        blockchain: blockchain.clone(),
     };
 
     // Build router
     let app = create_router(state);
 
-    // Start blockchain sync service in the background
-    let sync_db = db.clone();
-    tokio::spawn(async move {
-        // Initialize blockchain service for sync
-        let rpc_url = std::env::var("BLOCKCHAIN_RPC_URL")
-            .or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
-            .unwrap_or_else(|_| "http://localhost:8545".to_string());
-        let private_key = std::env::var("BLOCKCHAIN_PRIVATE_KEY")
-            .or_else(|_| std::env::var("PRIVATE_KEY"))
-            .unwrap_or_default();
-        let chain_id: u64 = std::env::var("CHAIN_ID")
-            .unwrap_or_else(|_| "31337".to_string())
-            .parse()
-            .unwrap_or(31337);
-        let bounty_manager_addr = std::env::var("BOUNTY_MANAGER_ADDRESS")
-            .or_else(|_| std::env::var("CONTRACT_ADDRESS_BOUNTY"))
-            .unwrap_or_default();
-        let threat_token_addr = std::env::var("THREAT_TOKEN_ADDRESS")
-            .or_else(|_| std::env::var("CONTRACT_ADDRESS_TOKEN"))
-            .unwrap_or_default();
-
-        if private_key.is_empty() || bounty_manager_addr.is_empty() {
-            warn!("Blockchain sync not started: BLOCKCHAIN_PRIVATE_KEY or BOUNTY_MANAGER_ADDRESS not set");
-            return;
+    if let Some(blockchain) = blockchain.clone() {
+        // Blockchain sync: mirror on-chain events (ConsensusReached, RewardsDistributed,
+        // ...) into the database. `start()` spawns its own loop and returns quickly.
+        let sync_service = services::blockchain_sync::BlockchainSyncService::new(
+            db.clone(),
+            blockchain.clone(),
+        );
+        info!("Blockchain sync service starting...");
+        if let Err(e) = sync_service.start().await {
+            error!("Blockchain sync service failed to start: {}", e);
         }
 
-        // Use empty ABIs as defaults — in production these should be loaded from JSON
-        let bounty_abi = ethers::abi::Abi::default();
-        let token_abi = ethers::abi::Abi::default();
-
-        match services::blockchain::BlockchainService::new(
-            &rpc_url,
-            &private_key,
-            chain_id,
-            &bounty_manager_addr,
-            &threat_token_addr,
-            bounty_abi,
-            token_abi,
-        )
-        .await
-        {
-            Ok(blockchain_service) => {
-                let sync_service = services::blockchain_sync::BlockchainSyncService::new(
-                    sync_db,
-                    Arc::new(blockchain_service),
-                );
-                info!("Blockchain sync service starting...");
-                if let Err(e) = sync_service.start().await {
-                    error!("Blockchain sync service failed: {}", e);
-                }
-            }
-            Err(e) => {
-                warn!("Could not start blockchain sync: {}", e);
-            }
-        }
-    });
+        // Resolution keeper: the contract decouples resolution from submission, so
+        // this worker calls resolveBounty() on-chain once a bounty is eligible.
+        let resolution_worker =
+            workers::resolution_worker::ResolutionWorker::new(db.clone(), blockchain);
+        info!("Bounty resolution keeper starting...");
+        tokio::spawn(async move {
+            resolution_worker.run().await;
+        });
+    } else {
+        warn!(
+            "Blockchain features disabled: set BLOCKCHAIN_PRIVATE_KEY and BOUNTY_MANAGER_ADDRESS \
+             (and optionally BOUNTY_MANAGER_ABI_PATH / THREAT_TOKEN_ABI_PATH) to enable the \
+             resolution keeper, chain sync, and withdrawal queries"
+        );
+    }
 
     // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
@@ -328,6 +304,96 @@ async fn bounty_metrics_track(
     resp
 }
 
+/// Build the shared blockchain client from environment configuration.
+/// Returns None (with a warning) when required settings are missing so the
+/// service can still serve its HTTP API without chain connectivity.
+async fn init_blockchain_service() -> Option<Arc<services::blockchain::BlockchainService>> {
+    let rpc_url = std::env::var("BLOCKCHAIN_RPC_URL")
+        .or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
+        .unwrap_or_else(|_| "http://localhost:8545".to_string());
+    let private_key = std::env::var("BLOCKCHAIN_PRIVATE_KEY")
+        .or_else(|_| std::env::var("PRIVATE_KEY"))
+        .unwrap_or_default();
+    let chain_id: u64 = std::env::var("CHAIN_ID")
+        .unwrap_or_else(|_| "31337".to_string())
+        .parse()
+        .unwrap_or(31337);
+    let bounty_manager_addr = std::env::var("BOUNTY_MANAGER_ADDRESS")
+        .or_else(|_| std::env::var("CONTRACT_ADDRESS_BOUNTY"))
+        .unwrap_or_default();
+    let threat_token_addr = std::env::var("THREAT_TOKEN_ADDRESS")
+        .or_else(|_| std::env::var("CONTRACT_ADDRESS_TOKEN"))
+        .unwrap_or_default();
+
+    if private_key.is_empty() || bounty_manager_addr.is_empty() {
+        return None;
+    }
+
+    // Load real ABIs so methods can be called by name (resolveBounty,
+    // pendingWithdrawals, approve, transfer). Without a configured path we fall
+    // back to empty ABIs and chain calls will fail loudly at call time.
+    let bounty_abi = std::env::var("BOUNTY_MANAGER_ABI_PATH")
+        .ok()
+        .and_then(|p| load_abi(&p))
+        .unwrap_or_default();
+    let token_abi = std::env::var("THREAT_TOKEN_ABI_PATH")
+        .ok()
+        .and_then(|p| load_abi(&p))
+        .unwrap_or_default();
+
+    match services::blockchain::BlockchainService::new(
+        &rpc_url,
+        &private_key,
+        chain_id,
+        &bounty_manager_addr,
+        &threat_token_addr,
+        bounty_abi,
+        token_abi,
+    )
+    .await
+    {
+        Ok(svc) => Some(Arc::new(svc)),
+        Err(e) => {
+            warn!("Could not initialize blockchain service: {}", e);
+            None
+        }
+    }
+}
+
+/// Load a contract ABI from a JSON file. Accepts either a bare ABI array or a
+/// Hardhat/Truffle artifact object containing an `"abi"` field.
+fn load_abi(path: &str) -> Option<ethers::abi::Abi> {
+    let contents = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            warn!("Failed to read ABI file {}: {}", path, e);
+            return None;
+        }
+    };
+
+    // Try a bare ABI array first.
+    if let Ok(abi) = serde_json::from_str::<ethers::abi::Abi>(&contents) {
+        return Some(abi);
+    }
+
+    // Fall back to an artifact object with an `abi` field.
+    match serde_json::from_str::<serde_json::Value>(&contents) {
+        Ok(v) => match v.get("abi") {
+            Some(abi_val) => serde_json::from_value::<ethers::abi::Abi>(abi_val.clone())
+                .map_err(|e| warn!("ABI field in {} is invalid: {}", path, e))
+                .ok(),
+            None => {
+                warn!("ABI file {} has no top-level `abi` field", path);
+                None
+            }
+        },
+        Err(e) => {
+            warn!("ABI file {} is not valid JSON: {}", path, e);
+            None
+        }
+    }
+}
+
 fn create_router(state: bounty_crud::BountyManagerState) -> Router {
     let metrics_layer = axum::middleware::from_fn(bounty_metrics_track);
 
@@ -368,6 +434,8 @@ fn create_router(state: bounty_crud::BountyManagerState) -> Router {
         )
         .route("/payouts/{id}/slash", post(handlers::handle_stake_slashing))
         .route("/payouts/history", get(handlers::get_payout_history))
+        // Withdrawal (pull-payment) surfacing
+        .route("/withdrawals/{address}", get(handlers::get_claimable))
         // Dispute routes
         .route("/disputes", post(handlers::create_dispute))
         .route("/disputes", get(handlers::list_disputes))

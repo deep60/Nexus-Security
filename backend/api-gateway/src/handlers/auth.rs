@@ -251,7 +251,12 @@ pub async fn collect_wallet(
     });
     let resp = state
         .proxy
-        .post("user-service", "/api/v1/wallet/link", body, Some(hm.clone()))
+        .post(
+            "user-service",
+            "/api/v1/wallet/link",
+            body,
+            Some(hm.clone()),
+        )
         .await
         .map_err(|e| ApiError::Internal(format!("user-service unreachable: {e}")))?;
     if !resp.status().is_success() {

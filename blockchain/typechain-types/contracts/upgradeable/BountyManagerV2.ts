@@ -137,6 +137,7 @@ export interface BountyManagerV2Interface extends Interface {
       | "CONSENSUS_THRESHOLD"
       | "DEFAULT_ADMIN_ROLE"
       | "DISPUTE_PERIOD"
+      | "MAX_ANALYSTS_PER_BOUNTY"
       | "MIN_ANALYSES_TO_RESOLVE"
       | "MIN_DISPUTE_STAKE"
       | "MIN_STAKE_AMOUNT"
@@ -167,10 +168,12 @@ export interface BountyManagerV2Interface extends Interface {
       | "isDisputed"
       | "pause"
       | "paused"
+      | "pendingWithdrawals"
       | "proxiableUUID"
       | "removeTrustedResolver"
       | "renounceRole"
       | "reputationSystem"
+      | "resolveBounty"
       | "resolveDispute"
       | "revokeRole"
       | "setFeeCollector"
@@ -182,6 +185,7 @@ export interface BountyManagerV2Interface extends Interface {
       | "upgradeToAndCall"
       | "userBounties"
       | "version"
+      | "withdraw"
   ): FunctionFragment;
 
   getEvent(
@@ -193,6 +197,7 @@ export interface BountyManagerV2Interface extends Interface {
       | "DisputeResolved"
       | "Initialized"
       | "Paused"
+      | "PaymentCredited"
       | "RewardDistributed"
       | "RoleAdminChanged"
       | "RoleGranted"
@@ -202,6 +207,7 @@ export interface BountyManagerV2Interface extends Interface {
       | "TrustedResolverRemoved"
       | "Unpaused"
       | "Upgraded"
+      | "Withdrawal"
   ): EventFragment;
 
   encodeFunctionData(
@@ -218,6 +224,10 @@ export interface BountyManagerV2Interface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "DISPUTE_PERIOD",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "MAX_ANALYSTS_PER_BOUNTY",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -335,6 +345,10 @@ export interface BountyManagerV2Interface extends Interface {
   encodeFunctionData(functionFragment: "pause", values?: undefined): string;
   encodeFunctionData(functionFragment: "paused", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "pendingWithdrawals",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "proxiableUUID",
     values?: undefined
   ): string;
@@ -349,6 +363,10 @@ export interface BountyManagerV2Interface extends Interface {
   encodeFunctionData(
     functionFragment: "reputationSystem",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "resolveBounty",
+    values: [BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "resolveDispute",
@@ -388,6 +406,7 @@ export interface BountyManagerV2Interface extends Interface {
     values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(functionFragment: "version", values?: undefined): string;
+  encodeFunctionData(functionFragment: "withdraw", values?: undefined): string;
 
   decodeFunctionResult(
     functionFragment: "ANALYSIS_TIMEOUT",
@@ -403,6 +422,10 @@ export interface BountyManagerV2Interface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "DISPUTE_PERIOD",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "MAX_ANALYSTS_PER_BOUNTY",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -499,6 +522,10 @@ export interface BountyManagerV2Interface extends Interface {
   decodeFunctionResult(functionFragment: "pause", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "paused", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "pendingWithdrawals",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "proxiableUUID",
     data: BytesLike
   ): Result;
@@ -512,6 +539,10 @@ export interface BountyManagerV2Interface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "reputationSystem",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "resolveBounty",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -549,6 +580,7 @@ export interface BountyManagerV2Interface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "version", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
 }
 
 export namespace AnalysisSubmittedEvent {
@@ -706,6 +738,19 @@ export namespace PausedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
+export namespace PaymentCreditedEvent {
+  export type InputTuple = [account: AddressLike, amount: BigNumberish];
+  export type OutputTuple = [account: string, amount: bigint];
+  export interface OutputObject {
+    account: string;
+    amount: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
 export namespace RewardDistributedEvent {
   export type InputTuple = [
     bountyId: BigNumberish,
@@ -856,6 +901,19 @@ export namespace UpgradedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
+export namespace WithdrawalEvent {
+  export type InputTuple = [account: AddressLike, amount: BigNumberish];
+  export type OutputTuple = [account: string, amount: bigint];
+  export interface OutputObject {
+    account: string;
+    amount: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
 export interface BountyManagerV2 extends BaseContract {
   connect(runner?: ContractRunner | null): BountyManagerV2;
   waitForDeployment(): Promise<this>;
@@ -906,6 +964,8 @@ export interface BountyManagerV2 extends BaseContract {
   DEFAULT_ADMIN_ROLE: TypedContractMethod<[], [string], "view">;
 
   DISPUTE_PERIOD: TypedContractMethod<[], [bigint], "view">;
+
+  MAX_ANALYSTS_PER_BOUNTY: TypedContractMethod<[], [bigint], "view">;
 
   MIN_ANALYSES_TO_RESOLVE: TypedContractMethod<[], [bigint], "view">;
 
@@ -1097,6 +1157,12 @@ export interface BountyManagerV2 extends BaseContract {
 
   paused: TypedContractMethod<[], [boolean], "view">;
 
+  pendingWithdrawals: TypedContractMethod<
+    [arg0: AddressLike],
+    [bigint],
+    "view"
+  >;
+
   proxiableUUID: TypedContractMethod<[], [string], "view">;
 
   removeTrustedResolver: TypedContractMethod<
@@ -1112,6 +1178,12 @@ export interface BountyManagerV2 extends BaseContract {
   >;
 
   reputationSystem: TypedContractMethod<[], [string], "view">;
+
+  resolveBounty: TypedContractMethod<
+    [bountyId: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
 
   resolveDispute: TypedContractMethod<
     [bountyId: BigNumberish, disputeIndex: BigNumberish, accept: boolean],
@@ -1169,6 +1241,8 @@ export interface BountyManagerV2 extends BaseContract {
 
   version: TypedContractMethod<[], [string], "view">;
 
+  withdraw: TypedContractMethod<[], [void], "nonpayable">;
+
   getFunction<T extends ContractMethod = ContractMethod>(
     key: string | FunctionFragment
   ): T;
@@ -1184,6 +1258,9 @@ export interface BountyManagerV2 extends BaseContract {
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
     nameOrSignature: "DISPUTE_PERIOD"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "MAX_ANALYSTS_PER_BOUNTY"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "MIN_ANALYSES_TO_RESOLVE"
@@ -1398,6 +1475,9 @@ export interface BountyManagerV2 extends BaseContract {
     nameOrSignature: "paused"
   ): TypedContractMethod<[], [boolean], "view">;
   getFunction(
+    nameOrSignature: "pendingWithdrawals"
+  ): TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
+  getFunction(
     nameOrSignature: "proxiableUUID"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
@@ -1413,6 +1493,9 @@ export interface BountyManagerV2 extends BaseContract {
   getFunction(
     nameOrSignature: "reputationSystem"
   ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "resolveBounty"
+  ): TypedContractMethod<[bountyId: BigNumberish], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "resolveDispute"
   ): TypedContractMethod<
@@ -1472,6 +1555,9 @@ export interface BountyManagerV2 extends BaseContract {
   getFunction(
     nameOrSignature: "version"
   ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "withdraw"
+  ): TypedContractMethod<[], [void], "nonpayable">;
 
   getEvent(
     key: "AnalysisSubmitted"
@@ -1521,6 +1607,13 @@ export interface BountyManagerV2 extends BaseContract {
     PausedEvent.InputTuple,
     PausedEvent.OutputTuple,
     PausedEvent.OutputObject
+  >;
+  getEvent(
+    key: "PaymentCredited"
+  ): TypedContractEvent<
+    PaymentCreditedEvent.InputTuple,
+    PaymentCreditedEvent.OutputTuple,
+    PaymentCreditedEvent.OutputObject
   >;
   getEvent(
     key: "RewardDistributed"
@@ -1584,6 +1677,13 @@ export interface BountyManagerV2 extends BaseContract {
     UpgradedEvent.InputTuple,
     UpgradedEvent.OutputTuple,
     UpgradedEvent.OutputObject
+  >;
+  getEvent(
+    key: "Withdrawal"
+  ): TypedContractEvent<
+    WithdrawalEvent.InputTuple,
+    WithdrawalEvent.OutputTuple,
+    WithdrawalEvent.OutputObject
   >;
 
   filters: {
@@ -1662,6 +1762,17 @@ export interface BountyManagerV2 extends BaseContract {
       PausedEvent.InputTuple,
       PausedEvent.OutputTuple,
       PausedEvent.OutputObject
+    >;
+
+    "PaymentCredited(address,uint256)": TypedContractEvent<
+      PaymentCreditedEvent.InputTuple,
+      PaymentCreditedEvent.OutputTuple,
+      PaymentCreditedEvent.OutputObject
+    >;
+    PaymentCredited: TypedContractEvent<
+      PaymentCreditedEvent.InputTuple,
+      PaymentCreditedEvent.OutputTuple,
+      PaymentCreditedEvent.OutputObject
     >;
 
     "RewardDistributed(uint256,address,uint256)": TypedContractEvent<
@@ -1761,6 +1872,17 @@ export interface BountyManagerV2 extends BaseContract {
       UpgradedEvent.InputTuple,
       UpgradedEvent.OutputTuple,
       UpgradedEvent.OutputObject
+    >;
+
+    "Withdrawal(address,uint256)": TypedContractEvent<
+      WithdrawalEvent.InputTuple,
+      WithdrawalEvent.OutputTuple,
+      WithdrawalEvent.OutputObject
+    >;
+    Withdrawal: TypedContractEvent<
+      WithdrawalEvent.InputTuple,
+      WithdrawalEvent.OutputTuple,
+      WithdrawalEvent.OutputObject
     >;
   };
 }

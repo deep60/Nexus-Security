@@ -455,24 +455,15 @@ services:
     environment:
       NODE_ENV: production
       PORT: 5000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-verdyx}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
-      JWT_SECRET: ${JWT_SECRET}
+      # The BFF only reverse-proxies /api/* to the gateway and serves static
+      # assets. It owns no database, cache, or auth state, so no DATABASE_URL /
+      # REDIS_URL / JWT_SECRET / BCRYPT are needed here.
       API_URL: ${API_URL:-http://localhost:8080}
       # The BFF proxies /api/* to the gateway by container name on the network.
       API_GATEWAY_URL: http://api-gateway:8080
-      BCRYPT_SALT_ROUNDS: 12
-      SESSION_EXPIRY: 604800000
-      RATE_LIMIT_WINDOW_MS: 900000
-      RATE_LIMIT_MAX_REQUESTS: 100
     ports:
       - "5001:5000"
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
       # Wait for api-gateway to pass its healthcheck before the BFF accepts
       # traffic, otherwise the first wave of frontend requests races the
       # gateway start_period and 502s.

@@ -36,6 +36,9 @@ describe("BountyFlow Integration", function () {
             console.log(" Reached consensus threshold");
 
             // Step 3: Check bounty resolved
+            // Resolution is decoupled from submission; trigger it explicitly.
+            await bountyManager.resolveBounty(bountyId);
+
             const bounty = await bountyManager.getBounty(bountyId);
             expect(bounty.status).to.equal(2); // Completed
             expect(bounty.consensusVerdict).to.equal(1); // Malicious
@@ -206,6 +209,12 @@ describe("BountyFlow Integration", function () {
                 await threatToken.transfer(analyst.address, ethers.parseEther("1000"));
                 await submitTestAnalysis(bountyManager, threatToken, analyst, bountyId, 1);
             }
+
+            // Resolution is decoupled from submission; trigger it explicitly.
+            await bountyManager.resolveBounty(bountyId);
+
+            // Fee collector is paid via pull-payment; it must withdraw().
+            await bountyManager.connect(feeCollector).withdraw();
 
             // Check final balances
             const submitterFinal = await threatToken.balanceOf(submitter.address);

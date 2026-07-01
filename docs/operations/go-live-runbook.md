@@ -136,4 +136,4 @@ If something goes wrong, see
 [`docs/database/rollback-strategy.md`](../database/rollback-strategy.md)
 for DB-level rollback and
 [`docs/operations/incident-response.md`](./incident-response.md) for
-incident handling (TBD).
+incident handling.

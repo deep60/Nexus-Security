@@ -6,13 +6,7 @@
 //! become live, exposed via that service's `/metrics` endpoint.
 
 use crate::MetricsRegistry;
-use axum::{
-    body::Body,
-    extract::Request,
-    http::StatusCode,
-    middleware::Next,
-    response::Response,
-};
+use axum::{body::Body, extract::Request, http::StatusCode, middleware::Next, response::Response};
 
 /// Increments `requests_total` for every request and `errors_total` for any
 /// response with HTTP status >= 500. Intentionally a flat counter (no path

@@ -456,13 +456,13 @@ impl HashAnalyzer {
         // `acquire()` cannot fail in practice. We still treat a closed
         // semaphore as a config error rather than panicking so that future
         // hot-reload / shutdown work cannot crash the engine.
-        let _permit = self
-            .semaphore
-            .acquire()
-            .await
-            .map_err(|e| HashAnalysisError::ConfigError {
-                message: format!("hash analyzer semaphore closed: {e}"),
-            })?;
+        let _permit =
+            self.semaphore
+                .acquire()
+                .await
+                .map_err(|e| HashAnalysisError::ConfigError {
+                    message: format!("hash analyzer semaphore closed: {e}"),
+                })?;
 
         info!(
             "Starting enhanced hash analysis for {} hash: {}",
@@ -661,16 +661,18 @@ impl HashAnalyzer {
         F: FnMut() -> Fut,
         Fut: std::future::Future<Output = Result<T, HashAnalysisError>>,
     {
-        let circuit_breaker = self.circuit_breakers.get(source).ok_or_else(|| {
-            HashAnalysisError::ConfigError {
-                message: format!("no circuit breaker registered for source '{source}'"),
-            }
-        })?;
-        let rate_limiter = self.rate_limiters.get(source).ok_or_else(|| {
-            HashAnalysisError::ConfigError {
-                message: format!("no rate limiter registered for source '{source}'"),
-            }
-        })?;
+        let circuit_breaker =
+            self.circuit_breakers
+                .get(source)
+                .ok_or_else(|| HashAnalysisError::ConfigError {
+                    message: format!("no circuit breaker registered for source '{source}'"),
+                })?;
+        let rate_limiter =
+            self.rate_limiters
+                .get(source)
+                .ok_or_else(|| HashAnalysisError::ConfigError {
+                    message: format!("no rate limiter registered for source '{source}'"),
+                })?;
 
         if !circuit_breaker.is_available().await {
             return Err(HashAnalysisError::ApiError {

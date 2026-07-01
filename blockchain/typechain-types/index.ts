@@ -32,6 +32,8 @@ export type { IERC20Errors } from "./@openzeppelin/contracts/interfaces/draft-IE
 export { IERC20Errors__factory } from "./factories/@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC20Errors__factory";
 export type { IERC721Errors } from "./@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC721Errors";
 export { IERC721Errors__factory } from "./factories/@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC721Errors__factory";
+export type { IERC1363 } from "./@openzeppelin/contracts/interfaces/IERC1363";
+export { IERC1363__factory } from "./factories/@openzeppelin/contracts/interfaces/IERC1363__factory";
 export type { IERC1967 } from "./@openzeppelin/contracts/interfaces/IERC1967";
 export { IERC1967__factory } from "./factories/@openzeppelin/contracts/interfaces/IERC1967__factory";
 export type { IBeacon } from "./@openzeppelin/contracts/proxy/beacon/IBeacon";
@@ -48,6 +50,8 @@ export type { IERC20Metadata } from "./@openzeppelin/contracts/token/ERC20/exten
 export { IERC20Metadata__factory } from "./factories/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata__factory";
 export type { IERC20 } from "./@openzeppelin/contracts/token/ERC20/IERC20";
 export { IERC20__factory } from "./factories/@openzeppelin/contracts/token/ERC20/IERC20__factory";
+export type { SafeERC20 } from "./@openzeppelin/contracts/token/ERC20/utils/SafeERC20";
+export { SafeERC20__factory } from "./factories/@openzeppelin/contracts/token/ERC20/utils/SafeERC20__factory";
 export type { Address } from "./@openzeppelin/contracts/utils/Address";
 export { Address__factory } from "./factories/@openzeppelin/contracts/utils/Address__factory";
 export type { Errors } from "./@openzeppelin/contracts/utils/Errors";

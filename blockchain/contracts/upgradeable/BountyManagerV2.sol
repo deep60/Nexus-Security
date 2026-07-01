@@ -9,11 +9,15 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "../Interfaces/IBountyManager.sol";
 import "../Interfaces/IReputationSystem.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title BountyManagerV2
  * @dev Upgradeable version of BountyManager with enhanced features
- * @notice V2 improvements: Better consensus mechanism, dispute resolution, multi-sig support
+ * @notice V2 improvements: Better consensus mechanism, dispute resolution, multi-sig support.
+ *         Uses a pull-payment (withdraw) pattern for all outbound token movement so that
+ *         resolution never loops over external transfers, preventing gas-limit DoS that
+ *         could permanently lock staked funds.
  */
 contract BountyManagerV2 is
     Initializable,
@@ -22,6 +26,8 @@ contract BountyManagerV2 is
     ReentrancyGuardUpgradeable,
     PausableUpgradeable
 {
+    using SafeERC20 for IERC20;
+
     // ============ ROLES ============
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -39,6 +45,7 @@ contract BountyManagerV2 is
     uint256 public constant CONSENSUS_THRESHOLD = 66;
     uint256 public constant PLATFORM_FEE_PERCENT = 5;
     uint256 public constant MIN_ANALYSES_TO_RESOLVE = 5;
+    uint256 public constant MAX_ANALYSTS_PER_BOUNTY = 50; // Bounds resolution loops (gas-DoS guard)
 
     // V2 Additions
     uint256 public constant DISPUTE_PERIOD = 48 hours;
@@ -122,12 +129,16 @@ contract BountyManagerV2 is
     mapping(uint256 => mapping(address => Analysis)) public analyses;
     mapping(uint256 => address[]) public bountyAnalysts;
     mapping(address => uint256[]) public userBounties;
-    mapping(uint256 => mapping(address => uint256)) public analystSubmissionIds;
+    mapping(uint256 => mapping(address => uint256)) public analystSubmissionIds; // Reserved slot; currently unused (reputation handled at resolution)
 
     // V2 Additions
     mapping(uint256 => Dispute[]) public bountyDisputes;
     mapping(uint256 => bool) public isDisputed;
     mapping(address => bool) public trustedResolvers;
+
+    // Appended in-place upgrade-safe storage (must remain at the end of the layout):
+    // pull-payment ledger of funds owed to accounts, claimed via withdraw()
+    mapping(address => uint256) public pendingWithdrawals;
 
     // ============ EVENTS ============
 
@@ -183,6 +194,9 @@ contract BountyManagerV2 is
 
     event TrustedResolverAdded(address indexed resolver);
     event TrustedResolverRemoved(address indexed resolver);
+
+    event PaymentCredited(address indexed account, uint256 amount);
+    event Withdrawal(address indexed account, uint256 amount);
 
     // ============ MODIFIERS ============
 
@@ -247,10 +261,7 @@ contract BountyManagerV2 is
         require(rewardAmount > 0, "Reward must be positive");
         require(deadline > block.timestamp + 1 hours, "Deadline too soon");
 
-        require(
-            threatToken.transferFrom(msg.sender, address(this), rewardAmount),
-            "Token transfer failed"
-        );
+        threatToken.safeTransferFrom(msg.sender, address(this), rewardAmount);
 
         bountyCounter++;
 
@@ -285,22 +296,22 @@ contract BountyManagerV2 is
         uint256 confidence,
         uint256 stakeAmount,
         string memory analysisHash
-    ) external validBounty(bountyId) bountyActive(bountyId) whenNotPaused {
+    ) external nonReentrant validBounty(bountyId) bountyActive(bountyId) whenNotPaused {
         require(verdict != ThreatVerdict.Pending, "Invalid verdict");
         require(confidence > 0 && confidence <= 100, "Invalid confidence");
         require(stakeAmount >= MIN_STAKE_AMOUNT, "Insufficient stake");
         require(analyses[bountyId][msg.sender].analyst == address(0), "Already submitted");
+        require(
+            bountyAnalysts[bountyId].length < MAX_ANALYSTS_PER_BOUNTY,
+            "Analyst cap reached"
+        );
 
         require(
             reputationSystem.getReputation(msg.sender) >= reputationSystem.getMinimumReputation(),
             "Insufficient reputation"
         );
 
-        require(
-            threatToken.transferFrom(msg.sender, address(this), stakeAmount),
-            "Stake transfer failed"
-        );
-
+        // Effects: record the analysis before any external interaction
         analyses[bountyId][msg.sender] = Analysis({
             analyst: msg.sender,
             verdict: verdict,
@@ -315,20 +326,39 @@ contract BountyManagerV2 is
         bounties[bountyId].totalStaked += stakeAmount;
         bounties[bountyId].analysisCount++;
 
-        // TODO: recordSubmission is not part of IReputationSystem interface
-        // Reputation updates are handled in resolveBounty via updateReputationForAnalysis
-        // uint256 submissionId = reputationSystem.recordSubmission(
-        //     msg.sender,
-        //     bountyId,
-        //     (verdict == ThreatVerdict.Malicious),
-        //     stakeAmount,
-        //     confidence
-        // );
-        // analystSubmissionIds[bountyId][msg.sender] = submissionId;
+        // Interaction: pull the stake into escrow
+        threatToken.safeTransferFrom(msg.sender, address(this), stakeAmount);
+
+        // NOTE: Reputation is intentionally NOT recorded at submission time.
+        // recordSubmission() is not part of the IReputationSystem interface, and
+        // accuracy can only be judged once consensus is known. All reputation updates
+        // happen in _resolveBountyInternal() via updateReputationForAnalysis().
 
         emit AnalysisSubmitted(bountyId, msg.sender, verdict, stakeAmount, analysisHash);
 
-        _checkAndResolveBounty(bountyId);
+        // NOTE: Resolution is decoupled from submission and triggered explicitly via
+        // resolveBounty(), so no single submitter pays to resolve for everyone and
+        // submission gas stays bounded.
+    }
+
+    /**
+     * @dev Resolve a bounty once the deadline has passed or enough analyses exist.
+     *      Callable by anyone; resolution credits payouts for later withdrawal.
+     */
+    function resolveBounty(uint256 bountyId)
+        external
+        nonReentrant
+        validBounty(bountyId)
+        whenNotPaused
+    {
+        Bounty storage bounty = bounties[bountyId];
+        require(bounty.status == BountyStatus.Active, "Bounty not active");
+        require(
+            block.timestamp > bounty.deadline || bounty.analysisCount >= MIN_ANALYSES_TO_RESOLVE,
+            "Cannot resolve yet"
+        );
+
+        _resolveBountyInternal(bountyId);
     }
 
     // ============ V2: DISPUTE FUNCTIONS ============
@@ -352,10 +382,7 @@ contract BountyManagerV2 is
         require(bytes(reason).length > 0, "Reason required");
 
         // Require dispute stake
-        require(
-            threatToken.transferFrom(msg.sender, address(this), MIN_DISPUTE_STAKE),
-            "Dispute stake transfer failed"
-        );
+        threatToken.safeTransferFrom(msg.sender, address(this), MIN_DISPUTE_STAKE);
 
         disputeCounter++;
 
@@ -401,15 +428,15 @@ contract BountyManagerV2 is
 
         if (accept) {
             dispute.status = DisputeStatus.Resolved;
-            // Return dispute stake plus bonus
-            threatToken.transfer(dispute.disputer, dispute.stakeAmount + (dispute.stakeAmount / 2));
+            // Return dispute stake plus bonus (credited for later withdrawal)
+            _credit(dispute.disputer, dispute.stakeAmount + (dispute.stakeAmount / 2));
 
             // Re-open bounty for re-resolution or manual handling
             bounties[bountyId].status = BountyStatus.Active;
         } else {
             dispute.status = DisputeStatus.Rejected;
-            // Slash dispute stake
-            threatToken.transfer(feeCollector, dispute.stakeAmount);
+            // Slash dispute stake (credited to fee collector)
+            _credit(feeCollector, dispute.stakeAmount);
 
             // Restore resolved status
             bounties[bountyId].status = BountyStatus.Resolved;
@@ -424,21 +451,13 @@ contract BountyManagerV2 is
 
     // ============ INTERNAL FUNCTIONS ============
 
-    function _checkAndResolveBounty(uint256 bountyId) internal {
-        Bounty storage bounty = bounties[bountyId];
-
-        if (bounty.analysisCount >= MIN_ANALYSES_TO_RESOLVE * 2 || block.timestamp > bounty.deadline) {
-            _resolveBountyInternal(bountyId);
-        }
-    }
-
     function _resolveBountyInternal(uint256 bountyId) internal {
         Bounty storage bounty = bounties[bountyId];
         address[] storage analysts = bountyAnalysts[bountyId];
 
         if (analysts.length == 0) {
             bounty.status = BountyStatus.Cancelled;
-            threatToken.transfer(bounty.creator, bounty.rewardAmount);
+            _credit(bounty.creator, bounty.rewardAmount);
             return;
         }
 
@@ -533,12 +552,12 @@ contract BountyManagerV2 is
 
         if (consensus == ThreatVerdict.Pending || winnerCount == 0) {
             uint256 refundAmount = bounty.rewardAmount - platformFee;
-            threatToken.transfer(feeCollector, platformFee);
-            threatToken.transfer(bounty.creator, refundAmount);
+            _credit(feeCollector, platformFee);
+            _credit(bounty.creator, refundAmount);
 
             for (uint256 i = 0; i < analysts.length; i++) {
                 Analysis storage analysis = analyses[bountyId][analysts[i]];
-                threatToken.transfer(analysts[i], analysis.stakeAmount);
+                _credit(analysts[i], analysis.stakeAmount);
             }
             return;
         }
@@ -555,13 +574,40 @@ contract BountyManagerV2 is
             if (analysis.verdict == consensus && !analysis.rewarded) {
                 analysis.rewarded = true;
                 uint256 totalPayout = analysis.stakeAmount + individualReward;
-                threatToken.transfer(analyst, totalPayout);
+                _credit(analyst, totalPayout);
 
                 emit RewardDistributed(bountyId, analyst, individualReward);
             }
         }
 
-        threatToken.transfer(feeCollector, platformFee);
+        _credit(feeCollector, platformFee);
+    }
+
+    /**
+     * @dev Credit an account's pull-payment balance. Funds are claimed via withdraw().
+     */
+    function _credit(address account, uint256 amount) internal {
+        if (amount == 0) {
+            return;
+        }
+        pendingWithdrawals[account] += amount;
+        emit PaymentCredited(account, amount);
+    }
+
+    /**
+     * @dev Withdraw funds owed to the caller (pull-payment pattern).
+     * @notice The only path that moves tokens out of the contract to users, isolating
+     *         external transfers from resolution so a single bad recipient cannot block
+     *         everyone else.
+     */
+    function withdraw() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        require(amount > 0, "Nothing to withdraw");
+
+        pendingWithdrawals[msg.sender] = 0;
+
+        threatToken.safeTransfer(msg.sender, amount);
+        emit Withdrawal(msg.sender, amount);
     }
 
     function _processSlashing(uint256 bountyId, ThreatVerdict consensus)
