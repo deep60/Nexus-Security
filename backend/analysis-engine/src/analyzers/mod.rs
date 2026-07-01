@@ -14,6 +14,8 @@ pub mod static_analyzer;
 
 #[cfg(feature = "clamav")]
 pub mod clamav_analyzer;
+#[cfg(feature = "ml-engine")]
+pub mod ml_analyzer;
 #[cfg(feature = "yara-engine")]
 pub mod yara_engine;
 
@@ -27,7 +29,11 @@ pub use static_analyzer::{StaticAnalyzer, StaticAnalyzerConfig};
 
 #[cfg(feature = "clamav")]
 pub use clamav_analyzer::{ClamAvAnalyzer, ClamAvAnalyzerConfig};
+#[cfg(feature = "ml-engine")]
+#[allow(unused_imports)]
+pub use ml_analyzer::{MlAnalyzer, MlAnalyzerConfig};
 #[cfg(feature = "yara-engine")]
+#[allow(unused_imports)]
 pub use yara_engine::{YaraEngine, YaraEngineConfig, YaraEngineError, YaraMatch, YaraRule};
 
 // ── Stubs when native features are disabled ──────────────────────
@@ -127,6 +133,49 @@ pub mod clamav_stub {
 #[cfg(not(feature = "clamav"))]
 pub use clamav_stub::*;
 
+#[cfg(not(feature = "ml-engine"))]
+pub mod ml_stub {
+    use crate::models::analysis_result::DetectionResult;
+    use anyhow::Result;
+
+    #[derive(Debug, Clone)]
+    pub struct MlAnalyzerConfig {
+        pub enabled: bool,
+        pub feature_size: usize,
+    }
+    impl Default for MlAnalyzerConfig {
+        fn default() -> Self {
+            Self {
+                enabled: false,
+                feature_size: 256,
+            }
+        }
+    }
+
+    pub struct MlAnalyzer {
+        _config: MlAnalyzerConfig,
+    }
+    impl MlAnalyzer {
+        pub fn new(config: MlAnalyzerConfig) -> Self {
+            Self { _config: config }
+        }
+        pub fn is_available(&self) -> bool {
+            false
+        }
+        pub async fn analyze_file_data(
+            &self,
+            _data: &[u8],
+            _filename: &str,
+        ) -> Result<DetectionResult> {
+            Err(anyhow::anyhow!(
+                "ML engine not compiled (enable 'ml-engine' feature)"
+            ))
+        }
+    }
+}
+#[cfg(not(feature = "ml-engine"))]
+pub use ml_stub::*;
+
 use crate::models::analysis_result::{
     AnalysisResult, DetectionResult, EngineType, FileMetadata, SeverityLevel, ThreatCategory,
     ThreatVerdict,
@@ -139,6 +188,7 @@ pub struct AnalysisEngineConfig {
     pub static_analyzer: StaticAnalyzerConfig,
     pub yara_engine: YaraEngineConfig,
     pub clamav_analyzer: ClamAvAnalyzerConfig,
+    pub ml_analyzer: MlAnalyzerConfig,
     pub signature_matcher: SignatureMatcherConfig,
     pub enable_parallel_analysis: bool,
     pub analysis_timeout_seconds: u64,
@@ -152,6 +202,7 @@ impl Default for AnalysisEngineConfig {
             static_analyzer: StaticAnalyzerConfig::default(),
             yara_engine: YaraEngineConfig::default(),
             clamav_analyzer: ClamAvAnalyzerConfig::default(),
+            ml_analyzer: MlAnalyzerConfig::default(),
             signature_matcher: SignatureMatcherConfig::default(),
             enable_parallel_analysis: true,
             analysis_timeout_seconds: 120,
@@ -176,6 +227,7 @@ pub struct AnalysisOptions {
     pub enable_static_analysis: bool,
     pub enable_yara_analysis: bool,
     pub enable_clamav_analysis: bool,
+    pub enable_ml_analysis: bool,
     pub enable_heuristic_analysis: bool,
     pub enable_signature_analysis: bool,
     pub priority: AnalysisPriority,
@@ -196,6 +248,7 @@ impl Default for AnalysisOptions {
             enable_static_analysis: true,
             enable_yara_analysis: cfg!(feature = "yara-engine"),
             enable_clamav_analysis: cfg!(feature = "clamav"),
+            enable_ml_analysis: cfg!(feature = "ml-engine"),
             enable_heuristic_analysis: true,
             enable_signature_analysis: true,
             priority: AnalysisPriority::Normal,
@@ -211,6 +264,7 @@ pub struct AnalysisEngine {
     static_analyzer: StaticAnalyzer,
     yara_engine: YaraEngine,
     clamav_analyzer: ClamAvAnalyzer,
+    ml_analyzer: MlAnalyzer,
     heuristic_engine: HeuristicEngine,
     signature_matcher: SignatureMatcher,
 }
@@ -228,6 +282,7 @@ impl AnalysisEngine {
             .map_err(|e| anyhow!("Failed to initialize YARA engine: {e}"))?;
 
         let clamav_analyzer = ClamAvAnalyzer::new(config.clamav_analyzer.clone());
+        let ml_analyzer = MlAnalyzer::new(config.ml_analyzer.clone());
         let heuristic_engine = HeuristicEngine::new();
         let signature_matcher = SignatureMatcher::new(config.signature_matcher.clone())
             .await
@@ -239,6 +294,7 @@ impl AnalysisEngine {
             static_analyzer,
             yara_engine,
             clamav_analyzer,
+            ml_analyzer,
             heuristic_engine,
             signature_matcher,
         })
@@ -293,14 +349,16 @@ impl AnalysisEngine {
             let static_future = self.run_static_analysis(request);
             let yara_future = self.run_yara_analysis(request);
             let clamav_future = self.run_clamav_analysis(request);
+            let ml_future = self.run_ml_analysis(request);
             let heuristic_future = self.run_heuristic_analysis(request);
             let signature_future = self.run_signature_analysis(request);
 
-            let (hash_res, static_res, yara_res, clamav_res, heuristic_res, signature_res) = tokio::join!(
+            let (hash_res, static_res, yara_res, clamav_res, ml_res, heuristic_res, signature_res) = tokio::join!(
                 hash_future,
                 static_future,
                 yara_future,
                 clamav_future,
+                ml_future,
                 heuristic_future,
                 signature_future
             );
@@ -334,6 +392,13 @@ impl AnalysisEngine {
                     analysis_errors.push(format!("ClamAV: {e}"));
                 }
             }
+            match ml_res {
+                Ok(det) => detections.push(det),
+                Err(e) => {
+                    warn!("ML analysis failed: {}", e);
+                    analysis_errors.push(format!("ML: {e}"));
+                }
+            }
             match heuristic_res {
                 Ok(det) => detections.push(det),
                 Err(e) => {
@@ -360,6 +425,9 @@ impl AnalysisEngine {
                 detections.push(det);
             }
             if let Ok(det) = self.run_clamav_analysis(request).await {
+                detections.push(det);
+            }
+            if let Ok(det) = self.run_ml_analysis(request).await {
                 detections.push(det);
             }
             if let Ok(det) = self.run_heuristic_analysis(request).await {
@@ -440,6 +508,16 @@ impl AnalysisEngine {
                 .await
         } else {
             Err(anyhow!("ClamAV analysis disabled"))
+        }
+    }
+
+    async fn run_ml_analysis(&self, request: &FileAnalysisRequest) -> Result<DetectionResult> {
+        if request.analysis_options.enable_ml_analysis {
+            self.ml_analyzer
+                .analyze_file_data(&request.file_data, &request.filename)
+                .await
+        } else {
+            Err(anyhow!("ML analysis disabled"))
         }
     }
 
@@ -629,6 +707,7 @@ mod tests {
             enable_static_analysis: true,
             enable_yara_analysis: true,
             enable_clamav_analysis: false,
+            enable_ml_analysis: false,
             enable_heuristic_analysis: true,
             enable_signature_analysis: true,
             priority: AnalysisPriority::High,

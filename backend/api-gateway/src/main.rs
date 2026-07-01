@@ -26,7 +26,10 @@ mod services;
 mod utils;
 
 use config::AppConfig;
-use services::{blockchain::BlockchainService, database::DatabaseService, redis::RedisService};
+use services::{
+    blockchain::BlockchainService, database::DatabaseService, proxy_service::ProxyService,
+    redis::RedisService,
+};
 
 use crate::models::response::ApiResponse;
 
@@ -39,6 +42,9 @@ pub struct AppState {
     pub config: Arc<AppConfig>,
     pub active_sessions: Arc<RwLock<HashMap<String, SessionInfo>>>,
     pub metrics: Arc<MetricsCollector>,
+    /// HTTP proxy to downstream microservices (auth/users → user-service,
+    /// submissions → submission-service, etc.) with circuit breaking + retries.
+    pub proxy: Arc<ProxyService>,
     /// Prometheus-text-format registry. Kept alongside the existing per-endpoint
     /// `MetricsCollector` so the gateway emits the same `verdyx_*` schema as
     /// every other service for the root `/metrics` scrape.
@@ -240,6 +246,12 @@ async fn main() -> Result<()> {
     // Initialize services
     let (db, redis, blockchain) = initialize_services(&config).await?;
 
+    // Initialize the downstream-service proxy (auth/users → user-service, etc.)
+    let proxy = Arc::new(
+        ProxyService::new(services::proxy_service::ProxyConfig::default())
+            .context("Failed to initialize proxy service")?,
+    );
+
     // Create application state
     let state = AppState {
         db: Arc::new(db),
@@ -248,6 +260,7 @@ async fn main() -> Result<()> {
         config: Arc::new(config.clone()),
         active_sessions: Arc::new(RwLock::new(HashMap::new())),
         metrics: metrics_collector.clone(),
+        proxy,
         prom_metrics: shared::MetricsRegistry::new("api-gateway", env!("CARGO_PKG_VERSION")),
     };
 

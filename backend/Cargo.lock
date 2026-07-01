@@ -1297,6 +1297,9 @@ name = "clamav-client"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80bcb2ac8203e98a420dfe3ad1723fa2a3c6bfe85ccb1ed9bbc7cbd1b2f5e51c"
+dependencies = [
+ "tokio",
+]
 
 [[package]]
 name = "clang-sys"

@@ -11,8 +11,9 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::handlers::identity::{bearer_map, fetch_identity, UserIdentity};
 use crate::models::user::User;
-use crate::utils::crypto::{hash_password, verify_password};
+use crate::utils::crypto::hash_password;
 use crate::utils::{ApiError, ApiResult};
 use crate::{ApiResponse, AppState};
 
@@ -164,201 +165,75 @@ pub async fn register(
         ));
     }
 
-    // Check if user already exists
-    let existing_user = sqlx::query("SELECT id FROM users WHERE username = $1 OR email = $2")
-        .bind(&payload.username)
-        .bind(&payload.email)
-        .fetch_optional(state.db.pool())
-        .await?;
-
-    if existing_user.is_some() {
-        return Err(ApiError::BadRequest(
-            "User with this username or email already exists".to_string(),
-        ));
-    }
-
-    // Hash Password
-    let password_hash = hash_password(&payload.password)
-        .map_err(|e| ApiError::Internal(format!("Password hashing failed: {e}")))?;
-
-    // Create User
-    let user_id = Uuid::new_v4();
-    let user = sqlx::query_as::<_, User>(
-        r#"
-        INSERT INTO users (id, username, email, password_hash, wallet_address, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *
-        "#,
-    )
-    .bind(user_id)
-    .bind(&payload.username)
-    .bind(&payload.email)
-    .bind(&password_hash)
-    .bind(&payload.wallet_address)
-    .bind(Utc::now())
-    .fetch_one(state.db.pool())
-    .await?;
-
-    // Generate Tokens
-    let (access_token, refresh_token) = generate_tokens(&user, &state.config.security.jwt_secret)?;
-
-    let response = AuthResponse {
-        user: user.into(),
-        access_token,
-        refresh_token,
-        expires_in: 3600, // 1 hour
-    };
-
-    Ok(Json(ApiResponse::success(response)))
+    // Auth is owned by user-service. The gateway validates input shape, then
+    // forwards to user-service and adapts the response to its public
+    // (camelCase) contract so the frontend is unaffected.
+    let body = serde_json::json!({
+        "username": payload.username,
+        "email": payload.email,
+        "password": payload.password,
+        "ethereum_address": payload.wallet_address,
+    });
+    forward_auth(&state, "/api/v1/auth/register", body).await
 }
 
 pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
 ) -> ApiResult<Json<ApiResponse<AuthResponse>>> {
-    // Find user by username or email
-    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = $1 OR email = $1")
-        .bind(&payload.identifier)
-        .fetch_optional(state.db.pool())
-        .await?
-        .ok_or(ApiError::Unauthorized)?;
-
-    // Verify Password
-    if !verify_password(&payload.password, &user.password_hash)
-        .map_err(|e| ApiError::Internal(format!("Password verification failed: {e}")))?
-    {
-        return Err(ApiError::Unauthorized);
-    }
-
-    // Update last login
-    sqlx::query("UPDATE users SET last_login = $1 WHERE id = $2")
-        .bind(Utc::now())
-        .bind(user.id)
-        .execute(state.db.pool())
-        .await?;
-
-    // Generate Tokens
-    let (access_token, refresh_token) = generate_tokens(&user, &state.config.security.jwt_secret)?;
-
-    let response = AuthResponse {
-        user: user.into(),
-        access_token,
-        refresh_token,
-        expires_in: 3600,
-    };
-
-    Ok(Json(ApiResponse::success(response)))
+    // user-service authenticates by email; map the gateway's `identifier`
+    // field onto it. (Username login can be re-added in user-service later.)
+    let body = serde_json::json!({
+        "email": payload.identifier,
+        "password": payload.password,
+    });
+    forward_auth(&state, "/api/v1/auth/login", body).await
 }
 
 pub async fn logout(
     headers: HeaderMap,
     State(state): State<AppState>,
 ) -> ApiResult<Json<ApiResponse<()>>> {
-    // Extract token from header
-    let token = extract_token_from_header(&headers)?;
-
-    // Decode token to get expiration
-    match decode_token(&token, &state.config.security.jwt_secret) {
-        Ok(claims) => {
-            // Calculate remaining TTL for the token
-            let exp = claims.exp;
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_err(|_| ApiError::Internal("System time error".to_string()))?
-                .as_secs() as i64;
-
-            let ttl = (exp as i64 - now).max(0) as usize;
-
-            if ttl > 0 {
-                // Store token in Redis blacklist
-                let blacklist_key = format!("jwt_blacklist:{token}");
-
-                // Use Redis SETEX to store token with TTL
-                let mut conn = state.redis.connection_pool.clone();
-
-                let _: () = redis::cmd("SETEX")
-                    .arg(&blacklist_key)
-                    .arg(ttl)
-                    .arg("blacklisted")
-                    .query_async(&mut conn)
-                    .await
-                    .map_err(|e| ApiError::Internal(format!("Failed to blacklist token: {e}")))?;
-
-                // Also remove from active sessions
-                let mut sessions = state.active_sessions.write().await;
-                sessions.remove(&claims.sub);
-            }
-
-            Ok(Json(ApiResponse::success_with_message(
-                (),
-                "Successfully logged out".to_string(),
-            )))
-        }
-        Err(_e) => {
-            // Token invalid or expired - still consider logout success for UX
-            Ok(Json(ApiResponse::success_with_message(
-                (),
-                "Successfully logged out".to_string(),
-            )))
-        }
+    // Forward to user-service, which blacklists the token and clears the
+    // session. Logout is best-effort for UX, so failures are swallowed.
+    if let Some(hm) = bearer_map(&headers) {
+        let _ = state
+            .proxy
+            .post(
+                "user-service",
+                "/api/v1/auth/logout",
+                serde_json::json!({}),
+                Some(hm),
+            )
+            .await;
     }
+
+    Ok(Json(ApiResponse::success_with_message(
+        (),
+        "Successfully logged out".to_string(),
+    )))
 }
 
 pub async fn refresh_token(
     State(state): State<AppState>,
     Json(payload): Json<RefreshTokenRequest>,
 ) -> ApiResult<Json<ApiResponse<AuthResponse>>> {
-    // Decode refresh token
-    let claims = decode_token(&payload.refresh_token, &state.config.security.jwt_secret)?;
-
-    // Get user from database
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| ApiError::BadRequest("Invalid user ID in token".to_string()))?;
-
-    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
-        .bind(user_id)
-        .fetch_optional(state.db.pool())
-        .await?
-        .ok_or(ApiError::Unauthorized)?;
-
-    // Generate new tokens
-    let (access_token, refresh_token) = generate_tokens(&user, &state.config.security.jwt_secret)?;
-
-    let response = AuthResponse {
-        user: user.into(),
-        access_token,
-        refresh_token,
-        expires_in: 3600,
-    };
-
-    Ok(Json(ApiResponse::success(response)))
+    let body = serde_json::json!({ "refresh_token": payload.refresh_token });
+    forward_auth(&state, "/api/v1/auth/refresh", body).await
 }
 
 pub async fn verify_token(
     headers: HeaderMap,
     State(state): State<AppState>,
 ) -> ApiResult<Json<ApiResponse<UserResponse>>> {
-    let token = extract_token_from_header(&headers)?;
-    let claims = decode_token(&token, &state.config.security.jwt_secret)?;
-
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| ApiError::BadRequest("Invalid user ID in token".to_string()))?;
-
-    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
-        .bind(user_id)
-        .fetch_optional(state.db.pool())
-        .await?
-        .ok_or(ApiError::Unauthorized)?;
-
-    Ok(Json(ApiResponse::success(user.into())))
+    identity_as_user_response(&state, &headers).await
 }
 
 pub async fn get_profile(
     headers: HeaderMap,
     State(state): State<AppState>,
 ) -> ApiResult<Json<ApiResponse<UserResponse>>> {
-    let user = authenticate_user(&headers, &state).await?;
-    Ok(Json(ApiResponse::success(user.into())))
+    identity_as_user_response(&state, &headers).await
 }
 
 pub async fn collect_wallet(
@@ -366,42 +241,47 @@ pub async fn collect_wallet(
     State(state): State<AppState>,
     Json(payload): Json<WalletConnectRequest>,
 ) -> ApiResult<Json<ApiResponse<UserResponse>>> {
-    let mut user = authenticate_user(&headers, &state).await?;
-
-    // Verify wallet signature ()
-    if !verify_wallet_signature(
-        &payload.wallet_address,
-        &payload.signature,
-        &payload.message,
-    ) {
-        return Err(ApiError::BadRequest("Invalid wallet signature".to_string()));
+    // Wallet linking is owned by user-service (it verifies the signature and
+    // stores the address). Forward, then return the refreshed identity.
+    let hm = bearer_map(&headers).ok_or(ApiError::Unauthorized)?;
+    let body = serde_json::json!({
+        "address": payload.wallet_address,
+        "signature": payload.signature,
+        "message": payload.message,
+    });
+    let resp = state
+        .proxy
+        .post("user-service", "/api/v1/wallet/link", body, Some(hm.clone()))
+        .await
+        .map_err(|e| ApiError::Internal(format!("user-service unreachable: {e}")))?;
+    if !resp.status().is_success() {
+        return Err(map_auth_status(resp.status().as_u16()));
     }
 
-    // Update user's wallet address
-    user.wallet_address = Some(payload.wallet_address);
-
-    sqlx::query("UPDATE users SET wallet_address = $1 WHERE id = $2")
-        .bind(&user.wallet_address)
-        .bind(user.id)
-        .execute(state.db.pool())
-        .await?;
-
-    Ok(Json(ApiResponse::success(user.into())))
+    match fetch_identity(&state, hm).await {
+        Ok(u) => Ok(Json(ApiResponse::success(to_user_response(u)))),
+        Err(code) => Err(map_auth_status(code)),
+    }
 }
 
 pub async fn disconnect_wallet(
     headers: HeaderMap,
     State(state): State<AppState>,
 ) -> ApiResult<Json<ApiResponse<UserResponse>>> {
-    let mut user = authenticate_user(&headers, &state).await?;
-    user.wallet_address = None;
+    let hm = bearer_map(&headers).ok_or(ApiError::Unauthorized)?;
+    let resp = state
+        .proxy
+        .delete("user-service", "/api/v1/wallet/unlink", Some(hm.clone()))
+        .await
+        .map_err(|e| ApiError::Internal(format!("user-service unreachable: {e}")))?;
+    if !resp.status().is_success() {
+        return Err(map_auth_status(resp.status().as_u16()));
+    }
 
-    sqlx::query("UPDATE users SET wallet_address = NULL WHERE id = $1")
-        .bind(user.id)
-        .execute(state.db.pool())
-        .await?;
-
-    Ok(Json(ApiResponse::success(user.into())))
+    match fetch_identity(&state, hm).await {
+        Ok(u) => Ok(Json(ApiResponse::success(to_user_response(u)))),
+        Err(code) => Err(map_auth_status(code)),
+    }
 }
 
 // Helper function
@@ -655,4 +535,105 @@ pub async fn generate_api_key(
         "key_id": key_id,
         "message": "Store this key securely — it will not be shown again"
     })))
+}
+
+// ===== user-service auth proxy helpers =====
+//
+// Auth/identity is owned by user-service. These helpers forward requests via
+// the gateway's ProxyService and translate user-service's snake_case contract
+// into the gateway's public camelCase contract, so the frontend is unaffected.
+
+/// Adapt a user-service identity into the gateway's public `UserResponse`.
+fn to_user_response(u: UserIdentity) -> UserResponse {
+    UserResponse {
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        wallet_address: u.ethereum_address,
+        // Reputation/earnings are owned by reputation-service; default here.
+        reputation_score: 0,
+        total_earnings: "0".to_string(),
+        created_at: u.created_at,
+        is_verified: u.email_verified,
+    }
+}
+
+/// user-service's auth response shape (snake_case).
+#[derive(Debug, Deserialize)]
+struct UsAuthResponse {
+    access_token: String,
+    refresh_token: String,
+    user: UserIdentity,
+    #[serde(default)]
+    expires_in: i64,
+}
+
+impl From<UsAuthResponse> for AuthResponse {
+    fn from(a: UsAuthResponse) -> Self {
+        Self {
+            user: to_user_response(a.user),
+            access_token: a.access_token,
+            refresh_token: a.refresh_token,
+            expires_in: if a.expires_in > 0 { a.expires_in } else { 3600 },
+        }
+    }
+}
+
+/// Map a downstream auth error status code to the gateway's ApiError.
+/// Takes a raw `u16` to avoid the reqwest/axum `http` StatusCode type split.
+fn map_auth_status(code: u16) -> ApiError {
+    match code {
+        401 | 403 => ApiError::Unauthorized,
+        409 => ApiError::BadRequest("User already exists".to_string()),
+        400..=499 => ApiError::Validation("Invalid request".to_string()),
+        _ => ApiError::Internal("Authentication service error".to_string()),
+    }
+}
+
+/// Forward an auth request to user-service and adapt the response to the
+/// gateway's public `AuthResponse` contract.
+async fn forward_auth(
+    state: &AppState,
+    path: &str,
+    body: serde_json::Value,
+) -> ApiResult<Json<ApiResponse<AuthResponse>>> {
+    let resp = state
+        .proxy
+        .post("user-service", path, body, None)
+        .await
+        .map_err(|e| ApiError::Internal(format!("user-service unreachable: {e}")))?;
+
+    let status = resp.status();
+    if status.is_success() {
+        let ua: UsAuthResponse = resp
+            .json()
+            .await
+            .map_err(|e| ApiError::Internal(format!("invalid user-service response: {e}")))?;
+        Ok(Json(ApiResponse::success(ua.into())))
+    } else {
+        // Prefer the downstream error message when present.
+        let msg = resp
+            .json::<serde_json::Value>()
+            .await
+            .ok()
+            .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(str::to_string));
+        Err(match (status.as_u16(), msg) {
+            (400, Some(m)) | (422, Some(m)) => ApiError::Validation(m),
+            (409, Some(m)) => ApiError::BadRequest(m),
+            (c, _) => map_auth_status(c),
+        })
+    }
+}
+
+/// Fetch the current identity from user-service and return it as the gateway's
+/// public `UserResponse`.
+async fn identity_as_user_response(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> ApiResult<Json<ApiResponse<UserResponse>>> {
+    let hm = bearer_map(headers).ok_or(ApiError::Unauthorized)?;
+    match fetch_identity(state, hm).await {
+        Ok(u) => Ok(Json(ApiResponse::success(to_user_response(u)))),
+        Err(code) => Err(map_auth_status(code)),
+    }
 }

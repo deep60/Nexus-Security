@@ -12,6 +12,7 @@ pub mod auth;
 pub mod bounty;
 pub mod engines;
 pub mod health;
+pub mod identity;
 pub mod reputation;
 pub mod submission;
 pub mod user;

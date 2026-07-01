@@ -1,5 +1,0 @@
-# Submission service migrations live here. The DB schema is currently managed
-# centrally in /database/init/*.sql; this directory is kept so that
-# `sqlx::migrate!("./migrations")` compiles and runs at startup without
-# panicking. Add a new `YYYYMMDD_<name>.sql` file when the service grows
-# service-local tables.

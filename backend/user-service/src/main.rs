@@ -79,16 +79,20 @@ async fn main() -> Result<()> {
         .await?;
     info!("Database connection pool established");
 
-    // Run migrations (if migrations directory exists and has migrations)
-    // Note: Database schema is managed centrally in /database folder
-    if std::path::Path::new("./migrations").exists() {
-        match sqlx::migrate!("./migrations").run(&db_pool).await {
-            Ok(_) => info!("Database migrations completed"),
-            Err(e) => info!("No migrations to run or already applied: {}", e),
-        }
-    } else {
-        info!("Migrations directory not found - using centralized database schema");
+    // Run service-local migrations. The schema (users, user_profiles,
+    // user_settings, kyc_verifications) lives in ./migrations and is owned by
+    // this service. `sqlx::migrate!` embeds the migration SQL into the binary
+    // at compile time, so we run it unconditionally — the migrations directory
+    // is not shipped in the runtime image, and gating on its runtime presence
+    // would skip schema creation entirely. A failure must be fatal: booting
+    // without the schema would let liveness pass while every real request 500s
+    // on a missing relation.
+    info!("Running database migrations...");
+    if let Err(e) = sqlx::migrate!("./migrations").run(&db_pool).await {
+        tracing::error!("Database migration failed: {}", e);
+        return Err(anyhow::anyhow!("Database migration failed: {e}"));
     }
+    info!("Database migrations completed");
 
     // Initialize Redis client for sessions
     let redis_client = redis::Client::open(config.redis.url.clone())?;
@@ -179,6 +183,8 @@ async fn main() -> Result<()> {
             "/api/v1/auth/wallet/verify",
             post(handlers::auth::verify_wallet),
         )
+        // Current-user identity (gateway proxies /auth/verify here)
+        .route("/api/v1/auth/me", get(handlers::auth::get_me))
         // Profile endpoints
         .route("/api/v1/profile", get(handlers::profile::get_profile))
         .route("/api/v1/profile", put(handlers::profile::update_profile))

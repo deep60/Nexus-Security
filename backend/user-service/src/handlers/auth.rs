@@ -63,6 +63,22 @@ pub async fn login(
     Ok(Json(response))
 }
 
+/// Return the authenticated user's public identity.
+///
+/// Used by the API gateway's `/api/v1/auth/verify` proxy to resolve the
+/// current user from an access token (user-service is the source of truth
+/// for identity under the microservices design).
+pub async fn get_me(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> Result<Json<UserPublic>, AppError> {
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| AppError::Unauthorized("Invalid token".to_string()))?;
+
+    let user = state.user_service.get_user_by_id(user_id).await?;
+    Ok(Json(user.into()))
+}
+
 /// Logout user - blacklist the JWT token
 pub async fn logout(
     headers: HeaderMap,

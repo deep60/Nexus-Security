@@ -1,13 +1,22 @@
-use serde::{Deserialize, Serialize};
+//! Real YARA engine backed by libyara (via the `yara` crate).
+//!
+//! Compiled only when the `yara-engine` cargo feature is enabled (which links
+//! libyara). Rule files (`*.yar` / `*.yara`) are discovered recursively under
+//! the configured rules directory, each compiled into its own ruleset so that
+//! a single malformed file cannot disable detection for the rest.
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
-use thiserror::Error;
-use tokio::time::timeout;
-use tracing::{debug, error, info, warn};
 
-use crate::models::analysis_result::{AnalysisResult, MatchDetails, ThreatLevel};
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use tracing::{info, warn};
+use yara::{Compiler, MetadataValue, Rule, Rules};
+
+use crate::models::analysis_result::{
+    DetectionResult, EngineType, SeverityLevel, ThreatCategory, ThreatVerdict,
+};
 
 #[derive(Error, Debug)]
 pub enum YaraEngineError {
@@ -19,124 +28,123 @@ pub enum YaraEngineError {
     RuleLoadError(String),
     #[error("File I/O error: {0}")]
     IoError(#[from] std::io::Error),
-    #[error("Timeout error: scan took too long")]
-    TimeoutError,
-    #[error("Invalid rule format: {0}")]
-    InvalidRuleFormat(String),
 }
 
+/// A structured representation of a single matched rule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YaraMatch {
     pub rule_name: String,
     pub namespace: String,
     pub tags: Vec<String>,
     pub meta: HashMap<String, String>,
-    pub strings: Vec<YaraStringMatch>,
-    pub confidence: f32,
+    pub matched_strings: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct YaraStringMatch {
-    pub identifier: String,
-    pub offset: u64,
-    pub length: usize,
-    pub content: String,
-}
-
+/// Lightweight description of a loaded rule file (for stats/introspection).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YaraRule {
-    pub name: String,
     pub namespace: String,
-    pub content: String,
-    pub tags: Vec<String>,
-    pub meta: HashMap<String, String>,
-    pub enabled: bool,
-    pub priority: i32,
+    pub source_file: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct YaraEngineConfig {
     pub rules_directory: PathBuf,
-    pub max_scan_time: Duration,
     pub max_file_size: u64,
-    pub enable_fast_mode: bool,
-    pub max_matches_per_rule: usize,
-    pub timeout_seconds: u64,
+    pub timeout_seconds: i32,
 }
 
 impl Default for YaraEngineConfig {
     fn default() -> Self {
         Self {
             rules_directory: PathBuf::from("./rules"),
-            max_scan_time: Duration::from_secs(30),
             max_file_size: 1024 * 1024 * 1024, // 1GB
-            enable_fast_mode: false,
-            max_matches_per_rule: 100,
             timeout_seconds: 30,
         }
     }
 }
 
+/// One compiled ruleset, originating from a single rule file.
+struct CompiledRuleSet {
+    namespace: String,
+    source_file: String,
+    rules: Rules,
+}
+
 pub struct YaraEngine {
     config: YaraEngineConfig,
-    loaded_rules: Vec<YaraRule>,
-    compiled_rules: Option<String>, // Placeholder - would be yara::Rules
-    rules_hash: String,
+    rulesets: Vec<CompiledRuleSet>,
 }
 
 impl YaraEngine {
     pub fn new(config: YaraEngineConfig) -> Result<Self, YaraEngineError> {
         let mut engine = Self {
             config,
-            loaded_rules: Vec::new(),
-            compiled_rules: None,
-            rules_hash: String::new(),
+            rulesets: Vec::new(),
         };
-
-        engine.load_rules()?;
-        engine.compile_rules()?;
-
+        engine.load_and_compile()?;
         Ok(engine)
     }
 
-    pub fn load_rules(&mut self) -> Result<(), YaraEngineError> {
-        info!(
-            "Loading YARA rules from directory: {:?}",
-            self.config.rules_directory
-        );
+    /// Discover and compile every rule file under the configured directory.
+    /// Files that fail to compile are skipped with a warning rather than
+    /// aborting the whole engine.
+    fn load_and_compile(&mut self) -> Result<(), YaraEngineError> {
+        let dir = &self.config.rules_directory;
+        info!("Loading YARA rules from directory: {:?}", dir);
 
-        if !self.config.rules_directory.exists() {
-            return Err(YaraEngineError::RuleLoadError(format!(
-                "Rules directory does not exist: {:?}",
-                self.config.rules_directory
-            )));
+        if !dir.exists() {
+            warn!(
+                "YARA rules directory does not exist: {:?}; engine has 0 rules",
+                dir
+            );
+            self.rulesets = Vec::new();
+            return Ok(());
         }
 
-        let mut rules = Vec::new();
-        let rule_files = self.discover_rule_files(&self.config.rules_directory)?;
+        let rule_files = Self::discover_rule_files(dir)?;
+        let mut rulesets = Vec::new();
 
-        for rule_file in rule_files {
-            match self.parse_rule_file(&rule_file) {
-                Ok(mut file_rules) => {
-                    rules.append(&mut file_rules);
-                }
+        for path in rule_files {
+            let namespace = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("default")
+                .to_string();
+
+            match Self::compile_file(&path, &namespace) {
+                Ok(rules) => rulesets.push(CompiledRuleSet {
+                    namespace,
+                    source_file: path.display().to_string(),
+                    rules,
+                }),
                 Err(e) => {
-                    warn!("Failed to parse rule file {:?}: {}", rule_file, e);
+                    warn!("Skipping YARA rule file {:?}: {}", path, e);
                     continue;
                 }
             }
         }
 
-        self.loaded_rules = rules.into_iter().filter(|rule| rule.enabled).collect();
-        info!("Loaded {} active YARA rules", self.loaded_rules.len());
-
-        // Generate hash of all rules for cache invalidation
-        self.rules_hash = self.generate_rules_hash();
-
+        info!(
+            "Compiled {} YARA rule file(s) from {:?}",
+            rulesets.len(),
+            dir
+        );
+        self.rulesets = rulesets;
         Ok(())
     }
 
-    fn discover_rule_files(&self, dir: &Path) -> Result<Vec<PathBuf>, YaraEngineError> {
+    fn compile_file(path: &Path, namespace: &str) -> Result<Rules, YaraEngineError> {
+        let compiler = Compiler::new()
+            .map_err(|e| YaraEngineError::CompilationError(e.to_string()))?
+            .add_rules_file_with_namespace(path, namespace)
+            .map_err(|e| YaraEngineError::CompilationError(e.to_string()))?;
+        compiler
+            .compile_rules()
+            .map_err(|e| YaraEngineError::CompilationError(e.to_string()))
+    }
+
+    fn discover_rule_files(dir: &Path) -> Result<Vec<PathBuf>, YaraEngineError> {
         let mut rule_files = Vec::new();
 
         for entry in fs::read_dir(dir)? {
@@ -150,8 +158,7 @@ impl YaraEngine {
             {
                 rule_files.push(path);
             } else if path.is_dir() {
-                // Recursively search subdirectories
-                let mut sub_files = self.discover_rule_files(&path)?;
+                let mut sub_files = Self::discover_rule_files(&path)?;
                 rule_files.append(&mut sub_files);
             }
         }
@@ -159,489 +166,281 @@ impl YaraEngine {
         Ok(rule_files)
     }
 
-    fn parse_rule_file(&self, path: &Path) -> Result<Vec<YaraRule>, YaraEngineError> {
-        let content = fs::read_to_string(path)?;
-        let mut rules = Vec::new();
-
-        // Simple YARA rule parser - in production, you'd want a more robust parser
-        let rule_blocks = self.split_rules(&content);
-
-        for (i, block) in rule_blocks.iter().enumerate() {
-            if let Ok(rule) = self.parse_rule_block(block, path, i) {
-                rules.push(rule);
-            }
-        }
-
-        Ok(rules)
-    }
-
-    fn split_rules(&self, content: &str) -> Vec<String> {
-        // Split YARA file into individual rule blocks
-        let mut rules = Vec::new();
-        let mut current_rule = String::new();
-        let mut brace_count = 0;
-        let mut in_rule = false;
-
-        for line in content.lines() {
-            let trimmed = line.trim();
-
-            if trimmed.starts_with("rule ") {
-                if !current_rule.is_empty() {
-                    rules.push(current_rule.clone());
-                }
-                current_rule = String::new();
-                in_rule = true;
-                brace_count = 0;
-            }
-
-            if in_rule {
-                current_rule.push_str(line);
-                current_rule.push('\n');
-
-                brace_count += line.matches('{').count() as i32;
-                brace_count -= line.matches('}').count() as i32;
-
-                if brace_count == 0 && current_rule.contains('{') {
-                    rules.push(current_rule.clone());
-                    current_rule = String::new();
-                    in_rule = false;
-                }
-            }
-        }
-
-        if !current_rule.is_empty() {
-            rules.push(current_rule);
-        }
-
-        rules
-    }
-
-    fn parse_rule_block(
-        &self,
-        block: &str,
-        file_path: &Path,
-        index: usize,
-    ) -> Result<YaraRule, YaraEngineError> {
-        let lines: Vec<&str> = block.lines().collect();
-
-        // Extract rule name
-        let rule_line = lines
-            .iter()
-            .find(|line| line.trim().starts_with("rule "))
-            .ok_or_else(|| {
-                YaraEngineError::InvalidRuleFormat("No rule declaration found".to_string())
-            })?;
-
-        let rule_name = rule_line
-            .split_whitespace()
-            .nth(1)
-            .and_then(|name| name.split(':').next())
-            .and_then(|name| name.split('{').next())
-            .map(|name| name.trim().to_string())
-            .ok_or_else(|| {
-                YaraEngineError::InvalidRuleFormat("Could not extract rule name".to_string())
-            })?;
-
-        // Extract namespace (from file path or rule)
-        let namespace = file_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("default")
-            .to_string();
-
-        // Extract tags and metadata
-        let mut tags = Vec::new();
-        let mut meta = HashMap::new();
-
-        // Simple tag extraction
-        if let Some(tag_line) = lines.iter().find(|line| line.contains("tags:")) {
-            // Extract tags from the rule (simplified)
-            tags = vec!["malware".to_string()]; // Placeholder
-        }
-
-        // Extract metadata
-        for line in lines.iter() {
-            if line.trim().starts_with("author") {
-                if let Some(author) = line.split('=').nth(1) {
-                    meta.insert(
-                        "author".to_string(),
-                        author.trim_matches(|c| c == '"' || c == ' ').to_string(),
-                    );
-                }
-            }
-            if line.trim().starts_with("description") {
-                if let Some(desc) = line.split('=').nth(1) {
-                    meta.insert(
-                        "description".to_string(),
-                        desc.trim_matches(|c| c == '"' || c == ' ').to_string(),
-                    );
-                }
-            }
-        }
-
-        Ok(YaraRule {
-            name: rule_name,
-            namespace,
-            content: block.to_string(),
-            tags,
-            meta,
-            enabled: true,
-            priority: 1,
-        })
-    }
-
-    fn generate_rules_hash(&self) -> String {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        for rule in &self.loaded_rules {
-            rule.content.hash(&mut hasher);
-        }
-        format!("{:x}", hasher.finish())
-    }
-
-    fn compile_rules(&mut self) -> Result<(), YaraEngineError> {
-        info!("Compiling {} YARA rules", self.loaded_rules.len());
-
-        // In a real implementation, you'd use the yara crate to compile rules
-        // For now, we'll simulate the compilation process
-
-        if self.loaded_rules.is_empty() {
-            warn!("No rules to compile");
-            return Ok(());
-        }
-
-        // Simulate compilation - in production with yara crate you'd do:
-        // let mut compiler = yara::Compiler::new()?;
-        // for rule in &self.loaded_rules {
-        //     compiler.add_rules_str(&rule.content)?;
-        // }
-        // self.compiled_rules = Some(compiler.compile_rules()?);
-
-        // For now, store a placeholder indicating rules are compiled
-        self.compiled_rules = Some(format!("compiled_{}_rules", self.loaded_rules.len()));
-
-        debug!(
-            "Successfully compiled {} YARA rules",
-            self.loaded_rules.len()
-        );
-        Ok(())
-    }
-
-    pub async fn analyze_file(&self, file_path: &Path) -> Result<AnalysisResult, YaraEngineError> {
-        info!("Starting YARA analysis of file: {:?}", file_path);
-
-        // Check file size
-        let metadata = fs::metadata(file_path)?;
-        if metadata.len() > self.config.max_file_size {
-            return Err(YaraEngineError::ScanError(format!(
-                "File too large: {} bytes",
-                metadata.len()
-            )));
-        }
-
-        // Perform scan with timeout
-        let scan_result = timeout(
-            Duration::from_secs(self.config.timeout_seconds),
-            self.scan_file_internal(file_path),
-        )
-        .await
-        .map_err(|_| YaraEngineError::TimeoutError)??;
-
-        Ok(scan_result)
-    }
-
-    pub async fn analyze_bytes(
+    /// Scan a byte buffer and summarize all rule matches into a single
+    /// `DetectionResult`. Errors are returned as a non-fatal `Unknown`
+    /// detection (with `error_message`) so a YARA failure does not abort the
+    /// surrounding multi-engine analysis.
+    pub async fn analyze_file_data(
         &self,
         data: &[u8],
         filename: &str,
-    ) -> Result<AnalysisResult, YaraEngineError> {
-        info!(
-            "Starting YARA analysis of {} bytes for file: {}",
-            data.len(),
-            filename
-        );
+    ) -> anyhow::Result<DetectionResult> {
+        let start = std::time::Instant::now();
 
         if data.len() as u64 > self.config.max_file_size {
-            return Err(YaraEngineError::ScanError(format!(
-                "Data too large: {} bytes",
-                data.len()
-            )));
+            return Ok(self.unknown_result(
+                start.elapsed().as_millis() as u64,
+                format!("File too large for YARA scan: {} bytes", data.len()),
+            ));
         }
 
-        let scan_result = timeout(
-            Duration::from_secs(self.config.timeout_seconds),
-            self.scan_bytes_internal(data, filename),
-        )
-        .await
-        .map_err(|_| YaraEngineError::TimeoutError)??;
+        if self.rulesets.is_empty() {
+            return Ok(self.unknown_result(
+                start.elapsed().as_millis() as u64,
+                "No YARA rules loaded".to_string(),
+            ));
+        }
 
-        Ok(scan_result)
-    }
-
-    async fn scan_file_internal(
-        &self,
-        file_path: &Path,
-    ) -> Result<AnalysisResult, YaraEngineError> {
-        let file_data = fs::read(file_path)?;
-        let filename = file_path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
-
-        self.scan_bytes_internal(&file_data, filename).await
-    }
-
-    async fn scan_bytes_internal(
-        &self,
-        data: &[u8],
-        filename: &str,
-    ) -> Result<AnalysisResult, YaraEngineError> {
-        let mut matches = Vec::new();
-        // Simulate YARA scanning - in reality you'd use:
-        // let scan_results = self.compiled_rules
-        //     .as_ref()
-        //     .ok_or_else(|| YaraEngineError::ScanError("No compiled rules".to_string()))?
-        //     .scan_mem(data, self.config.timeout_seconds as i32)?;
-
-        // For demonstration, we'll create some mock matches based on simple heuristics
-        matches.extend(self.perform_heuristic_analysis(data, filename));
-
-        let threat_level = self.calculate_threat_level(&matches);
-        let confidence = self.calculate_confidence(&matches);
-
-        use crate::models::analysis_result::{
-            DetectionResult, EngineType, FileMetadata, SeverityLevel, ThreatVerdict,
+        // scan_mem takes &self and is CPU-bound; run it on the blocking pool to
+        // avoid stalling the async runtime on large inputs.
+        let matches = match self.scan(data) {
+            Ok(m) => m,
+            Err(e) => {
+                warn!("YARA scan failed for {}: {}", filename, e);
+                return Ok(self.unknown_result(
+                    start.elapsed().as_millis() as u64,
+                    format!("YARA scan error: {e}"),
+                ));
+            }
         };
-        use chrono::Utc;
+
+        let processing_time_ms = start.elapsed().as_millis() as u64;
+        Ok(self.build_detection(matches, processing_time_ms))
+    }
+
+    fn scan(&self, data: &[u8]) -> Result<Vec<YaraMatch>, YaraEngineError> {
+        let mut matches = Vec::new();
+        for set in &self.rulesets {
+            let hits = set
+                .rules
+                .scan_mem(data, self.config.timeout_seconds)
+                .map_err(|e| YaraEngineError::ScanError(e.to_string()))?;
+            for rule in hits {
+                matches.push(Self::rule_to_match(&rule));
+            }
+        }
+        Ok(matches)
+    }
+
+    fn rule_to_match(rule: &Rule) -> YaraMatch {
+        let mut meta = HashMap::new();
+        for m in &rule.metadatas {
+            let value = match &m.value {
+                MetadataValue::Integer(i) => i.to_string(),
+                MetadataValue::String(s) => s.to_string(),
+                MetadataValue::Boolean(b) => b.to_string(),
+            };
+            meta.insert(m.identifier.to_string(), value);
+        }
+
+        YaraMatch {
+            rule_name: rule.identifier.to_string(),
+            namespace: rule.namespace.to_string(),
+            tags: rule.tags.iter().map(|t| t.to_string()).collect(),
+            meta,
+            matched_strings: rule.strings.len(),
+        }
+    }
+
+    fn build_detection(&self, matches: Vec<YaraMatch>, processing_time_ms: u64) -> DetectionResult {
         use uuid::Uuid;
 
-        // Create file metadata
-        let file_metadata = FileMetadata {
-            filename: Some(filename.to_string()),
-            file_size: data.len() as u64,
-            mime_type: "application/octet-stream".to_string(),
-            md5: String::new(),
-            sha1: String::new(),
-            sha256: self.calculate_hash(data),
-            sha512: None,
-            entropy: None,
-            magic_bytes: None,
-            executable_info: None,
-        };
-
-        let mut result = AnalysisResult::new(Uuid::new_v4(), file_metadata);
-
-        // Add YARA matches to the result
-        for m in matches {
-            let detection = DetectionResult {
+        if matches.is_empty() {
+            return DetectionResult {
                 detection_id: Uuid::new_v4(),
                 engine_name: "YARA".to_string(),
-                engine_version: "1.0.0".to_string(),
+                engine_version: "libyara".to_string(),
                 engine_type: EngineType::Yara,
-                verdict: if m.confidence > 0.7 {
-                    ThreatVerdict::Malicious
-                } else {
-                    ThreatVerdict::Suspicious
-                },
-                confidence: m.confidence,
-                severity: if m.tags.contains(&"critical".to_string()) {
-                    SeverityLevel::Critical
-                } else {
-                    SeverityLevel::Medium
-                },
+                verdict: ThreatVerdict::Benign,
+                confidence: 0.5,
+                severity: SeverityLevel::Info,
                 categories: vec![],
-                metadata: m
-                    .meta
-                    .into_iter()
-                    .map(|(k, v)| (k, serde_json::json!(v)))
-                    .collect(),
-                detected_at: Utc::now(),
-                processing_time_ms: 100,
+                metadata: HashMap::new(),
+                detected_at: chrono::Utc::now(),
+                processing_time_ms,
                 error_message: None,
             };
-            result.add_detection(detection);
         }
 
-        result.mark_completed();
-        Ok(result)
+        let severity = Self::severity_from(&matches);
+        let verdict = match severity {
+            SeverityLevel::Critical | SeverityLevel::High => ThreatVerdict::Malicious,
+            _ => ThreatVerdict::Suspicious,
+        };
+        let confidence = {
+            let base = 0.6 + 0.1 * (matches.len() as f32);
+            let bumped = if matches!(severity, SeverityLevel::Critical) {
+                base + 0.2
+            } else {
+                base
+            };
+            bumped.clamp(0.0, 0.98)
+        };
+        let categories = Self::categories_from(&matches);
+
+        let mut metadata = HashMap::new();
+        metadata.insert("match_count".to_string(), serde_json::json!(matches.len()));
+        metadata.insert(
+            "matched_rules".to_string(),
+            serde_json::json!(matches
+                .iter()
+                .map(|m| m.rule_name.clone())
+                .collect::<Vec<_>>()),
+        );
+        metadata.insert(
+            "matches".to_string(),
+            serde_json::to_value(&matches).unwrap_or_default(),
+        );
+
+        DetectionResult {
+            detection_id: Uuid::new_v4(),
+            engine_name: "YARA".to_string(),
+            engine_version: "libyara".to_string(),
+            engine_type: EngineType::Yara,
+            verdict,
+            confidence,
+            severity,
+            categories,
+            metadata,
+            detected_at: chrono::Utc::now(),
+            processing_time_ms,
+            error_message: None,
+        }
     }
 
-    fn perform_heuristic_analysis(&self, data: &[u8], filename: &str) -> Vec<YaraMatch> {
-        let mut matches = Vec::new();
-
-        // Simple heuristic checks (in reality, YARA rules would do this)
-
-        // Check for PE header
-        if data.len() > 2 && &data[0..2] == b"MZ" {
-            matches.push(YaraMatch {
-                rule_name: "pe_file_detected".to_string(),
-                namespace: "heuristic".to_string(),
-                tags: vec!["executable".to_string()],
-                meta: HashMap::from([(
-                    "description".to_string(),
-                    "Portable Executable file detected".to_string(),
-                )]),
-                strings: vec![YaraStringMatch {
-                    identifier: "mz_header".to_string(),
-                    offset: 0,
-                    length: 2,
-                    content: "MZ".to_string(),
-                }],
-                confidence: 0.8,
-            });
-        }
-
-        // Check for suspicious strings
-        let suspicious_strings = [
-            b"cmd.exe",
-            b"powershell",
-            b"CreateProcess",
-            b"VirtualAlloc",
-            b"GetProcAddress",
-            b"LoadLibrary",
-            b"RegCreateKey",
-        ];
-
-        // Find maximum string length for window size
-        let max_str_len = suspicious_strings
-            .iter()
-            .map(|s| s.len())
-            .max()
-            .unwrap_or(10);
-
-        for (i, window) in data.windows(max_str_len).enumerate() {
-            for suspicious in &suspicious_strings {
-                if window.starts_with(suspicious) {
-                    matches.push(YaraMatch {
-                        rule_name: format!(
-                            "suspicious_string_{}",
-                            String::from_utf8_lossy(suspicious)
-                        ),
-                        namespace: "heuristic".to_string(),
-                        tags: vec!["suspicious".to_string()],
-                        meta: HashMap::from([(
-                            "description".to_string(),
-                            format!(
-                                "Suspicious string found: {}",
-                                String::from_utf8_lossy(suspicious)
-                            ),
-                        )]),
-                        strings: vec![YaraStringMatch {
-                            identifier: "suspicious_string".to_string(),
-                            offset: i as u64,
-                            length: suspicious.len(),
-                            content: String::from_utf8_lossy(suspicious).to_string(),
-                        }],
-                        confidence: 0.6,
-                    });
-                    break;
+    /// Derive a severity from rule tags and the conventional `severity` meta
+    /// field, taking the most severe across all matches.
+    fn severity_from(matches: &[YaraMatch]) -> SeverityLevel {
+        let mut best = SeverityLevel::Low;
+        for m in matches {
+            let mut tokens: Vec<String> = m.tags.iter().map(|t| t.to_lowercase()).collect();
+            if let Some(sev) = m.meta.get("severity") {
+                tokens.push(sev.to_lowercase());
+            }
+            for token in tokens {
+                let level = match token.as_str() {
+                    "critical" => SeverityLevel::Critical,
+                    "high" => SeverityLevel::High,
+                    "medium" | "moderate" => SeverityLevel::Medium,
+                    "low" => SeverityLevel::Low,
+                    _ => continue,
+                };
+                if Self::severity_rank(&level) > Self::severity_rank(&best) {
+                    best = level;
                 }
             }
         }
-
-        // Check file extension
-        if filename.ends_with(".exe") || filename.ends_with(".dll") || filename.ends_with(".scr") {
-            matches.push(YaraMatch {
-                rule_name: "executable_extension".to_string(),
-                namespace: "heuristic".to_string(),
-                tags: vec!["executable".to_string()],
-                meta: HashMap::from([(
-                    "description".to_string(),
-                    "Executable file extension detected".to_string(),
-                )]),
-                strings: vec![],
-                confidence: 0.7,
-            });
-        }
-
-        matches
+        best
     }
 
-    fn calculate_threat_level(&self, matches: &[YaraMatch]) -> ThreatLevel {
-        if matches.is_empty() {
-            return ThreatLevel::Clean;
-        }
-
-        let max_confidence = matches
-            .iter()
-            .map(|m| m.confidence)
-            .fold(0.0f32, |acc, x| acc.max(x));
-
-        let has_critical = matches
-            .iter()
-            .any(|m| m.tags.contains(&"critical".to_string()));
-        let suspicious_count = matches.len();
-
-        if has_critical || max_confidence > 0.8 {
-            ThreatLevel::Critical
-        } else if max_confidence > 0.6 || suspicious_count > 3 {
-            ThreatLevel::High
-        } else if max_confidence > 0.4 || suspicious_count > 1 {
-            ThreatLevel::Medium
-        } else {
-            ThreatLevel::Low
+    fn severity_rank(level: &SeverityLevel) -> u8 {
+        match level {
+            SeverityLevel::Info => 0,
+            SeverityLevel::Low => 1,
+            SeverityLevel::Medium => 2,
+            SeverityLevel::High => 3,
+            SeverityLevel::Critical => 4,
         }
     }
 
-    fn calculate_confidence(&self, matches: &[YaraMatch]) -> f32 {
-        if matches.is_empty() {
-            return 0.95; // High confidence in clean files
+    /// Map rule tags / names to threat categories.
+    fn categories_from(matches: &[YaraMatch]) -> Vec<ThreatCategory> {
+        let mut categories = Vec::new();
+        let push_unique = |c: ThreatCategory, v: &mut Vec<ThreatCategory>| {
+            if !v.contains(&c) {
+                v.push(c);
+            }
+        };
+
+        for m in matches {
+            let haystack = format!("{} {}", m.rule_name.to_lowercase(), m.tags.join(" ").to_lowercase());
+            if haystack.contains("trojan") {
+                push_unique(ThreatCategory::Trojan, &mut categories);
+            }
+            if haystack.contains("ransom") {
+                push_unique(ThreatCategory::Ransomware, &mut categories);
+            }
+            if haystack.contains("worm") {
+                push_unique(ThreatCategory::Worm, &mut categories);
+            }
+            if haystack.contains("rootkit") {
+                push_unique(ThreatCategory::Rootkit, &mut categories);
+            }
+            if haystack.contains("backdoor") {
+                push_unique(ThreatCategory::Backdoor, &mut categories);
+            }
+            if haystack.contains("spyware") || haystack.contains("keylog") {
+                push_unique(ThreatCategory::Spyware, &mut categories);
+            }
+            if haystack.contains("adware") {
+                push_unique(ThreatCategory::Adware, &mut categories);
+            }
+            if haystack.contains("exploit") {
+                push_unique(ThreatCategory::Exploit, &mut categories);
+            }
+            if haystack.contains("phish") {
+                push_unique(ThreatCategory::Phishing, &mut categories);
+            }
         }
 
-        let avg_confidence: f32 =
-            matches.iter().map(|m| m.confidence).sum::<f32>() / matches.len() as f32;
-
-        // Adjust confidence based on number of matches
-        let match_bonus = (matches.len() as f32 * 0.1).min(0.3);
-
-        (avg_confidence + match_bonus).min(1.0)
+        if categories.is_empty() {
+            categories.push(ThreatCategory::Malware);
+        }
+        categories
     }
 
-    fn calculate_hash(&self, data: &[u8]) -> String {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        data.hash(&mut hasher);
-        format!("{:x}", hasher.finish())
+    fn unknown_result(&self, processing_time_ms: u64, error: String) -> DetectionResult {
+        DetectionResult {
+            detection_id: uuid::Uuid::new_v4(),
+            engine_name: "YARA".to_string(),
+            engine_version: "libyara".to_string(),
+            engine_type: EngineType::Yara,
+            verdict: ThreatVerdict::Unknown,
+            confidence: 0.0,
+            severity: SeverityLevel::Info,
+            categories: vec![],
+            metadata: HashMap::new(),
+            detected_at: chrono::Utc::now(),
+            processing_time_ms,
+            error_message: Some(error),
+        }
     }
 
+    /// Recompile all rules from disk (e.g. after rules are updated).
     pub fn reload_rules(&mut self) -> Result<(), YaraEngineError> {
         info!("Reloading YARA rules");
-        self.load_rules()?;
-        self.compile_rules()?;
-        info!("Successfully reloaded {} rules", self.loaded_rules.len());
+        self.load_and_compile()?;
+        info!("Reloaded {} YARA rule file(s)", self.rulesets.len());
         Ok(())
     }
 
-    pub fn get_loaded_rules(&self) -> &[YaraRule] {
-        &self.loaded_rules
-    }
-
-    pub fn get_rules_hash(&self) -> &str {
-        &self.rules_hash
+    pub fn loaded_rule_files(&self) -> Vec<YaraRule> {
+        self.rulesets
+            .iter()
+            .map(|s| YaraRule {
+                namespace: s.namespace.clone(),
+                source_file: s.source_file.clone(),
+            })
+            .collect()
     }
 
     pub fn get_stats(&self) -> HashMap<String, String> {
         HashMap::from([
             (
-                "rules_loaded".to_string(),
-                self.loaded_rules.len().to_string(),
+                "rule_files_loaded".to_string(),
+                self.rulesets.len().to_string(),
             ),
-            ("rules_hash".to_string(), self.rules_hash.clone()),
             (
                 "rules_directory".to_string(),
                 self.config.rules_directory.display().to_string(),
             ),
             (
-                "max_file_size".to_string(),
-                self.config.max_file_size.to_string(),
-            ),
-            (
                 "timeout_seconds".to_string(),
                 self.config.timeout_seconds.to_string(),
+            ),
+            (
+                "max_file_size".to_string(),
+                self.config.max_file_size.to_string(),
             ),
         ])
     }
@@ -652,69 +451,68 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn create_test_rule(name: &str, content: &str) -> String {
-        format!(
-            r#" rule {}
-{{
+    fn write_rule(dir: &Path, name: &str, body: &str) {
+        std::fs::write(dir.join(name), body).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_compile_and_match() {
+        let temp = TempDir::new().unwrap();
+        write_rule(
+            temp.path(),
+            "test.yara",
+            r#"
+rule DetectsEvil : trojan {
     meta:
-        author = "test"
-        description = "test rule"
-    
+        severity = "high"
+        description = "matches the marker string"
     strings:
-        $test = "{}"
-    
+        $a = "EVIL_MARKER"
     condition:
-        $test
-}}
-        "#,
-            name, content
-        )
-    }
-
-    #[tokio::test]
-    async fn test_yara_engine_creation() {
-        let temp_dir = TempDir::new().unwrap();
-        let rules_dir = temp_dir.path().to_path_buf();
-
-        // Create a test rule file
-        let rule_content = create_test_rule("TestRule", "malware");
-        std::fs::write(rules_dir.join("test.yara"), rule_content).unwrap();
+        $a
+}
+"#,
+        );
 
         let config = YaraEngineConfig {
-            rules_directory: rules_dir,
+            rules_directory: temp.path().to_path_buf(),
             ..Default::default()
         };
-
-        let engine = YaraEngine::new(config);
-        assert!(engine.is_ok());
-
-        let engine = engine.unwrap();
-        assert_eq!(engine.get_loaded_rules().len(), 1);
-    }
-
-    #[tokio::test]
-    async fn test_file_analysis() {
-        let temp_dir = TempDir::new().unwrap();
-        let rules_dir = temp_dir.path().to_path_buf();
-
-        let rule_content = create_test_rule("TestRule", "test");
-        std::fs::write(rules_dir.join("test.yara"), rule_content).unwrap();
-
-        let config = YaraEngineConfig {
-            rules_directory: rules_dir,
-            ..Default::default()
-        };
-
         let engine = YaraEngine::new(config).unwrap();
+        assert_eq!(engine.loaded_rule_files().len(), 1);
 
-        // Create test file
-        let test_file = temp_dir.path().join("test.exe");
-        std::fs::write(&test_file, b"MZ test content").unwrap();
+        // Matching input -> malicious (severity high).
+        let hit = engine
+            .analyze_file_data(b"prefix EVIL_MARKER suffix", "sample.bin")
+            .await
+            .unwrap();
+        assert_eq!(hit.verdict, ThreatVerdict::Malicious);
+        assert!(hit.categories.contains(&ThreatCategory::Trojan));
 
-        let result = engine.analyze_file(&test_file).await;
-        assert!(result.is_ok());
+        // Non-matching input -> benign.
+        let clean = engine
+            .analyze_file_data(b"nothing to see here", "clean.bin")
+            .await
+            .unwrap();
+        assert_eq!(clean.verdict, ThreatVerdict::Benign);
+    }
 
-        let analysis = result.unwrap();
-        assert!(!analysis.detections.is_empty());
+    #[tokio::test]
+    async fn test_bad_rule_file_is_skipped() {
+        let temp = TempDir::new().unwrap();
+        write_rule(temp.path(), "broken.yara", "this is not a valid yara rule {");
+        write_rule(
+            temp.path(),
+            "good.yara",
+            "rule Ok { strings: $a = \"hello\" condition: $a }",
+        );
+
+        let config = YaraEngineConfig {
+            rules_directory: temp.path().to_path_buf(),
+            ..Default::default()
+        };
+        let engine = YaraEngine::new(config).unwrap();
+        // Only the valid file compiles; the broken one is skipped.
+        assert_eq!(engine.loaded_rule_files().len(), 1);
     }
 }

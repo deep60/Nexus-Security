@@ -64,21 +64,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // Run migrations on startup. Submission-service does not yet own
-    // service-local tables (schema is in /database/init), so when migrations
-    // dir is empty this is effectively a no-op. We still call it so that
-    // adding a migration later does not require touching main.rs.
-    if std::path::Path::new("./migrations").exists() {
-        match sqlx::migrate!("./migrations").run(&db_pool).await {
-            Ok(_) => tracing::info!("Database migrations completed"),
-            Err(e) => {
-                tracing::error!("Database migration failed: {}", e);
-                return Err(anyhow::anyhow!("Database migration failed: {e}").into());
-            }
-        }
-    } else {
-        tracing::info!("Migrations directory not found - using centralized schema");
+    // Run service-local migrations on startup. The `submissions` table lives
+    // in ./migrations and is owned by this service. `sqlx::migrate!` embeds the
+    // migration SQL into the binary at compile time, so we run it
+    // unconditionally — the migrations directory is not shipped in the runtime
+    // image, and gating on its runtime presence would silently skip schema
+    // creation, leaving every real request to fail with `relation "submissions"
+    // does not exist`. A migration failure is therefore fatal.
+    tracing::info!("Running database migrations...");
+    if let Err(e) = sqlx::migrate!("./migrations").run(&db_pool).await {
+        tracing::error!("Database migration failed: {}", e);
+        return Err(anyhow::anyhow!("Database migration failed: {e}").into());
     }
+    tracing::info!("Database migrations completed");
 
     // Initialize Redis client with error handling
     let redis_url =

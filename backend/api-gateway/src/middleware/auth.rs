@@ -14,16 +14,35 @@ use uuid::Uuid;
 use crate::models::error::ApiError;
 use crate::AppState;
 
-/// JWT Claims structure
+/// JWT Claims structure.
+///
+/// Fields are tolerant of tokens minted by `user-service` (the auth authority
+/// under the microservices design), which omit `role`/`nbf`/`jti` and instead
+/// carry `is_admin`/`username`/`token_type`. `#[serde(default)]` lets a single
+/// validator accept tokens from either source as long as the JWT secret matches.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: Uuid,     // Subject (user ID)
+    pub sub: Uuid,     // Subject (user ID) — decodes from a UUID string
     pub email: String, // User email
-    pub role: String,  // User role
+    #[serde(default = "default_role")]
+    pub role: String, // User role (gateway-minted tokens)
     pub exp: i64,      // Expiration time
-    pub iat: i64,      // Issued at
-    pub nbf: i64,      // Not before
-    pub jti: String,   // JWT ID (unique token identifier)
+    #[serde(default)]
+    pub iat: i64, // Issued at
+    #[serde(default)]
+    pub nbf: i64, // Not before
+    #[serde(default)]
+    pub jti: String, // JWT ID
+    #[serde(default)]
+    pub is_admin: bool, // Admin flag (user-service tokens)
+    #[serde(default)]
+    pub username: String, // Username (user-service tokens)
+    #[serde(default)]
+    pub token_type: String, // "access" | "refresh" (user-service tokens)
+}
+
+fn default_role() -> String {
+    "user".to_string()
 }
 
 impl Claims {
@@ -33,12 +52,15 @@ impl Claims {
 
         Self {
             sub: user_id,
+            is_admin: role == "admin",
             email,
             role,
             exp: expiration.timestamp(),
             iat: now.timestamp(),
             nbf: now.timestamp(),
             jti: Uuid::new_v4().to_string(),
+            username: String::new(),
+            token_type: "access".to_string(),
         }
     }
 
@@ -78,9 +100,19 @@ impl JwtService {
     }
 
     pub fn validate_token(&self, token: &str) -> Result<Claims, ApiError> {
-        decode::<Claims>(token, &self.decoding_key, &self.validation)
+        let claims = decode::<Claims>(token, &self.decoding_key, &self.validation)
             .map(|data| data.claims)
-            .map_err(|e| ApiError::Unauthorized(format!("Invalid token: {e}")))
+            .map_err(|e| ApiError::Unauthorized(format!("Invalid token: {e}")))?;
+
+        // user-service mints both access and refresh tokens with the same
+        // secret; only access tokens may authorize API requests.
+        if claims.token_type == "refresh" {
+            return Err(ApiError::Unauthorized(
+                "Refresh token cannot be used for authorization".to_string(),
+            ));
+        }
+
+        Ok(claims)
     }
 
     pub fn refresh_token(&self, old_claims: &Claims) -> Result<String, ApiError> {
@@ -164,7 +196,7 @@ pub async fn require_admin(request: Request<Body>, next: Next) -> Result<Respons
         .get::<Claims>()
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    if claims.role != "admin" && claims.role != "moderator" {
+    if claims.role != "admin" && claims.role != "moderator" && !claims.is_admin {
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -218,12 +250,15 @@ pub async fn api_key_middleware(
 
     let claims = Claims {
         sub: user_id,
+        is_admin: role == "admin",
         email,
         role,
         exp: (Utc::now() + Duration::hours(24)).timestamp(),
         iat: Utc::now().timestamp(),
         nbf: Utc::now().timestamp(),
         jti: Uuid::new_v4().to_string(),
+        username: String::new(),
+        token_type: "access".to_string(),
     };
 
     request.extensions_mut().insert(claims);
@@ -283,5 +318,77 @@ mod tests {
 
         let validated_claims = jwt_service.validate_token(&token).unwrap();
         assert_eq!(validated_claims.email, "test@example.com");
+    }
+
+    /// The gateway must accept access tokens minted by user-service, which use
+    /// a different claim shape (no role/nbf/jti; carries is_admin/token_type).
+    #[test]
+    fn test_validates_user_service_token_shape() {
+        use jsonwebtoken::{encode, EncodingKey, Header};
+
+        #[derive(serde::Serialize)]
+        struct UsClaims {
+            sub: String,
+            email: String,
+            username: String,
+            is_admin: bool,
+            exp: i64,
+            iat: i64,
+            token_type: String,
+        }
+
+        let secret = "shared_secret_at_least_32_chars_long";
+        let uid = Uuid::new_v4();
+        let us = UsClaims {
+            sub: uid.to_string(),
+            email: "u@example.com".to_string(),
+            username: "u".to_string(),
+            is_admin: true,
+            exp: (Utc::now() + Duration::hours(1)).timestamp(),
+            iat: Utc::now().timestamp(),
+            token_type: "access".to_string(),
+        };
+        let token = encode(
+            &Header::default(),
+            &us,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .unwrap();
+
+        let claims = JwtService::new(secret).validate_token(&token).unwrap();
+        assert_eq!(claims.sub, uid);
+        assert_eq!(claims.email, "u@example.com");
+        assert!(claims.is_admin);
+        assert_eq!(claims.role, "user"); // defaulted when absent
+    }
+
+    /// Refresh tokens (token_type = "refresh") must not authorize requests.
+    #[test]
+    fn test_rejects_refresh_token() {
+        use jsonwebtoken::{encode, EncodingKey, Header};
+
+        #[derive(serde::Serialize)]
+        struct UsClaims {
+            sub: String,
+            email: String,
+            exp: i64,
+            token_type: String,
+        }
+
+        let secret = "shared_secret_at_least_32_chars_long";
+        let us = UsClaims {
+            sub: Uuid::new_v4().to_string(),
+            email: "u@example.com".to_string(),
+            exp: (Utc::now() + Duration::hours(1)).timestamp(),
+            token_type: "refresh".to_string(),
+        };
+        let token = encode(
+            &Header::default(),
+            &us,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .unwrap();
+
+        assert!(JwtService::new(secret).validate_token(&token).is_err());
     }
 }

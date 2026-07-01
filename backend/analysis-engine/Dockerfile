@@ -30,8 +30,16 @@ COPY reputation-service ./reputation-service
 COPY submission-service ./submission-service
 COPY user-service ./user-service
 
-# Build analysis-engine
-RUN cargo build --release --bin analysis-engine
+# Build analysis-engine with the real native scanners compiled in:
+#   - clamav:      streams to the clamd daemon (docker-compose runs it).
+#   - yara-engine: links the system libyara installed above and compiles the
+#                  rule files under ./rules at startup.
+# ml-engine stays OFF: the ML analyzer is fully implemented and wired in, but
+# the shipped ml_models/*.onnx are empty placeholders and the ONNX Runtime
+# shared library is not bundled in this runtime image. See
+# analysis-engine/ml_models/README.md for how to enable it once real models
+# and the runtime lib are provided.
+RUN cargo build --release --bin analysis-engine --features clamav,yara-engine
 
 FROM debian:bookworm-slim
 

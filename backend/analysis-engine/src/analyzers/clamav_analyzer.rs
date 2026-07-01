@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
-use clamav_client::tokio::{ClamClient, ScanResult};
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use tokio::time::timeout;
 use tracing::{error, info, warn};
 
 use crate::models::analysis_result::{
@@ -10,11 +10,9 @@ use crate::models::analysis_result::{
 /// Configuration for ClamAV analyzer
 #[derive(Debug, Clone)]
 pub struct ClamAvAnalyzerConfig {
-    /// ClamAV daemon host address
-    pub host: String,
-    /// ClamAV daemon port
-    pub port: u16,
-    /// Connection timeout in seconds
+    /// ClamAV daemon TCP address in `host:port` form (e.g. `clamav:3310`).
+    pub address: String,
+    /// Connection/scan timeout in seconds
     pub timeout_seconds: u64,
     /// Enable ClamAV scanning
     pub enabled: bool,
@@ -22,10 +20,26 @@ pub struct ClamAvAnalyzerConfig {
 
 impl Default for ClamAvAnalyzerConfig {
     fn default() -> Self {
+        // CLAMAV_HOST is the full `host:port` address (matches docker-compose,
+        // which sets `clamav:3310`). A bare host without a port falls back to
+        // the clamd default port 3310.
+        let address = std::env::var("CLAMAV_HOST")
+            .ok()
+            .map(|h| {
+                if h.contains(':') {
+                    h
+                } else {
+                    format!("{h}:3310")
+                }
+            })
+            .unwrap_or_else(|| "localhost:3310".to_string());
+
         Self {
-            host: std::env::var("CLAMAV_HOST").unwrap_or_else(|_| "localhost".to_string()),
-            port: 3310,
-            timeout_seconds: 30,
+            address,
+            timeout_seconds: std::env::var("CLAMAV_TIMEOUT_SECONDS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(30),
             enabled: std::env::var("ENABLE_CLAMAV")
                 .unwrap_or_else(|_| "true".to_string())
                 .parse()
@@ -34,7 +48,8 @@ impl Default for ClamAvAnalyzerConfig {
     }
 }
 
-/// ClamAV-based malware analyzer
+/// ClamAV-based malware analyzer. Streams file bytes to a running `clamd`
+/// daemon over TCP (INSTREAM) and interprets the verdict.
 pub struct ClamAvAnalyzer {
     config: ClamAvAnalyzerConfig,
 }
@@ -43,8 +58,8 @@ impl ClamAvAnalyzer {
     /// Create a new ClamAV analyzer
     pub fn new(config: ClamAvAnalyzerConfig) -> Self {
         info!(
-            "Initializing ClamAV analyzer - host: {}:{}, enabled: {}",
-            config.host, config.port, config.enabled
+            "Initializing ClamAV analyzer - address: {}, enabled: {}",
+            config.address, config.enabled
         );
         Self { config }
     }
@@ -53,7 +68,7 @@ impl ClamAvAnalyzer {
     pub async fn scan_file(&self, file_data: &[u8], filename: &str) -> Result<DetectionResult> {
         if !self.config.enabled {
             warn!("ClamAV analyzer is disabled");
-            return Ok(self.create_disabled_result(filename));
+            return Ok(self.create_disabled_result());
         }
 
         let start_time = Instant::now();
@@ -63,31 +78,30 @@ impl ClamAvAnalyzer {
             file_data.len()
         );
 
-        // Connect to ClamAV daemon
-        let address = format!("{}:{}", self.config.host, self.config.port);
-        let client = match ClamClient::new(&address).await {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Failed to connect to ClamAV daemon at {}: {}", address, e);
-                return Ok(
-                    self.create_error_result(filename, &format!("ClamAV connection failed: {}", e))
-                );
-            }
-        };
+        // Stream the buffer to clamd (INSTREAM) over TCP, bounded by a timeout.
+        let scan = timeout(
+            Duration::from_secs(self.config.timeout_seconds),
+            clamav_client::tokio::scan_buffer_tcp(file_data, &self.config.address, None),
+        )
+        .await;
 
-        // Scan the file
-        let scan_result = match client.scan_buffer(file_data).await {
-            Ok(result) => result,
-            Err(e) => {
-                error!("ClamAV scan failed for {}: {}", filename, e);
-                return Ok(self.create_error_result(filename, &format!("ClamAV scan error: {}", e)));
+        let response = match scan {
+            Ok(Ok(resp)) => resp,
+            Ok(Err(e)) => {
+                error!("ClamAV scan failed for {} via {}: {}", filename, self.config.address, e);
+                return Ok(self.create_error_result(filename, &format!("ClamAV scan error: {e}")));
+            }
+            Err(_) => {
+                error!(
+                    "ClamAV scan timed out for {} after {}s",
+                    filename, self.config.timeout_seconds
+                );
+                return Ok(self.create_error_result(filename, "ClamAV scan timed out"));
             }
         };
 
         let processing_time = start_time.elapsed().as_millis() as u64;
-
-        // Convert ClamAV result to DetectionResult
-        let detection = self.convert_scan_result(scan_result, filename, processing_time);
+        let detection = self.interpret_response(&response, filename, processing_time);
 
         info!(
             "ClamAV scan completed for {} - verdict: {:?}, time: {}ms",
@@ -97,63 +111,86 @@ impl ClamAvAnalyzer {
         Ok(detection)
     }
 
-    /// Convert ClamAV scan result to DetectionResult
-    fn convert_scan_result(
+    /// Interpret a raw clamd INSTREAM response into a `DetectionResult`.
+    ///
+    /// clamd replies with either `stream: OK` (clean) or
+    /// `stream: <Signature> FOUND` (malware detected).
+    fn interpret_response(
         &self,
-        scan_result: ScanResult,
+        response: &[u8],
         filename: &str,
         processing_time_ms: u64,
     ) -> DetectionResult {
-        match scan_result {
-            ScanResult::Clean => {
-                info!("ClamAV: File {} is clean", filename);
-                DetectionResult {
-                    detection_id: uuid::Uuid::new_v4(),
-                    engine_name: "ClamAV".to_string(),
-                    engine_version: "Latest".to_string(),
-                    engine_type: EngineType::Yara,
-                    verdict: ThreatVerdict::Benign,
-                    confidence: 0.95,
-                    severity: SeverityLevel::Info,
-                    categories: vec![],
-                    metadata: std::collections::HashMap::new(),
-                    detected_at: chrono::Utc::now(),
-                    processing_time_ms,
-                    error_message: None,
-                }
-            }
-            ScanResult::Found(virus_name) => {
-                warn!("ClamAV: Malware detected in {} - {}", filename, virus_name);
+        let is_clean = clamav_client::clean(response).unwrap_or(false);
+        let text = String::from_utf8_lossy(response);
 
-                let mut metadata = std::collections::HashMap::new();
-                metadata.insert(
-                    "signature".to_string(),
-                    serde_json::Value::String(virus_name.clone()),
-                );
-                metadata.insert(
-                    "filename".to_string(),
-                    serde_json::Value::String(filename.to_string()),
-                );
+        if is_clean {
+            info!("ClamAV: File {} is clean", filename);
+            return DetectionResult {
+                detection_id: uuid::Uuid::new_v4(),
+                engine_name: "ClamAV".to_string(),
+                engine_version: "clamd".to_string(),
+                engine_type: EngineType::Yara,
+                verdict: ThreatVerdict::Benign,
+                confidence: 0.95,
+                severity: SeverityLevel::Info,
+                categories: vec![],
+                metadata: std::collections::HashMap::new(),
+                detected_at: chrono::Utc::now(),
+                processing_time_ms,
+                error_message: None,
+            };
+        }
 
-                // Determine threat category based on signature name
-                let categories = self.categorize_threat(&virus_name);
-                let severity = self.determine_severity(&virus_name);
+        if text.contains("FOUND") {
+            let virus_name = Self::parse_signature(&text)
+                .unwrap_or_else(|| "Unknown.Signature".to_string());
+            warn!("ClamAV: Malware detected in {} - {}", filename, virus_name);
 
-                DetectionResult {
-                    detection_id: uuid::Uuid::new_v4(),
-                    engine_name: "ClamAV".to_string(),
-                    engine_version: "Latest".to_string(),
-                    engine_type: EngineType::Yara,
-                    verdict: ThreatVerdict::Malicious,
-                    confidence: 0.98,
-                    severity,
-                    categories,
-                    metadata,
-                    detected_at: chrono::Utc::now(),
-                    processing_time_ms,
-                    error_message: None,
-                }
-            }
+            let mut metadata = std::collections::HashMap::new();
+            metadata.insert(
+                "signature".to_string(),
+                serde_json::Value::String(virus_name.clone()),
+            );
+            metadata.insert(
+                "filename".to_string(),
+                serde_json::Value::String(filename.to_string()),
+            );
+
+            return DetectionResult {
+                detection_id: uuid::Uuid::new_v4(),
+                engine_name: "ClamAV".to_string(),
+                engine_version: "clamd".to_string(),
+                engine_type: EngineType::Yara,
+                verdict: ThreatVerdict::Malicious,
+                confidence: 0.98,
+                severity: self.determine_severity(&virus_name),
+                categories: self.categorize_threat(&virus_name),
+                metadata,
+                detected_at: chrono::Utc::now(),
+                processing_time_ms,
+                error_message: None,
+            };
+        }
+
+        // Neither OK nor FOUND: treat as an error/unknown response from clamd.
+        self.create_error_result(
+            filename,
+            &format!("Unexpected ClamAV response: {}", text.trim()),
+        )
+    }
+
+    /// Extract the signature name from a `stream: <Signature> FOUND` response.
+    fn parse_signature(response: &str) -> Option<String> {
+        let line = response.trim().trim_end_matches('\0').trim();
+        let idx = line.find("FOUND")?;
+        let before = line[..idx].trim_end();
+        // Drop the leading `stream:` (or any `prefix:`) label if present.
+        let name = before.rsplit(':').next().unwrap_or(before).trim();
+        if name.is_empty() {
+            None
+        } else {
+            Some(name.to_string())
         }
     }
 
@@ -211,7 +248,7 @@ impl ClamAvAnalyzer {
     }
 
     /// Create result for disabled state
-    fn create_disabled_result(&self, filename: &str) -> DetectionResult {
+    fn create_disabled_result(&self) -> DetectionResult {
         DetectionResult {
             detection_id: uuid::Uuid::new_v4(),
             engine_name: "ClamAV".to_string(),
@@ -248,37 +285,20 @@ impl ClamAvAnalyzer {
         }
     }
 
-    /// Get ClamAV version info
-    pub async fn get_version(&self) -> Result<String> {
-        let address = format!("{}:{}", self.config.host, self.config.port);
-        let client = ClamClient::new(&address).await?;
-
-        match client.get_version().await {
-            Ok(version) => {
-                info!("ClamAV version: {}", version);
-                Ok(version)
-            }
-            Err(e) => {
-                error!("Failed to get ClamAV version: {}", e);
-                Err(anyhow!("Failed to get ClamAV version: {}", e))
-            }
-        }
-    }
-
-    /// Ping ClamAV daemon to check if it's alive
+    /// Ping the ClamAV daemon to check that it is reachable and alive.
     pub async fn ping(&self) -> Result<()> {
-        let address = format!("{}:{}", self.config.host, self.config.port);
-        let client = ClamClient::new(&address).await?;
+        let response = clamav_client::tokio::ping_tcp(&self.config.address)
+            .await
+            .map_err(|e| anyhow!("ClamAV ping failed at {}: {e}", self.config.address))?;
 
-        match client.ping().await {
-            Ok(_) => {
-                info!("ClamAV daemon is alive at {}", address);
-                Ok(())
-            }
-            Err(e) => {
-                error!("ClamAV ping failed at {}: {}", address, e);
-                Err(anyhow!("ClamAV ping failed: {}", e))
-            }
+        if response.starts_with(b"PONG") {
+            info!("ClamAV daemon is alive at {}", self.config.address);
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Unexpected ClamAV ping response: {}",
+                String::from_utf8_lossy(&response)
+            ))
         }
     }
 }
@@ -287,19 +307,28 @@ impl ClamAvAnalyzer {
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_parse_signature() {
+        assert_eq!(
+            ClamAvAnalyzer::parse_signature("stream: Win.Test.EICAR_HDB-1 FOUND\0"),
+            Some("Win.Test.EICAR_HDB-1".to_string())
+        );
+        assert_eq!(
+            ClamAvAnalyzer::parse_signature("stream: OK\0"),
+            None
+        );
+    }
+
     #[tokio::test]
     async fn test_eicar_detection() {
         // EICAR test file - standard malware test string
         let eicar = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
 
-        let config = ClamAvAnalyzerConfig {
-            host: "localhost".to_string(),
-            port: 3310,
+        let analyzer = ClamAvAnalyzer::new(ClamAvAnalyzerConfig {
+            address: "localhost:3310".to_string(),
             timeout_seconds: 30,
             enabled: true,
-        };
-
-        let analyzer = ClamAvAnalyzer::new(config);
+        });
 
         // Only run if ClamAV is available
         if analyzer.ping().await.is_ok() {

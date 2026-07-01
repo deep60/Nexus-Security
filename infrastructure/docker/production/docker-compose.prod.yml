@@ -68,8 +68,17 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       JWT_SECRET: ${JWT_SECRET}
       BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL}
+      # Downstream service URLs. analysis-engine and bounty-manager keep their
+      # historical prod internal ports; the remaining services listen on 8080.
       ANALYSIS_ENGINE_URL: http://analysis-engine:8082
       BOUNTY_MANAGER_URL: http://bounty-manager:8083
+      USER_SERVICE_URL: http://user-service:8080
+      SUBMISSION_SERVICE_URL: http://submission-service:8080
+      STORAGE_SERVICE_URL: http://submission-service:8080
+      CONSENSUS_SERVICE_URL: http://consensus-service:8080
+      PAYMENT_SERVICE_URL: http://payment-service:8080
+      REPUTATION_SERVICE_URL: http://reputation-service:8080
+      NOTIFICATION_SERVICE_URL: http://notification-service:8080
       RUST_LOG: info
       PORT: 8080
       ENVIRONMENT: production
@@ -150,6 +159,254 @@ services:
       - "8083:8083"
     volumes:
       - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - verdyx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # MinIO (S3-compatible object storage). Required by submission-service, which
+  # calls ensure_bucket_exists() at startup and will not boot without a
+  # reachable S3 endpoint.
+  minio:
+    image: minio/minio:latest
+    container_name: verdyx-minio-prod
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-verdyx_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    networks:
+      - verdyx-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # User Service
+  user-service:
+    build:
+      context: ../../../backend
+      dockerfile: user-service/Dockerfile
+    container_name: verdyx-user-service-prod
+    environment:
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD}@postgres:5432/verdyx
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL}
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      RUST_LOG: info
+      ENVIRONMENT: production
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - verdyx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # Submission Service
+  submission-service:
+    build:
+      context: ../../../backend
+      dockerfile: submission-service/Dockerfile
+    container_name: verdyx-submission-service-prod
+    environment:
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD}@postgres:5432/verdyx
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      SUBMISSION_SERVICE_PORT: 8080
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: verdyx-submissions
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-verdyx_admin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      RUST_LOG: info
+      ENVIRONMENT: production
+    ports:
+      - "8084:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - verdyx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # Consensus Service
+  consensus-service:
+    build:
+      context: ../../../backend
+      dockerfile: consensus-service/Dockerfile
+    container_name: verdyx-consensus-service-prod
+    environment:
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD}@postgres:5432/verdyx
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      CONSENSUS_THRESHOLD: "0.7"
+      MIN_SUBMISSIONS_REQUIRED: "3"
+      RUST_LOG: info
+      ENVIRONMENT: production
+    ports:
+      - "8085:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - verdyx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # Payment Service
+  payment-service:
+    build:
+      context: ../../../backend
+      dockerfile: payment-service/Dockerfile
+    container_name: verdyx-payment-service-prod
+    environment:
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD}@postgres:5432/verdyx
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL}
+      BLOCKCHAIN_CHAIN_ID: ${CHAIN_ID:-31337}
+      TREASURY_ADDRESS: ${TREASURY_ADDRESS}
+      TREASURY_PRIVATE_KEY: ${TREASURY_PRIVATE_KEY}
+      TOKEN_CONTRACT_ADDRESS: ${THREAT_TOKEN_ADDRESS}
+      PAYMENT_CONTRACT_ADDRESS: ${BOUNTY_MANAGER_ADDRESS}
+      RUST_LOG: info
+      ENVIRONMENT: production
+    ports:
+      - "8086:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - verdyx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # Reputation Service
+  reputation-service:
+    build:
+      context: ../../../backend
+      dockerfile: reputation-service/Dockerfile
+    container_name: verdyx-reputation-service-prod
+    environment:
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD}@postgres:5432/verdyx
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      REPUTATION_DECAY_RATE: "0.95"
+      REPUTATION_UPDATE_INTERVAL: "3600"
+      RUST_LOG: info
+      ENVIRONMENT: production
+    ports:
+      - "8087:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - verdyx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ../../../backend
+      dockerfile: notification-service/Dockerfile
+    container_name: verdyx-notification-service-prod
+    environment:
+      DATABASE_URL: postgresql://verdyx:${POSTGRES_PASSWORD}@postgres:5432/verdyx
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      EMAIL_FROM: ${EMAIL_FROM}
+      WEBHOOK_TIMEOUT: "30"
+      MAX_RETRY_ATTEMPTS: "3"
+      RUST_LOG: info
+      ENVIRONMENT: production
+    ports:
+      - "8088:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -273,6 +530,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  minio_data:
     driver: local
   ipfs_data:
     driver: local

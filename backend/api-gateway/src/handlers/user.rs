@@ -1,12 +1,13 @@
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::Json,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::handlers::identity::{bearer_map, fetch_identity, UserIdentity};
 use crate::AppState;
 
 /// User profile response
@@ -50,35 +51,36 @@ pub struct UserStats {
 
 /// Get current user profile
 ///
-/// GET /api/v1/users/me
+/// GET /api/v1/users/me — identity is owned by user-service; proxy to it.
 pub async fn get_current_user(
     State(state): State<AppState>,
-    claims: crate::middleware::auth::Claims,
+    headers: HeaderMap,
+    _claims: crate::middleware::auth::Claims,
 ) -> Result<Json<UserProfile>, StatusCode> {
-    let user = state
-        .db
-        .get_user_by_id(claims.sub)
+    let hm = bearer_map(&headers).ok_or(StatusCode::UNAUTHORIZED)?;
+    let u = fetch_identity(&state, hm)
         .await
-        .map_err(|e| {
-            tracing::error!("Database error fetching user: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|c| StatusCode::from_u16(c).unwrap_or(StatusCode::BAD_GATEWAY))?;
+    Ok(Json(identity_to_profile(u)))
+}
 
-    Ok(Json(UserProfile {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        ethereum_address: user.wallet_address,
-        reputation_score: user.reputation_score as f64,
-        total_submissions: 0, // Placeholder: need to fetch from stats
+/// Map a user-service identity into the gateway's `UserProfile`. Reputation and
+/// submission stats are owned by other services; use `/users/me/stats` for those.
+fn identity_to_profile(u: UserIdentity) -> UserProfile {
+    UserProfile {
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        ethereum_address: u.ethereum_address,
+        reputation_score: 0.0,
+        total_submissions: 0,
         successful_submissions: 0,
         accuracy_rate: 0.0,
         total_earnings: "0".to_string(),
         rank: None,
-        joined_at: user.created_at,
-        last_active_at: Some(user.updated_at),
-    }))
+        joined_at: u.created_at,
+        last_active_at: None,
+    }
 }
 
 /// Get user profile by ID
@@ -116,42 +118,41 @@ pub async fn get_user_by_id(
 
 /// Update current user profile
 ///
-/// PUT /api/v1/users/me
+/// PUT /api/v1/users/me — profile is owned by user-service.
+/// NOTE: user-service currently supports updating profile fields (e.g. `bio`);
+/// username/email changes are not yet exposed by user-service and are ignored.
 pub async fn update_profile(
     State(state): State<AppState>,
-    claims: crate::middleware::auth::Claims,
+    headers: HeaderMap,
+    _claims: crate::middleware::auth::Claims,
     Json(payload): Json<UpdateProfileRequest>,
 ) -> Result<Json<UserProfile>, StatusCode> {
-    // Update profile fields directly via SQL
     if let Some(ref username) = payload.username {
         if username.is_empty() {
             return Err(StatusCode::BAD_REQUEST);
         }
     }
 
-    sqlx::query(
-        r#"
-        UPDATE users SET
-            username = COALESCE($1, username),
-            email = COALESCE($2, email),
-            wallet_address = COALESCE($3, wallet_address),
-            updated_at = NOW()
-        WHERE id = $4
-        "#,
-    )
-    .bind(&payload.username)
-    .bind(&payload.email)
-    .bind(&payload.ethereum_address)
-    .bind(claims.sub)
-    .execute(state.db.pool())
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to update user profile: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let hm = bearer_map(&headers).ok_or(StatusCode::UNAUTHORIZED)?;
 
-    // Return updated profile
-    get_current_user(State(state), claims).await
+    // Forward the profile fields user-service owns.
+    if payload.bio.is_some() {
+        let body = serde_json::json!({ "bio": payload.bio });
+        let resp = state
+            .proxy
+            .put("user-service", "/api/v1/profile", body, Some(hm.clone()))
+            .await
+            .map_err(|_| StatusCode::BAD_GATEWAY)?;
+        if !resp.status().is_success() {
+            return Err(StatusCode::from_u16(resp.status().as_u16())
+                .unwrap_or(StatusCode::BAD_GATEWAY));
+        }
+    }
+
+    let u = fetch_identity(&state, hm)
+        .await
+        .map_err(|c| StatusCode::from_u16(c).unwrap_or(StatusCode::BAD_GATEWAY))?;
+    Ok(Json(identity_to_profile(u)))
 }
 
 /// Get user statistics

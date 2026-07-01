@@ -72,9 +72,31 @@ struct HealthResponse {
 }
 #[derive(Serialize)]
 struct EngineStatus {
+    // Always compiled into the binary.
     static_analyzer: bool,
     hash_analyzer: bool,
+    heuristic_engine: bool,
+    signature_matcher: bool,
+    // Native engines, gated behind cargo features at build time.
     yara_engine: bool,
+    clamav: bool,
+    ml_engine: bool,
+}
+
+impl EngineStatus {
+    /// Report what is actually compiled into this binary rather than
+    /// hardcoding `true`. Native engines reflect their cargo feature flags.
+    fn current() -> Self {
+        Self {
+            static_analyzer: true,
+            hash_analyzer: true,
+            heuristic_engine: true,
+            signature_matcher: true,
+            yara_engine: cfg!(feature = "yara-engine"),
+            clamav: cfg!(feature = "clamav"),
+            ml_engine: cfg!(feature = "ml-engine"),
+        }
+    }
 }
 
 #[tokio::main]
@@ -96,7 +118,9 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| "8082".to_string())
         .parse::<u16>()
         .unwrap_or(8082);
-    let yara_rule_path = env::var("YARA_RULE_PATH").unwrap_or_else(|_| "./rules".to_string());
+    let yara_rule_path = env::var("YARA_RULES_PATH")
+        .or_else(|_| env::var("YARA_RULE_PATH"))
+        .unwrap_or_else(|_| "./rules".to_string());
     let upload_dir = env::var("UPLOAD_DIR").unwrap_or_else(|_| "./temp/verdyx-uploads".to_string());
 
     // Initialize database connection pool with proper error handling
@@ -279,11 +303,7 @@ async fn health_check() -> Json<HealthResponse> {
         status: "healthy".to_string(),
         service: "analysis-engine".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
-        engines: EngineStatus {
-            static_analyzer: true,
-            hash_analyzer: true,
-            yara_engine: true,
-        },
+        engines: EngineStatus::current(),
     })
 }
 
@@ -526,11 +546,7 @@ async fn get_detailed_analysis(
 }
 
 async fn engines_status(State(_state): State<AppState>) -> Json<EngineStatus> {
-    Json(EngineStatus {
-        static_analyzer: true,
-        hash_analyzer: true,
-        yara_engine: true,
-    })
+    Json(EngineStatus::current())
 }
 
 async fn perform_file_analysis(
