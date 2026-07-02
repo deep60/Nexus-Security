@@ -77,6 +77,11 @@ contract BountyManager is ReentrancyGuard {
     uint256 public constant MAX_ANALYSTS_PER_BOUNTY = 50; // Bounds resolution loops (gas-DoS guard)
 
     address public owner;
+    // Pending owner for the two-step ownership handover. Set by transferOwnership()
+    // and cleared once acceptOwnership() is called by the new owner. The two-step
+    // flow prevents transferring ownership to an address that cannot act (e.g. a
+    // mistyped multisig), which for this fund-custody contract would be unrecoverable.
+    address public pendingOwner;
     address public feeCollector;
     bool public paused;
 
@@ -130,6 +135,10 @@ contract BountyManager is ReentrancyGuard {
     event PaymentCredited(address indexed account, uint256 amount);
 
     event Withdrawal(address indexed account, uint256 amount);
+
+    event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
+
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // Modifiers
     modifier onlyOwner() {
@@ -595,6 +604,30 @@ contract BountyManager is ReentrancyGuard {
     function setFeeCollector(address _feeCollector) external onlyOwner {
         require(_feeCollector != address(0), "Invalid fee collector");
         feeCollector = _feeCollector;
+    }
+
+    /**
+     * @dev Start a two-step ownership transfer to a new owner (e.g. a Gnosis Safe
+     *      multisig or a timelock). The transfer only completes once `newOwner`
+     *      calls acceptOwnership(), which guarantees the target can actually
+     *      operate this contract before control is handed over.
+     * @param newOwner Address of the incoming owner (multisig/timelock in prod).
+     */
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "New owner is zero address");
+        pendingOwner = newOwner;
+        emit OwnershipTransferStarted(owner, newOwner);
+    }
+
+    /**
+     * @dev Complete the ownership transfer. Callable only by the pending owner.
+     */
+    function acceptOwnership() external {
+        require(msg.sender == pendingOwner, "Not pending owner");
+        address previousOwner = owner;
+        owner = pendingOwner;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(previousOwner, owner);
     }
 
     /**

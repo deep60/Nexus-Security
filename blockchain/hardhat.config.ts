@@ -46,6 +46,10 @@ const config: HardhatUserConfig = {
       url: process.env.SEPOLIA_RPC || process.env.RPC_URL || "",
       accounts: getPrivateKey(),
     },
+    mainnet: {
+      url: process.env.MAINNET_RPC || "",
+      accounts: getPrivateKey(),
+    },
     polygon: {
       url: process.env.POLYGON_RPC || "",
       accounts: getPrivateKey(),
@@ -57,6 +61,7 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
+      mainnet: process.env.ETHERSCAN_API || process.env.ETHERSCAN_API_KEY || "",
       sepolia: process.env.ETHERSCAN_API || process.env.ETHERSCAN_API_KEY || "",
       polygon: process.env.POLYGONSCAN_API || "",
       polygonMumbai: process.env.POLYGONSCAN_API || "",

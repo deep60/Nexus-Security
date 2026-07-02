@@ -1256,8 +1256,8 @@
       ]
     },
     "/Users/arjun/Developer/Verdyx/blockchain/contracts/core/BountyManager.sol": {
-      "lastModificationDate": 1782927686184,
-      "contentHash": "db19ca22d4d8ebd77a9babc42f0ca04a",
+      "lastModificationDate": 1782932784310,
+      "contentHash": "ce4c928b6f4c2ebd4fa5fd5c05dc98c5",
       "sourceName": "contracts/core/BountyManager.sol",
       "solcConfig": {
         "version": "0.8.28",

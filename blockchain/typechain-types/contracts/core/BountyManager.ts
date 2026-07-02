@@ -108,6 +108,7 @@ export interface BountyManagerInterface extends Interface {
       | "MIN_ANALYSES_TO_RESOLVE"
       | "MIN_STAKE_AMOUNT"
       | "PLATFORM_FEE_PERCENT"
+      | "acceptOwnership"
       | "analyses"
       | "analystSubmissionIds"
       | "bounties"
@@ -124,6 +125,7 @@ export interface BountyManagerInterface extends Interface {
       | "owner"
       | "pause"
       | "paused"
+      | "pendingOwner"
       | "pendingWithdrawals"
       | "reputationSystem"
       | "resolveBounty"
@@ -131,6 +133,7 @@ export interface BountyManagerInterface extends Interface {
       | "submitAnalysis"
       | "threatToken"
       | "totalEscrowed"
+      | "transferOwnership"
       | "unpause"
       | "userBounties"
       | "withdraw"
@@ -141,6 +144,8 @@ export interface BountyManagerInterface extends Interface {
       | "AnalysisSubmitted"
       | "BountyCreated"
       | "ConsensusReached"
+      | "OwnershipTransferStarted"
+      | "OwnershipTransferred"
       | "PaymentCredited"
       | "RewardsDistributed"
       | "Withdrawal"
@@ -168,6 +173,10 @@ export interface BountyManagerInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "PLATFORM_FEE_PERCENT",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "acceptOwnership",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -226,6 +235,10 @@ export interface BountyManagerInterface extends Interface {
   encodeFunctionData(functionFragment: "pause", values?: undefined): string;
   encodeFunctionData(functionFragment: "paused", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "pendingOwner",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "pendingWithdrawals",
     values: [AddressLike]
   ): string;
@@ -252,6 +265,10 @@ export interface BountyManagerInterface extends Interface {
   encodeFunctionData(
     functionFragment: "totalEscrowed",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "transferOwnership",
+    values: [AddressLike]
   ): string;
   encodeFunctionData(functionFragment: "unpause", values?: undefined): string;
   encodeFunctionData(
@@ -282,6 +299,10 @@ export interface BountyManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "PLATFORM_FEE_PERCENT",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "acceptOwnership",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "analyses", data: BytesLike): Result;
@@ -331,6 +352,10 @@ export interface BountyManagerInterface extends Interface {
   decodeFunctionResult(functionFragment: "pause", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "paused", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "pendingOwner",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "pendingWithdrawals",
     data: BytesLike
   ): Result;
@@ -356,6 +381,10 @@ export interface BountyManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "totalEscrowed",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "transferOwnership",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "unpause", data: BytesLike): Result;
@@ -440,6 +469,32 @@ export namespace ConsensusReachedEvent {
     consensus: bigint;
     confidenceScore: bigint;
     totalAnalyses: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace OwnershipTransferStartedEvent {
+  export type InputTuple = [previousOwner: AddressLike, newOwner: AddressLike];
+  export type OutputTuple = [previousOwner: string, newOwner: string];
+  export interface OutputObject {
+    previousOwner: string;
+    newOwner: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace OwnershipTransferredEvent {
+  export type InputTuple = [previousOwner: AddressLike, newOwner: AddressLike];
+  export type OutputTuple = [previousOwner: string, newOwner: string];
+  export interface OutputObject {
+    previousOwner: string;
+    newOwner: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -552,6 +607,8 @@ export interface BountyManager extends BaseContract {
   MIN_STAKE_AMOUNT: TypedContractMethod<[], [bigint], "view">;
 
   PLATFORM_FEE_PERCENT: TypedContractMethod<[], [bigint], "view">;
+
+  acceptOwnership: TypedContractMethod<[], [void], "nonpayable">;
 
   analyses: TypedContractMethod<
     [arg0: BigNumberish, arg1: AddressLike],
@@ -666,6 +723,8 @@ export interface BountyManager extends BaseContract {
 
   paused: TypedContractMethod<[], [boolean], "view">;
 
+  pendingOwner: TypedContractMethod<[], [string], "view">;
+
   pendingWithdrawals: TypedContractMethod<
     [arg0: AddressLike],
     [bigint],
@@ -702,6 +761,12 @@ export interface BountyManager extends BaseContract {
 
   totalEscrowed: TypedContractMethod<[], [bigint], "view">;
 
+  transferOwnership: TypedContractMethod<
+    [newOwner: AddressLike],
+    [void],
+    "nonpayable"
+  >;
+
   unpause: TypedContractMethod<[], [void], "nonpayable">;
 
   userBounties: TypedContractMethod<
@@ -734,6 +799,9 @@ export interface BountyManager extends BaseContract {
   getFunction(
     nameOrSignature: "PLATFORM_FEE_PERCENT"
   ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "acceptOwnership"
+  ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "analyses"
   ): TypedContractMethod<
@@ -860,6 +928,9 @@ export interface BountyManager extends BaseContract {
     nameOrSignature: "paused"
   ): TypedContractMethod<[], [boolean], "view">;
   getFunction(
+    nameOrSignature: "pendingOwner"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
     nameOrSignature: "pendingWithdrawals"
   ): TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
   getFunction(
@@ -890,6 +961,9 @@ export interface BountyManager extends BaseContract {
   getFunction(
     nameOrSignature: "totalEscrowed"
   ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "transferOwnership"
+  ): TypedContractMethod<[newOwner: AddressLike], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "unpause"
   ): TypedContractMethod<[], [void], "nonpayable">;
@@ -924,6 +998,20 @@ export interface BountyManager extends BaseContract {
     ConsensusReachedEvent.InputTuple,
     ConsensusReachedEvent.OutputTuple,
     ConsensusReachedEvent.OutputObject
+  >;
+  getEvent(
+    key: "OwnershipTransferStarted"
+  ): TypedContractEvent<
+    OwnershipTransferStartedEvent.InputTuple,
+    OwnershipTransferStartedEvent.OutputTuple,
+    OwnershipTransferStartedEvent.OutputObject
+  >;
+  getEvent(
+    key: "OwnershipTransferred"
+  ): TypedContractEvent<
+    OwnershipTransferredEvent.InputTuple,
+    OwnershipTransferredEvent.OutputTuple,
+    OwnershipTransferredEvent.OutputObject
   >;
   getEvent(
     key: "PaymentCredited"
@@ -979,6 +1067,28 @@ export interface BountyManager extends BaseContract {
       ConsensusReachedEvent.InputTuple,
       ConsensusReachedEvent.OutputTuple,
       ConsensusReachedEvent.OutputObject
+    >;
+
+    "OwnershipTransferStarted(address,address)": TypedContractEvent<
+      OwnershipTransferStartedEvent.InputTuple,
+      OwnershipTransferStartedEvent.OutputTuple,
+      OwnershipTransferStartedEvent.OutputObject
+    >;
+    OwnershipTransferStarted: TypedContractEvent<
+      OwnershipTransferStartedEvent.InputTuple,
+      OwnershipTransferStartedEvent.OutputTuple,
+      OwnershipTransferStartedEvent.OutputObject
+    >;
+
+    "OwnershipTransferred(address,address)": TypedContractEvent<
+      OwnershipTransferredEvent.InputTuple,
+      OwnershipTransferredEvent.OutputTuple,
+      OwnershipTransferredEvent.OutputObject
+    >;
+    OwnershipTransferred: TypedContractEvent<
+      OwnershipTransferredEvent.InputTuple,
+      OwnershipTransferredEvent.OutputTuple,
+      OwnershipTransferredEvent.OutputObject
     >;
 
     "PaymentCredited(address,uint256)": TypedContractEvent<

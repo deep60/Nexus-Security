@@ -251,6 +251,63 @@ describe("BountyManager", function () {
         });
     });
 
+    describe("Ownership Transfer (two-step)", function () {
+        it("Should not change owner until the new owner accepts", async function () {
+            const { bountyManager, deployer, analyst1 } = await loadFixture(deployFixture);
+
+            await expect(bountyManager.connect(deployer).transferOwnership(analyst1.address))
+                .to.emit(bountyManager, "OwnershipTransferStarted")
+                .withArgs(deployer.address, analyst1.address);
+
+            // Owner is unchanged; only pendingOwner is set.
+            expect(await bountyManager.owner()).to.equal(deployer.address);
+            expect(await bountyManager.pendingOwner()).to.equal(analyst1.address);
+        });
+
+        it("Should complete the transfer when the pending owner accepts", async function () {
+            const { bountyManager, deployer, analyst1 } = await loadFixture(deployFixture);
+
+            await bountyManager.connect(deployer).transferOwnership(analyst1.address);
+
+            await expect(bountyManager.connect(analyst1).acceptOwnership())
+                .to.emit(bountyManager, "OwnershipTransferred")
+                .withArgs(deployer.address, analyst1.address);
+
+            expect(await bountyManager.owner()).to.equal(analyst1.address);
+            expect(await bountyManager.pendingOwner()).to.equal(ethers.ZeroAddress);
+
+            // New owner can use admin functions; old owner cannot.
+            await expect(bountyManager.connect(analyst1).pause()).to.not.be.reverted;
+            await expect(bountyManager.connect(deployer).unpause()).to.be.revertedWith("Not authorized");
+        });
+
+        it("Should reject acceptOwnership from a non-pending account", async function () {
+            const { bountyManager, deployer, analyst1, analyst2 } = await loadFixture(deployFixture);
+
+            await bountyManager.connect(deployer).transferOwnership(analyst1.address);
+
+            await expect(bountyManager.connect(analyst2).acceptOwnership()).to.be.revertedWith(
+                "Not pending owner"
+            );
+        });
+
+        it("Should only let the owner start a transfer", async function () {
+            const { bountyManager, analyst1, analyst2 } = await loadFixture(deployFixture);
+
+            await expect(
+                bountyManager.connect(analyst1).transferOwnership(analyst2.address)
+            ).to.be.revertedWith("Not authorized");
+        });
+
+        it("Should reject transferring ownership to the zero address", async function () {
+            const { bountyManager, deployer } = await loadFixture(deployFixture);
+
+            await expect(
+                bountyManager.connect(deployer).transferOwnership(ethers.ZeroAddress)
+            ).to.be.revertedWith("New owner is zero address");
+        });
+    });
+
     describe("emergencyWithdraw escrow protection", function () {
         it("Should not let the owner withdraw escrowed user funds", async function () {
             const { bountyManager, threatToken, deployer, submitter, analyst1 } =

@@ -39,7 +39,11 @@
     "lint": "eslint 'scripts/**/*.ts' 'test/**/*.ts' 'hardhat.config.ts'",
     "lint:fix": "eslint 'scripts/**/*.ts' 'test/**/*.ts' 'hardhat.config.ts' --fix",
     "prettier": "prettier --write 'scripts/**/*.ts' 'test/**/*.ts'",
-    "prettier:check": "prettier --check 'scripts/**/*.ts' 'test/**/*.ts'"
+    "prettier:check": "prettier --check 'scripts/**/*.ts' 'test/**/*.ts'",
+    "transfer-ownership:sepolia": "hardhat run scripts/setup/transfer-ownership.ts --network sepolia",
+    "transfer-ownership:mainnet": "hardhat run scripts/setup/transfer-ownership.ts --network mainnet",
+    "analyze:slither": "slither . --config-file slither.config.json",
+    "analyze:mythril": "myth analyze contracts/core/BountyManager.sol --solc-json mythril.solc.json"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",

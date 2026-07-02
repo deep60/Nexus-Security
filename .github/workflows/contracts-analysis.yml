@@ -1,0 +1,48 @@
+name: Contracts Static Analysis
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'blockchain/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'blockchain/**'
+
+jobs:
+  slither:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    defaults:
+      run:
+        working-directory: ./blockchain
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: blockchain/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.4.0
+        id: slither
+        with:
+          target: 'blockchain/'
+          slither-config: 'blockchain/slither.config.json'
+          sarif: results.sarif
+          # Fail the job on medium/high findings; informational/low are reported only.
+          fail-on: medium
+
+      - name: Upload Slither SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && steps.slither.outputs.sarif != ''
+        with:
+          sarif_file: ${{ steps.slither.outputs.sarif }}
