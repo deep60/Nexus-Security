@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::sync::{Mutex, Semaphore};
 use tokio::time::{sleep, timeout};
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 
 use crate::models::analysis_result::{
     AnalysisResult, AnalysisStatus, DetectionResult, EngineType, FileMetadata, SeverityLevel,

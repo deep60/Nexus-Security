@@ -199,10 +199,7 @@ impl BlockchainService {
     /// bounty is eligible (deadline passed or enough analyses). The contract enforces
     /// eligibility with its own `require`s, so a premature/duplicate call reverts and
     /// surfaces here as `TransactionFailed`.
-    pub async fn resolve_bounty(
-        &self,
-        on_chain_bounty_id: u64,
-    ) -> Result<String, BlockchainError> {
+    pub async fn resolve_bounty(&self, on_chain_bounty_id: u64) -> Result<String, BlockchainError> {
         let bounty_id = U256::from(on_chain_bounty_id);
 
         let tx = self
