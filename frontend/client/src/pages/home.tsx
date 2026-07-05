@@ -10,13 +10,22 @@ import { useQuery } from "@tanstack/react-query";
 import { SEO } from "@/components/seo";
 import type { ApiStats } from "@/lib/api-types";
 
+/**
+ * Render a numeric platform metric only when the backend has supplied it.
+ * Falls back to an em dash while loading rather than inventing figures, so
+ * these trust-critical stats never display fabricated marketing numbers.
+ */
+function formatMetric(value: number | undefined): string {
+  return typeof value === "number" ? value.toLocaleString() : "—";
+}
+
 export default function Home() {
   const { data: stats } = useQuery<ApiStats>({
     queryKey: ["/api/analysis/stats"],
   });
 
   return (
-    <div className="min-h-screen bg-background text-muted-foreground font-sans selection:bg-primary/30">
+    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
       <SEO 
         title="Decentralized Threat Intelligence" 
         description="Verifiable malware analysis, powered by consensus. The first distributed threat intelligence engine utilizing YARA, ClamAV, and ML."
@@ -24,14 +33,14 @@ export default function Home() {
       <Navigation />
 
       {/* Hero Section */}
-      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+      <section id="main-content" tabIndex={-1} className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
         <HeroCanvas />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background z-0" />
         
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-20">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary font-mono text-xs md:text-sm mb-8">
             <Activity className="w-4 h-4 animate-pulse" />
-            <span>Engine v2.0 Live &mdash; 99.2% Consensus Accuracy</span>
+            <span>Engine v2.0 Live &mdash; Multi-Engine Consensus</span>
           </div>
           
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold font-display text-foreground tracking-tight mb-8 leading-tight">
@@ -60,17 +69,17 @@ export default function Home() {
             </Link>
           </div>
           
-          {/* Trust Metrics */}
+          {/* Trust Metrics — sourced live from /api/analysis/stats; no hardcoded claims */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-24 border-t border-border/50 pt-12">
             {[
-              { label: "Files Analyzed", value: stats?.totalSubmissions ? stats.totalSubmissions.toLocaleString() : "2.4M+" },
-              { label: "Active Nodes", value: stats?.totalEngines ? stats.totalEngines.toString() : "45" },
-              { label: "Avg Latency", value: "112ms" },
-              { label: "False Positives", value: "< 0.01%" }
+              { label: "Files Analyzed", value: formatMetric(stats?.totalSubmissions) },
+              { label: "Active Nodes", value: formatMetric(stats?.totalEngines) },
+              { label: "Threats Detected", value: formatMetric(stats?.threatsDetected) },
+              { label: "Analyses Run", value: formatMetric(stats?.totalAnalyses) }
             ].map((stat, i) => (
               <div key={i} className="flex flex-col gap-1 items-center">
                 <div className="text-2xl md:text-3xl font-mono font-bold text-accent">{stat.value}</div>
-                <div className="text-xs text-muted-foreground/80 uppercase tracking-wider">{stat.label}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</div>
               </div>
             ))}
           </div>

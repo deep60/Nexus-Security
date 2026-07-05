@@ -11,70 +11,70 @@
 
 @layer base {
   :root {
-    /* Surfaces — deep, slightly blue-tinted near-black for a calm, professional base */
-    --background: 222 47% 6%;
-    --foreground: 210 40% 96%;
+    /* Light theme — clean, high-contrast surfaces with a faint blue tint. */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
 
-    --card: 222 40% 9%;
-    --card-foreground: 210 40% 96%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
 
-    --popover: 222 44% 8%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
     /* Elevated surface used for nested panels, code blocks, table headers */
-    --surface: 222 38% 11%;
-    --surface-foreground: 210 40% 96%;
+    --surface: 210 40% 95%;
+    --surface-foreground: 222 47% 11%;
 
-    /* Brand — a refined, slightly desaturated blue (less neon, more enterprise) */
-    --primary: 213 94% 62%;
-    --primary-foreground: 222 47% 8%;
+    /* Brand — a slightly deeper blue so it stays legible on light surfaces */
+    --primary: 213 90% 48%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 33% 16%;
-    --secondary-foreground: 210 40% 96%;
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 222 47% 18%;
 
-    --muted: 217 33% 14%;
-    --muted-foreground: 215 18% 62%;
+    --muted: 214 32% 93%;
+    --muted-foreground: 215 16% 42%;
 
     /* Accent — a measured emerald for "safe / verified" semantics */
-    --accent: 160 70% 42%;
-    --accent-foreground: 222 47% 8%;
+    --accent: 160 74% 34%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 56%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 160 70% 42%;
-    --success-foreground: 222 47% 8%;
+    --success: 160 74% 34%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 58%;
-    --warning-foreground: 222 47% 8%;
+    --warning: 38 92% 45%;
+    --warning-foreground: 0 0% 100%;
 
-    --border: 217 30% 18%;
-    --input: 217 30% 18%;
-    --ring: 213 94% 62%;
+    --border: 214 25% 86%;
+    --input: 214 25% 86%;
+    --ring: 213 90% 48%;
 
-    --chart-1: 213 94% 62%;
-    --chart-2: 160 70% 42%;
-    --chart-3: 262 70% 64%;
-    --chart-4: 38 92% 58%;
-    --chart-5: 0 72% 56%;
+    --chart-1: 213 90% 48%;
+    --chart-2: 160 74% 34%;
+    --chart-3: 262 60% 55%;
+    --chart-4: 38 92% 45%;
+    --chart-5: 0 72% 48%;
 
     --radius: 0.625rem;
 
-    --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 210 40% 96%;
-    --sidebar-primary: 213 94% 62%;
-    --sidebar-primary-foreground: 222 47% 8%;
-    --sidebar-accent: 217 33% 14%;
-    --sidebar-accent-foreground: 210 40% 96%;
-    --sidebar-border: 217 30% 18%;
-    --sidebar-ring: 213 94% 62%;
+    --sidebar-background: 210 40% 98%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 213 90% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 214 32% 93%;
+    --sidebar-accent-foreground: 222 47% 18%;
+    --sidebar-border: 214 25% 86%;
+    --sidebar-ring: 213 90% 48%;
 
     --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-serif: Georgia, serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
   }
 
-  /* Dark is the canonical theme; .dark mirrors :root so token-based UI is stable. */
+  /* Dark theme — the original canonical Verdyx palette, applied via the .dark class. */
   .dark {
     --background: 222 47% 6%;
     --foreground: 210 40% 96%;

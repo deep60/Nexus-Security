@@ -16,7 +16,7 @@ export default function Dashboard() {
       <SEO title="Dashboard" description="Submit files for analysis and view recent intelligence reports." />
       <Navigation />
 
-      <main className="py-8">
+      <main id="main-content" tabIndex={-1} className="py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

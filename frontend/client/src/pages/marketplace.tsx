@@ -118,7 +118,7 @@ export default function Marketplace() {
       <ParticleBackground />
       <Navigation />
 
-      <main className="relative z-10 py-8">
+      <main id="main-content" tabIndex={-1} className="relative z-10 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Security Engines Section */}
           <section className="mb-16">

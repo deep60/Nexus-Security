@@ -12,7 +12,7 @@ export default function HowItWorks() {
       />
       <Navigation />
       
-      <main className="pt-32 pb-24">
+      <main id="main-content" tabIndex={-1} className="pt-32 pb-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-16">
             <h1 className="text-4xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-6">

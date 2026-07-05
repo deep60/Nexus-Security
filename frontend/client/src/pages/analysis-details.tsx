@@ -164,7 +164,7 @@ export default function AnalysisDetails() {
       <ParticleBackground />
       <Navigation />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div id="main-content" tabIndex={-1} className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>

@@ -82,6 +82,15 @@ export interface ApiConsensus {
 export interface ApiStats {
   totalSubmissions?: number;
   totalEngines?: number;
+  totalAnalyses?: number;
+  threatsDetected?: number;
+  maliciousCount?: number;
+  benignCount?: number;
+  suspiciousCount?: number;
+  completed?: number;
+  pending?: number;
+  activeAnalyses?: number;
+  completedToday?: number;
   totalActiveBounties?: string | number;
   avgResponseTime?: string;
   totalRewardsPaid?: string;

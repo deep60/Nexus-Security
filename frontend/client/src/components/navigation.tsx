@@ -12,6 +12,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Menu, Shield, User, LogOut, Wallet } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function Navigation() {
   const [location] = useLocation();
@@ -34,7 +35,15 @@ export function Navigation() {
     .toUpperCase() || "U";
 
   return (
-    <nav className="relative z-10 glassmorphism border-b border-border/50">
+    <>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg"
+        data-testid="link-skip-to-content"
+      >
+        Skip to main content
+      </a>
+      <nav className="relative z-10 glassmorphism border-b border-border/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" data-testid="link-home">
@@ -59,10 +68,16 @@ export function Navigation() {
               </Link>
             ))}
 
+            <ThemeToggle />
+
             {isAuthenticated && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                  <Button
+                    variant="ghost"
+                    className="relative h-10 w-10 rounded-full"
+                    aria-label="Account menu"
+                  >
                     <Avatar className="h-10 w-10 border-2 border-primary">
                       <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground">
                         {userInitials}
@@ -79,11 +94,9 @@ export function Navigation() {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/profile">
-                      <a className="flex items-center w-full cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
-                      </a>
+                    <Link href="/profile" className="flex items-center w-full cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
                     </Link>
                   </DropdownMenuItem>
                   {!user.walletAddress && (
@@ -116,13 +129,15 @@ export function Navigation() {
           </div>
 
           {/* Mobile Navigation */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" data-testid="button-menu">
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent>
+          <div className="flex items-center gap-1 md:hidden">
+            <ThemeToggle />
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Open menu" data-testid="button-menu">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
               <div className="flex flex-col space-y-4 mt-8">
                 {isAuthenticated && user && (
                   <div className="flex items-center gap-3 pb-4 border-b border-border">
@@ -185,10 +200,12 @@ export function Navigation() {
                   </>
                 )}
               </div>
-            </SheetContent>
-          </Sheet>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
     </nav>
+    </>
   );
 }

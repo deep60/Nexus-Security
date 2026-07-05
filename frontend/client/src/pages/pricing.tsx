@@ -14,7 +14,7 @@ export default function Pricing() {
       />
       <Navigation />
       
-      <main className="pt-32 pb-24">
+      <main id="main-content" tabIndex={-1} className="pt-32 pb-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20 max-w-3xl mx-auto">
             <h1 className="text-4xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-6 mt-8">
