@@ -19,14 +19,18 @@ terraform {
     }
   }
 
-  # Remote state configuration - uncomment for production
-  # backend "s3" {
-  #   bucket         = "verdyx-terraform-state"
-  #   key            = "infrastructure/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   encrypt        = true
-  #   dynamodb_table = "verdyx-terraform-locks"
-  # }
+  # Remote state — the S3 bucket + DynamoDB lock table must exist BEFORE
+  # `terraform init`. Create them once with scripts/bootstrap-tf-state.sh, then
+  # run `terraform init` (Terraform will offer to migrate any local state up).
+  # Backend blocks cannot use variables, so these values are hard-coded; keep
+  # them in sync with the bootstrap script.
+  backend "s3" {
+    bucket         = "verdyx-terraform-state"
+    key            = "infrastructure/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "verdyx-terraform-locks"
+  }
 }
 
 # Configure AWS Provider

@@ -35,7 +35,7 @@ export default function HowItWorks() {
               </p>
               <div className="surface-panel rounded-md p-4 overflow-x-auto">
                 <pre className="text-sm font-mono text-accent">
-                  <code>{`curl -X POST https://api.verdyx.com/v1/analyze \\ 
+                  <code>{`curl -X POST https://api.verdyx.io/v1/analyze \\
                   -H "Authorization: Bearer $VERDYX_TOKEN" \\
                   -F "file=@payload.bin" \\
                   -F "engines=yara,clamav"`}
@@ -57,7 +57,7 @@ services:
   verdyx-worker:
     image: verdyx/worker-yara:latest
     environment:
-      - VERDYX_ORCHESTRATOR_URL=wss://api.verdyx.com
+      - VERDYX_ORCHESTRATOR_URL=wss://api.verdyx.io
       - PRIVATE_RULES_DIR=/rules
     volumes:
       - ./my-rules:/rules:ro`}

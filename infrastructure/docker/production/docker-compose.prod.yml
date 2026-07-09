@@ -1,3 +1,13 @@
+# ⚠️ DEPRECATED — NOT the deploy target. See infrastructure/DEPLOYMENT.md.
+#
+# CI (.github/workflows/deploy.yml) deploys the ROOT ../../../docker-compose.yml
+# on the VM, NOT this file. This compose is stale and contradictory:
+#   - it points every service at a single `verdyx` database, but the services
+#     use per-service databases (verdyx_gateway, verdyx_users, ...);
+#   - it self-hosts Postgres/Redis, but production uses managed RDS/ElastiCache;
+#   - the frontend uses dead REACT_APP_* vars (the app is Vite, not CRA) and
+#     the old api.verdyx.com domain (now verdyx.io).
+# Kept only for reference until the Phase-2 Kubernetes path lands. Do not run it.
 version: '3.8'
 
 services:

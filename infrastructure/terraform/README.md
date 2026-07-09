@@ -16,10 +16,31 @@ This Terraform configuration deploys the cloud infrastructure for Verdyx on AWS.
 2. Terraform >= 1.0
 3. kubectl for Kubernetes management
 
+> **Note on RDS/EKS for launch:** the launch stack runs the app tier on a
+> single VM via Docker Compose and uses **RDS + ElastiCache** as its managed
+> data tier (see `../DEPLOYMENT.md`). The **EKS** cluster defined here is the
+> Phase-2 scale-out path and is not required to go live — you can `terraform
+> apply -target` just the VPC/RDS/ElastiCache/S3 resources if you want to skip
+> EKS for now.
+
+## Remote state (do this first)
+
+State is stored in S3 with DynamoDB locking (see the `backend "s3"` block in
+`main.tf`). The bucket and lock table must exist **before** the first
+`terraform init`:
+
+```bash
+# One-time, idempotent. Needs AWS creds that can create S3 + DynamoDB.
+./scripts/bootstrap-tf-state.sh
+```
+
+Then proceed to Quick Start. If you already have local state, `terraform init`
+will offer to migrate it into S3.
+
 ## Quick Start
 
 ```bash
-# Initialize Terraform
+# Initialize Terraform (uses the S3 backend created above)
 terraform init
 
 # Copy and customize variables

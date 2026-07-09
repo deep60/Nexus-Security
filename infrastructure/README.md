@@ -1,5 +1,12 @@
 # Verdyx Infrastructure
 
+> **📖 Read [`DEPLOYMENT.md`](./DEPLOYMENT.md) first — it is the authoritative deployment guide.**
+> Launch runs on **Docker Compose on a single VM** (root `docker-compose.yml`, deployed by
+> `.github/workflows/deploy.yml`) with **managed RDS + ElastiCache**. The Kubernetes / EKS / Helm
+> assets below are **Phase 2 (not live)** — CI does not deploy to them. Some sections of this
+> README (the `docker-compose.prod.yml` and single-`verdyx`-DB references) are outdated; where they
+> conflict with `DEPLOYMENT.md`, `DEPLOYMENT.md` wins.
+
 This directory contains all infrastructure-as-code configurations for deploying the Verdyx platform.
 
 ## Directory Structure

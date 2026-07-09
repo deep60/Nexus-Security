@@ -155,13 +155,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Rust supply-chain audit
+      # Rust supply-chain audit — BLOCKING on known vulnerabilities.
+      # (Plain `cargo audit` fails on security advisories but not on
+      # unmaintained-crate warnings, so transitive noise won't red the build.)
       - name: Install cargo-audit
-        run: cargo install --locked cargo-audit || true
+        run: cargo install --locked cargo-audit
       - name: Cargo audit
         working-directory: ./backend
-        run: cargo audit --deny warnings || echo "::warning::cargo-audit found issues"
-        continue-on-error: true
+        run: cargo audit
 
       # npm audit for frontend
       - name: Setup Node.js
@@ -170,10 +171,10 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
+      # npm audit — BLOCKING on high/critical production advisories.
       - name: npm audit
         working-directory: ./frontend
-        run: npm audit --omit=dev --audit-level=high || echo "::warning::npm audit found issues"
-        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
 
       # Trivy filesystem scan (SAST + secret detection + IaC)
       - name: Trivy filesystem scan
@@ -451,12 +452,15 @@ jobs:
           SERVICES: ${{ steps.svc.outputs.services }}
         run: |
           echo "Deploying services: $SERVICES"
+          # remote-deploy.sh ensures per-service RDS databases exist, pulls the
+          # new revision, restarts the services (which self-migrate at startup),
+          # and health-checks before returning. See infrastructure/DEPLOYMENT.md.
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd /opt/verdyx && git pull origin main && docker compose pull $SERVICES && docker compose up -d $SERVICES && docker system prune -af --filter until=24h"
+            "cd /opt/verdyx && git fetch origin main && git checkout origin/main -- scripts/deployment/remote-deploy.sh scripts/deployment/ensure-databases.sh && SERVICES='$SERVICES' BRANCH=main bash scripts/deployment/remote-deploy.sh"
 
-      - name: Health check
+      - name: External health check
         run: |
-          sleep 30
+          sleep 10
           curl --fail --retry 3 --retry-delay 10 https://verdyx.io/api/v1/health || exit 1
 
       - name: Notify deployment status

@@ -304,6 +304,20 @@ pub async fn create_submission(
     claims: crate::middleware::auth::Claims,
     Json(request): Json<CreateSubmissionRequest>,
 ) -> Result<Json<SubmissionResponse>, StatusCode> {
+    // Resolve the submitter's on-chain wallet address from their user record.
+    // Falls back to the zero address only if the account has no wallet linked
+    // (staking/payout for such submissions will fail on-chain, as expected).
+    let engine_address = match state.db.get_user_by_id(claims.sub).await {
+        Ok(Some(user)) => user
+            .wallet_address
+            .unwrap_or_else(|| "0x0000000000000000000000000000000000000000".to_string()),
+        Ok(None) => "0x0000000000000000000000000000000000000000".to_string(),
+        Err(e) => {
+            tracing::error!("Failed to look up submitter wallet: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
     // Construct BountySubmission
     let submission_id = Uuid::new_v4();
     let submission = crate::models::bounty::BountySubmission {
@@ -311,7 +325,7 @@ pub async fn create_submission(
         bounty_id: request.bounty_id,
         engine_id: claims.sub, // Authenticated user as the engine submitter
         engine_name: request.engine_name.clone(),
-        engine_address: "0x0000000000000000000000000000000000000000".to_string(), // Placeholder
+        engine_address,
         verdict: request.verdict.clone(),
         confidence: request.confidence as f64,
         details: request.technical_details.clone(),

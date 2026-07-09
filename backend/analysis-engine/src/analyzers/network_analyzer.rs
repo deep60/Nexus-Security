@@ -273,84 +273,33 @@ impl NetworkAnalyzer {
         Ok(analysis)
     }
 
-    /// Parse network connections from raw data
+    /// Parse network connections from raw data.
+    ///
+    /// TODO: implement real packet/flow parsing (libpcap for pcap captures,
+    /// netstat/proc parsing for active connections). Until then this returns
+    /// no connections rather than fabricating sample data — fabricated flows
+    /// would feed false signals into the risk score and final verdict.
     async fn parse_network_connections(&self, data: &[u8]) -> Result<Vec<NetworkConnection>> {
-        // In a real implementation, this would parse actual network traffic
-        // For now, we'll simulate parsing from a structured format
         debug!("Parsing network connections from {} bytes", data.len());
-        
-        let mut connections = Vec::new();
-        
-        // Simulate parsing logic - in reality, you'd use libraries like:
-        // - libpcap for packet capture analysis
-        // - netstat parsing for active connections
-        // - Process monitoring APIs
-        
-        if data.len() > 100 {
-            connections.push(NetworkConnection {
-                local_addr: "192.168.1.100".to_string(),
-                remote_addr: "8.8.8.8".to_string(),
-                port: 53,
-                protocol: "UDP".to_string(),
-                direction: "outbound".to_string(),
-                bytes_sent: 64,
-                bytes_received: 128,
-                duration: Duration::from_millis(50),
-                established: true,
-            });
-        }
-        
-        Ok(connections)
+        Ok(Vec::new())
     }
 
-    /// Parse DNS queries from network data
+    /// Parse DNS queries from network data.
+    ///
+    /// TODO: implement real DNS record parsing. Returns no queries for now
+    /// rather than fabricating sample data (see `parse_network_connections`).
     async fn parse_dns_queries(&self, data: &[u8]) -> Result<Vec<DnsQuery>> {
-        debug!("Parsing DNS queries from network data");
-        
-        let mut queries = Vec::new();
-        
-        // Simulate DNS query parsing
-        if data.len() > 50 {
-            queries.push(DnsQuery {
-                domain: "example.com".to_string(),
-                query_type: "A".to_string(),
-                response_code: 0,
-                resolved_ips: vec!["93.184.216.34".to_string()],
-                timestamp: SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
-                is_suspicious: false,
-            });
-        }
-        
-        Ok(queries)
+        debug!("Parsing DNS queries from {} bytes", data.len());
+        Ok(Vec::new())
     }
 
-    /// Parse HTTP requests from network data
+    /// Parse HTTP requests from network data.
+    ///
+    /// TODO: implement real HTTP transaction parsing. Returns no requests for
+    /// now rather than fabricating sample data (see `parse_network_connections`).
     async fn parse_http_requests(&self, data: &[u8]) -> Result<Vec<HttpRequest>> {
-        debug!("Parsing HTTP requests from network data");
-        
-        let mut requests = Vec::new();
-        
-        // Simulate HTTP request parsing
-        if data.len() > 200 {
-            let mut headers = HashMap::new();
-            headers.insert("Content-Type".to_string(), "text/html".to_string());
-            
-            requests.push(HttpRequest {
-                method: "GET".to_string(),
-                url: "https://example.com".to_string(),
-                headers,
-                user_agent: "Mozilla/5.0".to_string(),
-                status_code: 200,
-                response_size: 1024,
-                timing: Duration::from_millis(150),
-                is_encrypted: true,
-            });
-        }
-        
-        Ok(requests)
+        debug!("Parsing HTTP requests from {} bytes", data.len());
+        Ok(Vec::new())
     }
 
     /// Detect suspicious domains from DNS queries

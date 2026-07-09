@@ -1,4 +1,4 @@
-export function SEO({ title, description, url = "https://verdyx.com" }: { title: string; description: string; url?: string }) {
+export function SEO({ title, description, url = "https://verdyx.io" }: { title: string; description: string; url?: string }) {
   // In React 19, these tags are automatically hoisted to the document <head>
   return (
     <>

@@ -3,6 +3,10 @@
 vault_postgres_password:        CHANGE_ME
 vault_redis_password:           CHANGE_ME
 vault_jwt_secret:                CHANGE_ME
+# Managed data-tier endpoints (from `terraform output rds_endpoint` /
+# `redis_endpoint`). Host only, no port.
+vault_rds_endpoint:             verdyx-postgres.xxxx.us-east-1.rds.amazonaws.com
+vault_elasticache_endpoint:     verdyx-redis.xxxx.cache.amazonaws.com
 vault_minio_root_user:           verdyx_admin
 vault_minio_root_password:       CHANGE_ME
 vault_blockchain_rpc_url:        https://mainnet.infura.io/v3/CHANGE_ME

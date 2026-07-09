@@ -58,8 +58,8 @@ services:
       - "8080:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/verdyx_gateway
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/verdyx_gateway
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST:-redis}:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       - JWT_SECRET=${JWT_SECRET}
@@ -106,8 +106,8 @@ services:
       - "8081:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/verdyx_users
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/verdyx_users
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST:-redis}:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       - JWT_SECRET=${JWT_SECRET}
@@ -186,8 +186,8 @@ services:
       - "8082:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/verdyx_analysis
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/verdyx_analysis
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST:-redis}:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # S3/MinIO Configuration for file storage
@@ -232,8 +232,8 @@ services:
       - "8083:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/verdyx_bounty
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/verdyx_bounty
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST:-redis}:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # Blockchain Configuration
@@ -273,8 +273,8 @@ services:
       - SERVER_PORT=8080
       - SUBMISSION_SERVICE_PORT=8080
       # Database and Redis Configuration
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/verdyx_submissions
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/verdyx_submissions
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST:-redis}:6379
       # S3/MinIO Configuration
       - S3_ENDPOINT=http://minio:9000
       - S3_REGION=us-east-1
@@ -310,8 +310,8 @@ services:
       - "8085:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/verdyx_consensus
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/verdyx_consensus
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST:-redis}:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # Consensus algorithm configuration
@@ -344,8 +344,8 @@ services:
       - "8086:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/verdyx_payments
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/verdyx_payments
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST:-redis}:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # Blockchain Configuration
@@ -382,8 +382,8 @@ services:
       - "8087:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/verdyx_reputation
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/verdyx_reputation
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST:-redis}:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # Reputation calculation parameters
@@ -416,8 +416,8 @@ services:
       - "8088:8080"
     environment:
       - RUST_LOG=info
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@postgres:5432/verdyx_notifications
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-verdyx_user}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/verdyx_notifications
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST:-redis}:6379
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       # Email Configuration

@@ -121,9 +121,12 @@ jobs:
           ssh-private-key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
       - name: Deploy
         run: |
+          # Same on-VM entrypoint as production (ensures RDS databases, pulls,
+          # restarts with startup migrations, health-checks). See
+          # infrastructure/DEPLOYMENT.md.
           ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }} \
-            "cd /opt/verdyx && git pull origin develop && docker compose pull && docker compose up -d && docker system prune -af --filter until=24h"
-      - name: Smoke test
+            "cd /opt/verdyx && git fetch origin develop && git checkout origin/develop -- scripts/deployment/remote-deploy.sh scripts/deployment/ensure-databases.sh && BRANCH=develop bash scripts/deployment/remote-deploy.sh"
+      - name: External smoke test
         run: |
-          sleep 30
+          sleep 10
           curl --fail --retry 5 --retry-delay 10 https://staging.verdyx.io/api/v1/health

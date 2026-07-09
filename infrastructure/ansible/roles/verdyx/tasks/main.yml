@@ -30,7 +30,14 @@
     hour: "3"
     job: "cd {{ verdyx_install_path }} && ./scripts/maintenance/backup.sh >> /var/log/verdyx-backup.log 2>&1"
 
-- name: Bring up the stack
+- name: Bring up the stack (managed RDS/ElastiCache; app services only)
+  # Uses the same on-VM entrypoint as CI so first-boot matches every later
+  # deploy: ensures per-service RDS databases exist, starts app services with
+  # --no-deps (no local postgres/redis), then health-checks. See
+  # infrastructure/DEPLOYMENT.md.
   ansible.builtin.command:
-    cmd: docker compose up -d
+    cmd: "bash scripts/deployment/remote-deploy.sh"
     chdir: "{{ verdyx_install_path }}"
+  environment:
+    BRANCH: "{{ verdyx_repo_branch }}"
+  become_user: "{{ verdyx_user }}"
