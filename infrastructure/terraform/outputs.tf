@@ -57,7 +57,7 @@ output "rds_database_name" {
 # Redis Outputs
 output "redis_endpoint" {
   description = "Redis endpoint"
-  value       = module.redis.elasticache_replication_group_primary_endpoint_address
+  value       = module.redis.replication_group_primary_endpoint_address
 }
 
 output "redis_port" {
@@ -85,7 +85,7 @@ output "database_url" {
 
 output "redis_url" {
   description = "Redis connection URL (without password)"
-  value       = "redis://${module.redis.elasticache_replication_group_primary_endpoint_address}:6379"
+  value       = "redis://${module.redis.replication_group_primary_endpoint_address}:6379"
   sensitive   = false
 }
 

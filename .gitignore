@@ -37,3 +37,12 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Terraform (provider binaries, local/crash state — never commit these)
+# Note: .terraform.lock.hcl IS committed intentionally (dependency lock).
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+errored.tfstate
+crash.log
+crash.*.log

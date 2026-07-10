@@ -98,6 +98,16 @@ module "eks" {
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
 
+  # Grant the EBS CSI managed policy to every node role so the aws-ebs-csi-driver
+  # controller (which runs under the node instance role) can call the EC2 EBS
+  # APIs. A dedicated IRSA role would be more granular but creates a dependency
+  # cycle with the in-module addon; this is the cycle-free equivalent.
+  eks_managed_node_group_defaults = {
+    iam_role_additional_policies = {
+      AmazonEBSCSIDriverPolicy = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+    }
+  }
+
   # EKS Managed Node Groups
   eks_managed_node_groups = {
     # General purpose nodes
@@ -121,10 +131,10 @@ module "eks" {
     # High-memory nodes for analysis engine
     analysis = {
       name           = "analysis"
-      instance_types = ["r5.xlarge", "r5.2xlarge"]
+      instance_types = ["m7i-flex.large"] # free-plan-eligible; r5 blocked on this account
       min_size       = 1
-      max_size       = 5
-      desired_size   = 2
+      max_size       = 2
+      desired_size   = 1
 
       labels = {
         role = "analysis"
@@ -175,7 +185,7 @@ module "rds" {
   identifier = "${var.project_name}-postgres"
 
   engine               = "postgres"
-  engine_version       = "15.4"
+  engine_version       = "15"
   family               = "postgres15"
   major_engine_version = "15"
   instance_class       = var.rds_instance_class
@@ -187,17 +197,24 @@ module "rds" {
   username = "verdyx"
   port     = 5432
 
-  multi_az               = var.environment == "production"
-  db_subnet_group_name   = module.vpc.database_subnet_group_name
+  multi_az = var.environment == "production"
+
+  # The VPC module defines only public/private subnets (no dedicated database
+  # tier), so have the RDS module create its own subnet group from the private
+  # subnets instead of relying on a (non-existent) database subnet group.
+  create_db_subnet_group = true
+  subnet_ids             = module.vpc.private_subnets
   vpc_security_group_ids = [aws_security_group.rds.id]
 
-  backup_retention_period = var.environment == "production" ? 30 : 7
+  backup_retention_period = var.environment == "production" ? 30 : 1
   skip_final_snapshot     = var.environment != "production"
   deletion_protection     = var.environment == "production"
 
-  performance_insights_enabled = true
-  create_monitoring_role       = true
-  monitoring_interval          = 60
+  # Performance Insights and enhanced monitoring are blocked on AWS free-tier
+  # plans, so only enable them in production.
+  performance_insights_enabled = var.environment == "production"
+  create_monitoring_role       = var.environment == "production"
+  monitoring_interval          = var.environment == "production" ? 60 : 0
 
   parameters = [
     {
@@ -220,21 +237,31 @@ module "redis" {
   source  = "terraform-aws-modules/elasticache/aws"
   version = "~> 1.0"
 
-  cluster_id           = "${var.project_name}-redis"
-  engine               = "redis"
-  engine_version       = "7.0"
-  node_type            = var.redis_node_type
-  num_cache_nodes      = var.environment == "production" ? 3 : 1
-  parameter_group_name = "default.redis7"
+  replication_group_id = "${var.project_name}-redis"
+  description          = "Verdyx Redis replication group"
 
-  subnet_ids         = module.vpc.private_subnets
-  security_group_ids = [aws_security_group.redis.id]
+  engine         = "redis"
+  engine_version = "7.0"
+  node_type      = var.redis_node_type
+  port           = 6379
+
+  num_cache_clusters = var.environment == "production" ? 3 : 1
 
   automatic_failover_enabled = var.environment == "production"
   multi_az_enabled           = var.environment == "production"
 
   at_rest_encryption_enabled = true
   transit_encryption_enabled = true
+
+  # Networking — create the subnet group, but use our own security group
+  subnet_ids            = module.vpc.private_subnets
+  create_subnet_group   = true
+  create_security_group = false
+  security_group_ids    = [aws_security_group.redis.id]
+
+  # Use the AWS-managed default parameter group for Redis 7
+  create_parameter_group = false
+  parameter_group_name   = "default.redis7"
 
   tags = {
     Name = "${var.project_name}-redis"
