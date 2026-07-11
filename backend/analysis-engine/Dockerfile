@@ -12,6 +12,8 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
     libpq-dev \
     make \
     gcc \
+    clang \
+    libclang-dev \
     && apt-get install -y -t bookworm-backports libyara-dev \
     && rm -rf /var/lib/apt/lists/*
 

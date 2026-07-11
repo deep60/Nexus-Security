@@ -48,6 +48,7 @@ services:
 
   # API Gateway Service
   api-gateway:
+    image: ghcr.io/deep60/verdyx-api-gateway:latest
     build:
       context: ./backend
       dockerfile: ./api-gateway/Dockerfile
@@ -96,6 +97,7 @@ services:
       retries: 3
       start_period: 20s
   user-service:
+    image: ghcr.io/deep60/verdyx-user-service:latest
     build:
       context: ./backend
       dockerfile: ./user-service/Dockerfile
@@ -176,6 +178,7 @@ services:
 
   # Analysis Engine Service
   analysis-engine:
+    image: ghcr.io/deep60/verdyx-analysis-engine:latest
     build:
       context: ./backend
       dockerfile: ./analysis-engine/Dockerfile
@@ -222,6 +225,7 @@ services:
 
   # Bounty Manager Service
   bounty-manager:
+    image: ghcr.io/deep60/verdyx-bounty-manager:latest
     build:
       context: ./backend
       dockerfile: ./bounty-manager/Dockerfile
@@ -259,6 +263,7 @@ services:
 
   # Submission Service
   submission-service:
+    image: ghcr.io/deep60/verdyx-submission-service:latest
     build:
       context: ./backend
       dockerfile: ./submission-service/Dockerfile
@@ -300,6 +305,7 @@ services:
 
   # Consensus Service
   consensus-service:
+    image: ghcr.io/deep60/verdyx-consensus-service:latest
     build:
       context: ./backend
       dockerfile: ./consensus-service/Dockerfile
@@ -334,6 +340,7 @@ services:
 
   # Payment Service
   payment-service:
+    image: ghcr.io/deep60/verdyx-payment-service:latest
     build:
       context: ./backend
       dockerfile: ./payment-service/Dockerfile
@@ -372,6 +379,7 @@ services:
 
   # Reputation Service
   reputation-service:
+    image: ghcr.io/deep60/verdyx-reputation-service:latest
     build:
       context: ./backend
       dockerfile: ./reputation-service/Dockerfile
@@ -406,6 +414,7 @@ services:
 
   # Notification Service
   notification-service:
+    image: ghcr.io/deep60/verdyx-notification-service:latest
     build:
       context: ./backend
       dockerfile: ./notification-service/Dockerfile
@@ -446,6 +455,7 @@ services:
 
   # Frontend Web Application
   frontend:
+    image: ghcr.io/deep60/verdyx-frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
