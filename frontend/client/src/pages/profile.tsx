@@ -155,19 +155,19 @@ export default function Profile() {
                   <CardContent>
                     <div className="grid md:grid-cols-3 gap-6">
                       <div className="text-center p-4 bg-primary/10 rounded-lg border border-primary/20">
-                        <div className="text-3xl font-bold text-primary mb-2">
+                        <div className="text-3xl font-bold font-display tracking-tight text-primary mb-2">
                           {userSubmissions.length}
                         </div>
                         <div className="text-sm text-muted-foreground">Total Submissions</div>
                       </div>
                       <div className="text-center p-4 bg-accent/10 rounded-lg border border-accent/20">
-                        <div className="text-3xl font-bold text-accent mb-2">
+                        <div className="text-3xl font-bold font-display tracking-tight text-accent mb-2">
                           {completedAnalyses}
                         </div>
                         <div className="text-sm text-muted-foreground">Completed Analyses</div>
                       </div>
                       <div className="text-center p-4 bg-secondary/10 rounded-lg border border-secondary/20">
-                        <div className="text-3xl font-bold text-secondary mb-2">
+                        <div className="text-3xl font-bold font-display tracking-tight text-secondary mb-2">
                           {user.reputationScore}
                         </div>
                         <div className="text-sm text-muted-foreground">Reputation Score</div>

@@ -16,8 +16,9 @@ export default function Pricing() {
       
       <main id="main-content" tabIndex={-1} className="pt-32 pb-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-20 max-w-3xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-6 mt-8">
+          <div className="text-center mb-20 max-w-3xl mx-auto animate-fade-up">
+            <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">Pricing</span>
+            <h1 className="text-4xl md:text-6xl font-bold font-display text-foreground tracking-[-0.03em] mb-6">
               Transparent API Pricing
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed mt-4">
@@ -30,7 +31,7 @@ export default function Pricing() {
             {/* Developer Tier - Pay As You Go */}
             <div className="bg-card/50 border border-border rounded-2xl p-8 hover:border-primary/40 transition-colors relative h-full flex flex-col">
               <div className="mb-8">
-                <div className="inline-flex px-3 py-1 rounded-full bg-primary/10 text-primary font-mono text-sm font-bold mb-4">Pay As You Go</div>
+                <div className="inline-flex px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium mb-4">Pay As You Go</div>
                 <h2 className="text-3xl font-bold text-foreground mb-2 font-display">Developer</h2>
                 <div className="flex items-baseline gap-1 mt-4">
                   <span className="text-4xl font-bold text-foreground">$0.005</span>
@@ -57,16 +58,16 @@ export default function Pricing() {
               </ul>
 
               <Link href="/register">
-                <Button className="w-full font-mono h-12">
+                <Button className="w-full h-12">
                   Start Building
                 </Button>
               </Link>
             </div>
 
             {/* Enterprise Tier */}
-            <div className="bg-card border border-accent/30 rounded-2xl p-8 relative glow-effect h-full flex flex-col">
+            <div className="border-gradient rounded-2xl p-8 relative glow-effect h-full flex flex-col">
               <div className="absolute top-0 right-0 transform translate-x-2 -translate-y-2">
-                 <span className="bg-accent text-accent-foreground text-xs font-bold px-3 py-1 font-mono rounded-tl-lg rounded-br-lg shadow-lg">PRODUCTION READY</span>
+                 <span className="bg-gradient-brand text-white text-xs font-semibold px-3 py-1 rounded-tl-lg rounded-br-lg shadow-lg">PRODUCTION READY</span>
               </div>
               
               <div className="mb-8">
@@ -95,7 +96,7 @@ export default function Pricing() {
                 ))}
               </ul>
 
-              <Button variant="outline" className="w-full h-12 font-mono">
+              <Button variant="outline" className="w-full h-12">
                 Contact Sales
               </Button>
             </div>

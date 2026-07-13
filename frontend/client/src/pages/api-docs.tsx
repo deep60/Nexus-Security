@@ -88,8 +88,9 @@ print(f"Threat score: {results.json()['confidence']}")`;
 
       <div id="main-content" tabIndex={-1} className="relative z-10 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold mb-4">Developer API</h1>
+          <div className="text-center mb-12 animate-fade-up">
+            <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">API Reference</span>
+            <h1 className="text-4xl md:text-6xl font-bold font-display tracking-[-0.03em] mb-4">Developer API</h1>
             <p className="text-xl text-muted-foreground">Integrate threat intelligence into your applications</p>
           </div>
 

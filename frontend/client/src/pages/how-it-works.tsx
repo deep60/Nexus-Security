@@ -14,8 +14,9 @@ export default function HowItWorks() {
       
       <main id="main-content" tabIndex={-1} className="pt-32 pb-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-16">
-            <h1 className="text-4xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-6">
+          <div className="mb-16 animate-fade-up">
+            <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">How It Works</span>
+            <h1 className="text-4xl md:text-6xl font-bold font-display text-foreground tracking-[-0.03em] mb-6">
               How Verdyx Works
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">

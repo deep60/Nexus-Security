@@ -82,7 +82,7 @@ module.exports = {
   				'sans-serif'
   			],
   			display: [
-  				'Syne',
+  				'Space Grotesk',
   				'Inter',
   				'system-ui',
   				'sans-serif'
@@ -125,11 +125,23 @@ module.exports = {
   			},
   			glow: {
   				from: {
-  					boxShadow: '0 0 5px rgba(0,212,255,0.2), 0 0 10px rgba(0,212,255,0.2), 0 0 15px rgba(0,212,255,0.2)'
+  					boxShadow: '0 0 0 1px hsl(var(--primary) / 0.12), 0 8px 24px -8px hsl(var(--brand-from) / 0.35)'
   				},
   				to: {
-  					boxShadow: '0 0 10px rgba(0,212,255,0.4), 0 0 20px rgba(0,212,255,0.4), 0 0 30px rgba(0,212,255,0.4)'
+  					boxShadow: '0 0 0 1px hsl(var(--primary) / 0.24), 0 14px 40px -8px hsl(var(--brand-from) / 0.6)'
   				}
+  			},
+  			'fade-up': {
+  				from: { opacity: '0', transform: 'translateY(16px)' },
+  				to: { opacity: '1', transform: 'translateY(0)' }
+  			},
+  			'fade-in': {
+  				from: { opacity: '0' },
+  				to: { opacity: '1' }
+  			},
+  			shimmer: {
+  				'0%': { backgroundPosition: '-200% 0' },
+  				'100%': { backgroundPosition: '200% 0' }
   			},
   			particle: {
   				'0%': {
@@ -176,11 +188,14 @@ module.exports = {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
   			float: 'float 6s ease-in-out infinite',
-  			glow: 'glow 2s ease-in-out infinite alternate',
-  			particle: 'particle 20s linear infinite',
+  			glow: 'glow 2.6s ease-in-out infinite alternate',
+  			particle: 'particle 22s linear infinite',
   			scan: 'scan 2s linear infinite',
   			hologram: 'hologram 3s ease-in-out infinite',
-  			'pulse-slow': 'pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+  			'pulse-slow': 'pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+  			'fade-up': 'fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both',
+  			'fade-in': 'fade-in 0.6s ease-out both',
+  			shimmer: 'shimmer 2.5s linear infinite'
   		}
   	}
   },

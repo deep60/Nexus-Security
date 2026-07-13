@@ -53,8 +53,9 @@ export default function Features() {
       
       <main id="main-content" tabIndex={-1} className="pt-32 pb-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-20 max-w-3xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-6">
+          <div className="text-center mb-20 max-w-3xl mx-auto animate-fade-up">
+            <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">Features</span>
+            <h1 className="text-4xl md:text-6xl font-bold font-display text-foreground tracking-[-0.03em] mb-6">
               Technical Capabilities
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
@@ -64,16 +65,18 @@ export default function Features() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, idx) => (
-              <div key={idx} className="group relative bg-card/40 border border-border/60 rounded-xl overflow-hidden hover:border-primary/50 transition-colors">
+              <div key={idx} className="group relative bg-card/40 border border-border/60 rounded-2xl overflow-hidden hover:border-primary/50 hover:-translate-y-1 transition-all duration-300">
                 <div className="p-8">
-                  <feature.icon className="w-8 h-8 text-primary mb-6 group-hover:scale-110 transition-transform" />
-                  <h3 className="text-xl font-bold text-foreground mb-3">{feature.title}</h3>
+                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 border border-primary/20 mb-6 group-hover:bg-primary/15 transition-colors">
+                    <feature.icon className="w-6 h-6 text-primary group-hover:scale-110 transition-transform" />
+                  </div>
+                  <h3 className="text-xl font-bold font-display tracking-tight text-foreground mb-3">{feature.title}</h3>
                   <p className="text-muted-foreground text-sm leading-relaxed mb-6">
                     {feature.description}
                   </p>
                 </div>
                 <div className="surface-panel border-x-0 border-b-0 border-t p-4">
-                  <pre className="text-xs font-mono text-accent/90 overflow-x-auto whitespace-pre-wrap">
+                  <pre className="text-xs font-mono text-primary/90 overflow-x-auto whitespace-pre-wrap">
                     <code>{feature.code}</code>
                   </pre>
                 </div>

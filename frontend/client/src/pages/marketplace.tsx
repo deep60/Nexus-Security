@@ -123,7 +123,7 @@ export default function Marketplace() {
           {/* Security Engines Section */}
           <section className="mb-16">
             <div className="text-center mb-12">
-              <h1 className="text-4xl font-bold mb-4">Security Engines</h1>
+              <h1 className="text-4xl md:text-5xl font-bold font-display tracking-[-0.03em] mb-4">Security Engines</h1>
               <p className="text-xl text-muted-foreground">Compete and stake on analysis results</p>
             </div>
 
@@ -221,7 +221,7 @@ export default function Marketplace() {
           {/* Active Bounties Section */}
           <section className="mb-16">
             <div className="text-center mb-12">
-              <h2 className="text-4xl font-bold mb-4">Active Bounties</h2>
+              <h2 className="text-4xl font-bold font-display tracking-[-0.03em] mb-4">Active Bounties</h2>
               <p className="text-xl text-muted-foreground">Analyze files and earn cryptocurrency rewards</p>
             </div>
 
@@ -297,7 +297,7 @@ export default function Marketplace() {
             <div className="grid md:grid-cols-4 gap-6">
               <Card className="glassmorphism text-center">
                 <CardContent className="p-6">
-                  <div className="text-3xl font-bold text-primary mb-2" data-testid="stat-total-bounties">
+                  <div className="text-3xl font-bold font-display tracking-tight text-primary mb-2" data-testid="stat-total-bounties">
                     {stats?.totalActiveBounties || "0"} ETH
                   </div>
                   <div className="text-sm text-muted-foreground">Total Active Bounties</div>
@@ -305,7 +305,7 @@ export default function Marketplace() {
               </Card>
               <Card className="glassmorphism text-center">
                 <CardContent className="p-6">
-                  <div className="text-3xl font-bold text-accent mb-2" data-testid="stat-files-queue">
+                  <div className="text-3xl font-bold font-display tracking-tight text-accent mb-2" data-testid="stat-files-queue">
                     {activeBountySubmissions.length}
                   </div>
                   <div className="text-sm text-muted-foreground">Files in Queue</div>
@@ -313,7 +313,7 @@ export default function Marketplace() {
               </Card>
               <Card className="glassmorphism text-center">
                 <CardContent className="p-6">
-                  <div className="text-3xl font-bold text-secondary mb-2">
+                  <div className="text-3xl font-bold font-display tracking-tight text-secondary mb-2">
                     {stats?.avgResponseTime || "24.7s"}
                   </div>
                   <div className="text-sm text-muted-foreground">Avg Response Time</div>
@@ -321,7 +321,7 @@ export default function Marketplace() {
               </Card>
               <Card className="glassmorphism text-center">
                 <CardContent className="p-6">
-                  <div className="text-3xl font-bold text-primary mb-2">
+                  <div className="text-3xl font-bold font-display tracking-tight text-primary mb-2">
                     {stats?.totalRewardsPaid || "312.8"} ETH
                   </div>
                   <div className="text-sm text-muted-foreground">Rewards Paid Out</div>

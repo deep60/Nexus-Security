@@ -33,53 +33,57 @@ export default function Home() {
       <Navigation />
 
       {/* Hero Section */}
-      <section id="main-content" tabIndex={-1} className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+      <section id="main-content" tabIndex={-1} className="relative min-h-[92vh] flex items-center justify-center overflow-hidden aurora-bg">
+        <div className="absolute inset-0 cyber-grid z-0" />
         <HeroCanvas />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background z-0" />
-        
-        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-20">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary font-mono text-xs md:text-sm mb-8">
-            <Activity className="w-4 h-4 animate-pulse" />
-            <span>Engine v2.0 Live &mdash; Multi-Engine Consensus</span>
+        <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background z-0" />
+
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-20 animate-fade-up">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs md:text-sm mb-8 backdrop-blur-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-60 animate-ping" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+            </span>
+            <span className="font-medium tracking-tight">Engine v2.0 Live &mdash; Multi-Engine Consensus</span>
           </div>
-          
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold font-display text-foreground tracking-tight mb-8 leading-tight">
+
+          <h1 className="text-4xl md:text-6xl lg:text-[4.75rem] font-bold font-display text-foreground tracking-[-0.03em] mb-8 leading-[1.05]">
             Verifiable malware analysis,<br />
             <span className="text-gradient-brand">
               powered by consensus.
             </span>
           </h1>
-          
-          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-10 leading-relaxed">
+
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
             The first distributed threat intelligence engine. Submit telemetry via API, let independent nodes run YARA, ClamAV, and ML engines, and receive a cryptographically backed consensus score.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
             <Link href="/dashboard">
-              <Button size="lg" className="font-mono h-14 px-8 glow-effect">
-                <Terminal className="w-5 h-5 mr-3" />
+              <Button size="lg" variant="gradient">
+                <Terminal className="w-5 h-5 mr-2.5" />
                 Start Free Query
               </Button>
             </Link>
             <Link href="/api">
-              <Button size="lg" variant="outline" className="h-14 px-8 font-mono">
-                <Code className="w-5 h-5 mr-3" />
+              <Button size="lg" variant="outline">
+                <Code className="w-5 h-5 mr-2.5" />
                 View API Docs
               </Button>
             </Link>
           </div>
-          
+
           {/* Trust Metrics — sourced live from /api/analysis/stats; no hardcoded claims */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-24 border-t border-border/50 pt-12">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px mt-24 rounded-2xl border border-border/60 bg-border/40 overflow-hidden">
             {[
               { label: "Files Analyzed", value: formatMetric(stats?.totalSubmissions) },
               { label: "Active Nodes", value: formatMetric(stats?.totalEngines) },
               { label: "Threats Detected", value: formatMetric(stats?.threatsDetected) },
               { label: "Analyses Run", value: formatMetric(stats?.totalAnalyses) }
             ].map((stat, i) => (
-              <div key={i} className="flex flex-col gap-1 items-center">
-                <div className="text-2xl md:text-3xl font-mono font-bold text-accent">{stat.value}</div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</div>
+              <div key={i} className="flex flex-col gap-1.5 items-center py-7 bg-card/60 backdrop-blur-sm">
+                <div className="text-2xl md:text-3xl font-display font-bold text-foreground">{stat.value}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-widest">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -90,7 +94,8 @@ export default function Home() {
       <section className="py-24 relative bg-surface/30 border-y border-border/50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold font-display text-foreground mb-4">Architecture Deep Dive</h2>
+            <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">Architecture</span>
+            <h2 className="text-3xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-4">Architecture Deep Dive</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
               A transparent pipeline replacing the black box of legacy AVs. Hover over the layers to explore the components.
             </p>
@@ -102,6 +107,13 @@ export default function Home() {
       {/* Features Grid */}
       <section className="py-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">Why Verdyx</span>
+            <h2 className="text-3xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-4">Built for engineers who ship</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+              Consensus-backed detection that drops straight into your pipeline — no single vendor, no black box.
+            </p>
+          </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
@@ -120,9 +132,11 @@ export default function Home() {
                 desc: "Deploy a node in your own infrastructure to run proprietary YARA rules without sharing them with the network."
               }
             ].map((Feature, idx) => (
-              <div key={idx} className="p-8 rounded-xl border border-border/60 bg-card/40 hover:border-primary/40 hover:bg-card/70 transition-colors group">
-                <Feature.icon className="w-8 h-8 text-primary mb-6 group-hover:scale-110 transition-transform duration-300" />
-                <h3 className="text-xl font-bold text-foreground mb-3">{Feature.title}</h3>
+              <div key={idx} className="relative p-8 rounded-2xl border border-border/60 bg-card/40 hover:border-primary/40 hover:bg-card/70 hover:-translate-y-1 transition-all duration-300 group">
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 border border-primary/20 mb-6 group-hover:bg-primary/15 transition-colors">
+                  <Feature.icon className="w-6 h-6 text-primary group-hover:scale-110 transition-transform duration-300" />
+                </div>
+                <h3 className="text-xl font-bold font-display tracking-tight text-foreground mb-3">{Feature.title}</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">{Feature.desc}</p>
               </div>
             ))}

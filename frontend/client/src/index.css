@@ -3,117 +3,127 @@
 @tailwind utilities;
 
 /*
- * Verdyx Design System
- * A refined, professional dark theme for a threat-intelligence platform.
- * All surface, text, and accent colors are driven by semantic tokens so the
- * entire UI stays consistent. Avoid hardcoded color utilities in components.
+ * Verdyx Design System — "Aurora"
+ * A sleek, product-led dark aesthetic inspired by modern security/AI platforms.
+ * Deep indigo-black surfaces, a vivid indigo→magenta brand gradient, geometric
+ * typography (Space Grotesk / Inter), and restrained, purposeful motion.
+ *
+ * Everything is token-driven. Prefer semantic tokens and the utility classes
+ * defined here over hardcoded color values in components.
  */
 
 @layer base {
   :root {
-    /* Light theme — clean, high-contrast surfaces with a faint blue tint. */
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    /* Light theme — soft violet-tinted surfaces, high contrast. */
+    --background: 250 40% 99%;
+    --foreground: 250 30% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 250 30% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 250 30% 12%;
 
     /* Elevated surface used for nested panels, code blocks, table headers */
-    --surface: 210 40% 95%;
-    --surface-foreground: 222 47% 11%;
+    --surface: 250 32% 96%;
+    --surface-foreground: 250 30% 12%;
 
-    /* Brand — a slightly deeper blue so it stays legible on light surfaces */
-    --primary: 213 90% 48%;
+    /* Brand — indigo-violet, deepened so it stays legible on light surfaces */
+    --primary: 256 84% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 214 32% 91%;
-    --secondary-foreground: 222 47% 18%;
+    --secondary: 250 26% 94%;
+    --secondary-foreground: 250 30% 20%;
 
-    --muted: 214 32% 93%;
-    --muted-foreground: 215 16% 42%;
+    --muted: 250 24% 94%;
+    --muted-foreground: 250 10% 42%;
 
-    /* Accent — a measured emerald for "safe / verified" semantics */
-    --accent: 160 74% 34%;
+    /* Accent — vivid magenta-violet, the second brand-gradient stop */
+    --accent: 285 74% 54%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 48%;
+    --destructive: 0 74% 52%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 160 74% 34%;
+    --success: 152 60% 40%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 45%;
+    --warning: 34 92% 46%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 214 25% 86%;
-    --input: 214 25% 86%;
-    --ring: 213 90% 48%;
+    --border: 250 22% 88%;
+    --input: 250 22% 88%;
+    --ring: 256 84% 58%;
 
-    --chart-1: 213 90% 48%;
-    --chart-2: 160 74% 34%;
-    --chart-3: 262 60% 55%;
-    --chart-4: 38 92% 45%;
-    --chart-5: 0 72% 48%;
+    --chart-1: 256 84% 58%;
+    --chart-2: 285 74% 54%;
+    --chart-3: 190 88% 42%;
+    --chart-4: 34 92% 48%;
+    --chart-5: 152 60% 42%;
 
-    --radius: 0.625rem;
+    /* Brand gradient stops — indigo → magenta */
+    --brand-from: 256 89% 62%;
+    --brand-to: 288 82% 60%;
 
-    --sidebar-background: 210 40% 98%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 213 90% 48%;
+    --radius: 0.75rem;
+
+    --sidebar-background: 250 40% 99%;
+    --sidebar-foreground: 250 30% 12%;
+    --sidebar-primary: 256 84% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 214 32% 93%;
-    --sidebar-accent-foreground: 222 47% 18%;
-    --sidebar-border: 214 25% 86%;
-    --sidebar-ring: 213 90% 48%;
+    --sidebar-accent: 250 26% 94%;
+    --sidebar-accent-foreground: 250 30% 20%;
+    --sidebar-border: 250 22% 88%;
+    --sidebar-ring: 256 84% 58%;
 
     --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
     --font-serif: Georgia, serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
   }
 
-  /* Dark theme — the original canonical Verdyx palette, applied via the .dark class. */
+  /* Dark theme — the canonical Verdyx "Aurora" palette (deep indigo-black). */
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 96%;
-    --card: 222 40% 9%;
-    --card-foreground: 210 40% 96%;
-    --popover: 222 44% 8%;
-    --popover-foreground: 210 40% 96%;
-    --surface: 222 38% 11%;
-    --surface-foreground: 210 40% 96%;
-    --primary: 213 94% 62%;
-    --primary-foreground: 222 47% 8%;
-    --secondary: 217 33% 16%;
-    --secondary-foreground: 210 40% 96%;
-    --muted: 217 33% 14%;
-    --muted-foreground: 215 18% 62%;
-    --accent: 160 70% 42%;
-    --accent-foreground: 222 47% 8%;
-    --destructive: 0 72% 56%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 160 70% 42%;
-    --success-foreground: 222 47% 8%;
-    --warning: 38 92% 58%;
-    --warning-foreground: 222 47% 8%;
-    --border: 217 30% 18%;
-    --input: 217 30% 18%;
-    --ring: 213 94% 62%;
-    --chart-1: 213 94% 62%;
-    --chart-2: 160 70% 42%;
-    --chart-3: 262 70% 64%;
-    --chart-4: 38 92% 58%;
-    --chart-5: 0 72% 56%;
-    --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 210 40% 96%;
-    --sidebar-primary: 213 94% 62%;
-    --sidebar-primary-foreground: 222 47% 8%;
-    --sidebar-accent: 217 33% 14%;
-    --sidebar-accent-foreground: 210 40% 96%;
-    --sidebar-border: 217 30% 18%;
-    --sidebar-ring: 213 94% 62%;
+    --background: 250 32% 6%;
+    --foreground: 250 20% 96%;
+    --card: 250 28% 9%;
+    --card-foreground: 250 20% 96%;
+    --popover: 250 30% 8%;
+    --popover-foreground: 250 20% 96%;
+    --surface: 250 24% 12%;
+    --surface-foreground: 250 20% 96%;
+    --primary: 256 89% 66%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 250 22% 15%;
+    --secondary-foreground: 250 20% 92%;
+    --muted: 250 20% 13%;
+    --muted-foreground: 250 12% 66%;
+    --accent: 285 80% 66%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 78% 62%;
+    --destructive-foreground: 250 20% 98%;
+    --success: 152 62% 46%;
+    --success-foreground: 250 32% 8%;
+    --warning: 38 94% 60%;
+    --warning-foreground: 250 32% 8%;
+    --border: 250 20% 17%;
+    --input: 250 20% 17%;
+    --ring: 256 89% 66%;
+    --chart-1: 256 89% 66%;
+    --chart-2: 285 80% 66%;
+    --chart-3: 190 90% 55%;
+    --chart-4: 38 94% 60%;
+    --chart-5: 152 62% 50%;
+    --brand-from: 256 92% 68%;
+    --brand-to: 292 88% 68%;
+    --sidebar-background: 250 32% 6%;
+    --sidebar-foreground: 250 20% 96%;
+    --sidebar-primary: 256 89% 66%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 250 20% 13%;
+    --sidebar-accent-foreground: 250 20% 96%;
+    --sidebar-border: 250 20% 17%;
+    --sidebar-ring: 256 89% 66%;
   }
 }
 
@@ -131,38 +141,93 @@
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Display headings use the geometric face with tightened tracking. */
+  h1, h2, h3, .font-display {
+    letter-spacing: -0.02em;
   }
 
   /* Consistent, accessible focus rings across the app */
   :focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
+
+  /* Refined, low-contrast custom scrollbar (dark-first). */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--foreground) / 0.14);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--foreground) / 0.24);
+    background-clip: padding-box;
+  }
 }
 
 @layer utilities {
-  /* Subtle blueprint grid — restrained for a professional feel */
+  /* Subtle blueprint grid — soft, radially masked so it fades toward edges. */
   .cyber-grid {
     background-image:
-      linear-gradient(hsl(var(--primary) / 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(var(--primary) / 0.05) 1px, transparent 1px);
-    background-size: 56px 56px;
+      linear-gradient(hsl(var(--foreground) / 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.04) 1px, transparent 1px);
+    background-size: 64px 64px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
   }
 
-  /* Soft, professional elevation glow (token-driven, low intensity) */
+  /* Aurora glow field — large, soft brand-colored radial blooms for backdrops. */
+  .aurora-bg {
+    background:
+      radial-gradient(50% 45% at 20% 10%, hsl(var(--brand-from) / 0.16) 0%, transparent 70%),
+      radial-gradient(45% 45% at 85% 15%, hsl(var(--brand-to) / 0.14) 0%, transparent 70%),
+      radial-gradient(60% 50% at 50% 100%, hsl(var(--primary) / 0.10) 0%, transparent 70%);
+  }
+
+  /* Soft, premium elevation glow (token-driven, low intensity) */
   .glow-effect {
-    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.12), 0 8px 30px hsl(var(--primary) / 0.12);
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.18),
+      0 10px 30px -8px hsl(var(--brand-from) / 0.45),
+      0 2px 8px -2px hsl(var(--brand-to) / 0.25);
+  }
+
+  .glow-effect:hover {
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.28),
+      0 14px 40px -8px hsl(var(--brand-from) / 0.6),
+      0 4px 12px -2px hsl(var(--brand-to) / 0.35);
   }
 
   .neon-border {
     border: 1px solid hsl(var(--border));
-    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.04);
+    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.05);
+  }
+
+  /* Gradient hairline border via mask compositing. */
+  .border-gradient {
+    position: relative;
+    border: 1px solid transparent;
+    background:
+      linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
+      linear-gradient(135deg, hsl(var(--brand-from) / 0.6), hsl(var(--brand-to) / 0.15) 60%, transparent) border-box;
   }
 
   /* Frosted panel using semantic surface tones */
   .glassmorphism {
-    background: hsl(var(--card) / 0.6);
-    backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--border) / 0.8);
+    background: hsl(var(--card) / 0.55);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid hsl(var(--border) / 0.7);
   }
 
   .surface-panel {
@@ -171,11 +236,11 @@
   }
 
   .threat-visualization {
-    background: radial-gradient(circle at center, hsl(var(--destructive) / 0.18) 0%, hsl(var(--destructive) / 0.04) 50%, transparent 100%);
+    background: radial-gradient(circle at center, hsl(var(--destructive) / 0.2) 0%, hsl(var(--destructive) / 0.04) 50%, transparent 100%);
   }
 
   .safe-visualization {
-    background: radial-gradient(circle at center, hsl(var(--accent) / 0.18) 0%, hsl(var(--accent) / 0.04) 50%, transparent 100%);
+    background: radial-gradient(circle at center, hsl(var(--success) / 0.2) 0%, hsl(var(--success) / 0.04) 50%, transparent 100%);
   }
 
   .scanning-animation {
@@ -190,7 +255,7 @@
   }
 
   .hologram-effect {
-    background: linear-gradient(45deg, transparent 30%, hsl(var(--primary) / 0.08) 50%, transparent 70%);
+    background: linear-gradient(45deg, transparent 30%, hsl(var(--primary) / 0.1) 50%, transparent 70%);
     background-size: 200% 200%;
     animation: hologram 3s ease-in-out infinite;
   }
@@ -198,25 +263,38 @@
   /* Brand gradient text used for headings */
   .text-gradient-brand {
     @apply text-transparent bg-clip-text;
-    background-image: linear-gradient(to right, hsl(var(--primary)), hsl(var(--accent)));
+    background-image: linear-gradient(120deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
+  }
+
+  /* Brand gradient fill for buttons/badges */
+  .bg-gradient-brand {
+    background-image: linear-gradient(120deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
+  }
+
+  /* Purposeful entrance motion — subtle rise + fade. */
+  .animate-fade-up {
+    animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-fade-in {
+    animation: fade-in 0.6s ease-out both;
   }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-20px) rotate(5deg); }
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-16px); }
 }
 
 @keyframes glow {
-  from { box-shadow: 0 0 0 1px hsl(var(--primary) / 0.1), 0 6px 20px hsl(var(--primary) / 0.08); }
-  to { box-shadow: 0 0 0 1px hsl(var(--primary) / 0.2), 0 10px 34px hsl(var(--primary) / 0.18); }
+  from { box-shadow: 0 0 0 1px hsl(var(--primary) / 0.12), 0 8px 24px -8px hsl(var(--brand-from) / 0.35); }
+  to { box-shadow: 0 0 0 1px hsl(var(--primary) / 0.24), 0 14px 40px -8px hsl(var(--brand-from) / 0.6); }
 }
 
 @keyframes particle {
-  0% { transform: translateY(100vh) translateX(0px) rotate(0deg); opacity: 0; }
+  0% { transform: translateY(100vh) translateX(0px); opacity: 0; }
   10% { opacity: 1; }
   90% { opacity: 1; }
-  100% { transform: translateY(-100vh) translateX(100px) rotate(360deg); opacity: 0; }
+  100% { transform: translateY(-100vh) translateX(80px); opacity: 0; }
 }
 
 @keyframes scan {
@@ -234,16 +312,31 @@
   50% { opacity: 0.5; }
 }
 
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
 .animate-float {
   animation: float 6s ease-in-out infinite;
 }
 
 .animate-glow {
-  animation: glow 2.5s ease-in-out infinite alternate;
+  animation: glow 2.6s ease-in-out infinite alternate;
 }
 
 .animate-particle {
-  animation: particle 20s linear infinite;
+  animation: particle 22s linear infinite;
 }
 
 .animate-pulse-slow {
@@ -254,24 +347,24 @@
   position: fixed;
   width: 3px;
   height: 3px;
-  background: hsl(var(--primary) / 0.6);
+  background: hsl(var(--primary) / 0.55);
   border-radius: 50%;
   pointer-events: none;
-  animation: particle 20s linear infinite;
+  animation: particle 22s linear infinite;
 }
 
 .particle:nth-child(2n) {
   width: 2px;
   height: 2px;
-  background: hsl(var(--accent) / 0.6);
-  animation-duration: 25s;
+  background: hsl(var(--accent) / 0.55);
+  animation-duration: 26s;
   animation-delay: -5s;
 }
 
 .particle:nth-child(3n) {
   width: 2px;
   height: 2px;
-  background: hsl(var(--muted-foreground) / 0.5);
+  background: hsl(var(--muted-foreground) / 0.4);
   animation-duration: 30s;
   animation-delay: -10s;
 }

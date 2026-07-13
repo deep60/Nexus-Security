@@ -43,30 +43,38 @@ export function Navigation() {
       >
         Skip to main content
       </a>
-      <nav className="relative z-10 glassmorphism border-b border-border/50">
+      <nav className="sticky top-0 z-50 glassmorphism border-b border-border/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" data-testid="link-home">
-            <div className="flex items-center space-x-2 text-2xl font-bold font-display text-gradient-brand">
-              <Shield className="h-8 w-8 text-primary" />
-              <span>VERDYX</span>
+            <div className="group flex items-center gap-2.5">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-brand text-white shadow-[0_6px_18px_-6px_hsl(var(--brand-from)/0.7)] transition-transform group-hover:scale-105">
+                <Shield className="h-5 w-5" />
+              </span>
+              <span className="text-2xl font-bold font-display tracking-tight text-foreground">
+                Verdyx
+              </span>
             </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center gap-1">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 data-testid={`link-${item.label.toLowerCase()}`}
-                className={`text-muted-foreground hover:text-primary transition-colors ${
-                  location === item.href ? "text-primary" : ""
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  location === item.href
+                    ? "text-foreground bg-secondary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                 }`}
               >
                 {item.label}
               </Link>
             ))}
+
+            <div className="mx-2 h-5 w-px bg-border" />
 
             <ThemeToggle />
 
@@ -120,7 +128,7 @@ export function Navigation() {
                   </Button>
                 </Link>
                 <Link href="/register">
-                  <Button className="glow-effect" data-testid="button-register">
+                  <Button variant="gradient" data-testid="button-register">
                     Get Started
                   </Button>
                 </Link>
@@ -193,7 +201,7 @@ export function Navigation() {
                       </Button>
                     </Link>
                     <Link href="/register">
-                      <Button className="w-full glow-effect" data-testid="mobile-button-register">
+                      <Button variant="gradient" className="w-full" data-testid="mobile-button-register">
                         Get Started
                       </Button>
                     </Link>

@@ -168,7 +168,7 @@ export default function AnalysisDetails() {
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="text-4xl font-bold mb-2">Analysis Results</h1>
+            <h1 className="text-4xl md:text-5xl font-bold font-display tracking-[-0.03em] mb-2">Analysis Results</h1>
             <p className="text-muted-foreground">{submission.filename}</p>
           </div>
           <ExportReport
@@ -243,7 +243,7 @@ export default function AnalysisDetails() {
                   </Badge>
                 </div>
                 <div className="text-center">
-                  <div className="text-4xl font-bold text-primary">{consensus.confidenceScore}%</div>
+                  <div className="text-4xl font-bold font-display tracking-tight text-primary">{consensus.confidenceScore}%</div>
                   <div className="text-sm text-muted-foreground">Confidence</div>
                 </div>
               </div>
@@ -252,15 +252,15 @@ export default function AnalysisDetails() {
 
               <div className="grid grid-cols-3 gap-6">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-destructive">{consensus.maliciousVotes}</div>
+                  <div className="text-3xl font-bold font-display tracking-tight text-destructive">{consensus.maliciousVotes}</div>
                   <div className="text-sm text-muted-foreground">Malicious Votes</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-secondary">{consensus.suspiciousVotes}</div>
+                  <div className="text-3xl font-bold font-display tracking-tight text-secondary">{consensus.suspiciousVotes}</div>
                   <div className="text-sm text-muted-foreground">Suspicious Votes</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-success">{consensus.cleanVotes}</div>
+                  <div className="text-3xl font-bold font-display tracking-tight text-success">{consensus.cleanVotes}</div>
                   <div className="text-sm text-muted-foreground">Clean Votes</div>
                 </div>
               </div>

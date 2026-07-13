@@ -15,8 +15,9 @@ export default function UseCases() {
       
       <main id="main-content" tabIndex={-1} className="pt-32 pb-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16 max-w-3xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-6">
+          <div className="text-center mb-16 max-w-3xl mx-auto animate-fade-up">
+            <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">Use Cases</span>
+            <h1 className="text-4xl md:text-6xl font-bold font-display text-foreground tracking-[-0.03em] mb-6">
               Solutions by Role
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
@@ -40,7 +41,7 @@ export default function UseCases() {
             <TabsContent value="soc" className="focus-visible:outline-none focus-visible:ring-0">
               <div className="grid md:grid-cols-2 gap-12 items-center">
                 <div className="space-y-6">
-                  <h2 className="text-3xl font-bold text-foreground">Automate Triage. Eliminate Alert Fatigue.</h2>
+                  <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Automate Triage. Eliminate Alert Fatigue.</h2>
                   <p className="text-muted-foreground text-lg">
                     Stop wasting analysts' time on sandbox setup. Feed suspicious payloads into Verdyx directly from your SOAR. The consensus engine filters out low-confidence noise.
                   </p>
@@ -79,7 +80,7 @@ export default function UseCases() {
             <TabsContent value="devsecops" className="focus-visible:outline-none focus-visible:ring-0">
               <div className="grid md:grid-cols-2 gap-12 items-center">
                 <div className="space-y-6">
-                  <h2 className="text-3xl font-bold text-foreground">CI/CD Pipeline Security at Scale.</h2>
+                  <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">CI/CD Pipeline Security at Scale.</h2>
                   <p className="text-muted-foreground text-lg">
                     Don't let poisoned dependencies or injected malware reach production. Integrating Verdyx as a strict pre-flight check blocks deployments when consensus thresholds are breached.
                   </p>
@@ -121,7 +122,7 @@ export default function UseCases() {
             <TabsContent value="research" className="focus-visible:outline-none focus-visible:ring-0">
               <div className="grid md:grid-cols-2 gap-12 items-center">
                 <div className="space-y-6">
-                  <h2 className="text-3xl font-bold text-foreground">Verifiable Cryptographic Proofs.</h2>
+                  <h2 className="text-3xl font-bold font-display tracking-tight text-foreground">Verifiable Cryptographic Proofs.</h2>
                   <p className="text-muted-foreground text-lg">
                     Reverse engineers and researchers can download the exact engine signatures, memory dumps, and execution traces that led to the consensus score.
                   </p>

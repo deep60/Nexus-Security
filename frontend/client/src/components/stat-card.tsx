@@ -40,7 +40,7 @@ export function StatCard({ label, value, icon: Icon, accent = "primary", hint, t
             {loading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <p className="text-3xl font-bold tracking-tight tabular-nums">{value}</p>
+              <p className="text-3xl font-bold font-display tracking-tight tabular-nums">{value}</p>
             )}
           </div>
           <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", colors.iconBg)}>

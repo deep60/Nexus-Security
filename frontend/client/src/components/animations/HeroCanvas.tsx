@@ -44,9 +44,9 @@ export function HeroCanvas() {
     const nodeCount = 50;
     const maxDistance = 150;
     
-    // Cyber Blue (primary) & Matrix Green (accent)
-    const baseColor = "rgba(59, 130, 246, 0.3)";
-    const highlightColor = "rgba(16, 185, 129, 0.5)";
+    // Aurora palette — indigo (primary) & magenta (accent)
+    const baseColor = "rgba(124, 92, 246, 0.35)";
+    const highlightColor = "rgba(214, 92, 246, 0.55)";
 
     const nodes = Array.from({ length: nodeCount }).map(() => ({
       x: Math.random() * (canvas.width / (window.devicePixelRatio || 1)),
@@ -84,9 +84,9 @@ export function HeroCanvas() {
             ctx.moveTo(nodes[i].x, nodes[i].y);
             ctx.lineTo(nodes[j].x, nodes[j].y);
             
-            ctx.strokeStyle = nodes[i].isHighlight || nodes[j].isHighlight 
-              ? `rgba(16, 185, 129, ${opacity * 0.4})` 
-              : `rgba(59, 130, 246, ${opacity * 0.2})`;
+            ctx.strokeStyle = nodes[i].isHighlight || nodes[j].isHighlight
+              ? `rgba(214, 92, 246, ${opacity * 0.4})`
+              : `rgba(124, 92, 246, ${opacity * 0.22})`;
               
             ctx.lineWidth = 1;
             ctx.stroke();
@@ -104,7 +104,7 @@ export function HeroCanvas() {
         if (node.isHighlight) {
           ctx.beginPath();
           ctx.arc(node.x, node.y, node.radius * 3, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(16, 185, 129, 0.1)`;
+          ctx.fillStyle = `rgba(214, 92, 246, 0.12)`;
           ctx.fill();
         }
       });
