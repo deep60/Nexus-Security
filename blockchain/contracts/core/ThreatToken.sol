@@ -5,6 +5,7 @@ pragma solidity ^0.8.19;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -23,6 +24,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  */
 
 contract ThreatToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     // Roles
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -346,20 +349,26 @@ contract ThreatToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl, Reen
      * @param token Address of token to recover
      * @param amount Amount to recover
      */
-    function emergencyRecover(address token, uint256 amount) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
+    function emergencyRecover(address token, uint256 amount)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        nonReentrant
     {
         if (token == address(this)) {
             // Only recover excess tokens not part of active stakes
             uint256 contractBalance = balanceOf(address(this));
             require(amount <= contractBalance - globalActiveStakes, "Cannot recover staked tokens");
         }
-        
+
         if (token == address(0)) {
-            payable(msg.sender).transfer(amount);
+            // Recipient is constrained to the admin by onlyRole; use call (not
+            // transfer) to avoid the 2300-gas stipend and check the result.
+            // slither-disable-next-line arbitrary-send-eth
+            (bool success, ) = payable(msg.sender).call{value: amount}("");
+            require(success, "ETH recovery failed");
         } else {
-            IERC20(token).transfer(msg.sender, amount);
+            // safeTransfer reverts on tokens that return false instead of reverting.
+            IERC20(token).safeTransfer(msg.sender, amount);
         }
     }
     
