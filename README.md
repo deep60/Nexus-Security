@@ -29,33 +29,6 @@ Traditional threat detection relies on single-vendor engines, which creates blin
 
 The result is a threat feed where every verdict has skin in the game, priced and settled on-chain.
 
-## Architecture
-
-Verdyx is a set of Rust microservices behind a single API gateway, a React web client, and a Solidity contract suite for staking, payouts, and reputation.
-
-```
-                         ┌─────────────┐
-                         │   Frontend   │  React + Vite + TS
-                         └──────┬───────┘
-                                │ REST (/api/v1)
-                         ┌──────▼───────┐
-                         │  API Gateway │  auth, routing, rate limiting
-                         └──────┬───────┘
-        ┌──────────┬───────────┼───────────┬──────────────┬─────────────┐
-        ▼          ▼           ▼           ▼              ▼             ▼
-   User Svc  Submission Svc  Bounty Mgr  Consensus Svc  Reputation Svc  Payment Svc
-        │          │           │           │              │             │
-        └──────────┴─────┬─────┴───────────┴──────────────┴─────────────┘
-                          │
-                 ┌────────▼────────┐        ┌───────────────────────┐
-                 │ Postgres / Redis│        │ Ethereum Smart Contracts│
-                 │  / Object Store │        │ BountyManager · ThreatToken │
-                 └─────────────────┘        │ ReputationSystem · Governance│
-                                             └───────────────────────┘
-```
-
-See [`docs/architecture/system-design.md`](docs/architecture/system-design.md) and [`docs/architecture/data-flow.md`](docs/architecture/data-flow.md) for the full breakdown.
-
 ### Backend services (`backend/`)
 
 Rust workspace, one crate per domain:
