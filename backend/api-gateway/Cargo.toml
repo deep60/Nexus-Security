@@ -55,7 +55,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenvy = "0.15"
 
 # JWT tokens
-jsonwebtoken = "9.0"
+jsonwebtoken = "10.3"
 
 # Password hashing
 argon2 = "0.5"
