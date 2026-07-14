@@ -511,6 +511,36 @@ services:
       - verdyx-network
     restart: unless-stopped
 
+  # ── Auto-deploy ────────────────────────────────────────────────────────────
+  # Watches GHCR for new :latest images and restarts the affected app
+  # containers. Pull-based / outbound-only — needs no inbound access, GitHub
+  # secrets, or security-group changes. Only the app services named below are
+  # monitored; stateful infra (postgres/redis/minio/clamav/pgadmin) is
+  # deliberately excluded so it never auto-updates.
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: verdyx-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_CLEANUP: "true"            # prune the old image after each update
+      WATCHTOWER_POLL_INTERVAL: "300"       # check GHCR every 5 minutes
+      WATCHTOWER_ROLLING_RESTART: "true"    # update one container at a time
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_NO_STARTUP_MESSAGE: "true"
+    command: >-
+      verdyx-frontend
+      verdyx-api-gateway
+      verdyx-user-service
+      verdyx-analysis-engine
+      verdyx-bounty-manager
+      verdyx-submission-service
+      verdyx-consensus-service
+      verdyx-payment-service
+      verdyx-reputation-service
+      verdyx-notification-service
+
 networks:
   verdyx-network:
     driver: bridge
