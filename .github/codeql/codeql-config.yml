@@ -1,0 +1,10 @@
+name: "Verdyx CodeQL config"
+
+# Exclude generated / vendored code so CodeQL only analyzes source we own.
+paths-ignore:
+  - frontend/coverage
+  - frontend/dist
+  - frontend/playwright-report
+  - frontend/test-results
+  - "**/node_modules"
+  - "**/*.min.js"

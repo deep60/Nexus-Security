@@ -53,7 +53,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     );
 
     proxyReq.on("error", (err) => {
-      console.error(`[proxy] Error proxying ${req.originalUrl}:`, err.message);
+      // Pass the user-controlled URL as a separate argument (not interpolated
+      // into the format string) to avoid tainted-format-string / log injection.
+      console.error("[proxy] Error proxying request:", req.originalUrl, err.message);
       if (!res.headersSent) {
         res.writeHead(502, { "Content-Type": "application/json" });
       }
