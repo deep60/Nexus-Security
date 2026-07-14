@@ -20,7 +20,9 @@ pub struct PaymentService {
     config: Config,
     db_pool: PgPool,
     redis_conn: ConnectionManager,
-    provider: BlockchainProvider,
+    // None when the blockchain RPC is disabled/unreachable at startup. On-chain
+    // operations return an error in that mode; DB-backed routes keep working.
+    provider: Option<BlockchainProvider>,
 }
 
 impl PaymentService {
@@ -28,7 +30,7 @@ impl PaymentService {
         config: Config,
         db_pool: PgPool,
         redis_conn: ConnectionManager,
-        provider: BlockchainProvider,
+        provider: Option<BlockchainProvider>,
     ) -> Result<Self> {
         Ok(Self {
             config,
@@ -42,6 +44,13 @@ impl PaymentService {
         &self.db_pool
     }
 
+    /// The blockchain provider, or an error when the chain is unavailable.
+    fn provider(&self) -> Result<&BlockchainProvider> {
+        self.provider.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("blockchain provider unavailable (RPC disabled or unreachable)")
+        })
+    }
+
     /// Build a treasury-signing client (provider + treasury wallet).
     fn signer_client(&self) -> Result<Arc<SignerClient>> {
         let wallet = self
@@ -52,7 +61,7 @@ impl PaymentService {
             .context("Invalid treasury private key")?
             .with_chain_id(self.config.blockchain.chain_id);
 
-        let client = SignerMiddleware::new(self.provider.clone(), wallet);
+        let client = SignerMiddleware::new(self.provider()?.clone(), wallet);
         Ok(Arc::new(client))
     }
 
@@ -63,7 +72,7 @@ impl PaymentService {
             .token_contract_address
             .parse()
             .context("Invalid token contract address")?;
-        Ok(TokenContract::new(addr, self.provider.clone()))
+        Ok(TokenContract::new(addr, self.provider()?.clone()))
     }
 
     fn token_contract_signed(&self) -> Result<TokenContract<SignerClient>> {
@@ -93,7 +102,7 @@ impl PaymentService {
         tx_hash: &str,
     ) -> Result<Option<ethers::types::TransactionReceipt>> {
         let hash: H256 = tx_hash.parse().context("Invalid transaction hash")?;
-        self.provider
+        self.provider()?
             .get_transaction_receipt(hash)
             .await
             .context("Failed to get transaction receipt")
@@ -101,7 +110,7 @@ impl PaymentService {
 
     pub async fn estimate_gas_for_transfer(&self) -> Result<U256> {
         let gas_price = self
-            .provider
+            .provider()?
             .get_gas_price()
             .await
             .context("Failed to get gas price")?;
@@ -109,10 +118,13 @@ impl PaymentService {
     }
 
     pub async fn health_check(&self) -> bool {
+        let Some(provider) = self.provider.as_ref() else {
+            return false;
+        };
         matches!(
             tokio::time::timeout(
                 std::time::Duration::from_secs(5),
-                self.provider.get_block_number(),
+                provider.get_block_number(),
             )
             .await,
             Ok(Ok(_))
