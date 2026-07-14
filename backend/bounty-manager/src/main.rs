@@ -220,10 +220,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(blockchain) = blockchain.clone() {
         // Blockchain sync: mirror on-chain events (ConsensusReached, RewardsDistributed,
         // ...) into the database. `start()` spawns its own loop and returns quickly.
-        let sync_service = services::blockchain_sync::BlockchainSyncService::new(
-            db.clone(),
-            blockchain.clone(),
-        );
+        let sync_service =
+            services::blockchain_sync::BlockchainSyncService::new(db.clone(), blockchain.clone());
         info!("Blockchain sync service starting...");
         if let Err(e) = sync_service.start().await {
             error!("Blockchain sync service failed to start: {}", e);

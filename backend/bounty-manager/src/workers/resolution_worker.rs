@@ -57,11 +57,17 @@ impl ResolutionWorker {
             return Ok(());
         }
 
-        info!("Found {} bounties eligible for resolution", candidates.len());
+        info!(
+            "Found {} bounties eligible for resolution",
+            candidates.len()
+        );
 
         for (bounty_id, on_chain_id) in candidates {
             if let Err(e) = self.resolve_one(bounty_id, &on_chain_id).await {
-                error!("Failed to resolve bounty {} (chain id {}): {}", bounty_id, on_chain_id, e);
+                error!(
+                    "Failed to resolve bounty {} (chain id {}): {}",
+                    bounty_id, on_chain_id, e
+                );
             }
         }
 
@@ -112,7 +118,10 @@ impl ResolutionWorker {
             .await
             .map_err(|e| WorkerError::BlockchainError(e.to_string()))?;
 
-        info!("Resolution tx submitted for bounty {}: {}", bounty_id, tx_hash);
+        info!(
+            "Resolution tx submitted for bounty {}: {}",
+            bounty_id, tx_hash
+        );
 
         // Mark the bounty so the keeper does not resubmit while the sync service
         // catches up and flips the status to Completed/Paid from chain events.

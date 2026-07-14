@@ -46,7 +46,11 @@ pub async fn get_claimable(
             match e {
                 BlockchainError::InvalidAddress(_) => StatusCode::BAD_REQUEST,
                 other => {
-                    tracing::error!("Failed to read pending withdrawal for {}: {}", address, other);
+                    tracing::error!(
+                        "Failed to read pending withdrawal for {}: {}",
+                        address,
+                        other
+                    );
                     StatusCode::BAD_GATEWAY
                 }
             }
