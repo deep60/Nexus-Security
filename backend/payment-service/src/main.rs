@@ -85,9 +85,23 @@ async fn main() -> Result<()> {
     let redis_conn = redis_client.get_connection_manager().await?;
     info!("Redis connection established");
 
-    // Initialize blockchain provider
-    let provider = blockchain::provider::create_provider(&config.blockchain).await?;
-    info!("Blockchain provider initialized");
+    // Initialize blockchain provider. Don't hard-fail startup if the RPC is
+    // unreachable (blockchain disabled in CI/dev, or a momentary outage): run
+    // with no provider so DB-backed payment routes still serve. On-chain
+    // operations return an error until the RPC is reachable.
+    let provider = match blockchain::provider::create_provider(&config.blockchain).await {
+        Ok(p) => {
+            info!("Blockchain provider initialized");
+            Some(p)
+        }
+        Err(e) => {
+            warn!(
+                "Blockchain provider unavailable ({e}); on-chain payment features disabled \
+                 until the RPC is reachable."
+            );
+            None
+        }
+    };
 
     // Initialize payment service
     let payment_service = Arc::new(
