@@ -132,14 +132,23 @@ impl BlockchainService {
         // Create client
         let client = Arc::new(SignerMiddleware::new(provider, wallet));
 
-        // Get current nonce
+        // Get current nonce. Don't hard-fail startup if the RPC is unreachable
+        // (blockchain disabled in CI/dev, or a momentary node outage): start at
+        // nonce 0 so the gateway still binds and serves its non-chain routes.
+        // It is refreshed on the next on-chain transaction.
         let address = client.address();
-        let nonce = client
-            .get_transaction_count(address, None)
-            .await
-            .context("Failed to get transaction count")?;
+        let nonce = match client.get_transaction_count(address, None).await {
+            Ok(n) => n.as_u64(),
+            Err(e) => {
+                tracing::warn!(
+                    "Blockchain RPC unreachable at startup ({e}); starting with nonce 0. \
+                     On-chain features are unavailable until the RPC is reachable."
+                );
+                0
+            }
+        };
 
-        // Load contract ABIs and create instances
+        // Load contract ABIs and create instances (no network calls)
         let contracts = Self::load_contracts(&client, &config).await?;
 
         Ok(Self {
@@ -147,7 +156,7 @@ impl BlockchainService {
             contracts,
             config,
             pending_transactions: Arc::new(RwLock::new(HashMap::new())),
-            nonce_manager: Arc::new(Mutex::new(nonce.as_u64())),
+            nonce_manager: Arc::new(Mutex::new(nonce)),
         })
     }
 
