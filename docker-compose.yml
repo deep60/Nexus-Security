@@ -524,6 +524,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
+      # containrrr/watchtower:latest ships an old Docker API client; pin the
+      # negotiated version so the modern host daemon (min API 1.40) accepts it.
+      DOCKER_API_VERSION: "1.40"
       WATCHTOWER_CLEANUP: "true"            # prune the old image after each update
       WATCHTOWER_POLL_INTERVAL: "300"       # check GHCR every 5 minutes
       WATCHTOWER_ROLLING_RESTART: "true"    # update one container at a time
