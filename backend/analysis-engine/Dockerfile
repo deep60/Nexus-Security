@@ -1,4 +1,4 @@
-FROM rust:1.88-slim-bookworm AS builder
+FROM rust:1.94-slim-bookworm AS builder
 
 # Install build dependencies. YARA is installed from Debian bookworm-backports
 # (libyara 4.5.x) instead of compiling from source, which avoids the autoconf
