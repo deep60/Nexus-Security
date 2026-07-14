@@ -1,5 +1,6 @@
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
+import { KineticText } from "@/components/motion/kinetic-text";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -19,7 +20,7 @@ export default function Pricing() {
           <div className="text-center mb-20 max-w-3xl mx-auto animate-fade-up">
             <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">Pricing</span>
             <h1 className="text-4xl md:text-6xl font-bold font-display text-foreground tracking-[-0.03em] mb-6">
-              Transparent API Pricing
+              <KineticText text="Transparent API Pricing" />
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed mt-4">
               Pay strictly for the compute you consume. No required sales calls, no artificial rate limits, and zero hidden fees.

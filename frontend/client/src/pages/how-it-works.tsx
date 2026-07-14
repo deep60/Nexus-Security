@@ -1,6 +1,7 @@
 import { Navigation } from "@/components/navigation";
 import { ArchitectureDiagram } from "@/components/diagrams/ArchitectureDiagram";
 import { Footer } from "@/components/footer";
+import { KineticText } from "@/components/motion/kinetic-text";
 import { SEO } from "@/components/seo";
 
 export default function HowItWorks() {
@@ -17,7 +18,7 @@ export default function HowItWorks() {
           <div className="mb-16 animate-fade-up">
             <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">How It Works</span>
             <h1 className="text-4xl md:text-6xl font-bold font-display text-foreground tracking-[-0.03em] mb-6">
-              How Verdyx Works
+              <KineticText text="How Verdyx Works" />
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
               A transparent, verifiable pipeline replacing the legacy black-box heuristics of traditional antivirus.
