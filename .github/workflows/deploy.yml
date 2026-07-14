@@ -128,11 +128,31 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: backend
+      # Each service's db_schema.rs test applies its OWN migrations. Several
+      # services share migration version 20240101000000 with different content,
+      # so pointing them all at one DB collides (VersionMismatch). Give each its
+      # own database — the tests already read a per-service *_DATABASE_URL.
+      - name: Create per-service test databases
+        env:
+          PGPASSWORD: test_password
+        run: |
+          for db in analysis bounty consensus notification payment reputation submission user; do
+            psql -h localhost -U test_user -d verdyx_test -c "CREATE DATABASE verdyx_test_$db;"
+          done
+
       - name: Run backend tests
         working-directory: ./backend
         run: cargo test --workspace
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test
+          ANALYSIS_ENGINE_DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test_analysis
+          BOUNTY_MANAGER_DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test_bounty
+          CONSENSUS_SERVICE_DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test_consensus
+          NOTIFICATION_SERVICE_DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test_notification
+          PAYMENT_SERVICE_DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test_payment
+          REPUTATION_SERVICE_DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test_reputation
+          SUBMISSION_SERVICE_DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test_submission
+          USER_SERVICE_DATABASE_URL: postgresql://test_user:test_password@localhost:5432/verdyx_test_user
           REDIS_URL: redis://localhost:6379
 
   # ── Security scans (SAST + dependency audit) ───────────────────────────────
