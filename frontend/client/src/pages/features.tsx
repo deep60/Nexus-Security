@@ -1,5 +1,7 @@
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
+import { Reveal } from "@/components/motion/reveal";
+import { KineticText } from "@/components/motion/kinetic-text";
 import { Terminal, Shield, Zap, Cpu, Database, Network } from "lucide-react";
 import { SEO } from "@/components/seo";
 
@@ -53,10 +55,10 @@ export default function Features() {
       
       <main id="main-content" tabIndex={-1} className="pt-32 pb-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-20 max-w-3xl mx-auto animate-fade-up">
+          <div className="text-center mb-20 max-w-3xl mx-auto">
             <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">Features</span>
             <h1 className="text-4xl md:text-6xl font-bold font-display text-foreground tracking-[-0.03em] mb-6">
-              Technical Capabilities
+              <KineticText text="Technical Capabilities" />
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
               Built for speed, accuracy, and transparency. Designed to integrate seamlessly into modern security operations.
@@ -65,7 +67,7 @@ export default function Features() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, idx) => (
-              <div key={idx} className="group relative bg-card/40 border border-border/60 rounded-2xl overflow-hidden hover:border-primary/50 hover:-translate-y-1 transition-all duration-300">
+              <Reveal key={idx} delay={(idx % 3) * 100} className="group relative h-full bg-card/40 border border-border/60 rounded-2xl overflow-hidden hover:border-primary/50 hover:-translate-y-1 transition-all duration-300">
                 <div className="p-8">
                   <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 border border-primary/20 mb-6 group-hover:bg-primary/15 transition-colors">
                     <feature.icon className="w-6 h-6 text-primary group-hover:scale-110 transition-transform" />
@@ -80,7 +82,7 @@ export default function Features() {
                     <code>{feature.code}</code>
                   </pre>
                 </div>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>

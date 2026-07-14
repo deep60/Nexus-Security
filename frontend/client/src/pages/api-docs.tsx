@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Key, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { KineticText } from "@/components/motion/kinetic-text";
 import { SEO } from "@/components/seo";
 
 export default function ApiDocs() {
@@ -90,7 +91,7 @@ print(f"Threat score: {results.json()['confidence']}")`;
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 animate-fade-up">
             <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">API Reference</span>
-            <h1 className="text-4xl md:text-6xl font-bold font-display tracking-[-0.03em] mb-4">Developer API</h1>
+            <h1 className="text-4xl md:text-6xl font-bold font-display tracking-[-0.03em] mb-4"><KineticText text="Developer API" /></h1>
             <p className="text-xl text-muted-foreground">Integrate threat intelligence into your applications</p>
           </div>
 

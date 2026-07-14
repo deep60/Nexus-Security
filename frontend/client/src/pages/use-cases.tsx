@@ -1,6 +1,7 @@
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { KineticText } from "@/components/motion/kinetic-text";
 import { Activity, GitBranch, Search, ChevronRight } from "lucide-react";
 import { SEO } from "@/components/seo";
 
@@ -18,7 +19,7 @@ export default function UseCases() {
           <div className="text-center mb-16 max-w-3xl mx-auto animate-fade-up">
             <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">Use Cases</span>
             <h1 className="text-4xl md:text-6xl font-bold font-display text-foreground tracking-[-0.03em] mb-6">
-              Solutions by Role
+              <KineticText text="Solutions by Role" />
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
               Verdyx is built layer-by-layer to support the distinct operational requirements of modern security teams.

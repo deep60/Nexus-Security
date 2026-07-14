@@ -2,6 +2,8 @@ import { Navigation } from "@/components/navigation";
 import { HeroCanvas } from "@/components/animations/HeroCanvas";
 import { ArchitectureDiagram } from "@/components/diagrams/ArchitectureDiagram";
 import { ComparisonTable } from "@/components/tables/ComparisonTable";
+import { Reveal } from "@/components/motion/reveal";
+import { KineticText } from "@/components/motion/kinetic-text";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -48,10 +50,10 @@ export default function Home() {
           </div>
 
           <h1 className="text-4xl md:text-6xl lg:text-[4.75rem] font-bold font-display text-foreground tracking-[-0.03em] mb-8 leading-[1.05]">
-            Verifiable malware analysis,<br />
-            <span className="text-gradient-brand">
+            <KineticText text="Verifiable malware analysis," stagger={45} /><br />
+            <Reveal as="span" className="text-gradient-brand inline-block" delay={340} y={16}>
               powered by consensus.
-            </span>
+            </Reveal>
           </h1>
 
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
@@ -93,27 +95,33 @@ export default function Home() {
       {/* How It Works (Diagram) Section */}
       <section className="py-24 relative bg-surface/30 border-y border-border/50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <Reveal className="text-center mb-16">
             <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">Architecture</span>
-            <h2 className="text-3xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-4">Architecture Deep Dive</h2>
+            <h2 className="text-3xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-4">
+              <KineticText text="Architecture Deep Dive" />
+            </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
               A transparent pipeline replacing the black box of legacy AVs. Hover over the layers to explore the components.
             </p>
-          </div>
-          <ArchitectureDiagram />
+          </Reveal>
+          <Reveal delay={120}>
+            <ArchitectureDiagram />
+          </Reveal>
         </div>
       </section>
 
       {/* Features Grid */}
       <section className="py-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <Reveal className="text-center mb-16">
             <span className="inline-block text-xs font-medium uppercase tracking-widest text-primary mb-4">Why Verdyx</span>
-            <h2 className="text-3xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-4">Built for engineers who ship</h2>
+            <h2 className="text-3xl md:text-5xl font-bold font-display text-foreground tracking-tight mb-4">
+              <KineticText text="Built for engineers who ship" />
+            </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
               Consensus-backed detection that drops straight into your pipeline — no single vendor, no black box.
             </p>
-          </div>
+          </Reveal>
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
@@ -132,13 +140,15 @@ export default function Home() {
                 desc: "Deploy a node in your own infrastructure to run proprietary YARA rules without sharing them with the network."
               }
             ].map((Feature, idx) => (
-              <div key={idx} className="relative p-8 rounded-2xl border border-border/60 bg-card/40 hover:border-primary/40 hover:bg-card/70 hover:-translate-y-1 transition-all duration-300 group">
-                <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 border border-primary/20 mb-6 group-hover:bg-primary/15 transition-colors">
-                  <Feature.icon className="w-6 h-6 text-primary group-hover:scale-110 transition-transform duration-300" />
+              <Reveal key={idx} delay={idx * 120}>
+                <div className="relative h-full p-8 rounded-2xl border border-border/60 bg-card/40 hover:border-primary/40 hover:bg-card/70 hover:-translate-y-1 transition-all duration-300 group">
+                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 border border-primary/20 mb-6 group-hover:bg-primary/15 transition-colors">
+                    <Feature.icon className="w-6 h-6 text-primary group-hover:scale-110 transition-transform duration-300" />
+                  </div>
+                  <h3 className="text-xl font-bold font-display tracking-tight text-foreground mb-3">{Feature.title}</h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed">{Feature.desc}</p>
                 </div>
-                <h3 className="text-xl font-bold font-display tracking-tight text-foreground mb-3">{Feature.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{Feature.desc}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -147,7 +157,9 @@ export default function Home() {
       {/* Comparison Section */}
       <section className="py-24 relative">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ComparisonTable />
+          <Reveal>
+            <ComparisonTable />
+          </Reveal>
         </div>
       </section>
       
