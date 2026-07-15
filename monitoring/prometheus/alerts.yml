@@ -1,0 +1,38 @@
+groups:
+  - name: verdyx-service-health
+    rules:
+      # Prometheus can't scrape the service — it's down, crash-looping, or
+      # unreachable. `up` is 1 when the last scrape succeeded, 0 otherwise.
+      - alert: ServiceDown
+        expr: up{job="verdyx-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} is down"
+          description: "Prometheus has failed to scrape {{ $labels.service }} for 2 minutes (crash-loop, unreachable, or not serving)."
+
+      # Service scrapes fine but reports itself not-serving.
+      - alert: ServiceNotServing
+        expr: verdyx_service_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} reports not serving"
+          description: "{{ $labels.service }} exposes verdyx_service_up=0 for 2 minutes."
+
+      # >10% of requests erroring over 5 minutes.
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum by (service) (rate(verdyx_http_errors_total[5m]))
+            /
+            clamp_min(sum by (service) (rate(verdyx_http_requests_total[5m])), 1)
+          ) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} error rate >10%"
+          description: "{{ $labels.service }} has returned errors for >10% of requests over the last 5 minutes."

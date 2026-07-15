@@ -544,6 +544,79 @@ services:
       verdyx-reputation-service
       verdyx-notification-service
 
+  # ── Observability (profile: monitoring) ─────────────────────────────────────
+  # Scrapes every service's /metrics and evaluates alert rules. Host port is
+  # bound to 127.0.0.1 only — reach it via SSH tunnel, never exposed publicly.
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: verdyx-prometheus
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks:
+      - verdyx-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Dashboards over Prometheus. Also 127.0.0.1-only; view via SSH tunnel
+  # (ssh -L 3001:localhost:3001 ...) or put it behind nginx + auth later.
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: verdyx-grafana
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-verdyx_admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    networks:
+      - verdyx-network
+
+  # ── Backups (profile: backup) ───────────────────────────────────────────────
+  # Nightly pg_dumpall of the whole cluster, gzipped, with local retention.
+  db-backup:
+    image: postgres:16-alpine
+    container_name: verdyx-db-backup
+    profiles: ["backup"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-verdyx_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./scripts/backup/pg-backup.sh:/usr/local/bin/pg-backup.sh:ro
+      - pg_backups:/backups
+    entrypoint: ["/bin/sh", "/usr/local/bin/pg-backup.sh"]
+    networks:
+      - verdyx-network
+
 networks:
   verdyx-network:
     driver: bridge
@@ -553,3 +626,6 @@ volumes:
   redis_data:
   minio_data:
   clamav_data:
+  prometheus_data:
+  grafana_data:
+  pg_backups:
