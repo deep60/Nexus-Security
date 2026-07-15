@@ -28,7 +28,7 @@ jobs:
           - { service: submission-service,   context: ./backend,  dockerfile: ./backend/submission-service/Dockerfile }
           - { service: user-service,         context: ./backend,  dockerfile: ./backend/user-service/Dockerfile }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: docker/setup-buildx-action@v3
 

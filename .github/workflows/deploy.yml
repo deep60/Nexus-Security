@@ -35,7 +35,7 @@ jobs:
       shared:               ${{ steps.filter.outputs.shared }}
       infrastructure:       ${{ steps.filter.outputs.infrastructure }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -78,7 +78,7 @@ jobs:
       run:
         working-directory: ./frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -123,7 +123,7 @@ jobs:
           --health-cmd "redis-cli ping" --health-interval 10s
           --health-timeout 5s --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -173,7 +173,7 @@ jobs:
       needs.changes.outputs.submission-service == 'true' ||
       needs.changes.outputs.user-service == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Rust supply-chain audit — BLOCKING on known vulnerabilities.
       # (Plain `cargo audit` fails on security advisories but not on
@@ -236,7 +236,7 @@ jobs:
         needs.changes.outputs.infrastructure == 'true'
       )
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Stage minimal .env for compose
         run: |
           cp .env.example .env || true
@@ -367,7 +367,7 @@ jobs:
             echo "Skipping ${{ matrix.service }} — no changes detected"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.should.outputs.build == 'true'
 
       - name: Set up Docker Buildx
@@ -438,7 +438,7 @@ jobs:
       SSH_USER: ${{ secrets.SSH_USER }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup SSH
         if: env.SSH_HOST != ''
