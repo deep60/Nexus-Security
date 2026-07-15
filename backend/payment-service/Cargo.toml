@@ -63,7 +63,7 @@ validator = { version = "0.18", features = ["derive"] }
 hex = "0.4"
 
 # Background job processing
-tokio-cron-scheduler = "0.10"
+tokio-cron-scheduler = "0.15"
 
 # Shared module
 shared = { path = "../shared", features = ["axum-mw"] }
