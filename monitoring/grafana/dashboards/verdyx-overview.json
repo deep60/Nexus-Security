@@ -1,0 +1,124 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "30s",
+  "title": "Verdyx — Service Overview",
+  "uid": "verdyx-overview",
+  "tags": ["verdyx"],
+  "schemaVersion": 39,
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Services Up",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "verdyx-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum(up{job=\"verdyx-backend\"})", "instant": true }
+      ],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": {
+        "defaults": {
+          "max": 9, "min": 0, "unit": "none",
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null },
+            { "color": "orange", "value": 8 },
+            { "color": "green", "value": 9 }
+          ] }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Total Requests / s",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "verdyx-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(verdyx_http_requests_total[5m]))" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2 } }
+    },
+    {
+      "type": "stat",
+      "title": "Error Rate",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "verdyx-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(verdyx_http_errors_total[5m])) / clamp_min(sum(rate(verdyx_http_requests_total[5m])), 1)" }
+      ],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit", "decimals": 2,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 0.05 },
+            { "color": "red", "value": 0.1 }
+          ] }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Firing Alerts",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "verdyx-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)", "instant": true }
+      ],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "red", "value": 1 }
+          ] }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Service Status (1 = up)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "verdyx-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "up{job=\"verdyx-backend\"}", "legendFormat": "{{service}}" }
+      ],
+      "fieldConfig": { "defaults": { "min": 0, "max": 1, "custom": { "fillOpacity": 10, "lineWidth": 2, "stepAfter": true } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Rate by Service (req/s)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "verdyx-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (service) (rate(verdyx_http_requests_total[5m]))", "legendFormat": "{{service}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10, "lineWidth": 2 } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Error Rate by Service (errors/s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "verdyx-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (service) (rate(verdyx_http_errors_total[5m]))", "legendFormat": "{{service}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10, "lineWidth": 2 } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Uptime by Service",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "verdyx-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "verdyx_service_uptime_seconds", "legendFormat": "{{service}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 0, "lineWidth": 2 } } }
+    }
+  ]
+}
