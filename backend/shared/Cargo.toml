@@ -30,7 +30,7 @@ async-trait = "0.1"
 
 # Optional axum integration (feature `axum-mw`). Off by default so services
 # that don't use axum (or are on a different axum version) are unaffected.
-axum = { version = "0.7", optional = true }
+axum = { version = "0.8", optional = true }
 
 [features]
 default = []

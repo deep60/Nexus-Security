@@ -13,7 +13,7 @@ ml-engine = ["dep:ort", "dep:ndarray"]  # Requires ONNX Runtime
 native-engines = ["yara-engine", "clamav", "ml-engine"]
 
 [dependencies]
-axum = { version = "0.7", features = ["multipart"] }
+axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }
 shared = { path = "../shared", features = ["axum-mw"] }
 tower = "0.4"
