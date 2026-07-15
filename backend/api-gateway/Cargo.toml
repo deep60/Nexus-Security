@@ -77,7 +77,7 @@ validator = { version = "0.18", features = ["derive"] }
 # Additional utilities that might be needed based on your code
 base64 = "0.21"
 hex = "0.4"
-bcrypt = "0.17.1"
+bcrypt = "0.19.2"
 regex = "1.11.2"
 sha3 = "0.10.8"
 ring = "0.17.14"
