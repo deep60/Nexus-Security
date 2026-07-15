@@ -61,7 +61,7 @@ jsonwebtoken = "9.3"
 argon2 = "0.5"
 
 # Configuration
-config = "0.14"
+config = "0.15"
 toml = "0.8"
 
 # File handling
