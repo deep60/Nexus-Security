@@ -1,0 +1,33 @@
+version: 2
+
+# Scheduled version updates (security updates run automatically regardless).
+# minor + patch are grouped per ecosystem to cut PR noise and are auto-merged
+# once CI is green (see .github/workflows/dependabot-auto-merge.yml). Major
+# updates are deliberately left OUT of the groups so they arrive as individual
+# PRs and require manual review — majors can be breaking (cf. jsonwebtoken 9→10).
+updates:
+  - package-ecosystem: cargo
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      cargo-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
