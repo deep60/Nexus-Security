@@ -62,7 +62,7 @@ argon2 = "0.5"
 
 # Configuration
 config = "0.15"
-toml = "0.8"
+toml = "1.1"
 
 # File handling
 tempfile = "3.0"
