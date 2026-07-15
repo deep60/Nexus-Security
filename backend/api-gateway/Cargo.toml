@@ -88,7 +88,7 @@ serde_urlencoded = "0.7"
 flate2 = "1.0"
 tower = "0.4"
 async-trait = "0.1"
-tokio-tungstenite = "0.21"
+tokio-tungstenite = "0.24"
 futures-util = "0.3"
 
 # Shared metrics/utilities used by every service so the gateway emits the
