@@ -26,7 +26,7 @@ redis = { workspace = true }
 # File handling
 multer = "3.0"
 mime = "0.3"
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 
 # Storage (S3/MinIO)
