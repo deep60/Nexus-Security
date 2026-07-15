@@ -47,7 +47,7 @@ dotenvy = "0.15"
 # Authentication
 jsonwebtoken = "9.3"
 argon2 = "0.5"
-bcrypt = "0.17"
+bcrypt = "0.19"
 
 # Validation
 validator = { version = "0.18", features = ["derive"] }
