@@ -45,7 +45,7 @@ config = "0.15"
 dotenvy = "0.15"
 
 # Authentication
-jsonwebtoken = "9.3"
+jsonwebtoken = "10.4"
 argon2 = "0.5"
 bcrypt = "0.19"
 
