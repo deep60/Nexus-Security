@@ -11,7 +11,7 @@ repository = "https://github.com/verdyx/deep60"
 # Web framework
 axum = { version = "0.7", features = ["macros"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace", "limit", "catch-panic"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "limit", "catch-panic"] }
 
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
