@@ -387,7 +387,7 @@ jobs:
       - name: Extract metadata
         if: steps.should.outputs.build == 'true'
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/verdyx-${{ matrix.service }}
           tags: |
