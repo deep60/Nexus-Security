@@ -55,7 +55,7 @@ config = "0.14"
 dotenvy = "0.15"
 
 # Template engine for email
-handlebars = "5.0"
+handlebars = "6.4"
 
 # JWT for WebSocket authentication
 jsonwebtoken = "9.3"

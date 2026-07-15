@@ -1817,6 +1817,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
 
 [[package]]
+name = "derive_builder"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "507dfb09ea8b7fa618fcf76e953f4f5e192547945816d5358edffe39f6f94947"
+dependencies = [
+ "derive_builder_macro",
+]
+
+[[package]]
+name = "derive_builder_core"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d5bcf7b024d6835cfb3d473887cd966994907effbe9227e8c8219824d06c4e8"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.118",
+]
+
+[[package]]
+name = "derive_builder_macro"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab63b0e2bf4d5928aff72e83a7dace85d7bba5fe12dcc3c5a572d78caffd3f3c"
+dependencies = [
+ "derive_builder_core",
+ "syn 2.0.118",
+]
+
+[[package]]
 name = "derive_more"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2799,16 +2830,18 @@ dependencies = [
 
 [[package]]
 name = "handlebars"
-version = "5.1.2"
+version = "6.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d08485b96a0e6393e9e4d1b8d48cf74ad6c063cd905eb33f42c1ce3f0377539b"
+checksum = "4633d16a2350341713c379d6d06a4b9e1845329386026a49ce4fd09c2f3b16f6"
 dependencies = [
+ "derive_builder",
  "log",
+ "num-order",
  "pest",
  "pest_derive",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -4069,6 +4102,21 @@ checksum = "c92800bd69a1eac91786bcfe9da64a897eb72911b8dc3095decbd07429e8048b"
 dependencies = [
  "num-integer",
  "num-traits",
+]
+
+[[package]]
+name = "num-modular"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc41a1374056e9672221567958a66c16be12d0e2c1b408761e14d901c237d5e0"
+
+[[package]]
+name = "num-order"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "537b596b97c40fcf8056d153049eb22f481c17ebce72a513ec9286e4986d1bb6"
+dependencies = [
+ "num-modular",
 ]
 
 [[package]]
@@ -5679,6 +5727,7 @@ version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
 dependencies = [
+ "indexmap",
  "itoa",
  "memchr",
  "serde",
