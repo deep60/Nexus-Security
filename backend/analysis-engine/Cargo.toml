@@ -31,7 +31,7 @@ sha1 = "0.11"
 reqwest = { version = "0.11", features = ["json"] }
 yara = { version = "0.18", optional = true }
 clamav-client = { version = "0.3", optional = true, features = ["tokio"] }
-goblin = "0.6"  # For PE/ELF parsing
+goblin = "0.10"  # For PE/ELF parsing
 lazy_static = "1.4"
 regex = "1"
 mime = "0.3"  # For MIME parsing
