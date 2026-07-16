@@ -107,8 +107,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Audit PRODUCTION dependencies only, matching the Security Scan gate in
+      # deploy.yml. Dev-only tooling (vite, picomatch, eslint) never ships to
+      # users, and its advisories are frequently only fixable via breaking major
+      # bumps — gating CI on them just blocks every unrelated PR.
       - name: Run npm audit
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Run Snyk security scan
         uses: snyk/actions/node@master
