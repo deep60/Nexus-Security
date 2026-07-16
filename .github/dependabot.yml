@@ -1,16 +1,28 @@
 version: 2
 
-# Scheduled version updates (security updates run automatically regardless).
-# minor + patch are grouped per ecosystem to cut PR noise and are auto-merged
-# once CI is green (see .github/workflows/dependabot-auto-merge.yml). Major
-# updates are deliberately left OUT of the groups so they arrive as individual
-# PRs and require manual review — majors can be breaking (cf. jsonwebtoken 9→10).
+# Scheduled version updates. minor + patch are grouped per ecosystem into a
+# single PR and auto-merged once CI is green (see the dependabot-auto-merge
+# workflow), so routine dependency upkeep needs no human attention.
+#
+# MAJOR updates are ignored on purpose. They are breaking by definition, always
+# need a code migration, and can never be auto-merged — proposing them just
+# creates permanently-red PRs that pile up (cf. jsonwebtoken 9→10 breaking the
+# JWT tests, sqlx 0.7→0.8 needing a workspace-wide migration). Do majors as a
+# deliberate upgrade pass instead: bump the manifest by hand, or temporarily
+# drop the relevant ignore below.
+#
+# NOTE: `ignore` also applies to Dependabot *security* updates, so a CVE whose
+# only fix is a major bump won't be auto-proposed. That gap is covered by the
+# cargo-audit / npm-audit gates in the Security Scan job, which still fail on it.
 updates:
   - package-ecosystem: cargo
     directory: /backend
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       cargo-minor-patch:
         update-types: [minor, patch]
@@ -20,6 +32,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
@@ -28,6 +43,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       actions-minor-patch:
         update-types: [minor, patch]
