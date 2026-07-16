@@ -7,7 +7,7 @@ import { KineticText } from "@/components/motion/kinetic-text";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Terminal, Shield, Cpu, Zap, Activity, Code } from "lucide-react";
+import { Terminal, Shield, Cpu, Zap, Code } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { SEO } from "@/components/seo";
 import type { ApiStats } from "@/lib/api-types";
