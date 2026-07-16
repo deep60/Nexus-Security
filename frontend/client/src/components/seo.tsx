@@ -1,8 +1,11 @@
 export function SEO({ title, description, url = "https://verdyx.io" }: { title: string; description: string; url?: string }) {
-  // In React 19, these tags are automatically hoisted to the document <head>
+  // In React 19, these tags are automatically hoisted to the document <head>.
+  // NOTE: <title> must have exactly ONE string child — `{title} | Verdyx` would
+  // pass two children and React silently declines to hoist it, leaving the page
+  // with no title at all. Keep the template literal.
   return (
     <>
-      <title>{title} | Verdyx</title>
+      <title>{`${title} | Verdyx`}</title>
       <meta name="description" content={description} />
       
       {/* Open Graph */}
