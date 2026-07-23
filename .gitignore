@@ -18,6 +18,11 @@ config/**/*.env
 # CI: per-service test DATABASE_URLs written by scripts/ci/setup-test-databases.sh
 .ci-test-db-env
 
+# Alertmanager delivery secrets (Slack webhook, SMTP password). Keep the dir
+# (.gitkeep) but never commit the secret files themselves.
+monitoring/alertmanager/secrets/*
+!monitoring/alertmanager/secrets/.gitkeep
+
 # Node modules
 node_modules/
 blockchain/node_modules/

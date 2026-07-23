@@ -1,0 +1,61 @@
+# Alertmanager routing + delivery for Verdyx.
+#
+# The Slack webhook URL is a secret and is NOT committed. It is read at
+# notification time from a file (lazy — Alertmanager still starts if the file
+# is absent, it just logs a delivery error until you add it):
+#
+#   echo -n 'https://hooks.slack.com/services/XXX/YYY/ZZZ' \
+#     > monitoring/alertmanager/secrets/slack_api_url
+#
+# See monitoring/README.md. To use email instead, add an `email_configs`
+# receiver with `smtp_*` settings (password via `smtp_auth_password_file`).
+
+global:
+  resolve_timeout: 5m
+  slack_api_url_file: /etc/alertmanager/secrets/slack_api_url
+
+route:
+  receiver: slack-default
+  # Collapse a storm of related firings into one message per alert/service.
+  group_by: ["alertname", "service"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Critical alerts page more aggressively and go to their own channel.
+    - matchers:
+        - severity="critical"
+      receiver: slack-critical
+      group_wait: 10s
+      repeat_interval: 1h
+
+receivers:
+  - name: slack-default
+    slack_configs:
+      - channel: "#verdyx-alerts"
+        send_resolved: true
+        title: '{{ if eq .Status "firing" }}🔥{{ else }}✅{{ end }} [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: >-
+          {{ range .Alerts }}*{{ .Labels.severity }}* — {{ .Annotations.summary }}
+          {{ with .Annotations.description }}
+          {{ . }}{{ end }}
+          {{ with .Labels.service }}(service: {{ . }}){{ end }}
+          {{ end }}
+
+  - name: slack-critical
+    slack_configs:
+      - channel: "#verdyx-critical"
+        send_resolved: true
+        title: '{{ if eq .Status "firing" }}🚨{{ else }}✅{{ end }} [CRITICAL/{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: >-
+          {{ range .Alerts }}{{ .Annotations.summary }}
+          {{ with .Annotations.description }}
+          {{ . }}{{ end }}
+          {{ with .Labels.service }}(service: {{ . }}){{ end }}
+          {{ end }}
+
+# Suppress lower-severity alerts for a service while a critical one is firing.
+inhibit_rules:
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: ["alertname", "service"]

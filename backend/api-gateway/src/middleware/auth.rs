@@ -1,5 +1,4 @@
 use axum::{
-    async_trait,
     body::Body,
     extract::{FromRequestParts, State},
     http::{header, Request, StatusCode},
@@ -222,7 +221,7 @@ pub async fn api_key_middleware(
 
     // Hash the API key and look it up in the database
     use sha2::{Digest, Sha256};
-    let key_hash = format!("{:x}", Sha256::digest(api_key.as_bytes()));
+    let key_hash = hex::encode(Sha256::digest(api_key.as_bytes()));
 
     let row: Option<(Uuid, String, String)> = sqlx::query_as(
         r#"SELECT u.id, u.email, u.role
@@ -267,7 +266,6 @@ pub async fn api_key_middleware(
 }
 
 /// Extractor for authenticated user claims
-#[async_trait]
 impl<S> FromRequestParts<S> for Claims
 where
     S: Send + Sync,

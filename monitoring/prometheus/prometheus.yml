@@ -5,6 +5,13 @@ global:
 rule_files:
   - /etc/prometheus/alerts.yml
 
+# Fire evaluated alerts at Alertmanager (same compose network). Alertmanager
+# owns grouping, deduplication, silencing, and delivery (Slack/email).
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 scrape_configs:
   - job_name: prometheus
     static_configs:

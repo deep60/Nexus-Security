@@ -1,0 +1,28 @@
+# Edge reverse proxy + automatic HTTPS for Verdyx.
+#
+# Caddy provisions and renews Let's Encrypt certificates automatically (HTTP-01
+# / TLS-ALPN on :80/:443), so TLS config lives in the repo instead of on the
+# host. Bring it up with the `edge` profile once the host is ready to hand it
+# :80/:443:  docker compose --profile edge up -d caddy
+#
+# DOMAIN / ACME_EMAIL come from .env (see .env.example).
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Baseline hardening headers.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# The frontend BFF serves the SPA and already reverse-proxies /api/* to the
+	# api-gateway on the internal network, so one upstream covers everything.
+	reverse_proxy frontend:5000
+}

@@ -1135,8 +1135,8 @@
       ]
     },
     "/Users/arjun/Developer/Verdyx/blockchain/contracts/core/ThreatToken.sol": {
-      "lastModificationDate": 1777263924170,
-      "contentHash": "c368d0681795d5d74e9236fd73f67562",
+      "lastModificationDate": 1783977676041,
+      "contentHash": "a507bf14fe7b8bbecdca77b3316f441f",
       "sourceName": "contracts/core/ThreatToken.sol",
       "solcConfig": {
         "version": "0.8.28",
@@ -1167,6 +1167,7 @@
         "@openzeppelin/contracts/token/ERC20/ERC20.sol",
         "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol",
         "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol",
+        "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol",
         "@openzeppelin/contracts/access/AccessControl.sol",
         "@openzeppelin/contracts/utils/ReentrancyGuard.sol"
       ],

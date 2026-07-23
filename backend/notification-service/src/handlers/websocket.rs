@@ -57,7 +57,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, user_id: Option<
     // Forward queued notifications to the socket.
     let mut send_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
-            if ws_sender.send(Message::Text(msg)).await.is_err() {
+            if ws_sender.send(Message::Text(msg.into())).await.is_err() {
                 break;
             }
         }

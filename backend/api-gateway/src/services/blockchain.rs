@@ -122,12 +122,27 @@ impl BlockchainService {
             .context("Failed to create HTTP provider")?
             .interval(Duration::from_millis(1000));
 
-        // Setup wallet
-        let wallet = config
-            .private_key
-            .parse::<LocalWallet>()
-            .context("Invalid private key")?
-            .with_chain_id(config.chain_id);
+        // Setup wallet. Don't hard-fail startup on a missing/placeholder key
+        // (blockchain disabled in CI/dev where the key is empty or the all-zero
+        // sentinel, which is not a valid secp256k1 scalar). Fall back to a
+        // deterministic throwaway dev key so the gateway still binds and serves
+        // its non-chain routes; on-chain *writes* will fail at send-time (the
+        // same behaviour as an unreachable RPC below) until a real key is set.
+        let wallet = match config.private_key.parse::<LocalWallet>() {
+            Ok(w) => w.with_chain_id(config.chain_id),
+            Err(e) => {
+                tracing::warn!(
+                    "Invalid/placeholder blockchain private key ({e}); using a throwaway \
+                     dev key. On-chain transactions are disabled until a valid \
+                     BLOCKCHAIN_PRIVATE_KEY / TREASURY_PRIVATE_KEY is configured."
+                );
+                // Well-known Hardhat account #0 key — valid scalar, dev-only.
+                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                    .parse::<LocalWallet>()
+                    .expect("hardcoded dev key is a valid secp256k1 scalar")
+                    .with_chain_id(config.chain_id)
+            }
+        };
 
         // Create client
         let client = Arc::new(SignerMiddleware::new(provider, wallet));

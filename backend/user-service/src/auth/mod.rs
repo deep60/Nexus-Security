@@ -152,14 +152,14 @@ impl AuthService {
 
     /// Generate a verification token for email/password reset
     pub fn generate_verification_token(&self) -> String {
-        use rand::Rng;
+        use rand::RngExt;
         const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         const TOKEN_LEN: usize = 32;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         (0..TOKEN_LEN)
             .map(|_| {
-                let idx = rng.gen_range(0..CHARSET.len());
+                let idx = rng.random_range(0..CHARSET.len());
                 CHARSET[idx] as char
             })
             .collect()
@@ -168,10 +168,10 @@ impl AuthService {
     /// Generate a 2FA secret
     pub fn generate_2fa_secret(&self) -> String {
         use base32::Alphabet;
-        use rand::Rng;
+        use rand::RngExt;
 
-        let secret: Vec<u8> = (0..20).map(|_| rand::thread_rng().gen()).collect();
-        base32::encode(Alphabet::RFC4648 { padding: false }, &secret)
+        let secret: Vec<u8> = (0..20).map(|_| rand::rng().random()).collect();
+        base32::encode(Alphabet::Rfc4648 { padding: false }, &secret)
     }
 
     /// Verify a 2FA code
@@ -182,7 +182,7 @@ impl AuthService {
         let current_time = Utc::now().timestamp() as u64;
 
         // Decode the base32 secret
-        let secret_bytes = base32::decode(base32::Alphabet::RFC4648 { padding: false }, secret)
+        let secret_bytes = base32::decode(base32::Alphabet::Rfc4648 { padding: false }, secret)
             .ok_or_else(|| UserError::ValidationError("Invalid 2FA secret".to_string()))?;
 
         // Generate current TOTP code

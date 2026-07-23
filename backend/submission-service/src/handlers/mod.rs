@@ -3,8 +3,7 @@ pub mod url_submission;
 pub mod validation;
 
 use axum::{
-    async_trait,
-    extract::FromRequestParts,
+    extract::{FromRequestParts, OptionalFromRequestParts},
     http::{request::Parts, StatusCode},
 };
 use uuid::Uuid;
@@ -14,7 +13,6 @@ use uuid::Uuid;
 /// Returns `None` (via `Option<SubmitterId>`) for anonymous submissions.
 pub struct SubmitterId(pub Uuid);
 
-#[async_trait]
 impl<S: Send + Sync> FromRequestParts<S> for SubmitterId {
     type Rejection = (StatusCode, String);
 
@@ -36,5 +34,30 @@ impl<S: Send + Sync> FromRequestParts<S> for SubmitterId {
         })?;
 
         Ok(SubmitterId(user_id))
+    }
+}
+
+// axum 0.8 routes `Option<SubmitterId>` through `OptionalFromRequestParts`
+// (no longer the plain `FromRequestParts`): a missing header yields `None`
+// (anonymous submission), while a present-but-malformed header still rejects.
+impl<S: Send + Sync> OptionalFromRequestParts<S> for SubmitterId {
+    type Rejection = (StatusCode, String);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        _state: &S,
+    ) -> Result<Option<Self>, Self::Rejection> {
+        let Some(header) = parts.headers.get("X-User-Id").and_then(|v| v.to_str().ok()) else {
+            return Ok(None);
+        };
+
+        let user_id = Uuid::parse_str(header).map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                "Invalid X-User-Id format".to_string(),
+            )
+        })?;
+
+        Ok(Some(SubmitterId(user_id)))
     }
 }

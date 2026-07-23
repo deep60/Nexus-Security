@@ -1,10 +1,12 @@
 name: Dependabot auto-merge
 
-# Auto-merge Dependabot patch/minor updates once CI is green; leave majors for
-# manual review. "Green" is enforced by GitHub's auto-merge, which waits for the
-# repo's required status checks (CodeQL) before merging. The post-merge pipeline
-# (deploy.yml) + build-gated deploy are the backstop: a bad bump that slips
-# through fails CI on main and never produces a deployable image.
+# Auto-merge Dependabot *patch* updates once CI is green; leave minor AND major
+# for manual review. Minors are NOT auto-merged because Cargo uses 0.x semver:
+# for a 0.x crate, a breaking `0.7 -> 0.8` (axum) or `0.10 -> 0.11` (sha2) bump
+# is classified by Dependabot as `semver-minor`, and such bumps have shipped
+# code that no longer compiles. "Green" is only as strong as the repo's REQUIRED
+# status checks — ensure `test-backend` / `test-frontend` are required in branch
+# protection, not just CodeQL (a SAST scan that does not gate the Rust build).
 on: pull_request
 
 permissions:
@@ -22,20 +24,21 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Enable auto-merge (patch/minor)
-        if: contains(fromJSON('["version-update:semver-patch", "version-update:semver-minor"]'), steps.meta.outputs.update-type)
+      - name: Enable auto-merge (patch only)
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch'
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Flag majors for manual review
-        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+      - name: Flag minor/major for manual review
+        if: contains(fromJSON('["version-update:semver-minor", "version-update:semver-major"]'), steps.meta.outputs.update-type)
         run: |
-          gh pr comment "$PR_URL" --body "🔒 **Major update** — \`${DEP}\` \`${PREV}\` → \`${NEW}\`. Not auto-merged: major bumps can be breaking (e.g. the jsonwebtoken 9→10 regression that broke the JWT tests). Please review and merge manually."
+          gh pr comment "$PR_URL" --body "🔒 **${TYPE#version-update:semver-} update** — \`${DEP}\` \`${PREV}\` → \`${NEW}\`. Not auto-merged: under Cargo's 0.x semver a 'minor' bump can be breaking (e.g. axum 0.7→0.8, sha2 0.10→0.11 shipped non-compiling code; jsonwebtoken 9→10 broke the JWT tests). Please review and merge manually."
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TYPE: ${{ steps.meta.outputs.update-type }}
           DEP: ${{ steps.meta.outputs.dependency-names }}
           PREV: ${{ steps.meta.outputs.previous-version }}
           NEW: ${{ steps.meta.outputs.new-version }}

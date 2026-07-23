@@ -165,8 +165,8 @@ pub mod utils {
     }
 
     pub fn generate_nonce() -> u64 {
-        use rand::Rng;
-        rand::thread_rng().gen()
+        use rand::RngExt;
+        rand::rng().random()
     }
 
     pub async fn retry_with_backoff<F, T, E>(

@@ -85,17 +85,21 @@ async fn proxy_ws(client_socket: WebSocket, upstream_url: String) {
 fn axum_to_tungstenite(msg: Message) -> tokio_tungstenite::tungstenite::Message {
     use tokio_tungstenite::tungstenite::Message as TM;
     match msg {
-        Message::Text(t) => TM::Text(t),
-        Message::Binary(b) => TM::Binary(b),
-        Message::Ping(p) => TM::Ping(p),
-        Message::Pong(p) => TM::Pong(p),
+        // axum 0.8 and tungstenite 0.24 each have their own Utf8Bytes type;
+        // bridge via &str. Binary/Ping/Pong share bytes::Bytes so pass through.
+        // axum 0.8 uses Bytes / its own Utf8Bytes; tungstenite 0.24 uses Vec<u8>
+        // for Binary/Ping/Pong and its own Utf8Bytes for Text. Bridge explicitly.
+        Message::Text(t) => TM::Text(t.to_string().into()),
+        Message::Binary(b) => TM::Binary(b.to_vec()),
+        Message::Ping(p) => TM::Ping(p.to_vec()),
+        Message::Pong(p) => TM::Pong(p.to_vec()),
         Message::Close(c) => {
             TM::Close(
                 c.map(|f| tokio_tungstenite::tungstenite::protocol::CloseFrame {
                     code: tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode::from(
                         f.code,
                     ),
-                    reason: f.reason,
+                    reason: f.reason.to_string().into(),
                 }),
             )
         }
@@ -105,14 +109,14 @@ fn axum_to_tungstenite(msg: Message) -> tokio_tungstenite::tungstenite::Message 
 fn tungstenite_to_axum(msg: tokio_tungstenite::tungstenite::Message) -> Message {
     use tokio_tungstenite::tungstenite::Message as TM;
     match msg {
-        TM::Text(t) => Message::Text(t),
-        TM::Binary(b) => Message::Binary(b),
-        TM::Ping(p) => Message::Ping(p),
-        TM::Pong(p) => Message::Pong(p),
+        TM::Text(t) => Message::Text(t.to_string().into()),
+        TM::Binary(b) => Message::Binary(b.into()),
+        TM::Ping(p) => Message::Ping(p.into()),
+        TM::Pong(p) => Message::Pong(p.into()),
         TM::Close(c) => Message::Close(c.map(|f| axum::extract::ws::CloseFrame {
             code: f.code.into(),
-            reason: f.reason,
+            reason: f.reason.to_string().into(),
         })),
-        TM::Frame(_) => Message::Binary(vec![]),
+        TM::Frame(_) => Message::Binary(axum::body::Bytes::new()),
     }
 }

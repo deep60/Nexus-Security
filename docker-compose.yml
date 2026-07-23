@@ -511,6 +511,35 @@ services:
       - verdyx-network
     restart: unless-stopped
 
+  # ── Edge TLS reverse proxy (profile: edge) ─────────────────────────────────
+  # Terminates HTTPS with automatic Let's Encrypt certs and proxies to the
+  # frontend BFF (which serves the SPA and proxies /api/* to the gateway).
+  # Opt-in so it never races a host-level nginx already bound to :80/:443 —
+  # bring it up only when cutting over:
+  #   docker compose --profile edge up -d caddy
+  # See infrastructure/caddy/Caddyfile.
+  caddy:
+    image: caddy:2.9-alpine
+    container_name: verdyx-caddy
+    profiles: ["edge"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:-verdyx.duckdns.org}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@verdyx.io}
+    volumes:
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+    networks:
+      - verdyx-network
+
   # ── Auto-deploy ────────────────────────────────────────────────────────────
   # Watches GHCR for new :latest images and restarts the affected app
   # containers. Pull-based / outbound-only — needs no inbound access, GitHub
@@ -571,6 +600,33 @@ services:
       retries: 3
       start_period: 15s
 
+  # Receives fired alerts from Prometheus and delivers them (Slack/email) with
+  # grouping, dedup, and silencing. 127.0.0.1-only like the rest of the
+  # observability stack; the Slack webhook is read from a gitignored secret
+  # file (see monitoring/alertmanager/alertmanager.yml).
+  alertmanager:
+    image: prom/alertmanager:v0.28.0
+    container_name: verdyx-alertmanager
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alertmanager/secrets:/etc/alertmanager/secrets:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks:
+      - verdyx-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   # Dashboards over Prometheus. Also 127.0.0.1-only; view via SSH tunnel
   # (ssh -L 3001:localhost:3001 ...) or put it behind nginx + auth later.
   grafana:
@@ -610,6 +666,14 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      # Off-site upload (optional): set BACKUP_S3_BUCKET to also push each
+      # verified dump to S3/MinIO. Reuses the stack's AWS_* / MinIO creds.
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-pg}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-${AWS_ENDPOINT_URL:-}}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
     volumes:
       - ./scripts/backup/pg-backup.sh:/usr/local/bin/pg-backup.sh:ro
       - pg_backups:/backups
@@ -627,5 +691,8 @@ volumes:
   minio_data:
   clamav_data:
   prometheus_data:
+  alertmanager_data:
   grafana_data:
   pg_backups:
+  caddy_data:
+  caddy_config:
