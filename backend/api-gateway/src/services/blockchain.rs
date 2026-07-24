@@ -180,8 +180,9 @@ impl BlockchainService {
         client: &Arc<BlockchainClient>,
         config: &config::BlockchainConfig,
     ) -> Result<ContractInstances> {
-        // In a real implementation, you would load the ABIs from files or embedded resources
-        // For now, we'll create placeholder contract instances
+        // Bind ethers Contract instances to the configured on-chain addresses,
+        // using ABIs loaded from the extracted JSON (see get_*_abi below). These
+        // are live contract handles — reads/writes hit the chain via `client`.
 
         let bounty_manager_address: Address = config
             .contracts
@@ -201,7 +202,7 @@ impl BlockchainService {
             .parse()
             .context("Invalid reputation system address")?;
 
-        // Load ABIs (in practice, these would come from JSON files)
+        // ABIs are loaded from the extracted contract JSON at startup.
         let bounty_manager_abi = Self::get_bounty_manager_abi();
         let threat_token_abi = Self::get_threat_token_abi();
         let reputation_system_abi = Self::get_reputation_system_abi();

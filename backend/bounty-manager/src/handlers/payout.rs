@@ -387,38 +387,125 @@ pub async fn distribute_rewards(
 
     let mut reward_distributions = Vec::new();
     let mut blockchain_transactions = Vec::new();
+    let mut had_failure = false;
+
+    // On-chain client, when configured. `None` in dev/CI or when the chain env
+    // is unset — in that case we record the reward off-chain and leave it to
+    // settle once the chain is wired (graceful degradation, never a crash).
+    let chain = state.blockchain.as_ref();
 
     for payout in &session_payouts {
         if payout.payout_type == "StakeSlashing" {
             continue; // Handle slashing separately
         }
 
-        // Blockchain transaction execution (not yet connected)
-        tracing::warn!(
-            payout_id = %payout.id,
-            recipient = %payout.recipient,
-            amount = payout.amount,
-            "Blockchain reward transfer not yet implemented — marking as processed off-chain"
-        );
+        let amount = payout.amount as u64;
+        let is_correct = payout.amount > 0;
 
-        // Mark payout as processed
-        PayoutModel::update_status(&state.db, payout.id, "Processed", None)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to update payout status: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+        // Settle the reward on-chain: ThreatToken.transfer(recipient, amount).
+        // Zero-amount rewards and the blockchain-disabled path skip the transfer
+        // and are recorded off-chain as pending settlement.
+        //
+        // NOTE: this awaits the transaction receipt inline, so a slow chain slows
+        // the request. Acceptable for the operator-triggered distribute endpoint;
+        // move to a background settlement queue if this becomes hot.
+        let settlement: Result<(String, TransactionStatus, Option<u64>), String> =
+            match (chain, amount) {
+                (Some(bc), amt) if amt > 0 => bc
+                    .create_payout_transaction(&payout.recipient, bounty_id, amt)
+                    .await
+                    .map(|tx| {
+                        (
+                            tx.transaction_hash,
+                            TransactionStatus::Confirmed,
+                            tx.block_number,
+                        )
+                    })
+                    .map_err(|e| e.to_string()),
+                _ => Ok((
+                    format!("offchain_{}", payout.id),
+                    TransactionStatus::Pending,
+                    None,
+                )),
+            };
+
+        let (tx_hash, tx_status, block_number) = match settlement {
+            Ok(v) => v,
+            Err(e) => {
+                // On-chain transfer failed: record the failure and leave the
+                // payout un-settled for retry. Do NOT credit reputation or flip
+                // the submission — nothing actually moved.
+                had_failure = true;
+                tracing::error!(
+                    payout_id = %payout.id,
+                    recipient = %payout.recipient,
+                    amount,
+                    "on-chain reward transfer FAILED: {e}"
+                );
+                PayoutModel::update_status(&state.db, payout.id, "Failed", None)
+                    .await
+                    .map_err(|e| {
+                        tracing::error!("Failed to update payout status: {}", e);
+                        StatusCode::INTERNAL_SERVER_ERROR
+                    })?;
+                reward_distributions.push(RewardDistribution {
+                    engine_id: payout.recipient.clone(),
+                    submission_id: payout.submission_id.unwrap_or_else(Uuid::nil),
+                    base_reward: amount,
+                    accuracy_bonus: 0,
+                    reputation_multiplier: 1.0,
+                    stake_return: 0,
+                    total_payout: amount,
+                    transaction_hash: None,
+                    processed: false,
+                });
+                blockchain_transactions.push(PayoutTransaction {
+                    transaction_hash: format!("failed_{}", payout.id),
+                    transaction_type: TransactionType::RewardPayout,
+                    recipient: payout.recipient.clone(),
+                    amount,
+                    gas_used: None,
+                    status: TransactionStatus::Failed,
+                    block_number: None,
+                    processed_at: Utc::now(),
+                });
+                continue;
+            }
+        };
+
+        let settled = matches!(tx_status, TransactionStatus::Confirmed);
+        if settled {
+            tracing::info!(
+                payout_id = %payout.id, recipient = %payout.recipient, amount,
+                tx = %tx_hash, "on-chain reward transfer confirmed"
+            );
+        } else {
+            tracing::warn!(
+                payout_id = %payout.id, recipient = %payout.recipient, amount,
+                "blockchain disabled or zero reward — recorded off-chain, on-chain settlement pending"
+            );
+        }
+
+        // Persist the payout: the real tx hash + Processed once settled on-chain,
+        // otherwise PendingOnChain with no hash yet.
+        let db_status = if settled { "Processed" } else { "PendingOnChain" };
+        PayoutModel::update_status(
+            &state.db,
+            payout.id,
+            db_status,
+            if settled { Some(tx_hash.as_str()) } else { None },
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to update payout status: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
         // Update engine reputation: increment correct submission
-        let is_correct = payout.amount > 0;
         if let Err(e) =
             ReputationModel::increment_submission(&state.db, &payout.recipient, is_correct).await
         {
-            tracing::error!(
-                "Failed to update reputation for {}: {}",
-                payout.recipient,
-                e
-            );
+            tracing::error!("Failed to update reputation for {}: {}", payout.recipient, e);
         }
 
         // Update submission status to Correct
@@ -428,45 +515,52 @@ pub async fn distribute_rewards(
             }
         }
 
-        let tx_placeholder = format!("pending_tx_{}", payout.id);
-
         reward_distributions.push(RewardDistribution {
             engine_id: payout.recipient.clone(),
             submission_id: payout.submission_id.unwrap_or_else(Uuid::nil),
-            base_reward: payout.amount as u64,
+            base_reward: amount,
             accuracy_bonus: 0,
             reputation_multiplier: 1.0,
             stake_return: 0,
-            total_payout: payout.amount as u64,
-            transaction_hash: Some(tx_placeholder.clone()),
+            total_payout: amount,
+            transaction_hash: Some(tx_hash.clone()),
             processed: true,
         });
 
         blockchain_transactions.push(PayoutTransaction {
-            transaction_hash: tx_placeholder,
+            transaction_hash: tx_hash,
             transaction_type: TransactionType::RewardPayout,
             recipient: payout.recipient.clone(),
-            amount: payout.amount as u64,
+            amount,
             gas_used: None,
-            status: TransactionStatus::Pending, // Will be Confirmed once blockchain is wired
-            block_number: None,
+            status: tx_status,
+            block_number,
             processed_at: Utc::now(),
         });
     }
 
     // bounty_id already available from auth check above
 
+    let processed_count = reward_distributions.iter().filter(|r| r.processed).count() as u32;
     let payout_info = PayoutInfo {
         id: payout_id,
         bounty_id,
-        total_reward_pool: reward_distributions.iter().map(|r| r.total_payout).sum(),
+        total_reward_pool: reward_distributions
+            .iter()
+            .filter(|r| r.processed)
+            .map(|r| r.total_payout)
+            .sum(),
         consensus_verdict: ThreatVerdict::Unknown, // Already determined in process_bounty_completion
         consensus_confidence: 0.0,
-        total_correct_submissions: reward_distributions.len() as u32,
+        total_correct_submissions: processed_count,
         total_incorrect_submissions: 0,
         reward_distributions,
         slashed_stakes: vec![],
-        status: PayoutStatus::Completed,
+        status: if had_failure {
+            PayoutStatus::PartialFailure
+        } else {
+            PayoutStatus::Completed
+        },
         processing_started_at: Utc::now(),
         completed_at: Some(Utc::now()),
         blockchain_transactions,
