@@ -1,9 +1,23 @@
-name: Build amd64 images
+name: Build images (multi-arch)
 
-# Manually-triggered build of all service images for linux/amd64, pushed to GHCR.
-# Used to produce images that run on x86_64 hosts (the dev Mac is arm64).
+# Manually-triggered build of all service images for BOTH linux/amd64 and
+# linux/arm64, pushed to GHCR as multi-arch manifests. arm64 is required to run
+# on Oracle Cloud "Always Free" Ampere (ARM) VMs; amd64 keeps x86 hosts and the
+# CI smoke test working. `docker compose pull` on the VM then gets the right
+# architecture automatically.
+#
+# NOTE: arm64 layers are built under QEMU emulation, so the Rust compile is slow
+# (tens of minutes). That is fine for an occasional manual seed build. If it ever
+# gets too slow, split the build across native runners: build amd64 on
+# `ubuntu-latest` and arm64 on `ubuntu-24.04-arm` (free for public repos), push
+# by digest, then merge the manifest with `docker buildx imagetools create`.
 on:
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Target platforms"
+        default: linux/amd64,linux/arm64
+        required: true
 
 permissions:
   contents: read
@@ -30,6 +44,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # QEMU lets this amd64 runner emulate arm64 for the cross-build.
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
@@ -39,12 +55,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push (amd64)
+      - name: Build and push (multi-arch)
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          platforms: linux/amd64
+          platforms: ${{ inputs.platforms }}
           push: true
           tags: ghcr.io/deep60/verdyx-${{ matrix.service }}:latest
           cache-from: type=gha,scope=${{ matrix.service }}
