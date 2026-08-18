@@ -1,0 +1,6 @@
+# SPA fallback: the app routes client-side with `wouter`, so deep links such as
+# /dashboard or /analysis/<id> must serve index.html rather than 404.
+#
+# Requests to /api/* are handled by the Pages Function in functions/api/, which
+# takes precedence over this rule.
+/*    /index.html   200

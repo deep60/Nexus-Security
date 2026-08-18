@@ -36,6 +36,7 @@ pub enum VerdyxError {
 pub type Result<T> = std::result::Result<T, VerdyxError>;
 
 // Export modules
+pub mod env;
 pub mod messaging;
 pub mod service_metrics;
 pub mod types;

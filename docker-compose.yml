@@ -113,6 +113,12 @@ services:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       - JWT_SECRET=${JWT_SECRET}
+      # S3/MinIO Configuration for avatar uploads
+      - S3_ENDPOINT=http://minio:9000
+      - S3_REGION=us-east-1
+      - S3_AVATAR_BUCKET=verdyx-avatars
+      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-verdyx_admin}
+      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       # Blockchain Configuration
       - BLOCKCHAIN_RPC_URL=${BLOCKCHAIN_RPC_URL}
       - THREAT_TOKEN_ADDRESS=${THREAT_TOKEN_ADDRESS}
@@ -123,6 +129,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     networks:
       - verdyx-network
