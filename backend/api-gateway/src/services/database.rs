@@ -507,6 +507,71 @@ impl DatabaseService {
         Ok(())
     }
 
+    /// List one user's own file/URL submissions, newest first.
+    ///
+    /// Reads `submissions` (what a user uploaded), NOT `bounty_submissions`
+    /// (an analyst's verdict on a bounty) — see `list_submissions` in the
+    /// handler for why that distinction matters.
+    ///
+    /// `analysis_type` / `bounty_amount` / `priority` / `description` are
+    /// stored inside `metadata` by `create_file_submission`, so they are
+    /// extracted here with `->>` rather than being real columns.
+    pub async fn list_file_submissions_for_user(
+        &self,
+        submitter_id: Uuid,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<crate::handlers::submission::FileSubmissionListItem>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                id, submitter_id, original_filename, file_hash, url,
+                file_size, mime_type, submission_type,
+                COALESCE(analysis_status, 'pending') AS analysis_status,
+                is_malicious, created_at,
+                metadata ->> 'description'  AS description,
+                metadata ->> 'analysisType' AS analysis_type,
+                metadata ->> 'bountyAmount' AS bounty_amount,
+                (metadata ->> 'priority')::boolean AS priority
+            FROM submissions
+            WHERE submitter_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+        )
+        .bind(submitter_id)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to list file submissions for user")?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let analysis_status: String = r.get("analysis_status");
+                crate::handlers::submission::FileSubmissionListItem {
+                    id: r.get("id"),
+                    submitter_id: r.get("submitter_id"),
+                    original_filename: r.get("original_filename"),
+                    file_hash: r.get("file_hash"),
+                    url: r.get("url"),
+                    file_size: r.get("file_size"),
+                    mime_type: r.get("mime_type"),
+                    submission_type: r.get("submission_type"),
+                    status: analysis_status.clone(),
+                    analysis_status,
+                    is_malicious: r.get("is_malicious"),
+                    description: r.get("description"),
+                    analysis_type: r.get("analysis_type"),
+                    bounty_amount: r.get("bounty_amount"),
+                    priority: r.get("priority"),
+                    created_at: r.get("created_at"),
+                }
+            })
+            .collect())
+    }
+
     /// Get submissions with filters (paginated)
     pub async fn get_submissions_with_filters(
         &self,
