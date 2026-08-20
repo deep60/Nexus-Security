@@ -158,19 +158,19 @@ async fn main() -> Result<()> {
         .route("/metrics", get(metrics_handler))
         // Reputation endpoints
         .route(
-            "/api/v1/reputation/user/:user_id",
+            "/api/v1/reputation/user/{user_id}",
             get(handlers::reputation::get_user_reputation),
         )
         .route(
-            "/api/v1/reputation/user/:user_id/history",
+            "/api/v1/reputation/user/{user_id}/history",
             get(handlers::reputation::get_reputation_history),
         )
         .route(
-            "/api/v1/reputation/user/:user_id/update",
+            "/api/v1/reputation/user/{user_id}/update",
             post(handlers::reputation::update_reputation),
         )
         .route(
-            "/api/v1/reputation/engine/:engine_id",
+            "/api/v1/reputation/engine/{engine_id}",
             get(handlers::reputation::get_engine_reputation),
         )
         .route(
@@ -178,7 +178,7 @@ async fn main() -> Result<()> {
             get(handlers::reputation::get_leaderboard),
         )
         .route(
-            "/api/v1/reputation/badges/:user_id",
+            "/api/v1/reputation/badges/{user_id}",
             get(handlers::reputation::get_user_badges),
         )
         // Analytics endpoints
@@ -196,11 +196,11 @@ async fn main() -> Result<()> {
         )
         // Admin endpoints
         .route(
-            "/api/v1/admin/reputation/recalculate/:user_id",
+            "/api/v1/admin/reputation/recalculate/{user_id}",
             post(handlers::admin::recalculate_reputation),
         )
         .route(
-            "/api/v1/admin/reputation/reset/:user_id",
+            "/api/v1/admin/reputation/reset/{user_id}",
             post(handlers::admin::reset_reputation),
         )
         .route(

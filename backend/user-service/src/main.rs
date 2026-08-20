@@ -193,7 +193,7 @@ async fn main() -> Result<()> {
             post(handlers::profile::upload_avatar),
         )
         .route(
-            "/api/v1/profile/:user_id",
+            "/api/v1/profile/{user_id}",
             get(handlers::profile::get_user_profile),
         )
         // Settings endpoints
@@ -238,23 +238,23 @@ async fn main() -> Result<()> {
     let admin_routes = Router::new()
         .route("/api/v1/admin/users", get(handlers::admin::list_users))
         .route(
-            "/api/v1/admin/users/:user_id",
+            "/api/v1/admin/users/{user_id}",
             get(handlers::admin::get_user),
         )
         .route(
-            "/api/v1/admin/users/:user_id/suspend",
+            "/api/v1/admin/users/{user_id}/suspend",
             post(handlers::admin::suspend_user),
         )
         .route(
-            "/api/v1/admin/users/:user_id/activate",
+            "/api/v1/admin/users/{user_id}/activate",
             post(handlers::admin::activate_user),
         )
         .route(
-            "/api/v1/admin/kyc/:user_id/approve",
+            "/api/v1/admin/kyc/{user_id}/approve",
             post(handlers::admin::approve_kyc),
         )
         .route(
-            "/api/v1/admin/kyc/:user_id/reject",
+            "/api/v1/admin/kyc/{user_id}/reject",
             post(handlers::admin::reject_kyc),
         )
         .layer(axum_middleware::from_fn_with_state(

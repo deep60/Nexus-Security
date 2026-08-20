@@ -165,7 +165,7 @@ async fn main() -> Result<()> {
             get(handlers::notification::get_notification_history),
         )
         .route(
-            "/api/v1/notifications/:id/retry",
+            "/api/v1/notifications/{id}/retry",
             post(handlers::notification::retry_notification),
         )
         .route(

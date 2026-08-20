@@ -32,6 +32,19 @@ function normalizeToV1(segments: string[]): string {
 export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env, params } = context;
 
+  // `params.path` is the [[path]] wildcard: undefined for /api, string for a
+  // single segment, string[] for the rest.
+  const raw = params.path;
+  const segments = (raw === undefined ? [] : Array.isArray(raw) ? raw : [raw])
+    .filter((s) => s !== "");
+
+  // `[[path]]` matches zero segments, so this function also captures a bare
+  // /api — which is a real page in the app (the API docs route in App.tsx),
+  // not an API call. Hand those back to the static asset handler, which the
+  // SPA fallback in _redirects turns into index.html. Without this the docs
+  // page is unreachable in production.
+  if (segments.length === 0) return context.next();
+
   const gateway = env.API_GATEWAY_URL;
   if (!gateway) {
     return Response.json(
@@ -44,11 +57,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       { status: 503 },
     );
   }
-
-  // `params.path` is the [[path]] wildcard: undefined for /api, string for a
-  // single segment, string[] for the rest.
-  const raw = params.path;
-  const segments = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
 
   const incoming = new URL(request.url);
   const target = new URL(gateway);

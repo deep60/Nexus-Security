@@ -1,0 +1,50 @@
+# Edge config for the free-tier deployment (docker-compose.gcp.yml).
+#
+# Differs from ./Caddyfile in one important way: it proxies to `api-gateway`
+# rather than to the Node `frontend` BFF, because in this topology the frontend
+# is served by Cloudflare Pages and never runs on the VM. This host serves the
+# API and nothing else.
+#
+# Caddy provisions and renews the Let's Encrypt certificate itself over
+# HTTP-01/TLS-ALPN, which is why ports 80 AND 443 both have to be open on the
+# VPC firewall — closing 80 breaks renewal, not just redirects.
+#
+# DOMAIN / ACME_EMAIL come from .env.
+
+{
+	email {$ACME_EMAIL}
+	# Keep Caddy's own memory footprint predictable on a 1 GB box.
+	admin off
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Cheap liveness probe for uptime monitors that must not wake the gateway
+	# or touch the database.
+	respond /_edge/health "ok" 200
+
+	reverse_proxy api-gateway:8080 {
+		# The Pages Function forwards the browser's original host; pass through
+		# the standard headers so the gateway can build correct absolute URLs.
+		header_up X-Real-IP {remote_host}
+
+		# Analysis is slow on a shared-core VM, so the gateway can take a while
+		# to produce response headers. `response_header_timeout` is the knob
+		# that governs that wait; note the http transport has no
+		# read_timeout/write_timeout options — using those names makes Caddy
+		# fail to start.
+		transport http {
+			dial_timeout 10s
+			response_header_timeout 300s
+		}
+	}
+}

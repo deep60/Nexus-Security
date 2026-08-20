@@ -150,19 +150,19 @@ async fn main() -> Result<()> {
         .route("/metrics", get(metrics_handler))
         // Consensus endpoints
         .route(
-            "/api/v1/consensus/bounty/:bounty_id",
+            "/api/v1/consensus/bounty/{bounty_id}",
             get(handlers::consensus::get_bounty_consensus),
         )
         .route(
-            "/api/v1/consensus/bounty/:bounty_id/calculate",
+            "/api/v1/consensus/bounty/{bounty_id}/calculate",
             post(handlers::consensus::calculate_consensus),
         )
         .route(
-            "/api/v1/consensus/submission/:submission_id",
+            "/api/v1/consensus/submission/{submission_id}",
             get(handlers::consensus::get_submission_consensus),
         )
         .route(
-            "/api/v1/consensus/stats/:bounty_id",
+            "/api/v1/consensus/stats/{bounty_id}",
             get(handlers::consensus::get_consensus_stats),
         )
         // Dispute endpoints
@@ -171,20 +171,20 @@ async fn main() -> Result<()> {
             post(handlers::dispute::create_dispute),
         )
         .route(
-            "/api/v1/disputes/:dispute_id",
+            "/api/v1/disputes/{dispute_id}",
             get(handlers::dispute::get_dispute),
         )
         .route(
-            "/api/v1/disputes/:dispute_id/resolve",
+            "/api/v1/disputes/{dispute_id}/resolve",
             post(handlers::dispute::resolve_dispute),
         )
         .route(
-            "/api/v1/disputes/bounty/:bounty_id",
+            "/api/v1/disputes/bounty/{bounty_id}",
             get(handlers::dispute::get_bounty_disputes),
         )
         // Validation endpoints
         .route(
-            "/api/v1/validation/submission/:submission_id",
+            "/api/v1/validation/submission/{submission_id}",
             post(handlers::validation::validate_submission),
         )
         .route(
@@ -193,11 +193,11 @@ async fn main() -> Result<()> {
         )
         // Admin endpoints
         .route(
-            "/api/v1/admin/consensus/recalculate/:bounty_id",
+            "/api/v1/admin/consensus/recalculate/{bounty_id}",
             post(handlers::admin::recalculate_consensus),
         )
         .route(
-            "/api/v1/admin/consensus/override/:bounty_id",
+            "/api/v1/admin/consensus/override/{bounty_id}",
             post(handlers::admin::override_consensus),
         )
         .layer(axum::middleware::from_fn({

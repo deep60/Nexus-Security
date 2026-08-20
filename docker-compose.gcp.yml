@@ -1,0 +1,396 @@
+# Verdyx — free-tier deployment (Google Cloud e2-micro, 1 vCPU / 1 GB, always free).
+#
+# This is a STANDALONE compose file, not an override of docker-compose.yml.
+# Compose overrides can only add to or modify services, never remove them, and
+# the whole point here is removing things: the stock stack needs ~6-8 GB, which
+# no free tier provides.
+#
+# What was removed and where it went instead:
+#   postgres  -> Neon (free managed Postgres). sqlx is built with
+#                `runtime-tokio-rustls`, so Neon's mandatory TLS works as-is.
+#   minio     -> Cloudflare R2 via S3_ENDPOINT. The S3 client already takes an
+#                endpoint override and uses path-style addressing, which R2
+#                accepts, so this is config-only.
+#   clamav    -> disabled with ENABLE_CLAMAV=false. It alone wants ~1.5 GB for
+#                its signature database, more than the entire VM has.
+#   frontend  -> Cloudflare Pages. The Node BFF is redundant there because
+#                functions/api/[[path]].ts does the same /api proxying at the
+#                edge, for free, without using VM memory.
+#   pgadmin, prometheus, grafana -> not deployed. Use `docker compose logs` and
+#                Neon's own dashboard instead.
+#
+# Redis deliberately stays LOCAL. The `redis` crate is compiled without any TLS
+# feature (see backend/Cargo.toml), so it physically cannot speak `rediss://` —
+# which rules out Upstash and every other managed Redis. A local container is
+# ~15 MB with the memory cap below, so this costs almost nothing anyway.
+#
+# Usage on the VM:
+#   docker compose -f docker-compose.gcp.yml up -d
+#
+# Budget: the mem_limit values sum to more than 1 GB on purpose. They are caps
+# that stop any single service from taking the box down, not reservations.
+# Steady-state usage is ~700 MB; the bootstrap script adds 3 GB of swap to
+# absorb spikes.
+
+name: verdyx
+
+services:
+  # ── Data tier (the only stateful thing left on the box) ──────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: verdyx-redis
+    restart: unless-stopped
+    # No published port: nothing outside the compose network should reach it.
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 64mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+    mem_limit: 96m
+    networks: [verdyx-network]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Edge: TLS termination straight to the gateway ────────────────────────
+  # Unlike the stock Caddyfile this proxies to api-gateway, not to the Node
+  # frontend, because the frontend now lives on Cloudflare Pages.
+  caddy:
+    image: caddy:2.9-alpine
+    container_name: verdyx-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./infrastructure/caddy/Caddyfile.api:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    mem_limit: 64m
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks: [verdyx-network]
+
+  # ── Application services ─────────────────────────────────────────────────
+  api-gateway:
+    image: ghcr.io/deep60/verdyx-api-gateway:latest
+    container_name: verdyx-api-gateway
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - RUST_LOG=${RUST_LOG:-warn}
+      - DATABASE_URL=${PG_BASE_URL}/verdyx_gateway?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - JWT_SECRET=${JWT_SECRET}
+      - USER_SERVICE_URL=http://user-service:8080
+      - ANALYSIS_ENGINE_URL=http://analysis-engine:8080
+      - BOUNTY_MANAGER_URL=http://bounty-manager:8080
+      - SUBMISSION_SERVICE_URL=http://submission-service:8080
+      - STORAGE_SERVICE_URL=http://submission-service:8080
+      - CONSENSUS_SERVICE_URL=http://consensus-service:8080
+      - PAYMENT_SERVICE_URL=http://payment-service:8080
+      - REPUTATION_SERVICE_URL=http://reputation-service:8080
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8080
+      # Requests arrive server-side from the Pages Function, so CORS is never
+      # exercised by a browser. Set anyway so direct calls during debugging work.
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - BLOCKCHAIN_RPC_URL=${BLOCKCHAIN_RPC_URL}
+      - THREAT_TOKEN_ADDRESS=${THREAT_TOKEN_ADDRESS}
+      - REPUTATION_SYSTEM_ADDRESS=${REPUTATION_SYSTEM_ADDRESS}
+      - BOUNTY_MANAGER_ADDRESS=${BOUNTY_MANAGER_ADDRESS}
+      - CHAIN_ID=${CHAIN_ID:-11155111}
+    mem_limit: 192m
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [verdyx-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  user-service:
+    image: ghcr.io/deep60/verdyx-user-service:latest
+    container_name: verdyx-user-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - RUST_LOG=${RUST_LOG:-warn}
+      - DATABASE_URL=${PG_BASE_URL}/verdyx_users?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - JWT_SECRET=${JWT_SECRET}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_REGION=${S3_REGION:-auto}
+      - S3_AVATAR_BUCKET=${S3_AVATAR_BUCKET:-verdyx-avatars}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_PUBLIC_URL=${S3_PUBLIC_URL}
+      - BLOCKCHAIN_RPC_URL=${BLOCKCHAIN_RPC_URL}
+      - THREAT_TOKEN_ADDRESS=${THREAT_TOKEN_ADDRESS}
+      - REPUTATION_SYSTEM_ADDRESS=${REPUTATION_SYSTEM_ADDRESS}
+      - BOUNTY_MANAGER_ADDRESS=${BOUNTY_MANAGER_ADDRESS}
+      - CHAIN_ID=${CHAIN_ID:-11155111}
+    mem_limit: 160m
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [verdyx-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  analysis-engine:
+    image: ghcr.io/deep60/verdyx-analysis-engine:latest
+    container_name: verdyx-analysis-engine
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - RUST_LOG=${RUST_LOG:-warn}
+      - DATABASE_URL=${PG_BASE_URL}/verdyx_analysis?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_REGION=${S3_REGION:-auto}
+      - S3_BUCKET=${S3_BUCKET:-verdyx-submissions}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - YARA_RULES_PATH=/app/rules
+      # No clamd on this box — the analyzer skips itself when disabled rather
+      # than failing submissions.
+      - ENABLE_CLAMAV=false
+    mem_limit: 224m
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [verdyx-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  bounty-manager:
+    image: ghcr.io/deep60/verdyx-bounty-manager:latest
+    container_name: verdyx-bounty-manager
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - RUST_LOG=${RUST_LOG:-warn}
+      - DATABASE_URL=${PG_BASE_URL}/verdyx_bounty?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - BLOCKCHAIN_RPC_URL=${BLOCKCHAIN_RPC_URL}
+      - THREAT_TOKEN_ADDRESS=${THREAT_TOKEN_ADDRESS}
+      - REPUTATION_SYSTEM_ADDRESS=${REPUTATION_SYSTEM_ADDRESS}
+      - BOUNTY_MANAGER_ADDRESS=${BOUNTY_MANAGER_ADDRESS}
+      - CHAIN_ID=${CHAIN_ID:-11155111}
+    mem_limit: 160m
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [verdyx-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  submission-service:
+    image: ghcr.io/deep60/verdyx-submission-service:latest
+    container_name: verdyx-submission-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - RUST_LOG=${RUST_LOG:-warn}
+      - DATABASE_URL=${PG_BASE_URL}/verdyx_submissions?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - SUBMISSION_SERVICE_PORT=8080
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_REGION=${S3_REGION:-auto}
+      - S3_BUCKET=${S3_BUCKET:-verdyx-submissions}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+    mem_limit: 160m
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [verdyx-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  consensus-service:
+    image: ghcr.io/deep60/verdyx-consensus-service:latest
+    container_name: verdyx-consensus-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - RUST_LOG=${RUST_LOG:-warn}
+      - DATABASE_URL=${PG_BASE_URL}/verdyx_consensus?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - CONSENSUS_THRESHOLD=0.7
+      - MIN_SUBMISSIONS_REQUIRED=3
+    mem_limit: 128m
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [verdyx-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  payment-service:
+    image: ghcr.io/deep60/verdyx-payment-service:latest
+    container_name: verdyx-payment-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - RUST_LOG=${RUST_LOG:-warn}
+      - DATABASE_URL=${PG_BASE_URL}/verdyx_payments?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - BLOCKCHAIN_RPC_URL=${BLOCKCHAIN_RPC_URL}
+      - BLOCKCHAIN_CHAIN_ID=${CHAIN_ID:-11155111}
+      - TREASURY_ADDRESS=${TREASURY_ADDRESS}
+      - TREASURY_PRIVATE_KEY=${TREASURY_PRIVATE_KEY}
+      - TOKEN_CONTRACT_ADDRESS=${THREAT_TOKEN_ADDRESS}
+      - PAYMENT_CONTRACT_ADDRESS=${BOUNTY_MANAGER_ADDRESS}
+    mem_limit: 128m
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [verdyx-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  reputation-service:
+    image: ghcr.io/deep60/verdyx-reputation-service:latest
+    container_name: verdyx-reputation-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - RUST_LOG=${RUST_LOG:-warn}
+      - DATABASE_URL=${PG_BASE_URL}/verdyx_reputation?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - REPUTATION_DECAY_RATE=0.95
+      - REPUTATION_UPDATE_INTERVAL=3600
+    mem_limit: 128m
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [verdyx-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  notification-service:
+    image: ghcr.io/deep60/verdyx-notification-service:latest
+    container_name: verdyx-notification-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - RUST_LOG=${RUST_LOG:-warn}
+      - DATABASE_URL=${PG_BASE_URL}/verdyx_notifications?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - WEBHOOK_TIMEOUT=30
+      - MAX_RETRY_ATTEMPTS=3
+    mem_limit: 128m
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [verdyx-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── Auto-deploy ──────────────────────────────────────────────────────────
+  # Same pull-based CD as the old AWS box: push to main -> deploy.yml pushes
+  # :latest to GHCR -> this polls and rolling-restarts. Outbound only, so the
+  # firewall stays closed. Redis and Caddy are excluded by not being listed.
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: verdyx-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # Without this pin watchtower negotiates Docker API 1.25 and every poll
+      # fails with "client version 1.25 is too old. Minimum supported API
+      # version is 1.40", leaving the container in a restart loop.
+      - DOCKER_API_VERSION=1.40
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+    mem_limit: 64m
+    command: >
+      verdyx-api-gateway
+      verdyx-user-service
+      verdyx-analysis-engine
+      verdyx-bounty-manager
+      verdyx-submission-service
+      verdyx-consensus-service
+      verdyx-payment-service
+      verdyx-reputation-service
+      verdyx-notification-service
+    networks: [verdyx-network]
+
+networks:
+  verdyx-network:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
