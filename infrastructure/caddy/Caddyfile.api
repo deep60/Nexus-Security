@@ -32,6 +32,15 @@
 	# or touch the database.
 	respond /_edge/health "ok" 200
 
+	# Prometheus metrics are for the monitoring profile scraping over the
+	# internal Docker network, not for the public internet. They disclose the
+	# build version, process uptime and request/error volumes — low severity on
+	# their own, but version disclosure helps target known CVEs and there is no
+	# reason to publish it. 404 rather than 403 so the endpoint's existence is
+	# not confirmed.
+	respond /metrics 404
+	respond /metrics/* 404
+
 	reverse_proxy api-gateway:8080 {
 		# The Pages Function forwards the browser's original host; pass through
 		# the standard headers so the gateway can build correct absolute URLs.
