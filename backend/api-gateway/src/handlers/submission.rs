@@ -769,10 +769,10 @@ pub fn create_submission_router() -> Router<AppState> {
         .route("/submissions/file", post(create_file_submission))
         .route("/submissions", get(get_submissions))
         .route("/submissions/bulk", post(bulk_create_submissions))
-        .route("/submissions/:id", get(get_submission_details))
-        .route("/submissions/:id", put(update_submission))
-        .route("/submissions/:id", delete(delete_submission))
-        .route("/files/:hash", get(get_file_info))
+        .route("/submissions/{id}", get(get_submission_details))
+        .route("/submissions/{id}", put(update_submission))
+        .route("/submissions/{id}", delete(delete_submission))
+        .route("/files/{hash}", get(get_file_info))
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100MB max file size
 }
 

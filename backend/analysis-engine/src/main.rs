@@ -227,8 +227,8 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .route("/analyze/file", post(analyze_file))
         .route("/analyze/url", post(analyze_url))
         .route("/analyze/hash", post(analyze_hash))
-        .route("/analysis/:id", get(get_analysis_result))
-        .route("/analysis/:id/detailed", get(get_detailed_analysis))
+        .route("/analysis/{id}", get(get_analysis_result))
+        .route("/analysis/{id}/detailed", get(get_detailed_analysis))
         .route("/engines/status", get(engines_status))
         .with_state(app_state)
         .layer(axum::middleware::from_fn(move |req, next| {

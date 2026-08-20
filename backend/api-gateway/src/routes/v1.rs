@@ -88,42 +88,42 @@ fn bounty_routes() -> Router<AppState> {
     Router::new()
         // Public reads
         .route("/", get(bounty::list_bounties))
-        .route("/:bounty_id", get(bounty::get_bounty))
-        .route("/:bounty_id/stats", get(bounty::get_bounty_stats))
+        .route("/{bounty_id}", get(bounty::get_bounty))
+        .route("/{bounty_id}/stats", get(bounty::get_bounty_stats))
         .route("/active", get(bounty::list_active_bounties))
         .route("/completed", get(bounty::list_completed_bounties))
         // Writes — Claims extractor returns 401 if missing from extensions
         .route("/", post(bounty::create_bounty))
-        .route("/:bounty_id", put(bounty::update_bounty))
-        .route("/:bounty_id/cancel", post(bounty::cancel_bounty))
-        .route("/:bounty_id/extend", post(bounty::extend_bounty))
-        .route("/:bounty_id/claim", post(bounty::claim_reward))
-        .route("/:bounty_id/submit", post(bounty::submit_analysis))
-        .route("/:bounty_id/finalize", put(bounty::finalize_bounty))
+        .route("/{bounty_id}", put(bounty::update_bounty))
+        .route("/{bounty_id}/cancel", post(bounty::cancel_bounty))
+        .route("/{bounty_id}/extend", post(bounty::extend_bounty))
+        .route("/{bounty_id}/claim", post(bounty::claim_reward))
+        .route("/{bounty_id}/submit", post(bounty::submit_analysis))
+        .route("/{bounty_id}/finalize", put(bounty::finalize_bounty))
 }
 
 fn analysis_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(analysis::list_analyses))
-        .route("/:analysis_id", get(analysis::get_analysis))
-        .route("/:analysis_id/details", get(analysis::get_analysis_details))
+        .route("/{analysis_id}", get(analysis::get_analysis))
+        .route("/{analysis_id}/details", get(analysis::get_analysis_details))
         .route("/stats", get(analysis::get_analysis_stats))
         .route(
-            "/by-bounty/:bounty_id",
+            "/by-bounty/{bounty_id}",
             get(analysis::get_analyses_by_bounty),
         )
-        .route("/by-hash/:file_hash", get(analysis::get_analyses_by_hash))
+        .route("/by-hash/{file_hash}", get(analysis::get_analyses_by_hash))
         .route("/submit", post(analysis::submit_analysis))
-        .route("/:analysis_id/dispute", post(analysis::dispute_analysis))
+        .route("/{analysis_id}/dispute", post(analysis::dispute_analysis))
 }
 
 fn reputation_routes() -> Router<AppState> {
     Router::new()
         .route("/leaderboard", get(reputation::get_leaderboard))
         .route("/leaderboard/top", get(reputation::get_top_analysts))
-        .route("/user/:user_id", get(reputation::get_user_reputation))
+        .route("/user/{user_id}", get(reputation::get_user_reputation))
         .route("/badges", get(reputation::list_available_badges))
-        .route("/history/:user_id", get(reputation::get_reputation_history))
+        .route("/history/{user_id}", get(reputation::get_reputation_history))
         .route("/claim-badge", post(reputation::claim_badge))
 }
 
@@ -134,10 +134,10 @@ fn user_routes() -> Router<AppState> {
         .route("/me", get(user::get_current_user))
         .route("/me", put(user::update_profile))
         .route("/me/stats", get(user::get_user_stats))
-        .route("/:user_id", get(user::get_user_by_id))
-        .route("/:user_id/stats", get(user::get_user_stats_by_id))
+        .route("/{user_id}", get(user::get_user_by_id))
+        .route("/{user_id}/stats", get(user::get_user_stats_by_id))
         .route("/me/api-keys", get(user::list_api_keys))
-        .route("/me/api-keys/:key_id", delete(user::revoke_api_key))
+        .route("/me/api-keys/{key_id}", delete(user::revoke_api_key))
 }
 
 fn wallet_routes() -> Router<AppState> {
@@ -145,9 +145,9 @@ fn wallet_routes() -> Router<AppState> {
         .route("/connect", post(wallet::connect_wallet))
         .route("/disconnect", post(wallet::disconnect_wallet))
         .route("/balance", get(wallet::get_balance))
-        .route("/balance/:address", get(wallet::get_balance_by_address))
+        .route("/balance/{address}", get(wallet::get_balance_by_address))
         .route("/stake", post(wallet::stake_tokens))
-        .route("/unstake/:bounty_id", post(wallet::unstake_tokens))
+        .route("/unstake/{bounty_id}", post(wallet::unstake_tokens))
         .route("/transactions", get(wallet::get_transactions))
         .route("/claim-rewards", post(wallet::claim_rewards))
 }
@@ -155,24 +155,24 @@ fn wallet_routes() -> Router<AppState> {
 fn submission_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(submission::list_submissions))
-        .route("/:submission_id", get(submission::get_submission))
+        .route("/{submission_id}", get(submission::get_submission))
         .route("/", post(submission::create_submission))
         .route("/file", post(submission::create_file_submission))
-        .route("/:submission_id/vote", post(submission::vote_on_submission))
+        .route("/{submission_id}/vote", post(submission::vote_on_submission))
         .route(
-            "/:submission_id/verify",
+            "/{submission_id}/verify",
             post(submission::verify_submission),
         )
         .route(
-            "/:submission_id/start-analysis",
+            "/{submission_id}/start-analysis",
             post(submission::start_analysis),
         )
         .route(
-            "/:submission_id/analyses",
+            "/{submission_id}/analyses",
             get(submission::get_submission_analyses),
         )
         .route(
-            "/:submission_id/consensus",
+            "/{submission_id}/consensus",
             get(submission::get_submission_consensus),
         )
         .route("/my-submissions", get(submission::get_my_submissions))
@@ -181,19 +181,19 @@ fn submission_routes() -> Router<AppState> {
 fn engine_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(engines::list_engines))
-        .route("/:engine_id", get(engines::get_engine))
+        .route("/{engine_id}", get(engines::get_engine))
 }
 
 fn webhook_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(webhook::list_webhooks))
         .route("/", post(webhook::create_webhook))
-        .route("/:webhook_id", get(webhook::get_webhook))
-        .route("/:webhook_id", put(webhook::update_webhook))
-        .route("/:webhook_id", delete(webhook::delete_webhook))
-        .route("/:webhook_id/test", post(webhook::test_webhook))
+        .route("/{webhook_id}", get(webhook::get_webhook))
+        .route("/{webhook_id}", put(webhook::update_webhook))
+        .route("/{webhook_id}", delete(webhook::delete_webhook))
+        .route("/{webhook_id}/test", post(webhook::test_webhook))
         .route(
-            "/:webhook_id/deliveries",
+            "/{webhook_id}/deliveries",
             get(webhook::get_webhook_deliveries),
         )
         .route("/events", get(webhook::list_available_events))

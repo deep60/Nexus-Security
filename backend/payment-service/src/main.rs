@@ -205,15 +205,15 @@ async fn main() -> Result<()> {
             post(handlers::payment::withdraw_funds),
         )
         .route(
-            "/api/v1/payments/balance/:address",
+            "/api/v1/payments/balance/{address}",
             get(handlers::payment::get_balance),
         )
         .route(
-            "/api/v1/payments/transactions/:address",
+            "/api/v1/payments/transactions/{address}",
             get(handlers::payment::get_transactions),
         )
         .route(
-            "/api/v1/payments/transaction/:tx_hash",
+            "/api/v1/payments/transaction/{tx_hash}",
             get(handlers::payment::get_transaction_status),
         )
         // Gas estimation
@@ -231,7 +231,7 @@ async fn main() -> Result<()> {
             get(handlers::admin::get_failed_payments),
         )
         .route(
-            "/api/v1/admin/payments/:id/retry",
+            "/api/v1/admin/payments/{id}/retry",
             post(handlers::admin::retry_payment),
         )
         .route(
