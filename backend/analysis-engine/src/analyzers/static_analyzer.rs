@@ -704,7 +704,7 @@ impl StaticAnalyzer {
         Ok(PEAnalysis {
             machine_type: format!("{:?}", pe.header.coff_header.machine),
             timestamp: Some(pe.header.coff_header.time_date_stamp),
-            entry_point: pe.entry as u32,
+            entry_point: pe.entry,
             sections,
             imports,
             exports,
