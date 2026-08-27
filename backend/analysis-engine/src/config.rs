@@ -535,15 +535,19 @@ impl Default for SandboxConfig {
 }
 
 /// Analyzers configuration
+///
+/// NOTE: the ML analyzer is **not** configured here. It owns its own settings
+/// in [`crate::analyzers::MlAnalyzerConfig`], read from `ENABLE_ML_ENGINE`,
+/// `ML_CLASSIFIER_MODEL`, `ML_ANOMALY_MODEL`, `ML_FEATURE_SIZE` and
+/// `ML_ANOMALY_THRESHOLD`. Duplicate `ENABLE_ML_ANALYZER` / `ML_MODEL_PATH`
+/// fields used to live here and were read by nothing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalyzersConfig {
     pub enable_static_analyzer: bool,
     pub enable_dynamic_analyzer: bool,
     pub enable_hash_analyzer: bool,
     pub enable_yara_engine: bool,
-    pub enable_ml_analyzer: bool,
     pub yara_rules_directory: PathBuf,
-    pub ml_model_path: PathBuf,
     pub analysis_timeout_seconds: u64,
     pub max_concurrent_analyses: usize,
     pub enable_parallel_analysis: bool,
@@ -568,15 +572,8 @@ impl AnalyzersConfig {
                 .unwrap_or_else(|_| "true".to_string())
                 .parse()
                 .unwrap_or(true),
-            enable_ml_analyzer: env::var("ENABLE_ML_ANALYZER")
-                .unwrap_or_else(|_| "false".to_string())
-                .parse()
-                .unwrap_or(false),
             yara_rules_directory: PathBuf::from(
                 env::var("YARA_RULES_DIR").unwrap_or_else(|_| "./rules".to_string()),
-            ),
-            ml_model_path: PathBuf::from(
-                env::var("ML_MODEL_PATH").unwrap_or_else(|_| "./models/malware_detector.onnx".to_string()),
             ),
             analysis_timeout_seconds: env::var("ANALYSIS_TIMEOUT")
                 .unwrap_or_else(|_| "300".to_string())
@@ -611,9 +608,7 @@ impl Default for AnalyzersConfig {
             enable_dynamic_analyzer: true,
             enable_hash_analyzer: true,
             enable_yara_engine: true,
-            enable_ml_analyzer: false,
             yara_rules_directory: PathBuf::from("./rules"),
-            ml_model_path: PathBuf::from("./models/malware_detector.onnx"),
             analysis_timeout_seconds: 300,
             max_concurrent_analyses: 10,
             enable_parallel_analysis: true,
