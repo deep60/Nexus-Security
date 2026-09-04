@@ -89,7 +89,7 @@ fn axum_to_tungstenite(msg: Message) -> tokio_tungstenite::tungstenite::Message 
         // bridge via &str. Binary/Ping/Pong share bytes::Bytes so pass through.
         // axum 0.8 uses Bytes / its own Utf8Bytes; tungstenite 0.24 uses Vec<u8>
         // for Binary/Ping/Pong and its own Utf8Bytes for Text. Bridge explicitly.
-        Message::Text(t) => TM::Text(t.to_string().into()),
+        Message::Text(t) => TM::Text(t.to_string()),
         Message::Binary(b) => TM::Binary(b.to_vec()),
         Message::Ping(p) => TM::Ping(p.to_vec()),
         Message::Pong(p) => TM::Pong(p.to_vec()),
