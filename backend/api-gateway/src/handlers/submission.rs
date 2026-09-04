@@ -63,6 +63,41 @@ pub struct FileSubmissionResponse {
     pub created_at: DateTime<Utc>,
 }
 
+/// One row of `GET /api/v1/submissions`.
+///
+/// Serialized camelCase and returned as a FLAT ARRAY because that is what the
+/// client already expects: `marketplace.tsx` declares
+/// `useQuery<ApiSubmission[]>({ queryKey: ["/api/submissions"] })` and the
+/// default fetcher in `queryClient.ts` does no unwrapping, so an envelope
+/// object would arrive where an array is required.
+///
+/// `analysisType`, `bountyAmount` and `priority` live inside the row's
+/// `metadata` JSON (that is how `create_file_submission` writes them), so they
+/// are lifted back out here rather than exposing the raw blob.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSubmissionListItem {
+    pub id: Uuid,
+    pub submitter_id: Uuid,
+    pub original_filename: Option<String>,
+    pub file_hash: Option<String>,
+    pub url: Option<String>,
+    pub file_size: Option<i64>,
+    pub mime_type: Option<String>,
+    pub submission_type: String,
+    pub analysis_status: String,
+    /// Duplicate of `analysis_status`. `ApiSubmission` reads `status` in some
+    /// places and `analysisStatus` in others; emitting both keeps every
+    /// existing call site working without touching the client.
+    pub status: String,
+    pub is_malicious: Option<bool>,
+    pub description: Option<String>,
+    pub analysis_type: Option<String>,
+    pub bounty_amount: Option<String>,
+    pub priority: Option<bool>,
+    pub created_at: DateTime<Utc>,
+}
+
 #[derive(Deserialize)]
 pub struct UpdateSubmissionRequest {
     pub analysis_summary: Option<String>,
@@ -778,12 +813,37 @@ pub fn create_submission_router() -> Router<AppState> {
 
 // Aliases / stubs for v1 routes
 
-/// List submissions (alias for get_submissions)
+/// `GET /api/v1/submissions` — the caller's own file/URL submissions.
+///
+/// Previously this delegated to `get_submissions`, which reads
+/// `bounty_submissions` (analyst verdicts against a bounty). But
+/// `create_file_submission` writes to `submissions` (what a user uploads), so
+/// anything a user submitted was never returned by any list endpoint — it
+/// simply disappeared from the UI. These are two different tables with two
+/// different meanings, and this route is the one the client uses for "my
+/// submissions".
+///
+/// Scoped to the authenticated submitter: the route sits in the protected
+/// group, and returning other users' uploads here would leak filenames and
+/// descriptions to anyone with an account.
 pub async fn list_submissions(
-    state: State<AppState>,
-    query: Query<SubmissionFilters>,
-) -> Result<Json<SubmissionListResponse>, StatusCode> {
-    get_submissions(state, query).await
+    State(state): State<AppState>,
+    claims: crate::middleware::auth::Claims,
+    Query(filters): Query<SubmissionFilters>,
+) -> Result<Json<Vec<FileSubmissionListItem>>, StatusCode> {
+    let limit = filters.limit.unwrap_or(50).clamp(1, 200) as i64;
+    let offset = (filters.page.unwrap_or(1).max(1) as i64 - 1) * limit;
+
+    let rows = state
+        .db
+        .list_file_submissions_for_user(claims.sub, limit, offset)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to list submissions for {}: {}", claims.sub, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(rows))
 }
 
 /// Get single submission (alias for get_submission_details)

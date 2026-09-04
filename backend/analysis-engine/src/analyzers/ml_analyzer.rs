@@ -14,8 +14,11 @@
 //! The feature-vector layout produced by [`extract_features`] is a contract
 //! the trained model must match. The default layout is:
 //!   [ size_norm, entropy_norm, printable_ratio, <256-bin byte histogram> ]
-//! padded/truncated to `feature_size`. Adjust both sides together if you train
-//! a model with a different input.
+//! which is exactly [`DEFAULT_FEATURE_SIZE`] (= 259) floats. `feature_size`
+//! defaults to that, so the natural layout survives intact; overriding it to a
+//! smaller value truncates the tail of the histogram (and is warned about at
+//! load time). Adjust both sides together if you train a model with a
+//! different input.
 
 use std::path::Path;
 use std::sync::Mutex;
@@ -29,6 +32,21 @@ use ort::value::Tensor;
 use crate::models::analysis_result::{
     DetectionResult, EngineType, SeverityLevel, ThreatCategory, ThreatVerdict,
 };
+
+/// Number of scalar features emitted before the byte histogram
+/// (`size_norm`, `entropy_norm`, `printable_ratio`).
+pub const SCALAR_FEATURES: usize = 3;
+
+/// Number of bins in the byte-frequency histogram (one per possible byte).
+pub const HISTOGRAM_BINS: usize = 256;
+
+/// Natural length of the feature vector produced by
+/// [`MlAnalyzer::extract_features`]: the scalars plus the full histogram.
+///
+/// This is the default `feature_size`. A smaller `feature_size` silently drops
+/// the tail of the histogram, so the default must not be lowered without
+/// retraining the models against the shorter layout.
+pub const DEFAULT_FEATURE_SIZE: usize = SCALAR_FEATURES + HISTOGRAM_BINS;
 
 /// Configuration for the ML analyzer.
 #[derive(Debug, Clone)]
@@ -59,7 +77,7 @@ impl Default for MlAnalyzerConfig {
             feature_size: std::env::var("ML_FEATURE_SIZE")
                 .ok()
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(256),
+                .unwrap_or(DEFAULT_FEATURE_SIZE),
             anomaly_threshold: std::env::var("ML_ANOMALY_THRESHOLD")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -103,6 +121,17 @@ impl MlAnalyzer {
             };
         }
 
+        if config.feature_size < DEFAULT_FEATURE_SIZE {
+            warn!(
+                "ML_FEATURE_SIZE={} is below the natural layout length of {}; the byte \
+                 histogram will be truncated to its first {} bins. Models must be trained \
+                 against this exact shortened layout.",
+                config.feature_size,
+                DEFAULT_FEATURE_SIZE,
+                config.feature_size.saturating_sub(SCALAR_FEATURES),
+            );
+        }
+
         let classifier = Self::try_load_session("threat classifier", &config.classifier_model_path);
         let anomaly = Self::try_load_session("anomaly detector", &config.anomaly_model_path);
 
@@ -137,7 +166,7 @@ impl MlAnalyzer {
             }
         }
 
-        match Session::builder().and_then(|b| b.commit_from_file(p)) {
+        match Session::builder().and_then(|mut b| b.commit_from_file(p)) {
             Ok(session) => {
                 info!("Loaded ML {label} model from {path}");
                 Some(Mutex::new(session))
@@ -341,9 +370,12 @@ impl MlAnalyzer {
 
     /// Extract a fixed-length numeric feature vector from raw bytes.
     ///
-    /// Layout: [size_norm, entropy_norm, printable_ratio, 256-bin histogram],
-    /// then padded/truncated to `feature_size`. This is a deterministic,
-    /// model-agnostic baseline; retrain-time feature engineering must match it.
+    /// Layout: [size_norm, entropy_norm, printable_ratio, 256-bin histogram] —
+    /// [`DEFAULT_FEATURE_SIZE`] floats — then padded or truncated to
+    /// `feature_size`. At the default `feature_size` the layout is preserved
+    /// exactly; a smaller configured size truncates the histogram tail (warned
+    /// about at load time). This is a deterministic, model-agnostic baseline;
+    /// retrain-time feature engineering must match it.
     fn extract_features(&self, data: &[u8]) -> Vec<f32> {
         let mut features = Vec::with_capacity(self.config.feature_size);
 
@@ -375,14 +407,15 @@ impl MlAnalyzer {
         features.push(entropy / 8.0); // entropy is 0..8 bits
         features.push(printable_ratio);
 
-        // 256-bin normalized byte-frequency histogram.
+        // Normalized byte-frequency histogram, one bin per byte value.
         if !data.is_empty() {
             for c in counts.iter() {
                 features.push(*c as f32 / len);
             }
         } else {
-            features.extend(std::iter::repeat(0.0).take(256));
+            features.extend(std::iter::repeat(0.0).take(HISTOGRAM_BINS));
         }
+        debug_assert_eq!(features.len(), DEFAULT_FEATURE_SIZE);
 
         features.resize(self.config.feature_size, 0.0);
         features
@@ -426,6 +459,36 @@ mod tests {
         assert_eq!(empty.len(), analyzer.config.feature_size);
     }
 
+    /// Regression: the default `feature_size` used to be 256 while the layout
+    /// emits 259 floats, so `resize` silently dropped histogram bins 253-255.
+    /// The default must keep every bin.
+    #[test]
+    fn test_default_feature_size_preserves_full_histogram() {
+        assert_eq!(DEFAULT_FEATURE_SIZE, SCALAR_FEATURES + HISTOGRAM_BINS);
+        assert_eq!(MlAnalyzerConfig::default().feature_size, DEFAULT_FEATURE_SIZE);
+
+        let analyzer = MlAnalyzer::new(disabled_config());
+
+        // A sample containing only byte 0xFF must light up the *last* bin,
+        // which truncation to 256 would have removed.
+        let feats = analyzer.extract_features(&[0xFFu8; 4]);
+        assert_eq!(feats.len(), DEFAULT_FEATURE_SIZE);
+        assert_eq!(feats[SCALAR_FEATURES + 0xFF], 1.0);
+        assert_eq!(feats[SCALAR_FEATURES + 0x00], 0.0);
+    }
+
+    /// An explicit undersized override still truncates, deliberately.
+    #[test]
+    fn test_explicit_smaller_feature_size_truncates() {
+        let cfg = MlAnalyzerConfig {
+            enabled: false,
+            feature_size: 64,
+            ..Default::default()
+        };
+        let analyzer = MlAnalyzer::new(cfg);
+        assert_eq!(analyzer.extract_features(b"hello world").len(), 64);
+    }
+
     #[tokio::test]
     async fn test_disabled_returns_unknown() {
         let analyzer = MlAnalyzer::new(disabled_config());
@@ -452,8 +515,8 @@ mod tests {
 
     /// End-to-end inference against a real ONNX model. Self-skips unless
     /// `ML_TEST_CLASSIFIER` points at a model whose single input is
-    /// `[1, feature_size]` f32 and single output is the class vector. The
-    /// fixture used in local verification drives class index 1 ("malware").
+    /// `[1, DEFAULT_FEATURE_SIZE]` f32 and single output is the class vector.
+    /// The fixture used in local verification drives class index 1 ("malware").
     #[tokio::test]
     async fn test_real_model_inference() {
         let Ok(path) = std::env::var("ML_TEST_CLASSIFIER") else {
@@ -464,7 +527,7 @@ mod tests {
             enabled: true,
             classifier_model_path: path,
             anomaly_model_path: "/nonexistent/anomaly.onnx".to_string(),
-            feature_size: 256,
+            feature_size: DEFAULT_FEATURE_SIZE,
             ..Default::default()
         };
         let analyzer = MlAnalyzer::new(cfg);

@@ -19,7 +19,7 @@ The analyzer feeds each model a single input tensor and reads a single output
 tensor (bound positionally, so input/output *names* don't matter):
 
 - **Input:** `float32`, shape `[1, feature_size]` (`feature_size` defaults to
-  256, configurable via `ML_FEATURE_SIZE`).
+  **259**, configurable via `ML_FEATURE_SIZE`).
 - **Classifier output:** `float32`, shape `[1, n_classes]` — a per-class score
   vector. `argmax` selects the class; index 0 is treated as `benign`. The label
   list is index-aligned (see `MlAnalyzerConfig::labels`).
@@ -32,10 +32,22 @@ tensor (bound positionally, so input/output *names* don't matter):
 
 ```
 [ size_norm, entropy/8, printable_ratio, <256-bin byte-frequency histogram> ]
+   \_____________ 3 scalars ______________/  \________ 256 bins ________/
 ```
 
-padded/truncated to `feature_size`. **A model must be trained against this exact
-layout** (or update `extract_features` to match your training pipeline).
+which is `3 + 256 = 259` floats — the default `feature_size`, so the layout is
+passed through intact. **A model must be trained against this exact layout** (or
+update `extract_features` to match your training pipeline).
+
+> Setting `ML_FEATURE_SIZE` *below* 259 truncates the tail of the histogram
+> (the analyzer logs a warning at load time saying how many bins survive);
+> setting it above 259 zero-pads. Only do either if your model was trained on
+> the corresponding shape.
+>
+> Historical note: `feature_size` defaulted to 256 while the extractor emitted
+> 259 values, so histogram bins 253-255 were dropped without warning. Models
+> trained against that old truncated layout need `ML_FEATURE_SIZE=256` or a
+> retrain.
 
 ## Enabling ML in a build
 
