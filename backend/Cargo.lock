@@ -30,17 +30,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ahash"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9"
-dependencies = [
- "getrandom 0.2.17",
- "once_cell",
- "version_check",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -108,7 +97,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
- "uuid 1.24.1",
+ "uuid 1.26.0",
  "yara",
  "zip",
 ]
@@ -174,7 +163,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "urlencoding",
- "uuid 1.24.1",
+ "uuid 1.26.0",
  "validator",
 ]
 
@@ -384,7 +373,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "tracing",
- "uuid 1.24.1",
+ "uuid 1.26.0",
 ]
 
 [[package]]
@@ -610,7 +599,7 @@ dependencies = [
  "http 1.4.2",
  "http-body 0.4.6",
  "hyper 0.14.32",
- "hyper 1.11.0",
+ "hyper 1.11.1",
  "hyper-rustls 0.24.2",
  "hyper-rustls 0.27.9",
  "hyper-util",
@@ -789,7 +778,7 @@ dependencies = [
  "http 1.4.2",
  "http-body 1.1.0",
  "http-body-util",
- "hyper 1.11.0",
+ "hyper 1.11.1",
  "hyper-util",
  "itoa",
  "matchit",
@@ -1060,7 +1049,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "uuid 1.24.1",
+ "uuid 1.26.0",
 ]
 
 [[package]]
@@ -1084,28 +1073,6 @@ name = "byte-slice-cast"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7575182f7272186991736b70173b0ea045398f984bf5ebbb3804736ce1330c9d"
-
-[[package]]
-name = "bytecheck"
-version = "0.6.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23cdc57ce23ac53c931e88a43d06d070a6fd142f2617be5855eb75efc9beb1c2"
-dependencies = [
- "bytecheck_derive",
- "ptr_meta",
- "simdutf8",
-]
-
-[[package]]
-name = "bytecheck_derive"
-version = "0.6.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3db406d29fbcd95542e92559bed4d8ad92636d1ca8b3b72ede10b4bcc010e659"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
 
 [[package]]
 name = "bytemuck"
@@ -1441,7 +1408,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "uuid 1.24.1",
+ "uuid 1.26.0",
  "validator",
 ]
 
@@ -2451,12 +2418,13 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
-version = "1.1.9"
+version = "1.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
+checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
+ "zlib-rs",
 ]
 
 [[package]]
@@ -2834,15 +2802,6 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.12.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
-dependencies = [
- "ahash",
-]
-
-[[package]]
-name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
@@ -3089,9 +3048,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d22053281f852e11534f5198498373cbb59295120a20771d90f7ed1897490a72"
+checksum = "27b501faa50e7a26c3d3560ca625132f4078a17771f4810baf70475ae48cbe43"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -3131,7 +3090,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33ca68d021ef39cf6463ab54c1d0f5daf03377b70561305bb89a8f83aab66e0f"
 dependencies = [
  "http 1.4.2",
- "hyper 1.11.0",
+ "hyper 1.11.1",
  "hyper-util",
  "rustls 0.23.42",
  "rustls-native-certs",
@@ -3165,7 +3124,7 @@ dependencies = [
  "futures-util",
  "http 1.4.2",
  "http-body 1.1.0",
- "hyper 1.11.0",
+ "hyper 1.11.1",
  "ipnet",
  "libc",
  "percent-encoding",
@@ -3792,9 +3751,9 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "miniz_oxide"
-version = "0.8.9"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
+checksum = "b63fbc4a50860e98e7b2aa7804ded1db5cbc3aff9193adaff57a6931bf7c4b4c"
 dependencies = [
  "adler2",
  "simd-adler32",
@@ -3824,7 +3783,7 @@ dependencies = [
  "http 1.4.2",
  "http-body 1.1.0",
  "http-body-util",
- "hyper 1.11.0",
+ "hyper 1.11.1",
  "hyper-util",
  "log",
  "pin-project-lite",
@@ -3986,7 +3945,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
- "uuid 1.24.1",
+ "uuid 1.26.0",
  "validator",
 ]
 
@@ -4379,7 +4338,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "uuid 1.24.1",
+ "uuid 1.26.0",
  "validator",
 ]
 
@@ -4815,26 +4774,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ptr_meta"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0738ccf7ea06b608c10564b31debd4f5bc5e197fc8bfe088f68ae5ce81e7a4f1"
-dependencies = [
- "ptr_meta_derive",
-]
-
-[[package]]
-name = "ptr_meta_derive"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16b845dbfca988fa33db069c0e230574d15a3088f147a87b64c7589eb662c9ac"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "quanta"
 version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5101,15 +5040,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
-name = "rend"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71fe3824f5629716b1589be05dacd749f6aa084c87e00e016714a8cdfccc997c"
-dependencies = [
- "bytecheck",
-]
-
-[[package]]
 name = "reputation-service"
 version = "0.1.0"
 dependencies = [
@@ -5134,7 +5064,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "uuid 1.24.1",
+ "uuid 1.26.0",
  "validator",
 ]
 
@@ -5232,35 +5162,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rkyv"
-version = "0.7.46"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2297bf9c81a3f0dc96bc9521370b88f054168c29826a75e89c55ff196e7ed6a1"
-dependencies = [
- "bitvec",
- "bytecheck",
- "bytes",
- "hashbrown 0.12.3",
- "ptr_meta",
- "rend",
- "rkyv_derive",
- "seahash",
- "tinyvec",
- "uuid 1.24.1",
-]
-
-[[package]]
-name = "rkyv_derive"
-version = "0.7.46"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84d7b42d4b8d06048d3ac8db0eb31bcb942cbeb709f0b5f2b2ebde398d3038f5"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "rlp"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5347,16 +5248,16 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.42.1"
+version = "1.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be2a24f50780bc85f09cc6ac299bdf1424302742d77221106859c9d8b102126a"
+checksum = "7653272e75dcac41dc199fbea6f5797633994fafd339943c06c9af16bf29cd3a"
 dependencies = [
  "arrayvec",
  "borsh",
  "bytes",
  "num-traits",
  "rand 0.8.7",
- "rkyv",
+ "rand 0.9.5",
  "serde",
  "serde_json",
  "wasm-bindgen",
@@ -5610,12 +5511,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "seahash"
-version = "4.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
-
-[[package]]
 name = "sec1"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5849,7 +5744,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "uuid 1.24.1",
+ "uuid 1.26.0",
 ]
 
 [[package]]
@@ -5902,12 +5797,6 @@ name = "simd-adler32"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "703d5c7ef118737c72f1af64ad2f6f8c5e1921f818cdcb97b8fe6fc69bf66214"
-
-[[package]]
-name = "simdutf8"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
 name = "similar"
@@ -6097,7 +5986,7 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "url",
- "uuid 1.24.1",
+ "uuid 1.26.0",
  "webpki-roots 0.26.11",
 ]
 
@@ -6180,7 +6069,7 @@ dependencies = [
  "stringprep",
  "thiserror 2.0.18",
  "tracing",
- "uuid 1.24.1",
+ "uuid 1.26.0",
  "whoami",
 ]
 
@@ -6220,7 +6109,7 @@ dependencies = [
  "stringprep",
  "thiserror 2.0.18",
  "tracing",
- "uuid 1.24.1",
+ "uuid 1.26.0",
  "whoami",
 ]
 
@@ -6247,7 +6136,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "url",
- "uuid 1.24.1",
+ "uuid 1.26.0",
 ]
 
 [[package]]
@@ -6374,7 +6263,7 @@ dependencies = [
  "dotenvy",
  "futures",
  "hex",
- "hyper 1.11.0",
+ "hyper 1.11.1",
  "mime",
  "multer",
  "redis",
@@ -6391,7 +6280,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
- "uuid 1.24.1",
+ "uuid 1.26.0",
  "validator",
 ]
 
@@ -6682,7 +6571,7 @@ dependencies = [
  "num-traits",
  "tokio",
  "tracing",
- "uuid 1.24.1",
+ "uuid 1.26.0",
 ]
 
 [[package]]
@@ -7283,7 +7172,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "uuid 1.24.1",
+ "uuid 1.26.0",
  "validator",
 ]
 
@@ -7317,9 +7206,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.24.1"
+version = "1.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cefc03fd367c0c6d4305de1b312cf00248c4114f4a0418ce6a6af769e3b0bd9"
+checksum = "b5772d71c9be8a8a6ac2117d949c5b224c1b72241bb611d9a3012edcf8af7812"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
@@ -8033,6 +7922,12 @@ dependencies = [
  "time",
  "zstd",
 ]
+
+[[package]]
+name = "zlib-rs"
+version = "0.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34b31d188d9d685a4f9c7b46d6e36631b07058d2cfe190267adce54dc230bf12"
 
 [[package]]
 name = "zmij"
